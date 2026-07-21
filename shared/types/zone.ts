@@ -25,5 +25,7 @@ export interface Zone {
 
   imageUrl: string;
 
+  recommendedTypes?: PokemonType[];
+
   encounters: ZoneEncounter[];
 }

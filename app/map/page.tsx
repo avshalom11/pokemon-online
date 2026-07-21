@@ -1,6 +1,27 @@
-import Link from "next/link";
+"use client";
+
+import { useRouter } from "next/navigation";
+
+import { InteractiveWorldMap } from "./components/InteractiveWorldMap";
+import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
+import { ZONE_DATA } from "@/data/zones/zone-data";
+import type { ZoneId } from "@/shared/types/zone";
 
 export default function MapPage() {
+  const router = useRouter();
+
+  function handleZoneSelect(zoneId: ZoneId) {
+    router.push(`/battle?zone=${zoneId}`);
+  }
+
+  function getZoneLabel(zoneId: ZoneId) {
+    const zone = ZONE_DATA.find(
+      (currentZone) => currentZone.id === zoneId
+    );
+
+    return zone?.name ?? zoneId;
+  }
+
   return (
     <main
       style={{
@@ -20,23 +41,17 @@ export default function MapPage() {
 
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 220px)",
-          gap: "20px",
           marginTop: "40px",
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        <Link href="/battle?zone=grassland">🌿 דשא</Link>
-
-        <Link href="/battle?zone=water">🌊 מים</Link>
-
-        <Link href="/battle?zone=cave">🏔️ מערה</Link>
-
-        <Link href="/battle?zone=lava">🌋 לבה</Link>
-
-        <Link href="/battle?zone=beach">🏖️ חוף ים</Link>
-
-        <Link href="/battle?zone=haunted-house">👻 בית רוחות</Link>
+        <InteractiveWorldMap
+          config={WORLD_MAP_CONFIG}
+          onZoneSelect={handleZoneSelect}
+          getZoneLabel={getZoneLabel}
+        />
       </div>
     </main>
   );
