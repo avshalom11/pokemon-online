@@ -3,6 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Height reserved for the future global game header (player avatar,
+     level, gold, gems, energy, notifications, settings). The header itself
+     isn't built yet — this variable is what lets every full-screen game
+     surface (via components/layout/GameScreen.tsx) leave room for it today
+     without needing changes once it exists. Keep lib/layout/gameLayout.ts's
+     APP_HEADER_HEIGHT_PX in sync if this ever changes. */
+  --app-header-height: 64px;
 }
 
 @theme inline {
@@ -10,6 +18,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-fantasy: var(--font-cinzel);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,4 +32,93 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Ambient battle-background particles (falling leaves, embers, ...). Only
+   animation-name/timing-function/iteration-count are set here; duration and
+   delay are set inline per-particle so each one drifts independently. */
+@keyframes battle-float {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120vh) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+.animate-battle-float {
+  animation-name: battle-float;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Rising particles (bubbles, embers, spores, wisps): bottom-anchored,
+   drifting upward and fading in/out rather than falling. */
+@keyframes battle-rise {
+  0% {
+    transform: translateY(0) scale(0.85);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-70vh) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.animate-battle-rise {
+  animation-name: battle-rise;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* In-place twinkling particles (beach sun glints, a candle flame) — no
+   travel, just a soft opacity/scale pulse. */
+@keyframes battle-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.animate-battle-twinkle {
+  animation-name: battle-twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* Subtle ambient idle motion for battle sprites — not an attack/battle
+   animation, just enough life so the scene doesn't feel static. Applied to
+   an inner wrapper so it never conflicts with the outer scale/flip
+   transform used for enemy/player sizing. */
+@keyframes battle-idle-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-battle-idle {
+  animation: battle-idle-bob 3.2s ease-in-out infinite;
 }

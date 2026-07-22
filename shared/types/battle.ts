@@ -1,4 +1,4 @@
-import type { PlayerPokemon } from "./player-pokemon";
+import type { BattlePokemon } from "./battle-pokemon";
 
 export type BattleStatus =
   | "waiting"
@@ -12,7 +12,7 @@ export type BattleTurnOwner =
   | "opponent";
 
 export interface BattleParticipant {
-  pokemon: PlayerPokemon;
+  pokemon: BattlePokemon;
   currentHealth: number;
   currentMoveUses: Record<string, number>;
 }
@@ -27,4 +27,23 @@ export interface Battle {
   turnNumber: number;
 
   status: BattleStatus;
+}
+
+export interface BattleActionOutcome {
+  actor: BattleTurnOwner;
+
+  moveId: string;
+  moveName: string;
+
+  didHit: boolean;
+  damageDealt: number;
+  isCritical: boolean;
+  effectivenessMultiplier: number;
+
+  targetFainted: boolean;
+}
+
+export interface BattleTurnResult {
+  battle: Battle;
+  actions: BattleActionOutcome[];
 }

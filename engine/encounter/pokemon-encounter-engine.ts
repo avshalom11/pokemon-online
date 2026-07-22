@@ -1,5 +1,6 @@
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { ZONE_DATA } from "@/data/zones/zone-data";
+import { calculateBattleStats } from "@/engine/battle/stat-calculation";
 import type { PokemonSpecies } from "@/shared/types/pokemon";
 import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
 
@@ -78,8 +79,10 @@ export function startPokemonEncounter(
     selectedEncounter.maximumLevel
   );
 
-  const maximumHealth =
-    pokemon.baseStats.health + level * 2;
+  const maximumHealth = calculateBattleStats(
+    pokemon.baseStats,
+    level
+  ).health;
 
   return {
     zoneId: zone.id,

@@ -1,0 +1,55 @@
+import "server-only";
+
+import { prisma } from "@/lib/db/prisma";
+import { getSpeciesById, getStarterSpecies } from "@/features/pokemon/services/species-catalog";
+
+const STARTER_LEVEL = 5;
+
+export type SelectStarterResult =
+  | { status: "created" }
+  | { status: "already-completed" }
+  | { status: "invalid-species" };
+
+// Entirely server-side: verifies the species is an allowed starter, then
+// runs a single transaction that (a) flips onboardingCompleted only if it
+// was still false, and (b) creates the PlayerPokemon row — both guarded by
+// the same transaction, so a refresh, resubmission, or concurrent double
+// request can never create two starters. Postgres serializes the guarded
+// updateMany against concurrent transactions on the same row, which is what
+// actually makes this safe, not just the onboardingCompleted check by itself.
+export async function selectStarterPokemon(userId: string, speciesId: string): Promise<SelectStarterResult> {
+  const isAllowedStarter = getStarterSpecies().some((species) => species.id === speciesId);
+  const species = isAllowedStarter ? getSpeciesById(speciesId) : undefined;
+
+  if (!species) {
+    return { status: "invalid-species" };
+  }
+
+  const profile = await prisma.playerProfile.findUniqueOrThrow({
+    where: { userId },
+    select: { id: true },
+  });
+
+  return prisma.$transaction(async (tx) => {
+    const guardedUpdate = await tx.playerProfile.updateMany({
+      where: { id: profile.id, onboardingCompleted: false },
+      data: { onboardingCompleted: true, starterPokemonId: speciesId },
+    });
+
+    if (guardedUpdate.count === 0) {
+      return { status: "already-completed" };
+    }
+
+    await tx.playerPokemon.create({
+      data: {
+        playerId: profile.id,
+        speciesId,
+        level: STARTER_LEVEL,
+        currentHp: species.baseStats.health,
+        isStarter: true,
+      },
+    });
+
+    return { status: "created" };
+  });
+}

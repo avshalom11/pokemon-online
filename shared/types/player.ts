@@ -1,4 +1,4 @@
-import type { PlayerPokemon } from "./player-pokemon";
+import type { BattlePokemon } from "./battle-pokemon";
 export const MAX_ACTIVE_TEAM_SIZE = 6;
 
 export interface Player {
@@ -10,6 +10,6 @@ export interface Player {
 
   coins: number;
 
-  activeTeam: PlayerPokemon[];
-  pokemonStorage: PlayerPokemon[];
+  activeTeam: BattlePokemon[];
+  pokemonStorage: BattlePokemon[];
 }

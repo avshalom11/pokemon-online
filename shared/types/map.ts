@@ -1,5 +1,10 @@
 import type { ZoneId } from "./zone";
 
+export interface MapPoint {
+  x: number;
+  y: number;
+}
+
 export interface MapRegion {
   zoneId: ZoneId;
 

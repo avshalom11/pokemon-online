@@ -1,39 +1,19 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function HomePage() {
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#0f172a",
-        color: "white",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "Arial",
-      }}
-    >
-      <div style={{ textAlign: "center" }}>
-        <h1>Pokemon Online</h1>
+import { AuthScreen } from "@/components/auth/AuthScreen";
+import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
+import { getCurrentSession } from "@/lib/auth/auth-session";
 
-        <p>חקור את העולם, פגוש פוקימונים והילחם בהם</p>
+// The game's entry point. Real, server-side authorization check (proxy.ts
+// only does an optimistic cookie-presence redirect — this is the actual
+// guard): an authenticated visitor never sees the login/registration screen,
+// and lands on the starter page or the map depending on onboarding status.
+export default async function HomePage() {
+  const session = await getCurrentSession();
 
-        <Link
-          href="/map"
-          style={{
-            display: "inline-block",
-            marginTop: "20px",
-            padding: "12px 24px",
-            backgroundColor: "#22c55e",
-            color: "#0f172a",
-            textDecoration: "none",
-            borderRadius: "8px",
-            fontWeight: "bold",
-          }}
-        >
-          עבור למפה
-        </Link>
-      </div>
-    </main>
-  );
+  if (session) {
+    redirect(await getOnboardingRedirectTarget(session.user.id));
+  }
+
+  return <AuthScreen />;
 }

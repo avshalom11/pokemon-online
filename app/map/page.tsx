@@ -1,58 +1,31 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useRouter } from "next/navigation";
+import { MapContent } from "./components/MapContent";
+import { GameHeader } from "@/components/layout/GameHeader";
+import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
+import { getCurrentSession } from "@/lib/auth/auth-session";
 
-import { InteractiveWorldMap } from "./components/InteractiveWorldMap";
-import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
-import { ZONE_DATA } from "@/data/zones/zone-data";
-import type { ZoneId } from "@/shared/types/zone";
+// Real, server-side authorization check (proxy.ts only does an optimistic
+// cookie-presence redirect — this is the actual guard). MapContent itself
+// is the original map page's content, moved here unchanged. A player who
+// hasn't finished onboarding yet is redirected to the starter page instead.
+export default async function MapPage() {
+  const session = await getCurrentSession();
 
-export default function MapPage() {
-  const router = useRouter();
-
-  function handleZoneSelect(zoneId: ZoneId) {
-    router.push(`/battle?zone=${zoneId}`);
+  if (!session) {
+    redirect("/");
   }
 
-  function getZoneLabel(zoneId: ZoneId) {
-    const zone = ZONE_DATA.find(
-      (currentZone) => currentZone.id === zoneId
-    );
+  const redirectTarget = await getOnboardingRedirectTarget(session.user.id);
 
-    return zone?.name ?? zoneId;
+  if (redirectTarget === "/onboarding/starter") {
+    redirect("/onboarding/starter");
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#14532d",
-        color: "white",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "40px",
-        fontFamily: "Arial",
-      }}
-    >
-      <h1>מפת העולם</h1>
-
-      <p>בחר אזור כדי להתחיל קרב</p>
-
-      <div
-        style={{
-          marginTop: "40px",
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
-        <InteractiveWorldMap
-          config={WORLD_MAP_CONFIG}
-          onZoneSelect={handleZoneSelect}
-          getZoneLabel={getZoneLabel}
-        />
-      </div>
-    </main>
+    <>
+      <GameHeader />
+      <MapContent />
+    </>
   );
 }
