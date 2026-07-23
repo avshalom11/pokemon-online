@@ -1,36 +1,67 @@
+import { SpriteImage } from "@/components/media/SpriteImage";
+import { FLIP_PLAYER_SPRITE_HORIZONTALLY } from "@/lib/battle/battleLayout";
+
 interface PokemonSpriteProps {
   role: "enemy" | "player";
-  /** Real sprite art — later an animated GIF. Falls back to an original
-   * placeholder silhouette when not provided, so this component is the
-   * only thing that needs to change once real per-species art exists. */
+  /** Real sprite art (front for the wild Pokémon, back for the player's).
+   * Falls back to an original placeholder silhouette when not provided at
+   * all, so this component is the only thing that needs to change once
+   * every species has real art. */
   spriteUrl?: string;
+  /** Tried once if `spriteUrl` fails to load — e.g. the player's front
+   * sprite as a temporary stand-in while a species' back sprite hasn't
+   * been added yet (Milestone 9). SpriteImage's own placeholder box is the
+   * final fallback if both fail. */
+  fallbackSpriteUrl?: string;
   name?: string;
+  /** Brief shake + red-tint feedback (see app/globals.css's
+   * battle-hit-flash) for "took a hit" moments — a successful attack
+   * landing, or a failed capture attempt. Caller is responsible for
+   * turning this back off after the animation plays (BattleContent does
+   * this with a short timeout). */
+  isHit?: boolean;
 }
 
 const PLACEHOLDER_TINT = "#2dd4bf";
 
-// Reserves generous, responsive space for a future large animated sprite
-// (GIF) rather than a small fixed-size placeholder — swapping in real art
-// later only ever touches this file, never BattleScene.
-export function PokemonSprite({ role, spriteUrl, name }: PokemonSpriteProps) {
+// Reserves generous, responsive space for a large animated sprite (GIF)
+// rather than a small fixed-size placeholder — swapping in real art later
+// only ever touches this file, never BattleScene.
+export function PokemonSprite({ role, spriteUrl, fallbackSpriteUrl, name, isHit }: PokemonSpriteProps) {
   const isEnemy = role === "enemy";
 
+  // Flip only ever applies to the player — see FLIP_PLAYER_SPRITE_HORIZONTALLY's
+  // doc comment (lib/battle/battleLayout.ts) for why. The wild Pokémon's
+  // front sprite is never mirrored.
+  const shouldFlip = !isEnemy && FLIP_PLAYER_SPRITE_HORIZONTALLY;
+
   return (
-    <div className={isEnemy ? "scale-[0.85]" : "scale-[1.15]"}>
+    // Scale values match lib/battle/battleLayout.ts's SPRITE_SCALE —
+    // literal here because Tailwind can't resolve an interpolated class
+    // name, kept numerically in sync with that file by hand (see its
+    // comment). origin-bottom anchors the scale to this box's bottom edge
+    // (where the ground shadow below sits) rather than its center, so
+    // shrinking/growing the sprite never shifts its feet off the platform
+    // point BattleScene's PlatformAnchor already placed this whole element
+    // at — only the top of the sprite moves.
+    <div className={`origin-bottom ${isEnemy ? "scale-[0.55]" : "scale-[0.73]"}`}>
       {/* Idle bob lives on its own wrapper so it never fights the scale
           transform above (both would otherwise overwrite the same CSS
           `transform` property). */}
       <div className="animate-battle-idle" style={{ animationDelay: isEnemy ? "0s" : "0.6s" }}>
-        <div className="flex h-20 w-20 items-center justify-center sm:h-28 sm:w-28 md:h-36 md:w-36 lg:h-40 lg:w-40">
+        <div
+          className={`flex h-20 w-20 items-center justify-center sm:h-28 sm:w-28 md:h-36 md:w-36 lg:h-40 lg:w-40 ${isHit ? "animate-battle-hit-flash" : ""}`}
+        >
           {spriteUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- future animated GIF sprite, not a static optimizable asset
-            <img
+            <SpriteImage
               src={spriteUrl}
+              fallbackSrc={fallbackSpriteUrl}
               alt={name ?? role}
-              className={`h-full w-full object-contain drop-shadow-2xl ${isEnemy ? "" : "-scale-x-100"}`}
+              className={`h-full w-full object-contain drop-shadow-2xl ${shouldFlip ? "-scale-x-100" : ""}`}
+              fallbackClassName="flex h-full w-full items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
             />
           ) : (
-            <PlaceholderCreature flipped={!isEnemy} />
+            <PlaceholderCreature flipped={shouldFlip} />
           )}
         </div>
       </div>

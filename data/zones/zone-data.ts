@@ -1,5 +1,14 @@
 import type { Zone } from "@/shared/types/zone";
 
+// Encounter weights (Milestone 8): common species carry high weights, rare
+// species medium, very-rare low. Starters may appear in their thematic
+// zone but always at a low weight, so they read as a rare special find
+// despite their catalog `rarity` staying "common" (that field is the
+// species' permanent classification, independent of how often a specific
+// zone rolls it). Every entry's pokemonId belongs only to that zone's own
+// roster, so startPokemonEncounter can never cross zones (e.g. a Cave roll
+// can never select a Beach-only species) — nothing beyond correct data
+// here is required to guarantee that.
 export const ZONE_DATA: Zone[] = [
   {
     id: "grassland",
@@ -10,12 +19,10 @@ export const ZONE_DATA: Zone[] = [
     recommendedTypes: ["grass", "electric"],
 
     encounters: [
-      {
-        pokemonId: "pikachu",
-        minimumLevel: 3,
-        maximumLevel: 6,
-        encounterWeight: 10,
-      },
+      { pokemonId: "bulbasaur", minimumLevel: 5, maximumLevel: 7, encounterWeight: 5 },
+      { pokemonId: "caterpie", minimumLevel: 2, maximumLevel: 5, encounterWeight: 22 },
+      { pokemonId: "weedle", minimumLevel: 2, maximumLevel: 5, encounterWeight: 22 },
+      { pokemonId: "oddish", minimumLevel: 3, maximumLevel: 6, encounterWeight: 15 },
     ],
   },
   {
@@ -25,12 +32,10 @@ export const ZONE_DATA: Zone[] = [
     imageUrl: "/zones/water.png",
 
     encounters: [
-      {
-        pokemonId: "pikachu",
-        minimumLevel: 3,
-        maximumLevel: 6,
-        encounterWeight: 10,
-      },
+      { pokemonId: "squirtle", minimumLevel: 5, maximumLevel: 7, encounterWeight: 5 },
+      { pokemonId: "psyduck", minimumLevel: 2, maximumLevel: 5, encounterWeight: 20 },
+      { pokemonId: "poliwag", minimumLevel: 2, maximumLevel: 5, encounterWeight: 20 },
+      { pokemonId: "magikarp", minimumLevel: 2, maximumLevel: 5, encounterWeight: 25 },
     ],
   },
   {
@@ -40,12 +45,9 @@ export const ZONE_DATA: Zone[] = [
     imageUrl: "/zones/cave.png",
 
     encounters: [
-      {
-        pokemonId: "pikachu",
-        minimumLevel: 3,
-        maximumLevel: 6,
-        encounterWeight: 10,
-      },
+      { pokemonId: "zubat", minimumLevel: 3, maximumLevel: 6, encounterWeight: 22 },
+      { pokemonId: "geodude", minimumLevel: 3, maximumLevel: 6, encounterWeight: 20 },
+      { pokemonId: "onix", minimumLevel: 5, maximumLevel: 8, encounterWeight: 8 },
     ],
   },
   {
@@ -55,12 +57,9 @@ export const ZONE_DATA: Zone[] = [
     imageUrl: "/zones/lava.png",
 
     encounters: [
-      {
-        pokemonId: "pikachu",
-        minimumLevel: 3,
-        maximumLevel: 6,
-        encounterWeight: 10,
-      },
+      { pokemonId: "charmander", minimumLevel: 5, maximumLevel: 7, encounterWeight: 5 },
+      { pokemonId: "growlithe", minimumLevel: 4, maximumLevel: 7, encounterWeight: 12 },
+      { pokemonId: "ponyta", minimumLevel: 4, maximumLevel: 7, encounterWeight: 10 },
     ],
   },
   {
@@ -70,12 +69,9 @@ export const ZONE_DATA: Zone[] = [
     imageUrl: "/zones/beach.png",
 
     encounters: [
-      {
-        pokemonId: "pikachu",
-        minimumLevel: 3,
-        maximumLevel: 6,
-        encounterWeight: 10,
-      },
+      { pokemonId: "tentacool", minimumLevel: 2, maximumLevel: 5, encounterWeight: 22 },
+      { pokemonId: "krabby", minimumLevel: 2, maximumLevel: 5, encounterWeight: 20 },
+      { pokemonId: "shellder", minimumLevel: 3, maximumLevel: 6, encounterWeight: 18 },
     ],
   },
   {
@@ -85,12 +81,9 @@ export const ZONE_DATA: Zone[] = [
     imageUrl: "/zones/haunted-house.png",
 
     encounters: [
-      {
-        pokemonId: "pikachu",
-        minimumLevel: 3,
-        maximumLevel: 6,
-        encounterWeight: 10,
-      },
+      { pokemonId: "gastly", minimumLevel: 4, maximumLevel: 7, encounterWeight: 14 },
+      { pokemonId: "haunter", minimumLevel: 6, maximumLevel: 9, encounterWeight: 5 },
+      { pokemonId: "cubone", minimumLevel: 4, maximumLevel: 7, encounterWeight: 12 },
     ],
   },
 ];

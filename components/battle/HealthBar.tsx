@@ -20,7 +20,7 @@ export function HealthBar({ current, max }: HealthBarProps) {
     <div>
       <div className="mb-1 flex items-center justify-between text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
         <span>HP</span>
-        <span className="text-slate-300">
+        <span dir="ltr" className="text-slate-300">
           {current} / {max}
         </span>
       </div>

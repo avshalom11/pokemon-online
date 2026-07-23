@@ -42,7 +42,14 @@ export async function registerAction(
     return { status: "error", message: getRegistrationErrorMessage(error) };
   }
 
-  redirect("/map");
+  // The single landing destination after authentication is /home (see
+  // features/onboarding/services/onboarding-status.ts). This redirect only
+  // hands the freshly-authenticated user into protected territory — it does
+  // not decide onboarding status itself (auth stays ignorant of that
+  // business rule); /home's own server-side guard re-checks and bounces to
+  // /onboarding/starter when needed, exactly as it does for every other
+  // entry point.
+  redirect("/home");
 }
 
 export async function loginAction(
@@ -80,7 +87,8 @@ export async function loginAction(
     return { status: "error", message: getLoginErrorMessage() };
   }
 
-  redirect("/map");
+  // See the matching comment in registerAction above.
+  redirect("/home");
 }
 
 export async function logoutAction() {

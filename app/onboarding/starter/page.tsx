@@ -8,7 +8,7 @@ import { getCurrentSession } from "@/lib/auth/auth-session";
 
 // Real, server-side authorization check (proxy.ts only does an optimistic
 // cookie-presence redirect). A player who already completed onboarding is
-// bounced to /map here — this is what guarantees this page can never be
+// bounced to /home here — this is what guarantees this page can never be
 // revisited after a starter has been chosen.
 export default async function StarterSelectionPage() {
   const session = await getCurrentSession();
@@ -19,8 +19,8 @@ export default async function StarterSelectionPage() {
 
   const redirectTarget = await getOnboardingRedirectTarget(session.user.id);
 
-  if (redirectTarget === "/map") {
-    redirect("/map");
+  if (redirectTarget === "/home") {
+    redirect("/home");
   }
 
   const user = session.user as { displayUsername?: string | null; username?: string | null; name: string };

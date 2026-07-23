@@ -1,13 +1,21 @@
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
+
 import { BattleAttackPanel } from "./BattleAttackPanel";
 import { BattleBackground } from "./BattleBackground";
 import { BattleHUD } from "./BattleHUD";
 import { BattleMenu } from "./BattleMenu";
 import { BattleMessageBox } from "./BattleMessageBox";
 import { PokemonSprite } from "./PokemonSprite";
-import { DEFAULT_ATTACK_SLOTS, DEFAULT_BATTLE_MENU_ACTIONS } from "@/lib/battle/battleLayout";
-import type { BattleTheme } from "@/shared/types/battle-theme";
+import {
+  DEFAULT_ATTACK_SLOTS,
+  DEFAULT_BATTLE_MENU_ACTIONS,
+  ENEMY_HUD_POSITION_CLASS,
+  PLAYER_HUD_SIDE_CLASS,
+  PLAYER_HUD_TOP_PERCENT,
+} from "@/lib/battle/battleLayout";
+import type { BattleArenaPoint, BattleTheme } from "@/shared/types/battle-theme";
 import type {
   BattleAttackSlot,
   BattleMenuAction,
@@ -25,18 +33,42 @@ export interface BattleSceneProps {
   onAttackSelect?: (attackId: string) => void;
   menuActions?: BattleMenuAction[];
   onMenuAction?: (actionId: string) => void;
+  /** Brief hit-flash feedback, forwarded to PokemonSprite — see its own
+   * `isHit` doc comment. Both default to false/undefined, so omitting
+   * them is a no-op for any caller that doesn't need this. */
+  enemyHit?: boolean;
+  playerHit?: boolean;
+}
+
+// Anchors a Pokémon sprite so its feet land exactly on a given point of the
+// background art (theme.arena.wildPlatform / playerPlatform — a percentage
+// position, see shared/types/battle-theme.ts). translate(-50%, -100%)
+// shifts the element so its horizontal center and *bottom* edge sit at
+// that point, rather than its own top-left corner. Positioned relative to
+// this same absolute inset-0 layer that BattleBackground also fills, so
+// the percentages always line up with the actual artwork regardless of
+// how much room the footer below ends up taking.
+function PlatformAnchor({ point, children }: { point: BattleArenaPoint; children: ReactNode }) {
+  const style: CSSProperties = {
+    position: "absolute",
+    left: `${point.xPercent}%`,
+    top: `${point.yPercent}%`,
+    transform: "translate(-50%, -100%)",
+  };
+
+  return <div style={style}>{children}</div>;
 }
 
 // Composition root for every battle location. Layout (who goes where) lives
-// here; visual identity (background image/colors/particles/lighting) lives
-// entirely in the `theme` prop. Adding a new battle location should never
-// require editing this file — only a new theme object in
+// here; visual identity (background image/colors/particles/lighting/arena)
+// lives entirely in the `theme` prop. Adding a new battle location should
+// never require editing this file — only a new theme object in
 // lib/battle/battleThemes.ts.
 //
 // Fills whatever container it's placed in (100% width/height) rather than
-// owning the viewport or header space itself — that's GameScreen's job
-// (components/layout/GameScreen.tsx), so BattleScene stays reusable as
-// "just the battle content" regardless of how it's framed on the page.
+// owning the viewport or header space itself — that's BattleWindow's job
+// (features/battle/components/BattleWindow.tsx), so BattleScene stays
+// reusable as "just the battle content" regardless of how it's framed.
 export function BattleScene({
   theme,
   enemy,
@@ -46,45 +78,75 @@ export function BattleScene({
   onAttackSelect,
   menuActions = DEFAULT_BATTLE_MENU_ACTIONS,
   onMenuAction,
+  enemyHit,
+  playerHit,
 }: BattleSceneProps) {
   return (
     // `isolate` establishes a new stacking context so BattleBackground's
     // `-z-10` only ever stacks behind BattleScene's own content, never
-    // behind an ancestor's background (e.g. GameScreen's) — without it, a
-    // plain `relative` container doesn't contain negative z-index children.
+    // behind an ancestor's background — without it, a plain `relative`
+    // container doesn't contain negative z-index children.
     <div className="relative isolate flex h-full w-full flex-col overflow-hidden">
       <BattleBackground theme={theme} />
 
-      <div className="relative grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2 p-3 sm:gap-4 sm:p-6 lg:p-8">
-        <div className="col-start-1 row-start-1 flex items-start justify-start">
+      {/* Sprites — percentage-anchored to this theme's two battle-platform
+          circles in the art, independent of the HUD/footer layout below. */}
+      <PlatformAnchor point={theme.arena.wildPlatform}>
+        <PokemonSprite role="enemy" spriteUrl={enemy.spriteUrl} name={enemy.name} isHit={enemyHit} />
+      </PlatformAnchor>
+      <PlatformAnchor point={theme.arena.playerPlatform}>
+        <PokemonSprite
+          role="player"
+          spriteUrl={player.spriteUrl}
+          fallbackSpriteUrl={player.fallbackSpriteUrl}
+          name={player.name}
+          isHit={playerHit}
+        />
+      </PlatformAnchor>
+
+      {/* Player status card — positioned in the SAME full-scene percentage
+          coordinate space as the sprites above (not the arena sub-box the
+          enemy's card below uses), specifically so its vertical position is
+          independent of both the wild platform's Y and the footer's height
+          — see PLAYER_HUD_TOP_PERCENT's doc comment
+          (lib/battle/battleLayout.ts) for why an arena-relative offset
+          couldn't reliably clear the wild Pokémon in every zone. */}
+      <div className={PLAYER_HUD_SIDE_CLASS} style={{ top: `${PLAYER_HUD_TOP_PERCENT}%` }}>
+        <BattleHUD
+          theme={theme}
+          participant={player}
+          experience={
+            player.currentExperience !== undefined && player.maxExperience !== undefined
+              ? { current: player.currentExperience, max: player.maxExperience }
+              : undefined
+          }
+        />
+      </div>
+
+      {/* Enemy HUD — corner-anchored within the space above the footer.
+          Flexbox (min-h-0 flex-1, sibling to the shrink-0 footer below)
+          reserves exactly the footer's real, responsive height, so it
+          never ends up covered by it regardless of screen size. */}
+      <div className="relative min-h-0 flex-1 p-3 sm:p-6 lg:p-8">
+        <div className={ENEMY_HUD_POSITION_CLASS}>
           <BattleHUD theme={theme} participant={enemy} />
-        </div>
-
-        <div className="col-start-2 row-start-1 flex items-center justify-end">
-          <PokemonSprite role="enemy" />
-        </div>
-
-        <div className="col-start-1 row-start-2 flex items-end justify-start">
-          <PokemonSprite role="player" />
-        </div>
-
-        <div className="col-start-2 row-start-2 flex items-end justify-end">
-          <BattleHUD
-            theme={theme}
-            participant={player}
-            experience={{ current: player.currentExperience, max: player.maxExperience }}
-          />
         </div>
       </div>
 
       <div className="relative flex shrink-0 flex-col gap-2 bg-gradient-to-t from-black/55 to-transparent p-3 pt-6 sm:gap-3 sm:p-4 sm:pt-8">
         <BattleMessageBox theme={theme} message={message} />
 
-        {/* Attack Panel (~75% width) + Action Panel (~25% width) side by
-            side on larger screens; stacked full-width on mobile so nothing
-            overlaps or gets cramped. */}
+        {/* Attack Panel + Action Panel side by side on larger screens;
+            stacked full-width on mobile so nothing overlaps or gets
+            cramped. Even split (not the old ~75/25) — the battle window is
+            narrower now than when this footer spanned the full viewport,
+            and the temporary single-attack-slot system (see
+            TEMPORARY_ATTACK_SLOTS in features/battle/components/
+            BattleContent.tsx) leaves the attack panel mostly empty anyway,
+            while the two action buttons ("לכידה"/"בריחה") need the room to
+            avoid truncating at the panel's new width. */}
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-          <div className="sm:flex-[3]">
+          <div className="sm:flex-1">
             <BattleAttackPanel theme={theme} attacks={attacks} onSelect={onAttackSelect} />
           </div>
           <div className="sm:flex-1">

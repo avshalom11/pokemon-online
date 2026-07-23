@@ -2,13 +2,30 @@ import type { BattleTheme } from "@/shared/types/battle-theme";
 import type { ZoneId } from "@/shared/types/zone";
 
 // Background image paths reference the files exactly as they should exist
-// under public/battle-backgrounds/ (all lowercase .webp) — do not rename or
-// convert these on disk; if a filename ever needs to change, change it here
-// and on disk together.
+// under public/battle-backgrounds/ (all lowercase, currently .png — the
+// high-quality artwork replaced the original .webp placeholders in place;
+// keep this extension in sync with whatever's actually on disk) — do not
+// rename or convert these on disk; if a filename ever needs to change,
+// change it here and on disk together.
+//
+// Every image is the same 1536x1024 (3:2) canvas and shares the same
+// two-circle composition: a larger platform in the lower-left foreground
+// (the player's) and a smaller one in the upper-right background (the
+// wild Pokémon's). Each theme's `arena` values below were read directly
+// off that zone's own artwork rather than reused from a single shared
+// constant, since the exact circle positions vary a little zone to zone —
+// see BattleThemeArena's doc comment (shared/types/battle-theme.ts) and
+// components/battle/BattleScene.tsx, which is the one place that turns
+// these percentages into an actual Pokémon position; nothing here is
+// zone-specific positioning *code*, only zone-specific positioning *data*.
 export const GRASS_THEME: BattleTheme = {
   id: "grassland",
   name: "אזור הדשא",
-  backgroundImage: "/battle-backgrounds/grass-battle.webp",
+  backgroundImage: "/battle-backgrounds/grass-battle.png",
+  arena: {
+    playerPlatform: { xPercent: 32, yPercent: 68 },
+    wildPlatform: { xPercent: 75, yPercent: 49 },
+  },
   colors: {
     panelAccent: "#4ade80",
   },
@@ -22,7 +39,11 @@ export const GRASS_THEME: BattleTheme = {
 export const WATER_THEME: BattleTheme = {
   id: "water",
   name: "אזור המים",
-  backgroundImage: "/battle-backgrounds/water-battle.webp",
+  backgroundImage: "/battle-backgrounds/water-battle.png",
+  arena: {
+    playerPlatform: { xPercent: 36, yPercent: 59 },
+    wildPlatform: { xPercent: 75, yPercent: 34 },
+  },
   colors: {
     panelAccent: "#38bdf8",
   },
@@ -36,7 +57,11 @@ export const WATER_THEME: BattleTheme = {
 export const CAVE_THEME: BattleTheme = {
   id: "cave",
   name: "אזור המערה",
-  backgroundImage: "/battle-backgrounds/cave-battle.webp",
+  backgroundImage: "/battle-backgrounds/cave-battle.png",
+  arena: {
+    playerPlatform: { xPercent: 31, yPercent: 58 },
+    wildPlatform: { xPercent: 70, yPercent: 35 },
+  },
   colors: {
     panelAccent: "#a78bfa",
   },
@@ -50,7 +75,11 @@ export const CAVE_THEME: BattleTheme = {
 export const LAVA_THEME: BattleTheme = {
   id: "lava",
   name: "אזור הלבה",
-  backgroundImage: "/battle-backgrounds/lava-battle.webp",
+  backgroundImage: "/battle-backgrounds/lava-battle.png",
+  arena: {
+    playerPlatform: { xPercent: 27, yPercent: 71 },
+    wildPlatform: { xPercent: 76, yPercent: 48 },
+  },
   colors: {
     panelAccent: "#f97316",
   },
@@ -64,7 +93,11 @@ export const LAVA_THEME: BattleTheme = {
 export const BEACH_THEME: BattleTheme = {
   id: "beach",
   name: "אזור החוף",
-  backgroundImage: "/battle-backgrounds/beach-battle.webp",
+  backgroundImage: "/battle-backgrounds/beach-battle.png",
+  arena: {
+    playerPlatform: { xPercent: 35, yPercent: 66 },
+    wildPlatform: { xPercent: 76, yPercent: 43 },
+  },
   colors: {
     panelAccent: "#14b8a6",
   },
@@ -75,15 +108,14 @@ export const BEACH_THEME: BattleTheme = {
   },
 };
 
-// TODO(user-provided asset): this background contains recognizable
-// Pokémon characters (Gengar and other Ghost-type silhouettes) — the user
-// has explicitly accepted this as a temporary placeholder despite the
-// project's stated original-IP direction. Replace before any public
-// release; see conversation history for context.
 export const GHOST_THEME: BattleTheme = {
   id: "haunted-house",
   name: "בית הרוחות",
-  backgroundImage: "/battle-backgrounds/ghosthouse-battle.webp",
+  backgroundImage: "/battle-backgrounds/ghosthouse-battle.png",
+  arena: {
+    playerPlatform: { xPercent: 33, yPercent: 60 },
+    wildPlatform: { xPercent: 76, yPercent: 41 },
+  },
   colors: {
     panelAccent: "#93c5fd",
   },

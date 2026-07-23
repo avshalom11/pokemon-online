@@ -12,7 +12,7 @@ import type { NextRequest } from "next/server";
 // file convention to proxy.ts (confirmed from node_modules/next/dist/docs/
 // 01-app/03-api-reference/03-file-conventions/proxy.md) — a middleware.ts
 // file would simply never run.
-const PROTECTED_PATHS = ["/map", "/battle", "/onboarding/starter"];
+const PROTECTED_PATHS = ["/home", "/my-pokemon", "/map", "/battle", "/onboarding/starter"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -27,12 +27,23 @@ export function proxy(request: NextRequest) {
   }
 
   if (pathname === "/" && sessionCookie) {
-    return NextResponse.redirect(new URL("/map", request.url));
+    return NextResponse.redirect(new URL("/home", request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/", "/map", "/map/:path*", "/battle", "/battle/:path*", "/onboarding/starter"],
+  matcher: [
+    "/",
+    "/home",
+    "/home/:path*",
+    "/my-pokemon",
+    "/my-pokemon/:path*",
+    "/map",
+    "/map/:path*",
+    "/battle",
+    "/battle/:path*",
+    "/onboarding/starter",
+  ],
 };

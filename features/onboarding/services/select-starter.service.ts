@@ -47,6 +47,9 @@ export async function selectStarterPokemon(userId: string, speciesId: string): P
         level: STARTER_LEVEL,
         currentHp: species.baseStats.health,
         isStarter: true,
+        // New players always have an empty party, so slot 1 (the battle
+        // starter) is guaranteed free here.
+        partySlot: 1,
       },
     });
 

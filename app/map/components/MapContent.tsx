@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { InteractiveWorldMap } from "./InteractiveWorldMap";
@@ -7,15 +8,35 @@ import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
 import { ZONE_DATA } from "@/data/zones/zone-data";
 import type { ZoneId } from "@/shared/types/zone";
 
+interface MapContentProps {
+  // Optional one-off message forwarded from a redirect (see
+  // app/battle/page.tsx's "party-needs-healing" redirect when the whole
+  // party has fainted). Plain conditional banner, not a toast library —
+  // dismissible, never re-triggers itself.
+  notice?: string;
+}
+
+const NOTICE_MESSAGES: Record<string, string> = {
+  "party-needs-healing": "כל הפוקימונים בצוות שלך התעלפו — הם זקוקים להחלמה לפני קרב נוסף.",
+};
+
 // Moved verbatim from app/map/page.tsx when that page became a server
 // component (session check + redirect) — this component's own internals
 // and behavior are unchanged. The only tweak is extra top padding so the
 // existing back button clears the newly-added fixed GameHeader above it.
-export function MapContent() {
+export function MapContent({ notice }: MapContentProps) {
   const router = useRouter();
+  const [dismissedNotice, setDismissedNotice] = useState(false);
+  const noticeMessage = notice && !dismissedNotice ? NOTICE_MESSAGES[notice] : undefined;
 
+  // replace (not push): entering a battle shouldn't leave the pre-battle Map
+  // state as its own back-target — Battle is an ephemeral encounter, not a
+  // page a player would expect Back to return them into. Pairs with
+  // BattleContent's run-away handler, which also replaces rather than
+  // pushes, so leaving a battle always lands Back on whatever was open
+  // before Map (e.g. Home), never back into the finished battle.
   function handleZoneSelect(zoneId: ZoneId) {
-    router.push(`/battle?zone=${zoneId}`);
+    router.replace(`/battle?zone=${zoneId}`);
   }
 
   // "/" is only the current start page — it will become the real Home page
@@ -67,6 +88,42 @@ export function MapContent() {
       >
         ⬅ חזור
       </button>
+
+      {noticeMessage ? (
+        <div
+          style={{
+            marginTop: "16px",
+            width: "100%",
+            maxWidth: "600px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            backgroundColor: "rgba(248, 113, 113, 0.15)",
+            border: "1px solid rgba(248, 113, 113, 0.4)",
+            fontFamily: "Arial",
+            fontSize: "14px",
+          }}
+        >
+          <span>{noticeMessage}</span>
+          <button
+            type="button"
+            onClick={() => setDismissedNotice(true)}
+            aria-label="סגור הודעה"
+            style={{
+              cursor: "pointer",
+              backgroundColor: "transparent",
+              border: "none",
+              color: "white",
+              fontSize: "16px",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <h1>מפת העולם</h1>
 

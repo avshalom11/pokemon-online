@@ -10,10 +10,14 @@ interface BattleHUDProps {
   experience?: { current: number; max: number };
 }
 
+// Trimmed from the original w-56/sm:w-64 card (width, padding, and name
+// text all reduced slightly) as part of a visual-polish pass — HealthBar/
+// ExperienceBar themselves are untouched, so the HP bar stays exactly as
+// readable as before.
 export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
   return (
     <div
-      className="relative w-56 overflow-hidden rounded-lg border border-white/10 bg-slate-900/75 py-3 pr-4 pl-4 shadow-xl backdrop-blur-md sm:w-64 sm:py-4 sm:pr-5 sm:pl-5"
+      className="relative w-44 overflow-hidden rounded-lg border border-white/10 bg-slate-900/75 py-2 pr-3 pl-3 shadow-xl backdrop-blur-md sm:w-52 sm:py-2.5 sm:pr-4 sm:pl-4"
       style={{ boxShadow: `0 12px 30px -14px ${theme.colors.panelAccent}66, 0 0 0 1px rgba(255,255,255,0.03) inset` }}
     >
       <div
@@ -21,12 +25,12 @@ export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
         style={{ backgroundColor: theme.colors.panelAccent }}
       />
 
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <span className="font-fantasy truncate text-sm font-semibold tracking-wide text-slate-50 sm:text-base">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="font-fantasy truncate text-xs font-semibold tracking-wide text-slate-50 sm:text-sm">
           {participant.name}
         </span>
         <span
-          className="shrink-0 rounded border border-white/10 bg-black/30 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-slate-200"
+          className="shrink-0 rounded border border-white/10 bg-black/30 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-200"
         >
           רמה {participant.level}
         </span>
@@ -35,7 +39,7 @@ export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
       <HealthBar current={participant.currentHealth} max={participant.maxHealth} />
 
       {experience ? (
-        <div className="mt-2.5">
+        <div className="mt-2">
           <ExperienceBar
             current={experience.current}
             max={experience.max}

@@ -9,7 +9,7 @@ import { getCurrentSession } from "@/lib/auth/auth-session";
 // cookie-presence redirect — this is the actual guard). MapContent itself
 // is the original map page's content, moved here unchanged. A player who
 // hasn't finished onboarding yet is redirected to the starter page instead.
-export default async function MapPage() {
+export default async function MapPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -22,10 +22,12 @@ export default async function MapPage() {
     redirect("/onboarding/starter");
   }
 
+  const { notice } = await searchParams;
+
   return (
     <>
       <GameHeader />
-      <MapContent />
+      <MapContent notice={notice} />
     </>
   );
 }

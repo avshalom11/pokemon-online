@@ -81,9 +81,14 @@ model PlayerPokemon {
   experience  Int           @default(0)
   currentHp   Int
   isStarter   Boolean       @default(false)
+  // 1-6, null = not in the active party. Range validated in app code
+  // (features/party/validation/party.schema.ts) — Prisma's schema DSL has
+  // no declarative CHECK constraint support in this setup.
+  partySlot   Int?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  @@unique([playerId, partySlot])
   @@index([playerId])
   @@map("player_pokemon")
 }

@@ -41,6 +41,23 @@ const ACTION_ICONS: Record<string, ReactNode> = {
       <path d="M14 7 L17 10 L14 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  // Original "capture orb" glyph — same motif as the empty party-slot icon
+  // in features/pokemon/components/PartySlot.tsx (deliberately not a
+  // red/white Poké Ball; this project avoids recognizable Pokémon IP).
+  capture: (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="2" strokeDasharray="2.5 2.5" />
+      <circle cx="10" cy="10" r="2.2" fill="currentColor" />
+    </svg>
+  ),
+  // Two opposing curved arrows — a generic "swap" motif for switching the
+  // active Pokémon mid-battle.
+  switch: (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+      <path d="M4 7 H14 M14 7 L11 4 M14 7 L11 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 13 H6 M6 13 L9 10 M6 13 L9 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 };
 
 // The compact "Action Panel" — narrow (~25% width) alongside the wider

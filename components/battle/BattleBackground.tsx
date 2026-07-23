@@ -9,8 +9,18 @@ interface BattleBackgroundProps {
 
 // Every battle location renders through this one component — the location
 // itself is just data (theme.backgroundImage / colors / particles /
-// lighting). Adding a 7th zone means a new theme object in
+// lighting / arena). Adding a 7th zone means a new theme object in
 // lib/battle/battleThemes.ts, nothing here.
+//
+// Plain object-fit: cover is enough here (no oversize/zoom trick needed):
+// the game panel this renders inside (features/battle/components/
+// BattleWindow.tsx) is deliberately locked to this artwork's own aspect
+// ratio (3:2, matching every background image exactly), so cover only ever
+// needs to crop a sliver at most, at native resolution — sharp, full
+// artwork, no meaningful zoom. That's only true because the panel's shape
+// is controlled; a full-viewport-width/height container (this component's
+// previous context) could be a very different shape from the art, which is
+// what previously required a more elaborate fit.
 export function BattleBackground({ theme }: BattleBackgroundProps) {
   return (
     <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -19,7 +29,7 @@ export function BattleBackground({ theme }: BattleBackgroundProps) {
         alt=""
         fill
         priority
-        sizes="100vw"
+        sizes="(min-width: 1024px) 75vw, (min-width: 640px) 85vw, 92vw"
         className="object-cover"
       />
 

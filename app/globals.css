@@ -122,3 +122,49 @@ body {
 .animate-battle-idle {
   animation: battle-idle-bob 3.2s ease-in-out infinite;
 }
+
+/* Soft ambient glow pulse for the home hub (active party slot, premium-feel
+   accents) — a gentle box-shadow breathe, distinct from the battle-* set
+   above which are all particle-travel animations. */
+@keyframes home-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 14px rgba(99, 102, 241, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(99, 102, 241, 0.5);
+  }
+}
+
+.animate-home-glow {
+  animation: home-glow-pulse 2.6s ease-in-out infinite;
+}
+
+/* Brief "took a hit" feedback for battle sprites — a quick shake + red
+   tint, played once (not infinite, unlike the battle-* set above) whenever
+   the temporary fixed-damage attack lands or a capture attempt fails. See
+   components/battle/PokemonSprite.tsx's `isHit` prop. */
+@keyframes battle-hit-flash {
+  0% {
+    transform: translateX(0);
+    filter: brightness(1) saturate(1);
+  }
+  20% {
+    transform: translateX(-4px);
+    filter: brightness(1.4) saturate(1.6) drop-shadow(0 0 10px rgba(248, 113, 113, 0.8));
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: translateX(0);
+    filter: brightness(1) saturate(1);
+  }
+}
+
+.animate-battle-hit-flash {
+  animation: battle-hit-flash 0.4s ease-in-out;
+}

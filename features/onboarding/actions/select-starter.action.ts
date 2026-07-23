@@ -32,7 +32,7 @@ export async function selectStarterAction(
   }
 
   // "already-completed" (a duplicate submit/refresh) and "created" both mean
-  // onboarding is now done — send the player to the map either way instead
-  // of surfacing an error for what is really just a duplicate request.
-  redirect("/map");
+  // onboarding is now done — send the player to the home hub either way
+  // instead of surfacing an error for what is really just a duplicate request.
+  redirect("/home");
 }

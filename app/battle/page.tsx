@@ -1,27 +1,25 @@
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 
-import { BattleContent } from "./components/BattleContent";
 import { GameHeader } from "@/components/layout/GameHeader";
-import { GameScreen } from "@/components/layout/GameScreen";
+import { BattleContent } from "@/features/battle/components/BattleContent";
+import { getBattleViewData } from "@/features/battle/services/battle-view.service";
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
 import { getCurrentSession } from "@/lib/auth/auth-session";
+import type { ZoneId } from "@/shared/types/zone";
 
-function BattleLoadingFallback() {
-  return (
-    <GameScreen>
-      <main className="flex h-full items-center justify-center bg-slate-900 text-slate-300">
-        <p>טוען קרב...</p>
-      </main>
-    </GameScreen>
-  );
+const VALID_ZONE_IDS: ZoneId[] = ["grassland", "water", "cave", "lava", "beach", "haunted-house"];
+
+function isValidZoneId(value: string | undefined): value is ZoneId {
+  return VALID_ZONE_IDS.includes(value as ZoneId);
 }
 
 // Real, server-side authorization check (proxy.ts only does an optimistic
-// cookie-presence redirect — this is the actual guard). BattleContent and
-// the battle engine/encounter system below it are untouched. A player who
-// hasn't finished onboarding yet is redirected to the starter page instead.
-export default async function BattlePage() {
+// cookie-presence redirect — this is the actual guard), same pattern as
+// app/map/page.tsx. The wild encounter and the player's active Pokémon are
+// both resolved here (getBattleViewData) rather than client-side, so
+// BattleContent receives a clean, already-validated view model — see
+// features/battle/services/battle-view.service.ts.
+export default async function BattlePage({ searchParams }: { searchParams: Promise<{ zone?: string }> }) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -34,12 +32,25 @@ export default async function BattlePage() {
     redirect("/onboarding/starter");
   }
 
+  const { zone } = await searchParams;
+
+  if (!isValidZoneId(zone)) {
+    redirect("/map");
+  }
+
+  const data = await getBattleViewData(session.user.id, zone);
+
+  // No usable (HP > 0) party member — a battle must never start with a
+  // fully-fainted party. Unreachable for a brand-new player (a starter is
+  // guaranteed by onboarding) but reachable once fainted Pokémon exist.
+  if (!data) {
+    redirect("/map?notice=party-needs-healing");
+  }
+
   return (
     <>
       <GameHeader />
-      <Suspense fallback={<BattleLoadingFallback />}>
-        <BattleContent />
-      </Suspense>
+      <BattleContent zoneId={zone} wild={data.wild} party={data.party} activePokemonId={data.activePokemonId} />
     </>
   );
 }

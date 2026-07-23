@@ -4,6 +4,11 @@ import { useState } from "react";
 
 interface SpriteImageProps {
   src: string;
+  // Tried once if `src` fails to load, before falling back to the
+  // placeholder box below (e.g. a species' front sprite as a stand-in for
+  // a not-yet-added back sprite — see components/battle/PokemonSprite.tsx).
+  // Omit for the original single-source behavior.
+  fallbackSrc?: string;
   alt: string;
   className?: string;
   fallbackClassName?: string;
@@ -16,10 +21,24 @@ interface SpriteImageProps {
 // needs an onError hook, which next/image doesn't expose. Used wherever an
 // asset may not exist yet (onboarding starter art today; map/battle sprites
 // later) — swaps to a placeholder instead of a broken-image icon.
-export function SpriteImage({ src, alt, className, fallbackClassName }: SpriteImageProps) {
-  const [hasError, setHasError] = useState(false);
+export function SpriteImage({ src, fallbackSrc, alt, className, fallbackClassName }: SpriteImageProps) {
+  const [stage, setStage] = useState<"primary" | "fallback" | "broken">("primary");
 
-  if (hasError) {
+  // Reset when the requested source changes (e.g. this instance gets reused
+  // for a different Pokémon) so a previous failure doesn't stick around.
+  // Adjusting state during render (React's documented pattern for this —
+  // https://react.dev/learn/you-might-not-need-an-effect) rather than in a
+  // useEffect, which would cause an extra cascading render.
+  const [trackedSrc, setTrackedSrc] = useState({ src, fallbackSrc });
+
+  if (trackedSrc.src !== src || trackedSrc.fallbackSrc !== fallbackSrc) {
+    setTrackedSrc({ src, fallbackSrc });
+    setStage("primary");
+  }
+
+  const currentSrc = stage === "primary" ? src : stage === "fallback" ? fallbackSrc : undefined;
+
+  if (stage === "broken" || !currentSrc) {
     return (
       <div
         role="img"
@@ -36,10 +55,10 @@ export function SpriteImage({ src, alt, className, fallbackClassName }: SpriteIm
 
   return (
     <img
-      src={src}
+      src={currentSrc}
       alt={alt}
       className={className}
-      onError={() => setHasError(true)}
+      onError={() => setStage(stage === "primary" && fallbackSrc ? "fallback" : "broken")}
     />
   );
 }
