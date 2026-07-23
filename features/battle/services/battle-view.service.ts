@@ -1,9 +1,8 @@
 import "server-only";
 
-import { startPokemonEncounter, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
-import { getFirstUsableMember, hasUsableMember, isUsable } from "@/features/party/utils/party-rules";
-import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
+import { getOrStartBattle } from "@/features/battle-session/services/battle-session.service";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
+import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { ZoneId } from "@/shared/types/zone";
 
@@ -11,31 +10,42 @@ export interface BattleViewData {
   wild: EncounterResult;
   party: OwnedPokemon[];
   activePokemonId: string;
+  // The authenticated trainer's own display name (PlayerProfile.displayName
+  // — the same value HomeHeader/My Pokémon/Pokémon Center already show
+  // everywhere else as "the player's name"), threaded down so
+  // BattleContent's capture message never hardcodes a username.
+  playerName: string;
 }
 
-// Assembled server-side so app/battle/page.tsx stays a thin display layer,
-// mirroring home-data.service.ts / my-pokemon-view.service.ts. The wild
-// encounter is generated fresh per request via the existing, unmodified
-// startPokemonEncounter (engine/encounter/pokemon-encounter-engine.ts).
-//
-// The active Pokémon is party slot 1 (getPlayerParty is now ordered by the
-// persisted partySlot column, so party[0] is whichever Pokémon occupies the
-// lowest slot — normally slot 1) if it's usable, otherwise the first usable
-// member by slot order. Returns null when nobody in the party is usable
-// (HP > 0) — a battle must never start with a fully-fainted party.
-// app/battle/page.tsx redirects to /map with a "needs healing" notice in
-// that case.
-export async function getBattleViewData(userId: string, zoneId: ZoneId): Promise<BattleViewData | null> {
-  const profile = await getPlayerProfile(userId);
-  const party = await getPlayerParty(profile.id);
+export type BattleViewResult =
+  | { status: "ready"; data: BattleViewData }
+  // The player already has an active session for a *different* zone —
+  // app/battle/page.tsx redirects there instead of trusting the requested
+  // zone (see getOrStartBattle's own doc comment).
+  | { status: "redirect"; zoneId: ZoneId }
+  | { status: "no-usable-party" };
 
-  if (!hasUsableMember(party)) {
-    return null;
+// Assembled server-side so app/battle/page.tsx stays a thin display layer,
+// mirroring home-data.service.ts / my-pokemon-view.service.ts. The actual
+// "restore existing session, or start a new one" logic lives in
+// features/battle-session/services/battle-session.service.ts — this is
+// just the per-page assembler that adds the display-only playerName field
+// on top, same role assign-slot/view services elsewhere already play.
+export async function getBattleViewData(userId: string, zoneId: ZoneId): Promise<BattleViewResult> {
+  const profile = await getPlayerProfile(userId);
+  const result = await getOrStartBattle(profile.id, zoneId);
+
+  if (result.status !== "ready") {
+    return result;
   }
 
-  const starter = party[0];
-  const activePokemon = isUsable(starter) ? starter : getFirstUsableMember(party)!;
-  const wild = startPokemonEncounter(zoneId);
-
-  return { wild, party, activePokemonId: activePokemon.id };
+  return {
+    status: "ready",
+    data: {
+      wild: result.battle.wild,
+      party: result.battle.party,
+      activePokemonId: result.battle.activePokemonId,
+      playerName: profile.displayName,
+    },
+  };
 }

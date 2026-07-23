@@ -60,6 +60,7 @@ model PlayerProfile {
   starterPokemonId    String?
   coins               Int      @default(500)
   pokemon             PlayerPokemon[]
+  fieldBattleSession  FieldBattleSession?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -88,9 +89,69 @@ model PlayerPokemon {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  // A PlayerPokemon currently the active battler in a persisted field
+  // session (see FieldBattleSession below) — used only to block release
+  // (features/pokemon/services/release-pokemon.service.ts) while a battle
+  // still references it. Always empty in practice except for at most one
+  // row, since a player has at most one FieldBattleSession; kept as an
+  // array because that's how Prisma models the non-owning side of a
+  // one-to-many relation.
+  fieldBattleSessions FieldBattleSession[]
+
   @@unique([playerId, partySlot])
   @@index([playerId])
   @@map("player_pokemon")
+}
+
+// A player's single in-progress wild encounter, persisted so a page refresh
+// (or an accidental navigation away and back) restores the exact same
+// battle instead of silently rerolling a new one. `playerId` is @unique —
+// deliberately modeling "at most one active session per player" as a
+// row-existence fact rather than an `isActive` boolean: this session is
+// hard-deleted the moment the battle ends (capture/escape/party defeat), so
+// there is never a stale "inactive" row lying around to filter out or drift
+// out of sync with reality — existence *is* "active". Continuing in the
+// same zone after defeating a wild Pokémon reuses this same row (only the
+// wild* fields are overwritten), so the unique id/relation age across an
+// entire zone session, not just one encounter.
+//
+// No soft-delete here or on PlayerPokemon release: nothing in this project
+// reads deleted battle sessions or released Pokémon for history/audit
+// purposes, so a soft-deleted row would just be permanent dead weight with
+// no consumer — see features/pokemon/services/release-pokemon.service.ts's
+// own doc comment for the release side of this same reasoning.
+model FieldBattleSession {
+  id       String        @id @default(cuid())
+  playerId String        @unique
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // The requested zone (e.g. "grassland") — validated against ZONE_DATA at
+  // the app layer; stored as a plain string since Prisma has no enum synced
+  // to that TypeScript union.
+  zoneId String
+
+  // Wild Pokémon facts — speciesId resolves against the same static catalog
+  // every other Pokémon reference uses (data/pokemon/pokemon-data.ts),
+  // never duplicated here as name/types/etc.
+  wildSpeciesId String
+  wildLevel     Int
+  wildCurrentHp Int
+  wildMaxHp     Int
+
+  // The party member currently active in this battle. onDelete: Restrict —
+  // the DB itself refuses to delete a PlayerPokemon row while any session
+  // still references it, as a defense-in-depth backstop behind the
+  // application-level release check (this row is always deleted the
+  // moment a battle ends, so in correct operation this can only ever block
+  // deleting the Pokémon that's genuinely mid-battle right now).
+  activePlayerPokemonId String
+  activePlayerPokemon   PlayerPokemon @relation(fields: [activePlayerPokemonId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([activePlayerPokemonId])
+  @@map("field_battle_session")
 }
 
 model Session {

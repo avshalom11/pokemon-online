@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { PartySection } from "./PartySection";
 import { PokemonDetailsPanel } from "./PokemonDetailsPanel";
@@ -30,9 +30,26 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
   const [armedSlot, setArmedSlot] = useState<number | null>(null);
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
   const [partyError, setPartyError] = useState<string | null>(null);
+  const [releaseNotice, setReleaseNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const releaseNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (releaseNoticeTimeout.current) clearTimeout(releaseNoticeTimeout.current);
+  }, []);
 
   const selectedPokemon = data.collection.find((p) => p.id === selectedId) ?? null;
+
+  // Released Pokémon disappear from `data.collection` on their own — the
+  // server action's revalidatePath("/my-pokemon") refreshes this page's own
+  // server-fetched data automatically (same mechanism assign/remove/swap
+  // already rely on), no manual list-patching needed here. This handler
+  // only owns the transient success banner.
+  function handleReleaseSuccess(releasedName: string) {
+    setReleaseNotice(`${releasedName} שוחרר בהצלחה.`);
+    if (releaseNoticeTimeout.current) clearTimeout(releaseNoticeTimeout.current);
+    releaseNoticeTimeout.current = setTimeout(() => setReleaseNotice(null), 4000);
+  }
 
   function handlePartySlotSelect(slotIndex: number) {
     const occupant = data.party.find((p) => p.partySlot === slotIndex) ?? null;
@@ -121,6 +138,7 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
           </p>
         ) : null}
         {partyError ? <p className="text-xs text-rose-400">{partyError}</p> : null}
+        {releaseNotice ? <p className="text-xs text-emerald-400">{releaseNotice}</p> : null}
 
         <PartySection
           party={data.party}
@@ -140,7 +158,9 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
           pokemon={selectedPokemon}
           trainerName={data.displayName}
           party={data.party}
+          totalOwnedCount={data.collection.length}
           onClose={() => setSelectedId(null)}
+          onReleaseSuccess={handleReleaseSuccess}
         />
       ) : null}
 

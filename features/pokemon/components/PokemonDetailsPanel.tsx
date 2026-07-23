@@ -3,6 +3,8 @@ import { useState, useTransition } from "react";
 import { calculateBattleStats } from "@/engine/battle/stat-calculation";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { SpriteImage } from "@/components/media/SpriteImage";
+import { releasePokemonAction } from "@/features/pokemon/actions/release-pokemon.action";
+import { ReleaseConfirmDialog } from "@/features/pokemon/components/ReleaseConfirmDialog";
 import { assignPartySlotAction, removePartySlotAction, swapPartySlotsAction } from "@/features/party/actions/party.actions";
 import { formatDexNumber, getArtworkPath } from "@/features/pokemon/media/pokemon-media-paths";
 import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
@@ -16,7 +18,19 @@ interface PokemonDetailsPanelProps {
   // and whether the party is currently full — pokemon.partySlot already
   // tells us this specific Pokémon's own membership/leader status.
   party: OwnedPokemon[];
+  // Total Pokémon this player owns (collection.length) — the only piece of
+  // data needed, alongside pokemon.partySlot, to pre-emptively disable
+  // release client-side for the two locally-knowable restrictions ("in
+  // party" and "last owned Pokémon"). The third restriction ("referenced by
+  // an active battle session") isn't pre-checked here — it's rare enough
+  // (mid-battle in another tab) that surfacing it only as a post-submit
+  // error, same as any other server-side rejection, is enough.
+  totalOwnedCount: number;
   onClose: () => void;
+  // Fires after a successful release, with the released Pokémon's display
+  // name, so the page-level MyPokemonContent can show a success message
+  // even after this panel itself has closed.
+  onReleaseSuccess?: (releasedName: string) => void;
 }
 
 const STAT_LABELS: { key: keyof ReturnType<typeof calculateBattleStats>; label: string }[] = [
@@ -30,15 +44,29 @@ const STAT_LABELS: { key: keyof ReturnType<typeof calculateBattleStats>; label: 
 // Centered modal (not a browser popup) — reuses the same overlay pattern as
 // ConfirmStarterDialog (fixed inset-0 + backdrop + centered card), scaled up
 // into a scrollable glass panel for the much larger amount of content here.
-export function PokemonDetailsPanel({ pokemon, trainerName, party, onClose }: PokemonDetailsPanelProps) {
+export function PokemonDetailsPanel({
+  pokemon,
+  trainerName,
+  party,
+  totalOwnedCount,
+  onClose,
+  onReleaseSuccess,
+}: PokemonDetailsPanelProps) {
   const displayName = pokemon.nickname ?? pokemon.species.name;
   const stats = calculateBattleStats(pokemon.species.baseStats, pokemon.level);
 
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
 
   const isInParty = pokemon.partySlot !== null;
   const isFirst = pokemon.partySlot === 1;
+  const isLastOwned = totalOwnedCount <= 1;
+  const releaseBlockedReason = isInParty
+    ? "יש להסיר את הפוקימון מהשישייה לפני שניתן לשחרר אותו."
+    : isLastOwned
+      ? "לא ניתן לשחרר את הפוקימון האחרון שבבעלותך."
+      : null;
   const occupiedSlots = new Set(party.map((member) => member.partySlot));
   const firstEmptySlot = Array.from({ length: MAX_ACTIVE_TEAM_SIZE }, (_, index) => index + 1).find(
     (slot) => !occupiedSlots.has(slot)
@@ -71,6 +99,36 @@ export function PokemonDetailsPanel({ pokemon, trainerName, party, onClose }: Po
     startTransition(async () => {
       const result = await swapPartySlotsAction(pokemon.partySlot!, 1);
       if (result.status !== "ok") setErrorMessage("לא ניתן היה להפוך את הפוקימון למוביל.");
+    });
+  }
+
+  // Confirmation is required before this ever runs (see ReleaseConfirmDialog
+  // below) — this only fires from that dialog's own confirm button, never
+  // directly from the grid button. `isPending` (shared with every other
+  // mutation in this panel) already guards against a rapid double-click
+  // firing a second delete while the first is still in flight.
+  function handleRelease() {
+    setErrorMessage(null);
+    startTransition(async () => {
+      const result = await releasePokemonAction(pokemon.id);
+
+      if (result.status === "released") {
+        setShowReleaseConfirm(false);
+        onReleaseSuccess?.(displayName);
+        onClose();
+        return;
+      }
+
+      setShowReleaseConfirm(false);
+      if (result.status === "in-party") {
+        setErrorMessage("יש להסיר את הפוקימון מהשישייה לפני שניתן לשחרר אותו.");
+      } else if (result.status === "in-battle") {
+        setErrorMessage("לא ניתן לשחרר פוקימון שמשתתף כרגע בקרב פעיל.");
+      } else if (result.status === "last-pokemon") {
+        setErrorMessage("לא ניתן לשחרר את הפוקימון האחרון שבבעלותך.");
+      } else {
+        setErrorMessage("לא ניתן היה לשחרר את הפוקימון.");
+      }
     });
   }
 
@@ -172,17 +230,38 @@ export function PokemonDetailsPanel({ pokemon, trainerName, party, onClose }: Po
               disabled={isPending || !isInParty || isFirst}
               onClick={handleMakeLeader}
             />
+            <button
+              type="button"
+              disabled={isPending || releaseBlockedReason !== null}
+              title={releaseBlockedReason ?? undefined}
+              onClick={() => setShowReleaseConfirm(true)}
+              className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-3 py-2 text-xs font-semibold text-rose-300 transition-colors enabled:hover:border-rose-400/60 enabled:hover:bg-rose-950/70 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              שחרור פוקימון
+            </button>
             <ActionButton label="סגור" onClick={onClose} />
           </div>
 
           {errorMessage ? <p className="mt-2 text-center text-[11px] text-rose-400">{errorMessage}</p> : null}
-          {isInParty && !errorMessage ? (
+          {!errorMessage && isInParty ? (
             <p className="mt-2 text-center text-[11px] text-slate-500">
               {isFirst ? "מוביל הצוות — מתחיל כל קרב." : "כרגע חלק מהצוות הפעיל."}
             </p>
           ) : null}
+          {!errorMessage && releaseBlockedReason ? (
+            <p className="mt-1 text-center text-[11px] text-slate-500">{releaseBlockedReason}</p>
+          ) : null}
         </div>
       </div>
+
+      {showReleaseConfirm ? (
+        <ReleaseConfirmDialog
+          pokemon={pokemon}
+          pending={isPending}
+          onCancel={() => setShowReleaseConfirm(false)}
+          onConfirm={handleRelease}
+        />
+      ) : null}
     </div>
   );
 }

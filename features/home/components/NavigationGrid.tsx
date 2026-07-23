@@ -3,6 +3,7 @@ import { NavigationCard } from "./NavigationCard";
 const NAVIGATION_ITEMS = [
   { title: "מפה", icon: "🗺️", href: "/map" },
   { title: "הפוקימונים שלי", icon: "🐾", href: "/my-pokemon" },
+  { title: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },
   { title: "תיק ציוד", icon: "🎒", comingSoon: true },
   { title: "פוקידקס", icon: "📖", comingSoon: true },
   { title: "חנות", icon: "🛒", comingSoon: true },

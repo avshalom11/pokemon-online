@@ -38,19 +38,34 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
     redirect("/map");
   }
 
-  const data = await getBattleViewData(session.user.id, zone);
+  const result = await getBattleViewData(session.user.id, zone);
+
+  // The player already has an active battle session, but for a different
+  // zone than requested — never silently abandon or duplicate it; send
+  // them back to their real, in-progress battle instead.
+  if (result.status === "redirect") {
+    redirect(`/battle?zone=${result.zoneId}`);
+  }
 
   // No usable (HP > 0) party member — a battle must never start with a
   // fully-fainted party. Unreachable for a brand-new player (a starter is
   // guaranteed by onboarding) but reachable once fainted Pokémon exist.
-  if (!data) {
+  if (result.status === "no-usable-party") {
     redirect("/map?notice=party-needs-healing");
   }
+
+  const { data } = result;
 
   return (
     <>
       <GameHeader />
-      <BattleContent zoneId={zone} wild={data.wild} party={data.party} activePokemonId={data.activePokemonId} />
+      <BattleContent
+        zoneId={zone}
+        wild={data.wild}
+        party={data.party}
+        activePokemonId={data.activePokemonId}
+        playerName={data.playerName}
+      />
     </>
   );
 }

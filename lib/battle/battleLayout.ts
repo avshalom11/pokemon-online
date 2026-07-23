@@ -53,6 +53,33 @@ export const PLAYER_HUD_SIDE_CLASS = "absolute right-3 sm:right-6 lg:right-8";
 // leaving enough room below the card itself before the footer begins.
 export const PLAYER_HUD_TOP_PERCENT = 50;
 
+// Battle message box sizing — deliberately narrower than the footer's full
+// width, rather than stretching edge-to-edge, so it can never reach under
+// the player's status card: that card is pinned to the right edge at every
+// breakpoint (PLAYER_HUD_SIDE_CLASS above). A responsive width *percentage*
+// (not a fixed px value) so it scales with the panel's own responsive width
+// (BattleWindow's --panel-width-pct), with a max-width cap so it never
+// becomes uncomfortably wide on a large panel. ~60% on desktop, per the
+// design target; wider on mobile/tablet since those panels are already
+// narrow and a one-sentence message still needs room to breathe.
+// Centralized here (rather than left as inline classes on
+// BattleMessageBox) since this is a battle *layout* concern, same as every
+// other constant in this file.
+//
+// self-start (not centered): the footer below (BattleScene) is a flex-col
+// container, and the Attack Panel / Action Menu split into left/right
+// halves at sm: and up (`sm:flex-row`, each `sm:flex-1`) — anchoring the
+// message box to that same container's start (left) edge via align-self
+// means it sits mostly over the Attack Panel's column rather than spanning
+// the full footer width, putting it structurally far from the
+// right-anchored player status card rather than merely nudged away from
+// it. This replaced an earlier centered (mx-auto) + small transform-offset
+// approach: self-start is the footer's own existing flex alignment
+// mechanism, so reaching for it instead of a bigger arbitrary offset avoids
+// adding another magic number on top of an already-centralized value.
+export const MESSAGE_BOX_WIDTH_CLASS = "self-start w-[90%] sm:w-3/4 lg:w-3/5";
+export const MESSAGE_BOX_MAX_WIDTH_CLASS = "max-w-sm sm:max-w-md lg:max-w-lg";
+
 export const DEFAULT_BATTLE_MENU_ACTIONS: BattleMenuAction[] = [
   { id: "attack", label: "התקפה" },
   { id: "bag", label: "תיק" },
