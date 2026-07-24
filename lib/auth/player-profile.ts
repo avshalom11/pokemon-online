@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { prisma } from "@/lib/db/prisma";
 
 // Idempotent by design: safe to call every time a session is read, not just
@@ -30,6 +32,12 @@ export async function ensurePlayerProfile(userId: string, displayName: string) {
 // only need the current row and should not implicitly create one — creation
 // is ensurePlayerProfile's job alone, called once per request from
 // getCurrentSession().
-export async function getPlayerProfile(userId: string) {
+//
+// cache()-wrapped (same pattern as getCurrentSession above it in
+// auth-session.ts) so the several call sites that all fetch the same
+// player's profile within one request — the (game) layout's header data and
+// each page's own view-data service — collapse into a single DB round trip
+// instead of one per caller.
+export const getPlayerProfile = cache(async (userId: string) => {
   return prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
-}
+});

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { calculateBattleStats } from "@/engine/battle/stat-calculation";
+import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { prisma } from "@/lib/db/prisma";
 
@@ -32,7 +32,7 @@ export async function healParty(playerId: string, playerPokemonIds: string[]): P
     const species = getSpeciesById(pokemon.speciesId);
     if (!species) return [];
 
-    const maxHp = calculateBattleStats(species.baseStats, pokemon.level).health;
+    const maxHp = calculatePokemonHpStat(species.baseStats.health, pokemon.level);
     // Already full — excluded so a selection of only full-HP Pokémon never
     // triggers a no-op database write.
     if (pokemon.currentHp >= maxHp) return [];

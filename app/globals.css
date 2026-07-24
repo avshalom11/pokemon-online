@@ -4,13 +4,24 @@
   --background: #ffffff;
   --foreground: #171717;
 
-  /* Height reserved for the future global game header (player avatar,
-     level, gold, gems, energy, notifications, settings). The header itself
-     isn't built yet — this variable is what lets every full-screen game
-     surface (via components/layout/GameScreen.tsx) leave room for it today
-     without needing changes once it exists. Keep lib/layout/gameLayout.ts's
-     APP_HEADER_HEIGHT_PX in sync if this ever changes. */
+  /* Height reserved for the global game header
+     (components/layout/GameHeader.tsx) — every full-screen game surface
+     (GameScreen.tsx, BattleWindow.tsx, MapContent.tsx) reserves space for
+     the header via this single variable rather than a hardcoded number, so
+     it's the only place that needs to change if the header's height ever
+     does. Keep lib/layout/gameLayout.ts's APP_HEADER_HEIGHT_PX in sync. */
   --app-header-height: 64px;
+}
+
+/* Below the sm: breakpoint (640px, matching every other responsive class in
+   this project), the header stacks the XP bar + numeric progress onto a
+   second row instead of hiding them — see GameHeader.tsx — so it needs more
+   vertical room here. Every --app-header-height consumer reads this same
+   variable, so they all adapt automatically without per-component changes. */
+@media (max-width: 639px) {
+  :root {
+    --app-header-height: 84px;
+  }
 }
 
 @theme inline {

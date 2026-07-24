@@ -1,6 +1,6 @@
 import { useState, useTransition } from "react";
 
-import { calculateBattleStats } from "@/engine/battle/stat-calculation";
+import { calculatePokemonStats } from "@/engine/battle/pokemon-stat-calculations";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { releasePokemonAction } from "@/features/pokemon/actions/release-pokemon.action";
@@ -33,7 +33,7 @@ interface PokemonDetailsPanelProps {
   onReleaseSuccess?: (releasedName: string) => void;
 }
 
-const STAT_LABELS: { key: keyof ReturnType<typeof calculateBattleStats>; label: string }[] = [
+const STAT_LABELS: { key: keyof ReturnType<typeof calculatePokemonStats>; label: string }[] = [
   { key: "attack", label: "התקפה" },
   { key: "defense", label: "הגנה" },
   { key: "specialAttack", label: "התקפה מיוחדת" },
@@ -53,7 +53,7 @@ export function PokemonDetailsPanel({
   onReleaseSuccess,
 }: PokemonDetailsPanelProps) {
   const displayName = pokemon.nickname ?? pokemon.species.name;
-  const stats = calculateBattleStats(pokemon.species.baseStats, pokemon.level);
+  const stats = calculatePokemonStats({ baseStats: pokemon.species.baseStats, level: pokemon.level });
 
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -206,7 +206,9 @@ export function PokemonDetailsPanel({
           </div>
 
           <div className="mt-4">
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">סטטיסטיקות</h3>
+            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+              סטטיסטיקות מחושבות (רמה {pokemon.level})
+            </h3>
             <div className="space-y-2">
               {STAT_LABELS.map(({ key, label }) => (
                 <StatBar key={key} label={label} value={stats[key]} />

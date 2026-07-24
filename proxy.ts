@@ -12,7 +12,7 @@ import type { NextRequest } from "next/server";
 // file convention to proxy.ts (confirmed from node_modules/next/dist/docs/
 // 01-app/03-api-reference/03-file-conventions/proxy.md) — a middleware.ts
 // file would simply never run.
-const PROTECTED_PATHS = ["/home", "/my-pokemon", "/map", "/battle", "/onboarding/starter"];
+const PROTECTED_PATHS = ["/home", "/my-pokemon", "/map", "/battle", "/pokemon-center", "/onboarding/starter"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -44,6 +44,8 @@ export const config = {
     "/map/:path*",
     "/battle",
     "/battle/:path*",
+    "/pokemon-center",
+    "/pokemon-center/:path*",
     "/onboarding/starter",
   ],
 };

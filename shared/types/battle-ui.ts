@@ -14,12 +14,13 @@ export interface BattleParticipantDisplay {
 }
 
 export interface PlayerBattleParticipantDisplay extends BattleParticipantDisplay {
-  // Optional: no Pokémon-leveling XP curve exists yet (only the separate
-  // trainer-level one, engine/player/trainer-progress.ts) — omit both
-  // rather than fabricate values; BattleScene only shows the EXP bar when
-  // they're present.
-  currentExperience?: number;
-  maxExperience?: number;
+  // Total lifetime Pokémon XP — PokemonXpBar (components/battle/
+  // PokemonXpBar.tsx) derives current-level XP, the next-level requirement,
+  // and the max-level state from this single number via the centralized
+  // pokemon-progression calculations. Optional so a caller with no
+  // Pokémon-progression data yet can still render the rest of the HUD;
+  // BattleScene only shows the XP bar when it's present.
+  experience?: number;
 }
 
 export interface BattleMenuAction {

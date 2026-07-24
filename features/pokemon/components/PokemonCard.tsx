@@ -1,4 +1,5 @@
 import { HealthBar } from "@/components/battle/HealthBar";
+import { PokemonXpBar } from "@/components/battle/PokemonXpBar";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
@@ -54,6 +55,10 @@ export function PokemonCard({ pokemon, onClick }: PokemonCardProps) {
 
       <div className="w-full">
         <HealthBar current={pokemon.currentHp} max={pokemon.maxHp} />
+      </div>
+
+      <div className="w-full">
+        <PokemonXpBar experience={pokemon.experience} />
       </div>
 
       <div className="flex flex-wrap justify-center gap-1">

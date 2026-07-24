@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { calculateBattleStats } from "@/engine/battle/stat-calculation";
+import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { markParticipantFainted } from "@/features/battle-session/services/battle-session.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -31,13 +32,22 @@ export async function syncPartyHpAction(playerPokemonId: string, currentHp: numb
   const species = getSpeciesById(pokemon.speciesId);
   if (!species) return;
 
-  const maxHp = calculateBattleStats(species.baseStats, pokemon.level).health;
+  const maxHp = calculatePokemonHpStat(species.baseStats.health, pokemon.level);
   const clampedHp = Math.max(0, Math.min(maxHp, currentHp));
 
   await prisma.playerPokemon.update({
     where: { id: playerPokemonId },
     data: { currentHp: clampedHp },
   });
+
+  // Once HP lands at exactly 0, this Pokémon is permanently ineligible for
+  // the current encounter's Pokémon-XP reward — see
+  // battle-session.service.ts's markParticipantFainted and
+  // features/pokemon-progression's fainted-exclusion rule. A non-lethal HP
+  // change (still > 0) never touches participant eligibility.
+  if (clampedHp === 0) {
+    await markParticipantFainted(profile.id, playerPokemonId);
+  }
 
   // Every route that renders this Pokémon's HP outside of battle was
   // rendered (and client-side Router Cached) before the battle started, so

@@ -2,11 +2,15 @@ import "server-only";
 
 import { rollCapture } from "@/engine/battle/capture";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
+import { getTotalXpRequiredForPokemonLevel } from "@/features/pokemon-progression/pokemon-progression-calculations";
+import { calculateCaptureXpReward } from "@/features/player-progression/progression-calculations";
+import { addPlayerExperience } from "@/features/player-progression/progression-service";
+import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { prisma } from "@/lib/db/prisma";
 
 export type AttemptCaptureResult =
-  | { status: "captured"; speciesName: string }
+  | { status: "captured"; speciesName: string; xpResult: LevelUpResult }
   | { status: "failed" }
   | { status: "invalid-encounter" };
 
@@ -49,13 +53,13 @@ export async function attemptCapture(userId: string): Promise<AttemptCaptureResu
     return { status: "failed" };
   }
 
-  const didCapture = await prisma.$transaction(async (tx) => {
+  const captureOutcome = await prisma.$transaction(async (tx) => {
     const ended = await tx.fieldBattleSession.deleteMany({ where: { playerId: profile.id } });
     if (ended.count === 0) {
       // Already ended by a racing duplicate request (or some other
-      // battle-ending action) — never create a second Pokémon from this
-      // one throw.
-      return false;
+      // battle-ending action) — never create a second Pokémon (or grant a
+      // second XP reward) from this one throw.
+      return null;
     }
 
     await tx.playerPokemon.create({
@@ -63,17 +67,31 @@ export async function attemptCapture(userId: string): Promise<AttemptCaptureResu
         playerId: profile.id,
         speciesId: species.id,
         level: session.wildLevel,
+        // Not a capture-XP reward (there isn't one — see
+        // features/pokemon-progression's own "Pokémon do not receive XP
+        // from capturing" rule); this is only the total-XP baseline that's
+        // actually consistent with the level this Pokémon is created at, so
+        // its very next real battle-XP grant (features/pokemon-progression)
+        // computes a level *increase* from here, never an implicit drop
+        // back down from a stale `experience: 0` default.
+        experience: getTotalXpRequiredForPokemonLevel(session.wildLevel),
         currentHp: session.wildCurrentHp,
         isStarter: false,
       },
     });
 
-    return true;
+    // Same transaction, same race guard as the delete/create above — the
+    // deleteMany count check already makes this whole block run at most
+    // once per encounter, so the XP grant inherits that same
+    // exactly-once guarantee for free.
+    const xpResult = await addPlayerExperience(tx, profile.id, calculateCaptureXpReward(session.wildLevel));
+
+    return { xpResult };
   });
 
-  if (!didCapture) {
+  if (!captureOutcome) {
     return { status: "invalid-encounter" };
   }
 
-  return { status: "captured", speciesName: species.name };
+  return { status: "captured", speciesName: species.name, xpResult: captureOutcome.xpResult };
 }

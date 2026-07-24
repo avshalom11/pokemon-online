@@ -1,14 +1,57 @@
 import "server-only";
 
-import { calculateBattleStats } from "@/engine/battle/stat-calculation";
+import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { startPokemonEncounter, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { ZONE_DATA } from "@/data/zones/zone-data";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getFirstUsableMember, hasUsableMember, isUsable } from "@/features/party/utils/party-rules";
+import { getEligibleParticipantIds, withParticipant, withParticipantFainted } from "@/features/pokemon-progression/pokemon-progression-calculations";
+import { grantBattlePokemonXp } from "@/features/pokemon-progression/pokemon-progression-service";
+import type { BattleParticipantRecord, PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
+import { calculateVictoryXpReward } from "@/features/player-progression/progression-calculations";
+import { addPlayerExperience } from "@/features/player-progression/progression-service";
+import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { ZoneId } from "@/shared/types/zone";
+
+// The authoritative result of a wild-Pokémon victory: both the
+// player-account reward (unchanged) and every eligible owned Pokémon's own
+// reward, granted atomically together — see syncWildHp below.
+export interface BattleVictoryReward {
+  player: LevelUpResult;
+  pokemon: PokemonLevelUpResult[];
+}
+
+// FieldBattleSession.participants is stored as Prisma.JsonValue — never
+// trusted directly (a legacy row from before this column existed, or any
+// unexpected shape, must never crash a read). Anything that doesn't match
+// the expected shape is dropped rather than throwing, the same "invalid ->
+// safe fallback" philosophy restoreFromRow already uses for a stale session
+// row.
+function parseParticipants(value: Prisma.JsonValue): BattleParticipantRecord[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((entry) => {
+    if (
+      entry &&
+      typeof entry === "object" &&
+      !Array.isArray(entry) &&
+      typeof (entry as Record<string, unknown>).playerPokemonId === "string" &&
+      typeof (entry as Record<string, unknown>).fainted === "boolean" &&
+      typeof (entry as Record<string, unknown>).order === "number"
+    ) {
+      return [entry as unknown as BattleParticipantRecord];
+    }
+    return [];
+  });
+}
+
+function serializeParticipants(participants: BattleParticipantRecord[]): Prisma.InputJsonValue {
+  return participants as unknown as Prisma.InputJsonValue;
+}
 
 // Owns the FieldBattleSession row — the authoritative, persisted record of a
 // player's single in-progress wild encounter (see the model's own doc
@@ -130,6 +173,10 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
       wildCurrentHp: wild.currentHealth,
       wildMaxHp: wild.maximumHealth,
       activePlayerPokemonId: activePokemon.id,
+      // The starting active Pokémon is a participant in this first
+      // encounter from the moment the session exists — see
+      // BattleParticipantRecord's own doc comment.
+      participants: serializeParticipants([{ playerPokemonId: activePokemon.id, fainted: false, order: 0 }]),
     },
   });
 
@@ -142,29 +189,110 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
 // Re-derives max HP from the row's own species/level rather than trusting a
 // client-sent value — same rule syncPartyHpAction already follows for party
 // HP (features/battle/actions/sync-party-hp.action.ts).
-export async function syncWildHp(playerId: string, zoneId: ZoneId, currentHp: number): Promise<void> {
+//
+// Also the one place a wild-defeat reward (both the player-account XP and
+// every eligible owned Pokémon's own XP — see BattleVictoryReward) is
+// granted: when the clamped HP lands at 0 and the reward hasn't already
+// been claimed for this encounter, the HP write and both reward grants
+// happen in one transaction, gated by `wildDefeatRewardGranted: false` in
+// the update's WHERE clause — a racing duplicate call's updateMany then
+// matches 0 rows and returns null before granting anything, the same idiom
+// capture.service.ts's attemptCapture already uses (a deleteMany-count race
+// guard). This single guard now protects both rewards together, so
+// "player XP granted but Pokémon XP wasn't" can never happen from a retry
+// or a race. Returns null whenever no reward was granted by this call
+// (non-lethal hit, no session, or already claimed) so callers can tell
+// "nothing to show" from "here's the result".
+//
+// The finisher is simply `session.activePlayerPokemonId` at this exact
+// moment — never a client-supplied id. Only the currently-active Pokémon
+// can ever be the one whose attack reduced the wild's HP to 0 in this
+// fixed-attack battle system (see engine/battle/battle-config.ts), and
+// activePlayerPokemonId is itself only ever written by syncActivePokemon
+// below, which already re-validates ownership/party-membership server-side
+// before persisting it (sync-active-pokemon.action.ts) — so trusting it
+// here carries that same validation forward rather than re-doing it.
+export async function syncWildHp(playerId: string, zoneId: ZoneId, currentHp: number): Promise<BattleVictoryReward | null> {
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
-  if (!session || session.zoneId !== zoneId) return;
+  if (!session || session.zoneId !== zoneId) return null;
 
   const species = getSpeciesById(session.wildSpeciesId);
-  if (!species) return;
+  if (!species) return null;
 
-  const maxHp = calculateBattleStats(species.baseStats, session.wildLevel).health;
+  const maxHp = calculatePokemonHpStat(species.baseStats.health, session.wildLevel);
   const clampedHp = Math.max(0, Math.min(maxHp, currentHp));
 
-  await prisma.fieldBattleSession.updateMany({
-    where: { playerId, zoneId },
-    data: { wildCurrentHp: clampedHp },
+  if (clampedHp > 0 || session.wildDefeatRewardGranted) {
+    await prisma.fieldBattleSession.updateMany({
+      where: { playerId, zoneId },
+      data: { wildCurrentHp: clampedHp },
+    });
+    return null;
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const claimed = await tx.fieldBattleSession.updateMany({
+      where: { playerId, zoneId, wildDefeatRewardGranted: false },
+      data: { wildCurrentHp: clampedHp, wildDefeatRewardGranted: true },
+    });
+
+    if (claimed.count === 0) return null;
+
+    const player = await addPlayerExperience(tx, playerId, calculateVictoryXpReward(session.wildLevel));
+
+    const eligibleParticipantIds = getEligibleParticipantIds(parseParticipants(session.participants));
+    const pokemon = await grantBattlePokemonXp(tx, {
+      defeatedWildLevel: session.wildLevel,
+      eligibleParticipantIds,
+      finisherId: session.activePlayerPokemonId,
+      source: "wildBattleVictory",
+    });
+
+    return { player, pokemon };
   });
 }
 
 // `playerPokemonId` ownership/party-membership is the caller's
 // responsibility to have already validated (see
 // sync-active-pokemon.action.ts) before this is reached.
+//
+// Also records this Pokémon as a participant of the current encounter (see
+// BattleParticipantRecord) — a plain read-then-write rather than an atomic
+// JSON update because Prisma has no partial-array-update operator for
+// Postgres Json columns, and this write is never concurrent with itself in
+// practice: the battle's own turn-based phase guard (BattleContent's
+// BattlePhase state machine) already ensures only one switch can be
+// in-flight for a given player at a time. withParticipant is idempotent
+// (a Pokémon switching in and out repeatedly is recorded only once), so
+// even a hypothetical duplicate/racing call is safe.
 export async function syncActivePokemon(playerId: string, playerPokemonId: string): Promise<void> {
+  const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
+  if (!session) return;
+
+  const participants = withParticipant(parseParticipants(session.participants), playerPokemonId);
+
   await prisma.fieldBattleSession.updateMany({
     where: { playerId },
-    data: { activePlayerPokemonId: playerPokemonId },
+    data: { activePlayerPokemonId: playerPokemonId, participants: serializeParticipants(participants) },
+  });
+}
+
+// Marks an existing participant of the current encounter as fainted, making
+// it permanently ineligible for that encounter's Pokémon-XP reward (see
+// getEligibleParticipantIds) — even if it's switched back in or targeted
+// again later in the same encounter. Called from
+// features/battle/actions/sync-party-hp.action.ts whenever a party HP sync
+// lands at exactly 0. Same read-then-write shape and idempotency guarantee
+// as syncActivePokemon above.
+export async function markParticipantFainted(playerId: string, playerPokemonId: string): Promise<void> {
+  const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
+  if (!session) return;
+
+  const participants = withParticipantFainted(parseParticipants(session.participants), playerPokemonId);
+
+  await prisma.fieldBattleSession.updateMany({
+    where: { playerId },
+    data: { participants: serializeParticipants(participants) },
   });
 }
 
@@ -178,6 +306,13 @@ export async function endBattleSession(playerId: string): Promise<void> {
 // untouched. Returns null if there's no matching session to advance
 // (stale/duplicate call after the session already ended), so a caller can
 // never generate a second encounter against a session that isn't there.
+//
+// Also resets `participants` back to just the current active Pokémon —
+// participation is scoped to one encounter (see BattleParticipantRecord's
+// own doc comment), exactly like wildDefeatRewardGranted resets to false
+// here: a Pokémon that fought (or merely appeared for) an earlier,
+// already-defeated wild in this same zone session must never remain
+// "eligible" for a completely different wild's reward.
 export async function advanceToNextEncounter(playerId: string, zoneId: ZoneId): Promise<EncounterResult | null> {
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
   if (!session || session.zoneId !== zoneId) return null;
@@ -191,6 +326,8 @@ export async function advanceToNextEncounter(playerId: string, zoneId: ZoneId): 
       wildLevel: wild.level,
       wildCurrentHp: wild.currentHealth,
       wildMaxHp: wild.maximumHealth,
+      wildDefeatRewardGranted: false,
+      participants: serializeParticipants([{ playerPokemonId: session.activePlayerPokemonId, fainted: false, order: 0 }]),
     },
   });
 

@@ -1,10 +1,16 @@
 // Single source of truth for every battle notification string (rendered
 // through BattleContent's `message` state into the shared
-// components/battle/BattleMessageBox — never a separate notification
-// system). Centralizing wording here means every battle screen state reads
-// consistent Hebrew phrasing, and there is exactly one place to fix a typo
-// or translation instead of several inline template strings scattered
-// across BattleContent.
+// components/battle/BattleMessageBox). Centralizing wording here means
+// every battle screen state reads consistent Hebrew phrasing, and there is
+// exactly one place to fix a typo or translation instead of several inline
+// template strings scattered across BattleContent.
+//
+// Battle-only events, strictly: immediate attacks, faints, switches,
+// captures, escapes. Player XP/level-up feedback is deliberately NOT here —
+// XP is a brief toast (features/battle/components/XpToast.tsx, wording from
+// features/player-progression/progression-messages.ts) and level-ups are a
+// persistent notification (features/notifications/) — the battle loop must
+// never be slowed by meta-progression text sharing this message box.
 //
 // Pokémon species names and the player's own username are always passed in
 // as plain parameters and interpolated as-is (English, exactly as stored —

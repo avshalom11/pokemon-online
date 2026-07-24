@@ -1,22 +1,11 @@
 import "server-only";
 
-import { getTrainerProgress, type TrainerProgress } from "@/engine/player/trainer-progress";
-import { formatTrainerId } from "@/features/home/services/trainer-id";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 export interface HomeViewData {
-  displayName: string;
-  trainerId: string;
-
-  level: number;
-  xp: TrainerProgress;
-
-  coins: number;
-  gems: number;
-
   party: OwnedPokemon[];
 
   stats: {
@@ -25,9 +14,13 @@ export interface HomeViewData {
   };
 }
 
-// Single aggregator for everything app/home/page.tsx needs, so the page
-// itself stays a thin display layer (per PROJECT_RULES: "pages should
-// display data") instead of juggling four separate data calls itself.
+// Single aggregator for everything app/(game)/home/page.tsx needs, so the
+// page itself stays a thin display layer (per PROJECT_RULES: "pages should
+// display data") instead of juggling calls itself. Profile-level display
+// fields (displayName, level, xp, coins, gold) live in
+// features/player/services/player-header-data.service.ts instead — the
+// global header (app/(game)/layout.tsx) is the only thing that needs them,
+// so they're not duplicated here.
 export async function getHomeViewData(userId: string): Promise<HomeViewData> {
   const profile = await getPlayerProfile(userId);
   const [party, stats] = await Promise.all([getPlayerParty(profile.id), getOwnedPokemonStats(profile.id)]);
@@ -36,12 +29,6 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
   const dexCompletionPercent = dexSize > 0 ? Math.round((stats.uniqueSpeciesCaught / dexSize) * 100) : 0;
 
   return {
-    displayName: profile.displayName,
-    trainerId: formatTrainerId(profile.id),
-    level: profile.level,
-    xp: getTrainerProgress(profile.level, profile.experience),
-    coins: profile.coins,
-    gems: profile.gems,
     party,
     stats: {
       totalCaught: stats.totalCaught,

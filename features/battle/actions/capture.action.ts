@@ -1,10 +1,11 @@
 "use server";
 
 import { attemptCapture } from "@/features/battle/services/capture.service";
+import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 
 export type CaptureActionResult =
-  | { status: "captured"; pokemonName: string }
+  | { status: "captured"; pokemonName: string; xpResult: LevelUpResult }
   | { status: "failed" }
   | { status: "error" };
 
@@ -33,5 +34,5 @@ export async function attemptCaptureAction(): Promise<CaptureActionResult> {
     return { status: "failed" };
   }
 
-  return { status: "captured", pokemonName: result.speciesName };
+  return { status: "captured", pokemonName: result.speciesName, xpResult: result.xpResult };
 }

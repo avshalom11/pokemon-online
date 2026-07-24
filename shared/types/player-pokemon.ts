@@ -17,9 +17,9 @@ export interface OwnedPokemon {
   currentHp: number;
 
   // Derived (species base stat + level growth), not a persisted column — see
-  // engine/battle/stat-calculation.ts's calculateBattleStats, the same
-  // formula the battle engine uses. Included here so display components
-  // (HealthBar) never need to recompute it themselves.
+  // engine/battle/pokemon-stat-calculations.ts's calculatePokemonHpStat, the
+  // same formula every other HP consumer uses. Included here so display
+  // components (HealthBar) never need to recompute it themselves.
   maxHp: number;
 
   isStarter: boolean;

@@ -1,19 +1,20 @@
-import { ExperienceBar } from "./ExperienceBar";
 import { HealthBar } from "./HealthBar";
+import { PokemonXpBar } from "./PokemonXpBar";
 import type { BattleTheme } from "@/shared/types/battle-theme";
 import type { BattleParticipantDisplay } from "@/shared/types/battle-ui";
 
 interface BattleHUDProps {
   theme: BattleTheme;
   participant: BattleParticipantDisplay;
-  /** Present only for the player HUD — enemy HUDs never show EXP. */
-  experience?: { current: number; max: number };
+  /** Present only for the player HUD — enemy (wild) HUDs never show a
+   * Pokémon-XP bar; total lifetime XP, not a {current,max} pair, per
+   * PokemonXpBar's own doc comment. */
+  experience?: number;
 }
 
 // Trimmed from the original w-56/sm:w-64 card (width, padding, and name
-// text all reduced slightly) as part of a visual-polish pass — HealthBar/
-// ExperienceBar themselves are untouched, so the HP bar stays exactly as
-// readable as before.
+// text all reduced slightly) as part of a visual-polish pass — HealthBar
+// itself is untouched, so the HP bar stays exactly as readable as before.
 export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
   return (
     <div
@@ -38,13 +39,9 @@ export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
 
       <HealthBar current={participant.currentHealth} max={participant.maxHealth} />
 
-      {experience ? (
+      {experience !== undefined ? (
         <div className="mt-2">
-          <ExperienceBar
-            current={experience.current}
-            max={experience.max}
-            accent={theme.colors.panelAccent}
-          />
+          <PokemonXpBar experience={experience} />
         </div>
       ) : null}
     </div>

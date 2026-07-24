@@ -1,5 +1,5 @@
 import { getTypeEffectivenessMultiplier } from "./type-effectiveness";
-import type { BattleStats } from "./stat-calculation";
+import type { PokemonStats } from "./pokemon-stat-calculations";
 import type { Move } from "@/shared/types/move";
 import type { PokemonType } from "@/shared/types/pokemon";
 
@@ -16,8 +16,8 @@ const MAXIMUM_RANDOM_FACTOR = 1;
 
 export function calculateDamage(params: {
   attackerLevel: number;
-  attackerStats: BattleStats;
-  defenderStats: BattleStats;
+  attackerStats: PokemonStats;
+  defenderStats: PokemonStats;
   defenderTypes: PokemonType[];
   move: Move;
 }): DamageResult {

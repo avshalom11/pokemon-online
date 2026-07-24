@@ -53,14 +53,19 @@ model PlayerProfile {
   displayName         String
   level               Int      @default(1)
   experience          Int      @default(0)
+  // Rare/premium currency. Renamed from `gems` — that system was never read
+  // or written by any gameplay logic (display-only), and the project's
+  // earlier separate `gold` column was equally dead, so this replaces both
+  // rather than the game having three currency-ish fields. `coins` (below)
+  // is the only other currency.
   gold                Int      @default(0)
-  gems                Int      @default(0)
   energy              Int      @default(100)
   onboardingCompleted Boolean  @default(false)
   starterPokemonId    String?
   coins               Int      @default(500)
   pokemon             PlayerPokemon[]
   fieldBattleSession  FieldBattleSession?
+  notifications       Notification[]
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -138,6 +143,30 @@ model FieldBattleSession {
   wildCurrentHp Int
   wildMaxHp     Int
 
+  // Whether the player-XP reward for the *current* wild encounter in this
+  // row has already been granted — reset to false every time a new wild is
+  // set (session creation, and advanceToNextEncounter). Lets the HP-zero
+  // moment grant XP exactly once even under duplicate/racing requests,
+  // without a separate reward ledger table. See
+  // battle-session.service.ts's syncWildHp.
+  wildDefeatRewardGranted Boolean @default(false)
+
+  // Every owned Pokémon that has actually entered the *current* wild
+  // encounter (become activePlayerPokemonId at least once since the wild
+  // was last set), for Pokémon-XP eligibility at victory — see
+  // features/pokemon-progression and battle-session.service.ts's
+  // recordBattleParticipant/markParticipantFainted/resetBattleParticipants.
+  // A plain JSON array of `{ playerPokemonId, fainted, order }` rather than
+  // a separate table: it's scoped entirely to one encounter (reset every
+  // time a new wild is set, exactly like wildDefeatRewardGranted above),
+  // never queried independently of its own session row, and never grows
+  // past party size (6) — a related table would add a join for no benefit
+  // here. Stored as Prisma.JsonValue at the type level; always parsed
+  // through the same runtime shape guard (parseBattleParticipants) rather
+  // than trusted directly, so a malformed/legacy row can never crash a
+  // read.
+  participants Json @default("[]")
+
   // The party member currently active in this battle. onDelete: Restrict —
   // the DB itself refuses to delete a PlayerPokemon row while any session
   // still references it, as a defense-in-depth backstop behind the
@@ -152,6 +181,39 @@ model FieldBattleSession {
 
   @@index([activePlayerPokemonId])
   @@map("field_battle_session")
+}
+
+// Persistent, player-facing notifications for non-blocking meta/progression
+// events (level-ups now; item finds, move learns, evolutions, quests,
+// achievements later — see features/notifications/types.ts's
+// NotificationType union). Deliberately separate from the battle message
+// box (features/battle/utils/battle-messages.ts): battle messages are
+// ephemeral, in-memory, battle-only events, while these are durable records
+// the player can read on their own time from the global header's bell,
+// exactly so meta events never have to block or slow down the battle loop.
+model Notification {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // Plain string (not a Prisma enum), validated at the app layer against the
+  // NotificationType TS union — same precedent as
+  // FieldBattleSession.zoneId above ("Prisma has no enum synced to that
+  // TypeScript union"), so adding a future notification type is a one-line
+  // TS change, never a migration.
+  type    String
+  message String
+  isRead  Boolean @default(false)
+  // Optional structured data for a future richer UI (e.g. which Pokémon
+  // evolved) — unused by today's single PLAYER_LEVEL_UP type, kept nullable
+  // so it costs nothing until a type actually needs it.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([playerId, isRead])
+  @@index([playerId, createdAt])
+  @@map("notification")
 }
 
 model Session {

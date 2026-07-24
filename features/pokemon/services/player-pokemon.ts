@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
-import { calculateBattleStats } from "@/engine/battle/stat-calculation";
+import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
@@ -28,7 +28,7 @@ function hydrateOwnedPokemon(row: PlayerPokemonModel): OwnedPokemon | null {
     level: row.level,
     experience: row.experience,
     currentHp: row.currentHp,
-    maxHp: calculateBattleStats(species.baseStats, row.level).health,
+    maxHp: calculatePokemonHpStat(species.baseStats.health, row.level),
     isStarter: row.isStarter,
     caughtAt: row.createdAt,
     // See the isShiny doc comment on OwnedPokemon (shared/types/player-pokemon.ts).

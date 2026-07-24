@@ -2,7 +2,7 @@ import { MOVE_DATA } from "@/data/moves/move-data";
 import { chooseOpponentMove } from "./battle-ai";
 import { didMoveHit } from "./accuracy";
 import { calculateDamage } from "./damage-calculation";
-import { calculateBattleStats, type BattleStats } from "./stat-calculation";
+import { calculatePokemonStats, type PokemonStats } from "./pokemon-stat-calculations";
 import { determineFirstMover } from "./turn-order";
 import type {
   Battle,
@@ -29,8 +29,8 @@ function resolveAction(params: {
   actor: BattleTurnOwner;
   move: Move;
   attackerLevel: number;
-  attackerStats: BattleStats;
-  defenderStats: BattleStats;
+  attackerStats: PokemonStats;
+  defenderStats: PokemonStats;
   defenderTypes: PokemonType[];
 }): Omit<BattleActionOutcome, "targetFainted"> {
   const {
@@ -119,15 +119,15 @@ export function executeBattleTurn(
     battle.opponent.currentMoveUses
   );
 
-  const playerStats = calculateBattleStats(
-    battle.player.pokemon.species.baseStats,
-    battle.player.pokemon.level
-  );
+  const playerStats = calculatePokemonStats({
+    baseStats: battle.player.pokemon.species.baseStats,
+    level: battle.player.pokemon.level,
+  });
 
-  const opponentStats = calculateBattleStats(
-    battle.opponent.pokemon.species.baseStats,
-    battle.opponent.pokemon.level
-  );
+  const opponentStats = calculatePokemonStats({
+    baseStats: battle.opponent.pokemon.species.baseStats,
+    level: battle.opponent.pokemon.level,
+  });
 
   const firstMover = determineFirstMover({
     playerMove,

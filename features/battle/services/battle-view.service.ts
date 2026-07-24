@@ -11,9 +11,9 @@ export interface BattleViewData {
   party: OwnedPokemon[];
   activePokemonId: string;
   // The authenticated trainer's own display name (PlayerProfile.displayName
-  // — the same value HomeHeader/My Pokémon/Pokémon Center already show
-  // everywhere else as "the player's name"), threaded down so
-  // BattleContent's capture message never hardcodes a username.
+  // — the same value the global header and My Pokémon already show
+  // elsewhere as "the player's name"), threaded down so BattleContent's
+  // capture message never hardcodes a username.
   playerName: string;
 }
 
