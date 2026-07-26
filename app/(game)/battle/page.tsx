@@ -57,6 +57,7 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
       wild={data.wild}
       party={data.party}
       activePokemonId={data.activePokemonId}
+      knownMovesByPokemonId={data.knownMovesByPokemonId}
       playerName={data.playerName}
     />
   );

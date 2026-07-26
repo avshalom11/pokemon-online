@@ -8,14 +8,14 @@ import { BattleWindow } from "./BattleWindow";
 import { PokeballCounter } from "./PokeballCounter";
 import { XpToast } from "./XpToast";
 import { BattleScene } from "@/components/battle/BattleScene";
-import { applyFixedAttack } from "@/engine/battle/battle-config";
 import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
+import { executeBattleActionAction } from "@/features/battle/actions/battle-action.action";
 import { attemptCaptureAction } from "@/features/battle/actions/capture.action";
 import { getNextEncounterAction } from "@/features/battle/actions/next-encounter.action";
 import { syncPartyHpAction } from "@/features/battle/actions/sync-party-hp.action";
+import type { BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { endBattleSessionAction } from "@/features/battle-session/actions/end-battle-session.action";
 import { syncActivePokemonAction } from "@/features/battle-session/actions/sync-active-pokemon.action";
-import { syncWildHpAction } from "@/features/battle-session/actions/sync-wild-hp.action";
 import type { BattleVictoryReward } from "@/features/battle-session/services/battle-session.service";
 import {
   attackMessage,
@@ -28,6 +28,7 @@ import {
   throwPokeballMessage,
   wildAppearedMessage,
 } from "@/features/battle/utils/battle-messages";
+import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
 import {
   ATTACK_MESSAGE_DURATION_MS,
@@ -45,7 +46,7 @@ import type { LevelUpResult } from "@/features/player-progression/progression-ty
 import { getBackSpritePath, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import type { PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
 import { getBattleTheme } from "@/lib/battle/battleThemes";
-import type { BattleAttackSlot, BattleMenuAction } from "@/shared/types/battle-ui";
+import type { BattleMenuAction } from "@/shared/types/battle-ui";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { ZoneId } from "@/shared/types/zone";
 
@@ -54,6 +55,11 @@ interface BattleContentProps {
   wild: EncounterResult;
   party: OwnedPokemon[];
   activePokemonId: string;
+  // Every party member's Known Moves, resolved server-side against the
+  // Move Registry (see battle-view.service.ts) — keyed by playerPokemonId
+  // so the move panel stays correct across a mid-battle switch without a
+  // second fetch.
+  knownMovesByPokemonId: Record<string, BattleKnownMoveSlot[]>;
   // The authenticated trainer's own name (never hardcoded) — used only for
   // the "<name> threw a Poké Ball at <wild name>!" capture message.
   playerName: string;
@@ -78,11 +84,13 @@ type BattlePhase =
   | "escaped"
   | "partyDefeated";
 
-// TEMPORARY attack: one shared move, fixed damage (engine/battle/battle-config.ts).
-// Real per-species moves (engine/battle/battle-engine.ts + data/moves/move-data.ts)
-// are already built and untouched — this is a deliberately simpler, parallel
-// system until that gets wired into actual gameplay.
-const TEMPORARY_ATTACK_SLOTS: BattleAttackSlot[] = [{ id: "attack", name: "תקיפה" }];
+// Damage is still the existing TEMPORARY_ATTACK_DAMAGE
+// (engine/battle/battle-config.ts, applied server-side by the Battle
+// Action Service) no matter which known move is picked — only the
+// button/selection layer changes in this phase. buildAttackSlots itself
+// (always four slots, in slot order, empty ones disabled) lives in
+// features/battle/utils/battle-attack-slots.ts — pure, independently
+// tested, same pattern as battle-turn-rules.ts.
 
 // All battle timing constants (HIT_FLASH_DURATION_MS, ATTACK_MESSAGE_DURATION_MS,
 // NEXT_ENCOUNTER_DELAY_MS, XP_TOAST_DURATION_MS) live in
@@ -107,7 +115,14 @@ const TEMPORARY_ATTACK_SLOTS: BattleAttackSlot[] = [{ id: "attack", name: "תק�
 // never call it. This was chosen over "sync only at battle end" so there is
 // only ever one source of truth to reason about, and so a player closing
 // the tab mid-battle doesn't get their Pokémon's HP rolled back.
-export function BattleContent({ zoneId, wild, party, activePokemonId, playerName }: BattleContentProps) {
+export function BattleContent({
+  zoneId,
+  wild,
+  party,
+  activePokemonId,
+  knownMovesByPokemonId,
+  playerName,
+}: BattleContentProps) {
   const router = useRouter();
   const theme = getBattleTheme(zoneId);
   const { applyProgress } = usePlayerProgression();
@@ -148,6 +163,12 @@ export function BattleContent({ zoneId, wild, party, activePokemonId, playerName
   const [isCapturing, startCaptureTransition] = useTransition();
   const [, startHpSyncTransition] = useTransition();
   const [, startNextEncounterTransition] = useTransition();
+  // Phase 4F: the attack button's own request to the Battle Action Service
+  // (features/battle/actions/battle-action.action.ts) — distinct from
+  // startSessionSyncTransition below, which only ever fires fire-and-forget
+  // writes for the OTHER battle actions (switch/capture/escape) that this
+  // phase deliberately leaves untouched.
+  const [, startBattleActionTransition] = useTransition();
   // Fire-and-forget writes to the persisted FieldBattleSession (wild HP,
   // active Pokémon, ending the session) — a distinct concern from
   // startHpSyncTransition above, which only ever touches PlayerPokemon rows.
@@ -356,7 +377,15 @@ export function BattleContent({ zoneId, wild, party, activePokemonId, playerName
     setPhase("playerTurn");
   }
 
-  function handleAttack() {
+  // Phase 4F: orchestration only — no damage/HP math happens in this
+  // component anymore. handleAttack locks the UI, shows the player's own
+  // attack line, then asks the Battle Action Service (via
+  // executeBattleActionAction) to actually resolve the action; every field
+  // it renders below (updatedWildHp, updatedPartyHp, wildFainted,
+  // partyPokemonFainted, battleEnded, experienceGranted) is exactly what
+  // the server already computed and persisted — this function only decides
+  // *when* to reveal it and which message/phase that implies.
+  function handleAttack(moveId: string) {
     if (phase !== "playerTurn") return;
 
     // Locks input immediately (same convention every other action handler
@@ -364,57 +393,64 @@ export function BattleContent({ zoneId, wild, party, activePokemonId, playerName
     setPhase("enemyTurn");
     setMessage(attackMessage(playerDisplayName, wildState.pokemon.name));
 
-    // activeId is only ever consulted for the dev/testing one-hit-KO
-    // override (see applyFixedAttack's own doc comment) — for every other
-    // Pokémon this is a no-op and damage stays the normal fixed amount.
-    const newWildHp = applyFixedAttack(wildState.currentHealth, activeId);
-    setWildState((prev) => ({ ...prev, currentHealth: newWildHp }));
-    triggerHit("enemy");
+    startBattleActionTransition(async () => {
+      const result = await executeBattleActionAction(zoneId, "attack", moveId);
 
-    if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
+      if (result.status !== "success") {
+        // The server rejected the action (stale phase, a race, an already-
+        // concluded battle, ...) — never trust the client's own belief that
+        // it was still the player's turn. Recover to a safe, interactive
+        // state rather than leaving the UI stuck on "enemyTurn".
+        setPhase("playerTurn");
+        return;
+      }
 
-    // Lethal hit: no outcome message is ever shown here — no "fainted",
-    // no XP, no victory text (see the Core Design Rule: the battle box
-    // only ever carries immediate battle events, and gameplay speed is the
-    // top priority for this exact path). So unlike the non-lethal branch
-    // below, this never schedules the ATTACK_MESSAGE_DURATION_MS "read the
-    // outcome" pause — there is nothing to read. The message box simply
-    // keeps showing this attack line until the next encounter's own
-    // wildAppeared message replaces it. scheduleNextEncounter's own short
-    // delay (NEXT_ENCOUNTER_DELAY_MS) is the *only* remaining pause in this
-    // entire path, purely for visual stability, not reading time.
-    if (newWildHp <= 0) {
-      setPhase("enemyDefeated");
+      setWildState((prev) => ({ ...prev, currentHealth: result.updatedWildHp }));
+      triggerHit("enemy");
 
-      // Reward granting runs fully in parallel with advancing to the next
-      // encounter below — the next encounter must never wait on this
-      // network round trip. The XP toast (if any) appears independently
-      // whenever this resolves, possibly even after the next encounter has
-      // already loaded — a level-up notification, if any, was already
-      // created server-side atomically inside this same call
-      // (progression-service.ts), so there's nothing further to do here
-      // for that. XP is otherwise awarded entirely silently: no battle
-      // message, no blocking of any kind.
-      startSessionSyncTransition(async () => {
-        const reward = await syncWildHpAction(zoneId, newWildHp);
-        applyVictoryReward(reward);
-      });
+      if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
 
-      scheduleNextEncounter();
-      return;
-    }
+      // Lethal hit: no outcome message is ever shown here — no "fainted",
+      // no XP, no victory text (see the Core Design Rule: the battle box
+      // only ever carries immediate battle events, and gameplay speed is
+      // the top priority for this exact path). So unlike the non-lethal
+      // branch below, this never schedules the ATTACK_MESSAGE_DURATION_MS
+      // "read the outcome" pause — there is nothing to read. The message
+      // box simply keeps showing the attack line until the next
+      // encounter's own wildAppeared message replaces it.
+      // scheduleNextEncounter's own short delay (NEXT_ENCOUNTER_DELAY_MS)
+      // is the *only* remaining pause in this entire path, purely for
+      // visual stability, not reading time.
+      if (result.wildFainted) {
+        setPhase("enemyDefeated");
+        applyVictoryReward(result.experienceGranted);
+        scheduleNextEncounter();
+        return;
+      }
 
-    // Non-lethal: sync HP immediately, fire-and-forget, same as ever, then
-    // hold the attack message for ATTACK_MESSAGE_DURATION_MS so it's
-    // actually readable before the wild's counter-attack message replaces
-    // it — this pause is unchanged, only the lethal path above was sped up.
-    startSessionSyncTransition(() => {
-      syncWildHpAction(zoneId, newWildHp);
+      // Non-lethal: the wild's counter-attack outcome was already resolved
+      // server-side in this same call — only *revealing* it is delayed, by
+      // ATTACK_MESSAGE_DURATION_MS, so the player's own attack line stays
+      // readable first, exactly like before.
+      messageStepTimeout.current = setTimeout(() => {
+        // Already persisted server-side by the Battle Action Service — no
+        // syncPartyHpAction call needed here (unlike the switch/failed-
+        // capture counter-attack paths below, which still compute and sync
+        // client-side; that's unchanged, out-of-scope territory for this
+        // phase).
+        setPartyHpMap((prev) => ({ ...prev, [activeId]: result.updatedPartyHp }));
+        triggerHit("player");
+
+        if (!result.partyPokemonFainted) {
+          setPhase("playerTurn");
+          setMessage(attackMessage(wildState.pokemon.name, playerDisplayName));
+          return;
+        }
+
+        setPhase(result.battleEnded ? "partyDefeated" : "selectingForcedReplacement");
+        setMessage(result.battleEnded ? partyDefeatedMessage() : forcedReplacementMessage(playerDisplayName));
+      }, ATTACK_MESSAGE_DURATION_MS);
     });
-
-    messageStepTimeout.current = setTimeout(() => {
-      resolveCounterAttackAgainstActive(activeId, playerDisplayName);
-    }, ATTACK_MESSAGE_DURATION_MS);
   }
 
   function handleCapture() {
@@ -526,11 +562,14 @@ export function BattleContent({ zoneId, wild, party, activePokemonId, playerName
     }
   }
 
+  // attackId is the selected Known Move's moveId (see buildAttackSlots) —
+  // BattleAttackPanel never fires onSelect for a disabled (empty) slot, so
+  // this only ever runs for a real, currently-known move.
   function handleAttackSelect(attackId: string) {
-    if (attackId === "attack") {
-      handleAttack();
-    }
+    handleAttack(attackId);
   }
+
+  const attackSlots = buildAttackSlots(knownMovesByPokemonId[activeId] ?? []);
 
   const menuActions: BattleMenuAction[] = [
     { id: "switch", label: "החלפה" },
@@ -563,7 +602,7 @@ export function BattleContent({ zoneId, wild, party, activePokemonId, playerName
           // reflects a level-up/XP gain immediately, no refresh needed.
           experience: activePokemon.experience,
         }}
-        attacks={TEMPORARY_ATTACK_SLOTS}
+        attacks={attackSlots}
         onAttackSelect={handleAttackSelect}
         menuActions={menuActions}
         onMenuAction={handleMenuAction}

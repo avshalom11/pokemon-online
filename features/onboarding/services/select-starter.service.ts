@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
 import { getSpeciesById, getStarterSpecies } from "@/features/pokemon/services/species-catalog";
+import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
 import { getTotalXpRequiredForPokemonLevel } from "@/features/pokemon-progression/pokemon-progression-calculations";
 
 const STARTER_LEVEL = 5;
@@ -41,22 +42,24 @@ export async function selectStarterPokemon(userId: string, speciesId: string): P
       return { status: "already-completed" };
     }
 
-    await tx.playerPokemon.create({
-      data: {
-        playerId: profile.id,
-        speciesId,
-        level: STARTER_LEVEL,
-        // See capture.service.ts's identical comment: this is only the
-        // total-XP baseline consistent with STARTER_LEVEL, never a granted
-        // reward, so the starter's first real battle-XP grant increases its
-        // level rather than implicitly resetting it from experience: 0.
-        experience: getTotalXpRequiredForPokemonLevel(STARTER_LEVEL),
-        currentHp: species.baseStats.health,
-        isStarter: true,
-        // New players always have an empty party, so slot 1 (the battle
-        // starter) is guaranteed free here.
-        partySlot: 1,
-      },
+    // createOwnedPokemon (shared with capture.service.ts) also assigns
+    // this Pokémon's starting known moves in the same transaction — see
+    // that function's doc comment for why this must never be duplicated
+    // as a second, separate call site.
+    await createOwnedPokemon(tx, {
+      playerId: profile.id,
+      speciesId,
+      level: STARTER_LEVEL,
+      // See capture.service.ts's identical comment: this is only the
+      // total-XP baseline consistent with STARTER_LEVEL, never a granted
+      // reward, so the starter's first real battle-XP grant increases its
+      // level rather than implicitly resetting it from experience: 0.
+      experience: getTotalXpRequiredForPokemonLevel(STARTER_LEVEL),
+      currentHp: species.baseStats.health,
+      isStarter: true,
+      // New players always have an empty party, so slot 1 (the battle
+      // starter) is guaranteed free here.
+      partySlot: 1,
     });
 
     return { status: "created" };

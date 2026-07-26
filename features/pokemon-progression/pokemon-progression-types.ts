@@ -1,3 +1,5 @@
+import type { LevelUpMoveLearningPlan } from "@/engine/move-learning";
+
 // Owned-Pokémon progression only — never reused for the separate
 // player/account-level XP system (features/player-progression), which has
 // its own curve, its own reward formula, and its own result types.
@@ -89,6 +91,16 @@ export interface PokemonLevelUpResult {
   // was written to in the same transaction as the level/experience update.
   newMaxHp: number;
   newCurrentHp: number;
+
+  // What leveling from previousLevel to newLevel did to this Pokémon's
+  // moves (Phase 4D) — computed and persisted (Known Move/Pending Move
+  // Learning rows) in the same transaction as the level/XP/HP update
+  // above, via features/move-learning's applyLevelUpMoveLearning. Empty
+  // (no detected/learned/pending moves) whenever previousLevel ===
+  // newLevel, i.e. an XP grant that didn't cross a level boundary. IDs
+  // only, never preformatted display text — a future UI derives messages
+  // like "X learned Y" from this itself.
+  moveLearning: LevelUpMoveLearningPlan;
 }
 
 // Where a Pokémon-XP grant originated — only "wildBattleVictory" exists

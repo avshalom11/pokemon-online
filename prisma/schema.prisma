@@ -13,13 +13,13 @@ datasource db {
 }
 
 model User {
-  id              String    @id
+  id              String         @id
   name            String
   email           String
-  emailVerified   Boolean   @default(false)
+  emailVerified   Boolean        @default(false)
   image           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   username        String?
   displayUsername String?
   sessions        Session[]
@@ -47,27 +47,27 @@ model User {
 // and the standard hardening option (a citext column or a functional
 // LOWER(username) unique index) if stronger defense-in-depth is ever wanted.
 model PlayerProfile {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String              @id @default(cuid())
+  userId              String              @unique
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   displayName         String
-  level               Int      @default(1)
-  experience          Int      @default(0)
+  level               Int                 @default(1)
+  experience          Int                 @default(0)
   // Rare/premium currency. Renamed from `gems` — that system was never read
   // or written by any gameplay logic (display-only), and the project's
   // earlier separate `gold` column was equally dead, so this replaces both
   // rather than the game having three currency-ish fields. `coins` (below)
   // is the only other currency.
-  gold                Int      @default(0)
-  energy              Int      @default(100)
-  onboardingCompleted Boolean  @default(false)
+  gold                Int                 @default(0)
+  energy              Int                 @default(100)
+  onboardingCompleted Boolean             @default(false)
   starterPokemonId    String?
-  coins               Int      @default(500)
+  coins               Int                 @default(500)
   pokemon             PlayerPokemon[]
   fieldBattleSession  FieldBattleSession?
   notifications       Notification[]
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   @@map("player_profile")
 }
@@ -78,21 +78,21 @@ model PlayerProfile {
 // species catalog in data/pokemon/pokemon-data.ts, so that catalog stays the
 // only place species facts live.
 model PlayerPokemon {
-  id          String        @id @default(cuid())
-  playerId    String
-  player      PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  speciesId   String
-  nickname    String?
-  level       Int           @default(5)
-  experience  Int           @default(0)
-  currentHp   Int
-  isStarter   Boolean       @default(false)
+  id         String        @id @default(cuid())
+  playerId   String
+  player     PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  speciesId  String
+  nickname   String?
+  level      Int           @default(5)
+  experience Int           @default(0)
+  currentHp  Int
+  isStarter  Boolean       @default(false)
   // 1-6, null = not in the active party. Range validated in app code
   // (features/party/validation/party.schema.ts) — Prisma's schema DSL has
   // no declarative CHECK constraint support in this setup.
-  partySlot   Int?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  partySlot  Int?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   // A PlayerPokemon currently the active battler in a persisted field
   // session (see FieldBattleSession below) — used only to block release
@@ -103,9 +103,110 @@ model PlayerPokemon {
   // one-to-many relation.
   fieldBattleSessions FieldBattleSession[]
 
+  // The (at most four) moves this specific Pokémon currently knows — see
+  // PlayerKnownMove below and engine/known-moves for the domain rules.
+  knownMoves PlayerKnownMove[]
+
+  // Unresolved opportunities to learn a move once Known Moves were already
+  // full when it was reached by leveling up (Phase 4D) — see
+  // PlayerPendingMoveLearning below and engine/move-learning for the
+  // domain rules. Not itself a Known Move until a future phase (4E)
+  // resolves it.
+  pendingMoveLearnings PlayerPendingMoveLearning[]
+
   @@unique([playerId, partySlot])
   @@index([playerId])
   @@map("player_pokemon")
+}
+
+// One move slot for one owned Pokémon (Phase 4C). Deliberately named
+// Player* to match every other ownership/progression model in this file
+// (PlayerProfile, PlayerPokemon) rather than an "OwnedPokemon*" prefix
+// that doesn't otherwise exist in this schema.
+//
+// Only the reference (moveId) and its slot are stored — never move name,
+// type, power, PP, or any other static move fact. Those live exclusively
+// in the static move registry (engine/moves) and are resolved by id at
+// read time; duplicating them here would let this table drift out of
+// sync with that registry. Likewise this table has no PP/currentPp
+// column of any kind — there is no PP gameplay in this project yet (see
+// engine/known-moves's module doc comment).
+//
+// slot is 1-4, app-validated by engine/known-moves's knownMoveSetSchema
+// (contiguous starting at 1) — same precedent as PlayerPokemon.partySlot
+// above: Prisma's schema DSL has no declarative CHECK constraint support
+// in this setup, so the *shape* rule (contiguity) lives in application
+// code, while the two structural constraints Postgres *can* enforce
+// (no two rows for the same Pokémon sharing a moveId, no two rows for the
+// same Pokémon sharing a slot) are declared as real unique indexes below.
+model PlayerKnownMove {
+  id              String        @id @default(cuid())
+  playerPokemonId String
+  playerPokemon   PlayerPokemon @relation(fields: [playerPokemonId], references: [id], onDelete: Cascade)
+  moveId          String
+  slot            Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([playerPokemonId, moveId])
+  @@unique([playerPokemonId, slot])
+  @@index([playerPokemonId])
+  @@map("player_known_move")
+}
+
+// An unresolved opportunity for one owned Pokémon to learn a move,
+// created (Phase 4D) when a level-up made a move eligible but all four
+// Known Move slots were already full. Not a Known Move — Phase 4E is what
+// lets a player turn a "pending" row into either a learned move (Known
+// Move gets created, this row's status becomes "learned") or a
+// permanently skipped one ("declined"). Phase 4D only ever creates and
+// reads "pending" rows.
+//
+// moveId is a static registry reference, same precedent as
+// PlayerKnownMove.moveId above — never move name/type/power/etc.
+// duplicated here.
+//
+// status is a plain String ("pending" | "learned" | "declined",
+// engine/move-learning's PendingMoveLearningStatus), not a Prisma enum —
+// same precedent as Notification.type and FieldBattleSession.zoneId
+// elsewhere in this file: no Prisma enum kept in sync with a TS union in
+// this setup, validated at the app layer instead.
+//
+// Uniqueness: "no duplicate *unresolved* pending decision for the same
+// Pokémon+move" is what actually needs enforcing, but Prisma's schema DSL
+// can't declare a partial/filtered unique index (`WHERE status =
+// 'pending'`) — only a full-table one. Rather than hand-editing the
+// migration SQL to add a partial index Prisma's own schema can't express
+// (workable, but exactly the kind of awkwardness this constraint doesn't
+// need), @@unique below covers all three fields including status: since
+// "pending" is a fixed value, that makes at most one *pending* row
+// possible per (Pokémon, move) at the database level — a real, always-on
+// constraint, not just an application-level check — while still leaving
+// room for a future "learned" or "declined" row for that same pair to
+// coexist without ever colliding with it. The primary correctness
+// mechanism is still the transactional read-existing-pending-then-decide
+// step in features/move-learning (this constraint is the backstop against
+// a concurrent/retried write slipping past that check).
+model PlayerPendingMoveLearning {
+  id              String        @id @default(cuid())
+  playerPokemonId String
+  playerPokemon   PlayerPokemon @relation(fields: [playerPokemonId], references: [id], onDelete: Cascade)
+  moveId          String
+  learnedAtLevel  Int
+  status          String        @default("pending")
+  // Monotonically increasing, independent of moveId/slot — the
+  // stable creation-order tiebreak PENDING DECISION ORDER requires
+  // (learnedAtLevel ascending, then creation order ascending), since
+  // createdAt timestamp precision alone isn't a safe tiebreak for two
+  // rows written in the same transaction.
+  sequence        Int           @default(autoincrement())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  resolvedAt      DateTime?
+
+  @@unique([playerPokemonId, moveId, status])
+  @@index([playerPokemonId, status])
+  @@map("player_pending_move_learning")
 }
 
 // A player's single in-progress wild encounter, persisted so a page refresh
@@ -201,9 +302,9 @@ model Notification {
   // FieldBattleSession.zoneId above ("Prisma has no enum synced to that
   // TypeScript union"), so adding a future notification type is a one-line
   // TS change, never a migration.
-  type    String
-  message String
-  isRead  Boolean @default(false)
+  type     String
+  message  String
+  isRead   Boolean @default(false)
   // Optional structured data for a future richer UI (e.g. which Pokémon
   // evolved) — unused by today's single PLAYER_LEVEL_UP type, kept nullable
   // so it costs nothing until a type actually needs it.

@@ -2,6 +2,7 @@ import "server-only";
 
 import { rollCapture } from "@/engine/battle/capture";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
+import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
 import { getTotalXpRequiredForPokemonLevel } from "@/features/pokemon-progression/pokemon-progression-calculations";
 import { calculateCaptureXpReward } from "@/features/player-progression/progression-calculations";
 import { addPlayerExperience } from "@/features/player-progression/progression-service";
@@ -62,22 +63,24 @@ export async function attemptCapture(userId: string): Promise<AttemptCaptureResu
       return null;
     }
 
-    await tx.playerPokemon.create({
-      data: {
-        playerId: profile.id,
-        speciesId: species.id,
-        level: session.wildLevel,
-        // Not a capture-XP reward (there isn't one — see
-        // features/pokemon-progression's own "Pokémon do not receive XP
-        // from capturing" rule); this is only the total-XP baseline that's
-        // actually consistent with the level this Pokémon is created at, so
-        // its very next real battle-XP grant (features/pokemon-progression)
-        // computes a level *increase* from here, never an implicit drop
-        // back down from a stale `experience: 0` default.
-        experience: getTotalXpRequiredForPokemonLevel(session.wildLevel),
-        currentHp: session.wildCurrentHp,
-        isStarter: false,
-      },
+    // createOwnedPokemon (shared with select-starter.service.ts) also
+    // assigns this Pokémon's starting known moves in the same transaction
+    // — see that function's doc comment for why this must never be
+    // duplicated as a second, separate call site.
+    await createOwnedPokemon(tx, {
+      playerId: profile.id,
+      speciesId: species.id,
+      level: session.wildLevel,
+      // Not a capture-XP reward (there isn't one — see
+      // features/pokemon-progression's own "Pokémon do not receive XP
+      // from capturing" rule); this is only the total-XP baseline that's
+      // actually consistent with the level this Pokémon is created at, so
+      // its very next real battle-XP grant (features/pokemon-progression)
+      // computes a level *increase* from here, never an implicit drop
+      // back down from a stale `experience: 0` default.
+      experience: getTotalXpRequiredForPokemonLevel(session.wildLevel),
+      currentHp: session.wildCurrentHp,
+      isStarter: false,
     });
 
     // Same transaction, same race guard as the delete/create above — the

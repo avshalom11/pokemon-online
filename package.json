@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --conditions=react-server --experimental-strip-types --import ./test/support/register.mjs --test \"**/*.test.ts\"",
     "validate:map-regions": "node scripts/validate-map-regions.mjs"
   },
   "dependencies": {

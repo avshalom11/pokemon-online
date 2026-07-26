@@ -5,6 +5,7 @@ import { HealthBar } from "@/components/battle/HealthBar";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { releasePokemonAction } from "@/features/pokemon/actions/release-pokemon.action";
 import { ReleaseConfirmDialog } from "@/features/pokemon/components/ReleaseConfirmDialog";
+import { PendingMoveLearningPanel } from "@/features/pokemon/components/PendingMoveLearningPanel";
 import { assignPartySlotAction, removePartySlotAction, swapPartySlotsAction } from "@/features/party/actions/party.actions";
 import { formatDexNumber, getArtworkPath } from "@/features/pokemon/media/pokemon-media-paths";
 import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
@@ -215,6 +216,8 @@ export function PokemonDetailsPanel({
               ))}
             </div>
           </div>
+
+          <PendingMoveLearningPanel playerPokemonId={pokemon.id} />
 
           <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {isInParty ? (

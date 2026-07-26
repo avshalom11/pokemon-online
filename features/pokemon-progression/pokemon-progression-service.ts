@@ -4,6 +4,7 @@ import { calculateBaseBattlePokemonXp, distributeBattlePokemonXp, getPokemonLeve
 import type { PokemonLevelUpResult, PokemonXpRewardRole, PokemonXpSource } from "./pokemon-progression-types";
 import { applyLevelUpToCurrentHp, calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
+import { applyLevelUpMoveLearning } from "@/features/move-learning/move-learning-service";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 // The only place PlayerPokemon.level/experience are ever written. Always
@@ -63,6 +64,23 @@ export async function applyPokemonXpGrant(
     data: { level: progress.level, experience: progress.totalXp, currentHp: newCurrentHp },
   });
 
+  // Same transaction as the level/XP/HP update above — a Known Move or
+  // Pending Move Learning row this call creates commits or rolls back
+  // together with this Pokémon's new level, never separately. Called
+  // unconditionally (even when previousLevel === progress.level): the
+  // planner treats an empty level interval as an ordinary no-op and
+  // performs no writes, so this stays correct without a separate
+  // "did we actually level up" branch here. A non-"success" result here
+  // means genuinely malformed persisted state (every structural
+  // precondition — the Pokémon existing, oldLevel <= newLevel — already
+  // holds by construction at this point in the transaction), so it's
+  // surfaced loudly rather than silently discarded.
+  const moveLearningResult = await applyLevelUpMoveLearning(tx, playerPokemonId, pokemon.speciesId, previousLevel, progress.level);
+
+  if (moveLearningResult.status !== "success") {
+    throw new Error(`applyLevelUpMoveLearning failed unexpectedly: ${JSON.stringify(moveLearningResult)}`);
+  }
+
   return {
     playerPokemonId,
     speciesId: pokemon.speciesId,
@@ -82,6 +100,7 @@ export async function applyPokemonXpGrant(
     isMaxLevel: progress.isMaxLevel,
     newMaxHp,
     newCurrentHp,
+    moveLearning: moveLearningResult.plan,
   };
 }
 

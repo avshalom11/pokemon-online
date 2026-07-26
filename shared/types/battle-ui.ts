@@ -28,7 +28,20 @@ export interface BattleMenuAction {
   label: string;
 }
 
+// Phase 5A: id is the actual Known Move's moveId for a real slot — never a
+// synthetic label like the old single "attack" placeholder — so selecting
+// it can be passed straight through to the Battle Action Pipeline
+// unmodified. type/category/power/accuracy are the same fields the Move
+// Registry already exposes (engine/moves), read-only display data, never
+// duplicated/reformatted here beyond what BattleAttackPanel needs to print
+// them. Absent (undefined) exactly when `disabled` is true — an empty
+// Known Move slot has no move to describe.
 export interface BattleAttackSlot {
   id: string;
   name: string;
+  type?: string;
+  category?: string;
+  power?: number | null;
+  accuracy?: number | null;
+  disabled?: boolean;
 }
