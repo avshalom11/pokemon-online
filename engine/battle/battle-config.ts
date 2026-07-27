@@ -1,28 +1,39 @@
 // TEMPORARY combat system — deliberately simpler than the real move-based
 // engine (battle-engine.ts + damage-calculation.ts + move-data.ts): fixed
-// damage, no PP/accuracy/crits/type effectiveness. Every Pokémon shares one
-// attack until the real moves system is wired into gameplay. When that
-// happens, this whole file goes away and BattleContent switches to
-// executeBattleTurn() instead — nothing outside this file should assume
-// TEMPORARY_ATTACK_DAMAGE survives that change.
+// damage, no PP/accuracy/crits/type effectiveness.
+//
+// Phase 5B.2: the player's own attack no longer uses this — it now goes
+// through the real Phase 5B.1 Damage Engine (see
+// features/battle/services/battle-action.service.ts's resolveAttackDamage
+// call). This function is still very much alive, though: it's the wild
+// Pokémon's one counter-attack (both the Battle Action Service's
+// wild-hits-player branch, and battle-turn-rules.ts's
+// resolveWildCounterAttack for the switch-in/failed-capture counter-hit),
+// since enemy move selection doesn't exist yet. Every caller now only ever
+// invokes this in the wild-hits-player direction — see
+// ONE_HIT_KO_PLAYER_POKEMON_ID's own doc comment below for what that means
+// for the one-hit-KO dev override.
 export const TEMPORARY_ATTACK_DAMAGE = 8;
 
 // TEMPORARY dev/testing override — see battleDevelopmentConfig below for
 // the same pattern applied to Poké Balls. Scoped to one exact
 // PlayerPokemon.id (avshalom's owned Charmander), never a species/level/
-// account-wide rule, so it can never affect any other Pokémon. Set to
-// `null` to remove entirely once no longer needed for testing; nothing
-// else needs to change.
+// account-wide rule, so it can never affect any other Pokémon.
+//
+// Phase 5B.2: since every remaining caller of applyFixedAttack only ever
+// attacks in the wild-hits-player direction (never passing
+// attackerPlayerPokemonId — see this function's own doc comment above),
+// this override is now permanently dormant rather than removed outright;
+// nothing here needs to change for that to be safe. Set to `null` (or
+// delete this override and the `attackerPlayerPokemonId` parameter
+// entirely) whenever it's no longer wanted for testing.
 const ONE_HIT_KO_PLAYER_POKEMON_ID: string | null = "cmrwlaet00007bwo7qmbpnolk";
 
 // Single place both HP updates (player-hits-wild, wild-hits-player) go
 // through, so "clamp at 0" and the damage constant are never duplicated
 // inline in UI components. `attackerPlayerPokemonId` is only ever passed
-// for the player-hits-wild direction (see BattleContent's handleAttack) —
-// the wild-hits-player direction (battle-turn-rules.ts's
-// resolveWildCounterAttack) never passes it, so ONE_HIT_KO_PLAYER_POKEMON_ID
-// can only ever reduce a *wild's* HP, never make this Pokémon untouchable
-// itself.
+// for the player-hits-wild direction — see this file's Phase 5B.2 doc
+// comments above for why no live caller passes it anymore.
 export function applyFixedAttack(currentHp: number, attackerPlayerPokemonId?: string): number {
   if (attackerPlayerPokemonId && attackerPlayerPokemonId === ONE_HIT_KO_PLAYER_POKEMON_ID) {
     return 0;

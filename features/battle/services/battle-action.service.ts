@@ -1,6 +1,7 @@
 import "server-only";
 
 import { applyFixedAttack } from "@/engine/battle/battle-config";
+import { rollDamageRandomFactor } from "@/engine/damage";
 import { getMoveById } from "@/engine/moves";
 import {
   endBattleSession,
@@ -8,8 +9,10 @@ import {
   syncWildHp,
   type BattleVictoryReward,
 } from "@/features/battle-session/services/battle-session.service";
+import { resolveAttackDamage } from "@/features/battle/utils/battle-damage-rules";
 import { getKnownMoveIds } from "@/features/known-moves/known-moves-queries";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
+import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { isPartyDefeated } from "@/features/party/utils/party-rules";
 import { prisma } from "@/lib/db/prisma";
 import type { ZoneId } from "@/shared/types/zone";
@@ -22,14 +25,28 @@ import type { ZoneId } from "@/shared/types/zone";
 //
 // Phase 5A: "attack" now always carries a moveId — the player's actual
 // selected Known Move — instead of the old generic, moveId-less attack.
-// The move is validated (exists in the registry, is actually known by the
-// active Pokémon) and its name is threaded through the result, but it does
-// NOT change how damage is computed: real move power, accuracy, crits, and
-// type effectiveness are still explicitly out of scope (see
-// engine/battle/battle-config.ts's own TEMPORARY_ATTACK_DAMAGE doc
-// comment, reused here completely unchanged for every legal move). The
-// old, parallel move-based engine (engine/battle/battle-engine.ts and its
-// siblings) is deliberately NOT touched or wired in by this phase either.
+//
+// Phase 5B.2: the player's own damage is now the real Phase 5B.1 Damage
+// Engine result (move power/category + calculated Attack-or-Special-Attack
+// vs. Defense-or-Special-Defense + a random 0.85-1.00 factor) — see
+// resolveAttackDamage (battle-damage-rules.ts) below.
+//
+// Phase 5C: STAB (Same Type Attack Bonus) is now included in that same
+// Damage Engine result — the active Pokémon's own species types are passed
+// through to resolveAttackDamage below, and the 1.5x multiplier (if it
+// applies) is entirely computed inside the Engine, never here.
+//
+// Phase 5D: Type Effectiveness is now included too — the wild's own
+// species types are also passed through to resolveAttackDamage below, and
+// the resulting 0x/0.25x/0.5x/1x/2x/4x multiplier is likewise entirely
+// computed inside the Engine (engine/damage/type-chart.ts), never here.
+// Accuracy, crits, and abilities (Adaptability etc.) are still explicitly
+// out of scope. The wild's one counter-attack is deliberately UNCHANGED:
+// it still reuses applyFixedAttack
+// (engine/battle/battle-config.ts) exactly as before, since enemy move
+// selection is a separate, not-yet-implemented system. The old, parallel
+// move-based engine (engine/battle/battle-engine.ts and its siblings) is
+// deliberately NOT touched or wired in by this phase either.
 export type BattleActionType = "attack";
 
 export interface BattleActionSuccess {
@@ -82,7 +99,13 @@ export async function executeBattleAction(
   playerId: string,
   zoneId: ZoneId,
   actionType: BattleActionType,
-  moveId: string
+  moveId: string,
+  // Test-only seam: production callers (battle-action.action.ts) never pass
+  // this, so rollDamageRandomFactor falls back to its own Math.random
+  // default. Passing a fixed function here is how tests get a deterministic
+  // damage roll without stubbing Math.random globally (see Phase 5B.1's own
+  // design note on engine/damage/random.ts).
+  randomSource?: () => number
 ): Promise<BattleActionResult> {
   if (actionType !== "attack") {
     return { status: "invalid-action" };
@@ -130,7 +153,8 @@ export async function executeBattleAction(
   // or registry-valid but simply not this Pokémon's) even though in
   // practice Known Moves can never contain a moveId the registry doesn't
   // recognize (engine/known-moves already enforces that at write time).
-  if (!getMoveById(moveId)) {
+  const move = getMoveById(moveId);
+  if (!move) {
     return { status: "invalid-move", moveId };
   }
 
@@ -139,15 +163,33 @@ export async function executeBattleAction(
     return { status: "invalid-move", moveId };
   }
 
-  // ---- Temporary fixed damage (unchanged) -------------------------------
-  // Reuses engine/battle/battle-config.ts's applyFixedAttack exactly as
-  // BattleContent used to call it client-side — same constant, same
-  // one-hit-KO dev override (only ever keyed to the *attacking*
-  // PlayerPokemon.id, so it can only ever reduce the wild's HP). No
-  // damage formula, accuracy, crits, or type effectiveness are introduced
-  // here; that is explicitly deferred to a future phase.
-  const updatedWildHp = applyFixedAttack(session.wildCurrentHp, activePokemon.id);
-  const playerDamage = session.wildCurrentHp - updatedWildHp;
+  // The wild's species is re-derived from the session row rather than
+  // trusted from a client value — same rule every other wild-stat read in
+  // this codebase follows (see battle-session.service.ts's syncWildHp). A
+  // missing species means a corrupt/stale row; treat it the same as an
+  // already-concluded encounter rather than crash or fabricate stats.
+  const wildSpecies = getSpeciesById(session.wildSpeciesId);
+  if (!wildSpecies) {
+    return { status: "battle-inactive" };
+  }
+
+  // ---- Damage Engine (Phase 5B.2 integration, Phase 5C STAB, Phase 5D ---
+  // ---- Type Effectiveness) ------------------------------------------------
+  // Real move power/category, the centralized stat system, a production
+  // 0.85-1.00 random roll, STAB (the active Pokémon's own species types vs.
+  // the move's own type), and Type Effectiveness (the move's own type vs.
+  // the wild's own species types) — replaces the old fixed
+  // TEMPORARY_ATTACK_DAMAGE hit for the player's own attack only. A status
+  // move correctly resolves to 0 damage via the Engine's own non-damaging
+  // result rather than a special case here.
+  const damageResult = resolveAttackDamage(
+    move,
+    { baseStats: activePokemon.species.baseStats, level: activePokemon.level, types: activePokemon.species.types },
+    { baseStats: wildSpecies.baseStats, level: session.wildLevel, types: wildSpecies.types },
+    rollDamageRandomFactor(randomSource)
+  );
+  const playerDamage = damageResult.kind === "damage" ? damageResult.damage : 0;
+  const updatedWildHp = Math.max(0, session.wildCurrentHp - playerDamage);
   const wildFainted = updatedWildHp <= 0;
 
   // Persists the wild's new HP and — only the first time it lands at 0 —

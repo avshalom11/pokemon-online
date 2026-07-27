@@ -36,6 +36,41 @@ Rules:
 - Engine functions should not depend on React.
 - Engine functions should be reusable and testable.
 - Prefer small functions with one clear responsibility.
+- Engine functions must never import Prisma or any database client.
+- `engine/battle/battle-engine.ts` and its siblings (`damage-calculation.ts`,
+  `battle-ai.ts`, `accuracy.ts`, `turn-order.ts`) are an unfinished, parallel
+  move-based battle engine that is currently **not connected to gameplay**.
+  Do not revive, partially integrate, or delete it without an explicit
+  instruction — see AI_CONTEXT.md's "Current architecture status".
+
+### features/
+
+Contains the Prisma-backed persistence and orchestration layer, organized by
+feature (e.g. `features/battle`, `features/known-moves`,
+`features/move-learning`, `features/pokemon-progression`).
+
+Each feature typically has:
+
+- `services/` — Prisma access + business orchestration (never imported by
+  Client Components directly).
+- `actions/` — `"use server"` Server Actions: session validation, ownership
+  validation, schema validation, then delegate to a service.
+- `validation/` — Zod schemas for that feature's Server Action inputs.
+- `components/` (when the feature owns UI) — Client Components that call the
+  feature's own Server Actions.
+
+Rules:
+
+- Only `features/` (and `lib/db`, `lib/auth`) may import Prisma — never
+  `engine/`, `components/`, or `app/`.
+- A service function should be the *one* place a given piece of game logic is
+  resolved; Server Actions and React components should not duplicate it.
+- The current live battle loop follows this pattern end to end — the
+  **Battle Action Pipeline**: Battle UI → Server Action
+  (`features/battle/actions/battle-action.action.ts`) → Battle Action Service
+  (`features/battle/services/battle-action.service.ts`) → validation →
+  engine logic → a structured result. New battle actions should follow the
+  same shape rather than adding a new one-off pattern.
 
 ### data/
 

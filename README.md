@@ -70,7 +70,29 @@ Each system should remain independent and easy to extend.
 
 ✅ Random encounter engine
 
-✅ Battle screen prototype
+✅ Battle screen
+
+✅ Authentication & player profiles
+
+✅ Party system & persisted battle sessions
+
+✅ Capture system
+
+✅ Player & Pokémon experience/leveling
+
+✅ Move Registry & Learnsets
+
+✅ Known Moves (persisted, 4-slot, per Pokémon)
+
+✅ Level-up move learning (automatic + pending resolution)
+
+✅ Battle Action Pipeline (centralized, server-side action resolution)
+
+✅ Battle Move Selection — battle attacks are now driven by a Pokémon's actual Known Moves
+
+⬜ Physical/Special damage formula (still temporary fixed damage)
+
+See `AI_CONTEXT.md` → "Current Development Status" for the full phase history and what's next.
 
 ---
 

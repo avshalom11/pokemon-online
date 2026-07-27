@@ -69,29 +69,64 @@ beforeEach(() => {
   resetFakeDb();
 });
 
-test("executes an attack: reduces the wild's HP by the fixed damage amount and applies the wild's counter-attack in the same call", async () => {
-  const wildMaxHp = bulbasaurMaxHpAtLevel(3);
-  seedPlayerProfile({ id: "owner-1", level: 5, experience: 4000 });
-  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+// Phase 5B.2 fixtures: charmander (attacker, level 100) vs. bulbasaur
+// (defender, level 100 — same level as the attacker, so its real max HP
+// (200, via bulbasaurMaxHpAtLevel) comfortably survives every hit below;
+// syncWildHp always re-derives and clamps to the *real* species/level max,
+// so the seeded wildMaxHp must match that real value, not an arbitrary
+// number). Hand-computed via the exact Phase 5B.1 formula:
+//   charmander Attack@100        = floor(2*52*100/100)+5 = 109
+//   charmander SpecialAttack@100 = floor(2*60*100/100)+5 = 125
+//   bulbasaur Defense@100        = floor(2*49*100/100)+5 = 103
+//   bulbasaur SpecialDefense@100 = floor(2*65*100/100)+5 = 135
+//   levelFactor                  = 2*100/5+2             = 42
+//   scratch (physical, power 40): raw = 42*40*109/103 = 1778.834...
+//     baseDamage = floor(1778.834/50+2) = floor(37.5766...) = 37
+//   ember (special, power 40):    raw = 42*40*125/135 = 1555.555...
+//     baseDamage = floor(1555.555/50+2) = floor(33.111...) = 33
+//     charmander is Fire-type and ember is a Fire-type move (Phase 5C
+//     STAB): afterRandom (rf=1.0) = 33 -> floor(33*1.5) = floor(49.5) = 49.
+//     bulbasaur is Grass/Poison (Phase 5D Type Effectiveness): Fire vs.
+//     Grass = 2x (super-effective), Fire vs. Poison = 1x (neutral) ->
+//     combined 2x -> floor(49*2) = 98.
+//     scratch is Normal-type and charmander is not Normal-type, so it
+//     never receives STAB; Normal vs. Grass/Poison is neutral (1x) too —
+//     37 stays 37, completely unaffected by either Phase 5C or 5D.
+const BULBASAUR_LEVEL_100_MAX_HP_VALUE = bulbasaurMaxHpAtLevel(100);
+const SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE = 37;
+const EMBER_VS_LEVEL_100_BULBASAUR_DAMAGE = 98;
+
+// A randomSource whose Math.random-shaped output rolls the maximum 1.00
+// randomFactor (see engine/damage/random.ts's rollDamageRandomFactor: a
+// value just under 1 rolls the top of the 85-100 integer-percent range).
+const MAX_ROLL_RANDOM_SOURCE = () => 0.999999;
+
+function seedLevel100BulbasaurSession(activePlayerPokemonId: string) {
   seedFieldBattleSession({
     playerId: "owner-1",
     zoneId: ZONE_ID,
     wildSpeciesId: "bulbasaur",
-    wildLevel: 3,
-    wildCurrentHp: wildMaxHp,
-    wildMaxHp,
-    activePlayerPokemonId: "p1",
+    wildLevel: 100,
+    wildCurrentHp: BULBASAUR_LEVEL_100_MAX_HP_VALUE,
+    wildMaxHp: BULBASAUR_LEVEL_100_MAX_HP_VALUE,
+    activePlayerPokemonId,
   });
+}
 
-  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl");
+test("executes an attack: applies the Damage Engine's calculated damage to the wild, and the wild's unchanged fixed counter-attack to the party, in the same call", async () => {
+  seedPlayerProfile({ id: "owner-1", level: 5, experience: 4000 });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MAX_ROLL_RANDOM_SOURCE);
 
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
 
-  assert.equal(result.moveId, "growl");
-  assert.equal(result.playerDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.moveId, "scratch");
+  assert.equal(result.playerDamage, SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
   assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(result.updatedWildHp, wildMaxHp - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE - SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
   assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
   assert.equal(result.wildFainted, false);
   assert.equal(result.partyPokemonFainted, false);
@@ -99,11 +134,111 @@ test("executes an attack: reduces the wild's HP by the fixed damage amount and a
   assert.equal(result.winner, null);
   assert.equal(result.experienceGranted, null);
 
-  assert.equal(getFieldBattleSessionRow("owner-1")?.wildCurrentHp, wildMaxHp - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(
+    getFieldBattleSessionRow("owner-1")?.wildCurrentHp,
+    BULBASAUR_LEVEL_100_MAX_HP_VALUE - SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE
+  );
   assert.equal(getPlayerPokemonRow("p1")?.currentHp, 100 - TEMPORARY_ATTACK_DAMAGE);
   // Exactly one write to the acting Pokémon's HP — the action was resolved
   // exactly once, not applied twice.
   assert.equal(getPlayerPokemonUpdateCallCount(), 1);
+});
+
+test("a status move (growl) deals zero damage to the wild via the Damage Engine's non-damaging result, but the wild still counter-attacks", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedFieldBattleSession({
+    playerId: "owner-1",
+    zoneId: ZONE_ID,
+    wildSpeciesId: "bulbasaur",
+    wildLevel: 3,
+    wildCurrentHp: 100,
+    wildMaxHp: 100,
+    activePlayerPokemonId: "p1",
+  });
+
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl", MAX_ROLL_RANDOM_SOURCE);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+
+  assert.equal(result.playerDamage, 0);
+  assert.equal(result.updatedWildHp, 100);
+  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.wildFainted, false);
+});
+
+test("a lower random roll (0.85) deals less damage than the maximum roll (1.00) for the same move and stats", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  const minRollResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", () => 0);
+  assert.equal(minRollResult.status, "success");
+  if (minRollResult.status !== "success") return;
+  // baseDamage 37 * 0.85 = 31.45 -> floor 31.
+  assert.equal(minRollResult.playerDamage, 31);
+  assert.ok(minRollResult.playerDamage < SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
+});
+
+test("a higher-Attack (higher-level) attacker deals more calculated damage than a lower-level one against the same defender", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  const lowLevelPokemon = seedPlayerPokemon({
+    id: "p1",
+    playerId: "owner-1",
+    speciesId: "charmander",
+    level: 10,
+    currentHp: 100,
+    partySlot: 1,
+  });
+  seedKnownMove({ playerPokemonId: lowLevelPokemon.id, moveId: "scratch", slot: 1 });
+  seedLevel100BulbasaurSession("p1");
+
+  const lowLevelResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MAX_ROLL_RANDOM_SOURCE);
+  assert.equal(lowLevelResult.status, "success");
+  if (lowLevelResult.status !== "success") return;
+
+  // charmander Attack@10 = floor(2*52*10/100)+5 = 15; levelFactor@10 = 2*10/5+2 = 6
+  // raw = 6*40*15/103 = 34.951...; baseDamage = floor(34.951/50+2) = floor(2.699) = 2
+  assert.equal(lowLevelResult.playerDamage, 2);
+  assert.ok(
+    lowLevelResult.playerDamage < SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE,
+    "a level 10 attacker must deal less calculated damage than the level 100 attacker used in the baseline test above"
+  );
+});
+
+test("a special move (ember) uses Special Attack/Special Defense, dealing a different, higher-Defense-reducing amount than a physical move with the same power", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  const pokemon = seedPlayerPokemon({ id: "p1", playerId: "owner-1", speciesId: "charmander", level: 100, currentHp: 100, partySlot: 1 });
+  seedKnownMove({ playerPokemonId: pokemon.id, moveId: "scratch", slot: 1 });
+  seedKnownMove({ playerPokemonId: pokemon.id, moveId: "ember", slot: 2 });
+  seedLevel100BulbasaurSession("p1");
+
+  const physicalResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MAX_ROLL_RANDOM_SOURCE);
+  assert.equal(physicalResult.status, "success");
+  if (physicalResult.status !== "success") return;
+  assert.equal(physicalResult.playerDamage, SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
+
+  // Reset the wild back to full before the second hit so both attacks are
+  // measured against the same starting HP.
+  seedLevel100BulbasaurSession("p1");
+
+  const specialResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "ember", MAX_ROLL_RANDOM_SOURCE);
+  assert.equal(specialResult.status, "success");
+  if (specialResult.status !== "success") return;
+
+  // charmander's Special Attack (60 base) is higher than its Attack (52
+  // base), and bulbasaur's Special Defense (65 base) is higher than its
+  // Defense (49 base) — different enough stats on both sides alone that
+  // ember (power 40, special) would not land the same number as scratch
+  // (power 40, physical). Phase 5C STAB and Phase 5D Type Effectiveness
+  // both widen that gap further: ember is Fire-type and charmander is
+  // Fire-type, so ember gets the 1.5x STAB bonus that Normal-type scratch
+  // never does; bulbasaur is Grass/Poison, so ember (Fire) is also
+  // super-effective (2x) against it while scratch (Normal) stays neutral.
+  assert.equal(specialResult.playerDamage, EMBER_VS_LEVEL_100_BULBASAUR_DAMAGE);
+  assert.notEqual(specialResult.playerDamage, physicalResult.playerDamage);
 });
 
 test("rejects when there is no battle session for the requested zone", async () => {
@@ -218,12 +353,16 @@ test("defeating the wild grants the reward, ends the encounter without a counter
     zoneId: ZONE_ID,
     wildSpeciesId: "bulbasaur",
     wildLevel: 2,
-    wildCurrentHp: TEMPORARY_ATTACK_DAMAGE,
+    // 1 HP is guaranteed lethal against any real physical/special move: the
+    // Damage Engine always deals at least 1 damage for a valid damaging
+    // move (Phase 5B.1). scratch (physical, power 40), not growl (status,
+    // which now deals zero and could never defeat anything).
+    wildCurrentHp: 1,
     wildMaxHp: 100,
     activePlayerPokemonId: "p1",
   });
 
-  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl");
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MAX_ROLL_RANDOM_SOURCE);
 
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
@@ -402,28 +541,49 @@ test("the pipeline carries the selected moveId through to the result unchanged",
   assert.equal(result.moveId, "scratch");
 });
 
-test("every legal known move produces exactly the same fixed damage — the move itself never changes gameplay", async () => {
+// Phase 5B.2 superseded the old "every move deals the same fixed damage"
+// assumption: the move itself (its power and category) now genuinely
+// changes gameplay via the Damage Engine. growl (status) and scratch
+// (physical, power 40) must no longer produce the same number.
+test("different known moves produce different damage — a status move deals none, a physical move deals its calculated amount", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  const growlResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl", MAX_ROLL_RANDOM_SOURCE);
+  assert.equal(growlResult.status, "success");
+  if (growlResult.status !== "success") return;
+  assert.equal(growlResult.playerDamage, 0);
+  assert.equal(growlResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+
+  // Reset the wild back to full before the second hit so both attacks are
+  // measured against the same starting HP.
+  seedLevel100BulbasaurSession("p1");
+
+  const scratchResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MAX_ROLL_RANDOM_SOURCE);
+  assert.equal(scratchResult.status, "success");
+  if (scratchResult.status !== "success") return;
+  assert.equal(scratchResult.playerDamage, SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
+  assert.equal(scratchResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+
+  assert.notEqual(scratchResult.playerDamage, growlResult.playerDamage);
+});
+
+test("a session referencing an unrecognized wild species is treated as battle-inactive rather than crashing", async () => {
   seedPlayerProfile({ id: "owner-1" });
   seedMaxLevelActivePokemon("p1", "owner-1", 100);
   seedFieldBattleSession({
     playerId: "owner-1",
     zoneId: ZONE_ID,
-    wildSpeciesId: "bulbasaur",
+    wildSpeciesId: "not-a-real-species",
     wildLevel: 3,
     wildCurrentHp: 100,
     wildMaxHp: 100,
     activePlayerPokemonId: "p1",
   });
 
-  const growlResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl");
-  assert.equal(growlResult.status, "success");
-  if (growlResult.status !== "success") return;
-  assert.equal(growlResult.playerDamage, TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(growlResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch");
 
-  const scratchResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch");
-  assert.equal(scratchResult.status, "success");
-  if (scratchResult.status !== "success") return;
-  assert.equal(scratchResult.playerDamage, TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(scratchResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.deepEqual(result, { status: "battle-inactive" });
+  assert.equal(getPlayerPokemonUpdateCallCount(), 0, "no damage may ever be applied against an unresolvable wild");
 });

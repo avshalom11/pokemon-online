@@ -95,7 +95,10 @@ test("resolves a valid, authenticated, owned attack with a real known move and r
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
   assert.equal(result.moveId, "growl");
-  assert.equal(result.updatedWildHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  // Phase 5B.2: growl is a status move, so it now resolves through the
+  // Damage Engine's non-damaging result — the wild's HP is untouched. The
+  // wild's own counter-attack is still the unchanged fixed amount.
+  assert.equal(result.updatedWildHp, 100);
   assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
 });
 
