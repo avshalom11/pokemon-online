@@ -27,6 +27,17 @@ test("a physical move resolved by id (Pound) uses Attack/Defense and matches the
     stabApplied: false,
     effectivenessMultiplier: 1,
     effectivenessResult: "normal",
+    // "pound" has a real accuracy (100) in the Move Registry, but no
+    // accuracyRoll was supplied here, so the check cannot be evaluated and
+    // resolves to an automatic hit (accuracy/accuracyRoll both null) — see
+    // checkMoveAccuracy's own doc comment in accuracy.ts.
+    hit: true,
+    accuracy: null,
+    accuracyRoll: null,
+    // No criticalRoll was supplied either, so the critical check likewise
+    // cannot be evaluated and resolves to "never critical".
+    critical: false,
+    criticalRoll: null,
   });
 });
 

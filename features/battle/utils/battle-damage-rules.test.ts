@@ -307,3 +307,105 @@ test("a status move never receives a type-effectiveness multiplier either", () =
 
   assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "status-move" });
 });
+
+// --- Phase 5E: Accuracy ------------------------------------------------------------
+
+const LOW_ACCURACY_MOVE = fixtureMove({ id: "low-accuracy-move", category: "physical", power: 40, accuracy: 70 });
+
+test("a low-accuracy move hits when the accuracyRoll is below its accuracy", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const result = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, defender, 1.0, 0);
+
+  assert.equal(result.kind, "damage");
+});
+
+test("a low-accuracy move misses when the accuracyRoll is at or above its accuracy", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const result = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, defender, 1.0, 70);
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+});
+
+test("omitting accuracyRoll always hits, even for a move with a real low accuracy (pre-Phase-5E callers keep working unchanged)", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const result = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, defender, 1.0);
+
+  assert.equal(result.kind, "damage");
+});
+
+test("a miss skips STAB even when the move's type would otherwise match the attacker's own type", () => {
+  const lowAccuracyFireMove = fixtureMove({ id: "low-accuracy-fire-move", type: "fire", category: "special", power: 40, accuracy: 70 });
+  const fireAttacker = { baseStats: BASE_STATS, level: 50, types: ["fire"] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const result = resolveAttackDamage(lowAccuracyFireMove, fireAttacker, defender, 1.0, 70);
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+});
+
+test("a miss skips Type Effectiveness even when the move would otherwise be super-effective", () => {
+  const lowAccuracyFireMove = fixtureMove({ id: "low-accuracy-fire-move-2", type: "fire", category: "special", power: 40, accuracy: 70 });
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const grassDefender = { baseStats: BASE_STATS, level: 50, types: ["grass"] as const };
+
+  const result = resolveAttackDamage(lowAccuracyFireMove, attacker, grassDefender, 1.0, 70);
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+});
+
+// --- Phase 5F: Critical Hit ---------------------------------------------------------
+
+test("a low criticalRoll produces a critical hit that deals more damage than the same attack without one", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const normal = resolveAttackDamage(PHYSICAL_MOVE, attacker, defender, 1.0, 0, 0.5);
+  const critical = resolveAttackDamage(PHYSICAL_MOVE, attacker, defender, 1.0, 0, 0);
+
+  assert.ok(normal.kind === "damage" && critical.kind === "damage");
+  assert.equal(normal.critical, false);
+  assert.equal(critical.critical, true);
+  assert.equal(critical.damage, Math.floor(normal.damage * 1.5));
+});
+
+test("omitting criticalRoll never produces a critical hit (pre-Phase-5F callers keep working unchanged)", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const result = resolveAttackDamage(PHYSICAL_MOVE, attacker, defender, 1.0, 0);
+
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, false);
+});
+
+test("a miss never becomes critical, even with a criticalRoll that would otherwise crit", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const result = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, defender, 1.0, 70, 0);
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+});
+
+test("a critical hit still combines with STAB and Type Effectiveness through the full glue layer", () => {
+  const fireAttacker = { baseStats: BASE_STATS, level: 50, types: ["fire"] as const };
+  const grassDefender = { baseStats: BASE_STATS, level: 50, types: ["grass"] as const };
+
+  const withoutCritical = resolveAttackDamage(FIRE_MOVE, fireAttacker, grassDefender, 1.0, 0, 0.5);
+  const withCritical = resolveAttackDamage(FIRE_MOVE, fireAttacker, grassDefender, 1.0, 0, 0);
+
+  assert.ok(withoutCritical.kind === "damage" && withCritical.kind === "damage");
+  assert.equal(withoutCritical.critical, false);
+  assert.equal(withCritical.critical, true);
+  assert.equal(withCritical.damage, Math.floor(withoutCritical.damage * 1.5));
+});

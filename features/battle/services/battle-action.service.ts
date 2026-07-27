@@ -1,7 +1,7 @@
 import "server-only";
 
 import { applyFixedAttack } from "@/engine/battle/battle-config";
-import { rollDamageRandomFactor } from "@/engine/damage";
+import { rollAccuracyCheck, rollCriticalHit, rollDamageRandomFactor } from "@/engine/damage";
 import { getMoveById } from "@/engine/moves";
 import {
   endBattleSession,
@@ -40,7 +40,22 @@ import type { ZoneId } from "@/shared/types/zone";
 // species types are also passed through to resolveAttackDamage below, and
 // the resulting 0x/0.25x/0.5x/1x/2x/4x multiplier is likewise entirely
 // computed inside the Engine (engine/damage/type-chart.ts), never here.
-// Accuracy, crits, and abilities (Adaptability etc.) are still explicitly
+//
+// Phase 5E: the move must now also pass an Accuracy check before any of
+// the above runs — a freshly rolled accuracyRoll (rollAccuracyCheck) is
+// passed through to resolveAttackDamage alongside the move's own
+// Registry accuracy, and a miss short-circuits to a MissedMoveResult
+// (0 damage) entirely inside the Engine; STAB/Type Effectiveness never
+// run for a missed attempt. The wild's own counter-attack is NOT
+// accuracy-checked — it's still the same unconditional applyFixedAttack
+// below, unaffected by whether the player's own attack hit or missed.
+//
+// Phase 5F: a landed, non-immune hit also rolls a flat 1/24 Critical Hit
+// chance (rollCriticalHit) — passed through to resolveAttackDamage
+// alongside everything else, with the 1.5x multiplier (if it applies)
+// entirely computed inside the Engine (engine/damage/critical.ts), never
+// here, and applied only after STAB and Type Effectiveness. Variable
+// critical ratios and abilities (Adaptability etc.) are still explicitly
 // out of scope. The wild's one counter-attack is deliberately UNCHANGED:
 // it still reuses applyFixedAttack
 // (engine/battle/battle-config.ts) exactly as before, since enemy move
@@ -174,19 +189,25 @@ export async function executeBattleAction(
   }
 
   // ---- Damage Engine (Phase 5B.2 integration, Phase 5C STAB, Phase 5D ---
-  // ---- Type Effectiveness) ------------------------------------------------
+  // ---- Type Effectiveness, Phase 5E Accuracy, Phase 5F Critical Hit) ------
   // Real move power/category, the centralized stat system, a production
   // 0.85-1.00 random roll, STAB (the active Pokémon's own species types vs.
-  // the move's own type), and Type Effectiveness (the move's own type vs.
-  // the wild's own species types) — replaces the old fixed
-  // TEMPORARY_ATTACK_DAMAGE hit for the player's own attack only. A status
-  // move correctly resolves to 0 damage via the Engine's own non-damaging
-  // result rather than a special case here.
+  // the move's own type), Type Effectiveness (the move's own type vs. the
+  // wild's own species types), an Accuracy check (the move's own Registry
+  // accuracy vs. a freshly rolled accuracyRoll), and a Critical Hit check
+  // (a freshly rolled criticalRoll against the one global 1/24 chance) —
+  // replaces the old fixed TEMPORARY_ATTACK_DAMAGE hit for the player's own
+  // attack only. A status move correctly resolves to 0 damage via the
+  // Engine's own non-damaging result rather than a special case here; a
+  // missed damaging move resolves to 0 damage via the Engine's own miss
+  // result the exact same way.
   const damageResult = resolveAttackDamage(
     move,
     { baseStats: activePokemon.species.baseStats, level: activePokemon.level, types: activePokemon.species.types },
     { baseStats: wildSpecies.baseStats, level: session.wildLevel, types: wildSpecies.types },
-    rollDamageRandomFactor(randomSource)
+    rollDamageRandomFactor(randomSource),
+    rollAccuracyCheck(randomSource),
+    rollCriticalHit(randomSource)
   );
   const playerDamage = damageResult.kind === "damage" ? damageResult.damage : 0;
   const updatedWildHp = Math.max(0, session.wildCurrentHp - playerDamage);

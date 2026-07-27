@@ -144,6 +144,11 @@ test("random factor 0.85 (the minimum) is accepted and applied", () => {
     stabApplied: false,
     effectivenessMultiplier: 1,
     effectivenessResult: "normal",
+    hit: true,
+    accuracy: null,
+    accuracyRoll: null,
+    critical: false,
+    criticalRoll: null,
   });
 });
 
@@ -572,4 +577,396 @@ test("omitting moveType/defenderTypes never applies an effectiveness multiplier 
   assert.equal(withoutTypes.effectivenessMultiplier, 1);
   assert.equal(withoutTypes.effectivenessResult, "normal");
   assert.equal(withoutTypes.damage, 48);
+});
+
+// --- Phase 5E: Accuracy ------------------------------------------------------------
+
+// Same stats as PHYSICAL_BASELINE (baseDamage 19 at randomFactor 1.0), with
+// a real accuracy value added so the check actually runs.
+const PHYSICAL_WITH_ACCURACY: CalculateMoveDamageInput = {
+  ...PHYSICAL_BASELINE,
+  accuracy: 70,
+};
+
+test("accuracy 100 always hits regardless of the roll", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: 100, accuracyRoll: 99 });
+  assert.equal(result.kind, "damage");
+});
+
+test("accuracy 95 can hit (a roll below 95)", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: 95, accuracyRoll: 0 });
+  assert.equal(result.kind, "damage");
+});
+
+test("accuracy 95 can miss (a roll in its 5% miss band)", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: 95, accuracyRoll: 95 });
+  assert.equal(result.kind, "miss");
+});
+
+test("accuracy 70 can miss (a roll at or above 70)", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 70 });
+  assert.equal(result.kind, "miss");
+});
+
+test("accuracy 70 can hit (a roll below 70)", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 0 });
+  assert.equal(result.kind, "damage");
+});
+
+test("accuracy 0 always misses regardless of the roll", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: 0, accuracyRoll: 0 });
+  assert.equal(result.kind, "miss");
+});
+
+test("a miss deals exactly 0 damage", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 70 });
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+});
+
+test("a miss result carries hit: false and the exact accuracy/accuracyRoll it was decided from", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 70 });
+  assert.ok(result.kind === "miss");
+  assert.equal(result.hit, false);
+  assert.equal(result.accuracy, 70);
+  assert.equal(result.accuracyRoll, 70);
+});
+
+test("a hit result carries hit: true and the exact accuracy/accuracyRoll it was decided from", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 0 });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.hit, true);
+  assert.equal(result.accuracy, 70);
+  assert.equal(result.accuracyRoll, 0);
+});
+
+test("a miss never applies STAB — a move that would otherwise get STAB deals 0 damage instead", () => {
+  const result = calculateMoveDamage({
+    ...FIRE_SPECIAL_WITH_STAB,
+    accuracy: 70,
+    accuracyRoll: 70, // miss
+  });
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+  // MissedMoveResult has no stabApplied field at all — the STAB step never ran.
+  assert.ok(!("stabApplied" in result));
+});
+
+test("a miss never applies Type Effectiveness — a move that would otherwise be super-effective deals 0 damage instead", () => {
+  const result = calculateMoveDamage({
+    ...SPECIAL_WITH_EFFECTIVENESS,
+    moveType: "fire",
+    defenderTypes: ["grass"],
+    accuracy: 70,
+    accuracyRoll: 70, // miss
+  });
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+  // MissedMoveResult has no effectivenessMultiplier field at all — the
+  // Type Effectiveness step never ran.
+  assert.ok(!("effectivenessMultiplier" in result));
+});
+
+test("a miss leaves no stat-validation side effect — an otherwise-invalid defense stat never even gets checked once the move has already missed", () => {
+  // A 0 defense stat would normally throw (see the stat-validation tests
+  // above) — proving it does NOT throw here confirms the accuracy check
+  // truly short-circuits before stat validation ever runs.
+  const result = calculateMoveDamage({
+    ...PHYSICAL_WITH_ACCURACY,
+    accuracyRoll: 70, // miss
+    defenderStats: { defense: 0, specialDefense: 999 },
+  });
+
+  assert.equal(result.kind, "miss");
+});
+
+test("a status move is never accuracy-checked, even when a real accuracy/accuracyRoll pair would otherwise miss", () => {
+  const result = calculateMoveDamage({
+    level: 50,
+    moveCategory: "status",
+    movePower: null,
+    attackerStats: { attack: 50, specialAttack: 50 },
+    defenderStats: { defense: 50, specialDefense: 50 },
+    randomFactor: 1.0,
+    accuracy: 0,
+    accuracyRoll: 0,
+  });
+
+  assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "status-move" });
+});
+
+test("a missing-power move is never accuracy-checked, even when a real accuracy/accuracyRoll pair would otherwise miss", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_BASELINE, movePower: null, accuracy: 0, accuracyRoll: 0 });
+  assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "missing-power" });
+});
+
+test("accuracy null (e.g. Swift/Bide/Struggle) always hits and never consumes a roll", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: null });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.hit, true);
+  assert.equal(result.accuracy, null);
+  assert.equal(result.accuracyRoll, null);
+});
+
+test("omitting accuracy/accuracyRoll entirely always hits (pre-Phase-5E callers keep working unchanged)", () => {
+  const result = calculateMoveDamage(PHYSICAL_BASELINE);
+  assert.ok(result.kind === "damage");
+  assert.equal(result.hit, true);
+  assert.equal(result.damage, 19);
+});
+
+test("a numeric accuracy without a paired accuracyRoll always hits rather than throwing", () => {
+  const result = calculateMoveDamage(PHYSICAL_WITH_ACCURACY);
+  assert.ok(result.kind === "damage");
+  assert.equal(result.hit, true);
+  assert.equal(result.damage, 19);
+});
+
+test("an accuracy above 100 is rejected", () => {
+  assert.throws(
+    () => calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: 101, accuracyRoll: 0 }),
+    DamageValidationError
+  );
+});
+
+test("a negative accuracy is rejected", () => {
+  assert.throws(
+    () => calculateMoveDamage({ ...PHYSICAL_BASELINE, accuracy: -1, accuracyRoll: 0 }),
+    DamageValidationError
+  );
+});
+
+test("an accuracyRoll above 99 is rejected", () => {
+  assert.throws(
+    () => calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 100 }),
+    DamageValidationError
+  );
+});
+
+test("a negative accuracyRoll is rejected", () => {
+  assert.throws(
+    () => calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: -1 }),
+    DamageValidationError
+  );
+});
+
+// --- Phase 5F: Critical Hit ---------------------------------------------------------
+
+// A guaranteed hit (accuracy 100 always hits regardless of roll) built on
+// top of PHYSICAL_BASELINE (baseDamage 19 at randomFactor 1.0), so every
+// test below isolates the critical-hit step alone.
+const PHYSICAL_GUARANTEED_HIT: CalculateMoveDamageInput = {
+  ...PHYSICAL_BASELINE,
+  accuracy: 100,
+  accuracyRoll: 0,
+};
+
+test("a normal hit (a high criticalRoll) is not critical", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: 0.5 });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, false);
+  assert.equal(result.damage, 19);
+});
+
+test("a critical hit (a low criticalRoll) multiplies the final damage by 1.5", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: 0 });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, true);
+  // afterRandom = 19 (randomFactor 1.0), no STAB, no effectiveness change ->
+  // afterEffectiveness = 19; critical: floor(19 * 1.5) = floor(28.5) = 28.
+  assert.equal(result.damage, 28);
+});
+
+test("critical is only checked after a successful hit — a miss never rolls or reports one", () => {
+  const result = calculateMoveDamage({
+    ...PHYSICAL_BASELINE,
+    accuracy: 0,
+    accuracyRoll: 0, // guaranteed miss
+    criticalRoll: 0, // would be a guaranteed critical, if it were ever checked
+  });
+
+  assert.ok(result.kind === "miss");
+  assert.equal(result.damage, 0);
+  // MissedMoveResult has no critical field at all — the critical step
+  // never ran.
+  assert.ok(!("critical" in result));
+});
+
+test("a missed attack can never become critical, even at the lowest possible criticalRoll", () => {
+  const result = calculateMoveDamage({
+    ...PHYSICAL_BASELINE,
+    accuracy: 50,
+    accuracyRoll: 50, // guaranteed miss (roll must be < accuracy)
+    criticalRoll: 0,
+  });
+
+  assert.equal(result.kind, "miss");
+});
+
+test("a type-immune hit can never become critical, even at the lowest possible criticalRoll", () => {
+  const result = calculateMoveDamage({
+    ...PHYSICAL_GUARANTEED_HIT,
+    moveType: "normal",
+    defenderTypes: ["ghost"], // Normal -> Ghost is a complete immunity (0x)
+    criticalRoll: 0,
+  });
+
+  assert.ok(result.kind === "damage");
+  assert.equal(result.damage, 0);
+  assert.equal(result.critical, false);
+  assert.equal(result.criticalRoll, null);
+});
+
+test("a status move never becomes critical, even when a criticalRoll that would otherwise crit is supplied", () => {
+  const result = calculateMoveDamage({
+    level: 50,
+    moveCategory: "status",
+    movePower: null,
+    attackerStats: { attack: 50, specialAttack: 50 },
+    defenderStats: { defense: 50, specialDefense: 50 },
+    randomFactor: 1.0,
+    criticalRoll: 0,
+  });
+
+  assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "status-move" });
+});
+
+test("a missing-power move never becomes critical, even when a criticalRoll that would otherwise crit is supplied", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, movePower: null, criticalRoll: 0 });
+  assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "missing-power" });
+});
+
+test("STAB and Critical combine correctly", () => {
+  const result = calculateMoveDamage({
+    ...FIRE_SPECIAL_WITH_STAB,
+    accuracy: 100,
+    accuracyRoll: 0,
+    criticalRoll: 0, // guaranteed critical
+  });
+
+  assert.ok(result.kind === "damage");
+  assert.equal(result.stabApplied, true);
+  assert.equal(result.critical, true);
+  // afterRandom = 48; afterStab = floor(48*1.5) = 72; afterEffectiveness =
+  // 72 (no type data here); critical: floor(72*1.5) = floor(108) = 108.
+  assert.equal(result.damage, 108);
+});
+
+test("Type Effectiveness and Critical combine correctly", () => {
+  const result = calculateMoveDamage({
+    ...SPECIAL_WITH_EFFECTIVENESS,
+    moveType: "fire",
+    defenderTypes: ["grass"],
+    accuracy: 100,
+    accuracyRoll: 0,
+    criticalRoll: 0, // guaranteed critical
+  });
+
+  assert.ok(result.kind === "damage");
+  assert.equal(result.effectivenessMultiplier, 2);
+  assert.equal(result.critical, true);
+  // afterRandom = 48 (no STAB); afterEffectiveness = floor(48*2) = 96;
+  // critical: floor(96*1.5) = 144.
+  assert.equal(result.damage, 144);
+});
+
+test("STAB, Type Effectiveness, and Critical all combine correctly together", () => {
+  const result = calculateMoveDamage({
+    ...SPECIAL_WITH_EFFECTIVENESS,
+    moveType: "fire",
+    attackerTypes: ["fire"],
+    defenderTypes: ["grass"],
+    accuracy: 100,
+    accuracyRoll: 0,
+    criticalRoll: 0, // guaranteed critical
+  });
+
+  assert.ok(result.kind === "damage");
+  assert.equal(result.stabApplied, true);
+  assert.equal(result.effectivenessMultiplier, 2);
+  assert.equal(result.critical, true);
+  // afterRandom = 48; afterStab = floor(48*1.5) = 72; afterEffectiveness =
+  // floor(72*2) = 144; critical: floor(144*1.5) = 216.
+  assert.equal(result.damage, 216);
+});
+
+test("critical is applied to the floored post-effectiveness damage, not to an unrounded intermediate value", () => {
+  // level 50, power 40, attack 60, defense 50, randomFactor 1.0, no
+  // STAB/effectiveness data: afterEffectiveness lands on 23 exactly (see
+  // below). floor(23 * 1.5) = floor(34.5) = 34 is the correct answer;
+  // applying the 1.5x to some unrounded upstream value instead of this
+  // floored 23 would produce a different number.
+  const result = calculateMoveDamage({
+    level: 50,
+    moveCategory: "physical",
+    movePower: 40,
+    attackerStats: { attack: 60, specialAttack: 1 },
+    defenderStats: { defense: 50, specialDefense: 1 },
+    randomFactor: 1.0,
+    accuracy: 100,
+    accuracyRoll: 0,
+    criticalRoll: 0,
+  });
+
+  assert.ok(result.kind === "damage");
+  // levelFactor@50 = 22; raw = 22*40*60/50 = 1056; baseDamage = floor(1056/50+2) = floor(23.12) = 23.
+  assert.equal(result.baseDamage, 23);
+  // afterRandom = 23 (randomFactor 1.0); no STAB/effectiveness ->
+  // afterEffectiveness = 23; critical: floor(23*1.5) = floor(34.5) = 34.
+  assert.equal(result.damage, 34);
+});
+
+test("the minimum-1-damage floor still applies after a critical hit", () => {
+  const result = calculateMoveDamage({
+    level: 1,
+    moveCategory: "physical",
+    movePower: 1,
+    attackerStats: { attack: 1, specialAttack: 1 },
+    defenderStats: { defense: 999999, specialDefense: 999999 },
+    randomFactor: MIN_DAMAGE_RANDOM_FACTOR,
+    accuracy: 100,
+    accuracyRoll: 0,
+    criticalRoll: 0, // guaranteed critical
+  });
+
+  assert.ok(result.kind === "damage");
+  assert.ok(result.damage >= 1);
+});
+
+test("a critical result reports back the exact criticalRoll it was decided from", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: 0.02 });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, true);
+  assert.equal(result.criticalRoll, 0.02);
+});
+
+test("a non-critical result reports back the exact criticalRoll it was decided from", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: 0.5 });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, false);
+  assert.equal(result.criticalRoll, 0.5);
+});
+
+test("omitting criticalRoll entirely always resolves to non-critical (pre-Phase-5F callers keep working unchanged)", () => {
+  const result = calculateMoveDamage(PHYSICAL_BASELINE);
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, false);
+  assert.equal(result.criticalRoll, null);
+  assert.equal(result.damage, 19);
+});
+
+test("a criticalRoll of exactly 1 is rejected", () => {
+  assert.throws(
+    () => calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: 1 }),
+    DamageValidationError
+  );
+});
+
+test("a negative criticalRoll is rejected", () => {
+  assert.throws(
+    () => calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: -0.1 }),
+    DamageValidationError
+  );
 });

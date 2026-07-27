@@ -99,7 +99,21 @@ const EMBER_VS_LEVEL_100_BULBASAUR_DAMAGE = 98;
 // A randomSource whose Math.random-shaped output rolls the maximum 1.00
 // randomFactor (see engine/damage/random.ts's rollDamageRandomFactor: a
 // value just under 1 rolls the top of the 85-100 integer-percent range).
+// executeBattleAction draws all three Phase 5E/5F rolls (accuracy, damage
+// random factor, critical) from this SAME source, so 0.999999 also rolls
+// the highest possible accuracy roll (99, still a guaranteed hit against
+// any accuracy > 99) and a guaranteed non-critical (0.999999 is nowhere
+// near the 1/24 critical threshold) — exactly what every test using this
+// constant already expects.
 const MAX_ROLL_RANDOM_SOURCE = () => 0.999999;
+
+// A randomSource that rolls the minimum 0.85 randomFactor (floor(0.05*16)
+// = 0) while staying just above CRITICAL_HIT_CHANCE (1/24 ≈ 0.041667), so
+// it never incidentally triggers a critical hit the way a flat `() => 0`
+// source would (0 < 1/24 is always true, which would silently inflate
+// every "minimum roll" test below by an unwanted 1.5x). Also rolls a low
+// accuracy check (5), a guaranteed hit against any move used with it here.
+const MIN_ROLL_NO_CRIT_RANDOM_SOURCE = () => 0.05;
 
 function seedLevel100BulbasaurSession(activePlayerPokemonId: string) {
   seedFieldBattleSession({
@@ -174,10 +188,10 @@ test("a lower random roll (0.85) deals less damage than the maximum roll (1.00) 
   seedMaxLevelActivePokemon("p1", "owner-1", 100);
   seedLevel100BulbasaurSession("p1");
 
-  const minRollResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", () => 0);
+  const minRollResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MIN_ROLL_NO_CRIT_RANDOM_SOURCE);
   assert.equal(minRollResult.status, "success");
   if (minRollResult.status !== "success") return;
-  // baseDamage 37 * 0.85 = 31.45 -> floor 31.
+  // baseDamage 37 * 0.85 = 31.45 -> floor 31 (no critical hit at this roll).
   assert.equal(minRollResult.playerDamage, 31);
   assert.ok(minRollResult.playerDamage < SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
 });
@@ -567,6 +581,147 @@ test("different known moves produce different damage — a status move deals non
   assert.equal(scratchResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
 
   assert.notEqual(scratchResult.playerDamage, growlResult.playerDamage);
+});
+
+// ===========================================================================
+// Phase 5E — Accuracy & Miss
+// ===========================================================================
+
+// mega-kick: physical, Normal-type, power 120, accuracy 75 — a real Move
+// Registry entry with an accuracy below 100, used (rather than a fixture)
+// so this is genuine end-to-end coverage against the real registry, same
+// rule move-damage-query.test.ts's own doc comment already follows.
+//   charmander Attack@100 = 109, bulbasaur Defense@100 = 103, levelFactor@100 = 42
+//   raw = 42*120*109/103 = 5333.598...; baseDamage = floor(5333.598/50+2) = 108
+//   mega-kick is Normal-type (charmander is Fire-type: no STAB) vs.
+//   bulbasaur (Grass/Poison: both neutral to Normal, multiplier 1) — STAB
+//   and Type Effectiveness are both neutral here on purpose, isolating the
+//   accuracy check as the only thing under test.
+const MEGA_KICK_BASE_DAMAGE = 108;
+
+function seedMegaKickActivePokemon(id: string, playerId: string, currentHp: number) {
+  const pokemon = seedPlayerPokemon({ id, playerId, speciesId: "charmander", level: 100, currentHp, partySlot: 1 });
+  seedKnownMove({ playerPokemonId: id, moveId: "mega-kick", slot: 1 });
+  return pokemon;
+}
+
+test("a low-accuracy move (mega-kick, 75) can hit, dealing its calculated damage", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMegaKickActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  // MIN_ROLL_NO_CRIT_RANDOM_SOURCE (0.05) -> rollDamageRandomFactor = 0.85
+  // (minimum), rollAccuracyCheck = 5 (well below 75) -> guaranteed hit, and
+  // rollCriticalHit = 0.05 (just above the 1/24 threshold) -> guaranteed
+  // non-critical, so this test isolates the accuracy hit alone.
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "mega-kick", MIN_ROLL_NO_CRIT_RANDOM_SOURCE);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+
+  // afterRandom = floor(108 * 0.85) = floor(91.8) = 91; no STAB, no
+  // effectiveness change (both neutral), no critical -> final damage 91.
+  const expectedDamage = Math.floor(MEGA_KICK_BASE_DAMAGE * 0.85);
+  assert.equal(expectedDamage, 91);
+  assert.equal(result.playerDamage, expectedDamage);
+  assert.equal(result.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE - expectedDamage);
+  // The wild survived, so its own unchanged counter-attack still lands —
+  // a hit changes nothing else about the rest of the turn.
+  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+});
+
+test("a low-accuracy move (mega-kick, 75) can miss, dealing zero damage while the battle continues normally", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMegaKickActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  // random() just under 1 -> rollAccuracyCheck = 99, which is >= 75 ->
+  // guaranteed miss (the same source that would otherwise roll the maximum
+  // 1.00 damage factor, proving the miss happens before that value is ever
+  // used for anything).
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "mega-kick", MAX_ROLL_RANDOM_SOURCE);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+
+  // No damage, no HP change on the wild's side...
+  assert.equal(result.playerDamage, 0);
+  assert.equal(result.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE);
+  assert.equal(result.wildFainted, false);
+  assert.equal(
+    getFieldBattleSessionRow("owner-1")?.wildCurrentHp,
+    BULBASAUR_LEVEL_100_MAX_HP_VALUE,
+    "a miss must leave the wild's persisted HP completely untouched"
+  );
+
+  // ...but the battle continues normally: the wild's own counter-attack is
+  // entirely unaffected by whether the player's own attack landed.
+  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.battleEnded, false);
+});
+
+test("a full-accuracy move (scratch, 100) never misses even on the highest possible accuracy roll", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MAX_ROLL_RANDOM_SOURCE);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+  assert.equal(result.playerDamage, SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
+});
+
+// ===========================================================================
+// Phase 5F — Critical Hit
+// ===========================================================================
+
+// random() = 0 -> rollDamageRandomFactor = 0.85 (minimum), rollAccuracyCheck
+// = 0 (a guaranteed hit against any real move's accuracy), AND
+// rollCriticalHit = 0 (well below the 1/24 critical-hit threshold) — a
+// guaranteed critical, deliberately reusing the same "roll everything to
+// its floor" source that predates Phase 5F, now also proving the critical
+// multiplier applies inside the live Battle Action Service.
+const GUARANTEED_CRITICAL_RANDOM_SOURCE = () => 0;
+
+test("a guaranteed critical hit multiplies the live service's calculated damage by 1.5", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  const normalResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", MIN_ROLL_NO_CRIT_RANDOM_SOURCE);
+  assert.equal(normalResult.status, "success");
+  if (normalResult.status !== "success") return;
+  // Same 0.85 minimum random factor as the guaranteed-critical roll below,
+  // but without the critical — isolates the 1.5x multiplier as the only
+  // difference between the two results.
+  assert.equal(normalResult.playerDamage, 31);
+
+  seedLevel100BulbasaurSession("p1");
+
+  const criticalResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", GUARANTEED_CRITICAL_RANDOM_SOURCE);
+  assert.equal(criticalResult.status, "success");
+  if (criticalResult.status !== "success") return;
+  // afterRandom = floor(37*0.85) = 31 (no STAB/effectiveness change, both
+  // neutral); critical: floor(31*1.5) = floor(46.5) = 46.
+  assert.equal(criticalResult.playerDamage, 46);
+  assert.equal(criticalResult.playerDamage, Math.floor(normalResult.playerDamage * 1.5));
+  assert.equal(criticalResult.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE - 46);
+});
+
+test("a critical hit still lets the wild's own unaffected counter-attack land normally", async () => {
+  seedPlayerProfile({ id: "owner-1" });
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
+  seedLevel100BulbasaurSession("p1");
+
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", GUARANTEED_CRITICAL_RANDOM_SOURCE);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
 });
 
 test("a session referencing an unrecognized wild species is treated as battle-inactive rather than crashing", async () => {

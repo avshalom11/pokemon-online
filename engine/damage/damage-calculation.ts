@@ -6,6 +6,8 @@ import type {
   OffensiveStatKind,
 } from "./damage-types.ts";
 import { DamageValidationError } from "./damage-errors.ts";
+import { checkMoveAccuracy } from "./accuracy.ts";
+import { CRITICAL_HIT_MULTIPLIER, checkCriticalHit } from "./critical.ts";
 import { calculateTypeEffectiveness } from "./type-chart.ts";
 import type { MoveType } from "../moves/index.ts";
 
@@ -16,28 +18,36 @@ import type { MoveType } from "../moves/index.ts";
 export { DamageValidationError };
 
 // Phase 5B.1 — pure damage calculation engine. Phase 5C added STAB.
-// Phase 5D added Type Effectiveness.
+// Phase 5D added Type Effectiveness. Phase 5E added the Accuracy/Miss gate.
+// Phase 5F added the basic Critical Hit multiplier.
 //
 // Formula (Physical/Special moves only):
 //
+//   accuracy check     = miss -> return MissedMoveResult, formula never runs
 //   baseDamage         = floor( ( (2*level/5 + 2) * power * attackStat / defenseStat ) / 50 + 2 )
 //   afterRandom        = floor( baseDamage * randomFactor )
 //   afterStab          = STAB applies ? floor( afterRandom * 1.5 ) : afterRandom
+//   afterEffectiveness = floor( afterStab * effectivenessMultiplier )
 //   damage             = effectivenessMultiplier === 0
-//                           ? 0
-//                           : floor( afterStab * effectivenessMultiplier ), never below 1
+//                           ? 0 (never critical, never below 1)
+//                           : critical applies
+//                             ? floor( afterEffectiveness * 1.5 ), never below 1
+//                             : afterEffectiveness, never below 1
 //
 // Rounding happens at every stage, in this exact order, and never earlier:
 // once on the whole bracketed expression after the "+ 2" (baseDamage), once
 // after multiplying by randomFactor (afterRandom), once after multiplying
-// by the STAB multiplier if it applies (afterStab), and once more after
-// multiplying by the type-effectiveness multiplier (the final damage).
-// Never floor before the "+ 2", never apply STAB before the random factor,
-// and never apply type effectiveness before STAB — Base Damage -> Random
-// -> STAB -> Type Effectiveness -> Final Damage, exactly in that order.
-// The one exception is a 0x (immune) effectiveness result: that always
-// forces exactly 0 final damage, bypassing the "at least 1" floor entirely
-// (see the Phase 5D note below) — no other stage is ever skipped.
+// by the STAB multiplier if it applies (afterStab), once more after
+// multiplying by the type-effectiveness multiplier (afterEffectiveness),
+// and once more after multiplying by the critical-hit multiplier if it
+// applies (the final damage). Never floor before the "+ 2", never apply
+// STAB before the random factor, never apply type effectiveness before
+// STAB, and never apply the critical multiplier before type effectiveness
+// — Accuracy Check -> Base Damage -> Random -> STAB -> Type Effectiveness ->
+// Critical Hit -> Final Damage, exactly in that order. The one exception is
+// a 0x (immune) effectiveness result: that always forces exactly 0 final
+// damage, bypassing both the critical-hit check entirely (see the Phase 5F
+// note below) and the "at least 1" floor — no other stage is ever skipped.
 //
 // Supported categories: "physical" (Attack/Defense) and "special" (Special
 // Attack/Special Defense). "status" moves never reach the formula — they
@@ -66,12 +76,32 @@ export { DamageValidationError };
 // Damage Engine ever calculates it (see calculateTypeEffectiveness in
 // type-chart.ts, the one canonical Type Chart for the whole project).
 //
+// Phase 5E — Accuracy: a physical/special move with a real power (i.e. one
+// that would otherwise reach the formula below) first runs through
+// checkMoveAccuracy (accuracy.ts). A miss short-circuits immediately with a
+// MissedMoveResult — 0 damage, and the base formula, STAB, and Type
+// Effectiveness never run at all for that attempt. Status moves and
+// missing-power moves are untouched: they still resolve to their existing
+// non-damaging result before the accuracy check ever runs (see the two
+// early returns above), exactly as every phase before this one.
+//
+// Phase 5F — Critical Hit: checkCriticalHit (critical.ts) only ever runs
+// once a hit has already landed AND the target isn't immune (0x
+// effectiveness) — a miss returns MissedMoveResult before this point, and
+// an immune hit is always exactly 0 damage and skips the critical check
+// entirely rather than rolling it and discarding the result. A status move
+// never reaches any of this either (see its own early return above). When
+// it does apply, the flat 1.5x multiplier is the LAST modifier applied,
+// after STAB and Type Effectiveness, and before the final "at least 1"
+// floor.
+//
 // Intentionally excluded this phase (see AGENTS/phase spec — not a bug):
-// critical hits, accuracy/evasion, status effects, multi-hit, fixed-damage
-// moves (Seismic Toss/Sonic Boom-style), OHKO, recoil, drain, weather,
-// abilities (including Adaptability), Terastalization, held items,
-// screens, PP. A physical/special move with null/undefined/0 power (e.g.
-// Seismic Toss) deliberately falls through to the same non-damaging
+// variable critical-hit ratios (Focus Energy, Super Luck, high-crit moves,
+// Scope Lens), accuracy/evasion *stages*, status effects, multi-hit,
+// fixed-damage moves (Seismic Toss/Sonic Boom-style), OHKO, recoil, drain,
+// weather, abilities (including Adaptability), Terastalization, held
+// items, screens, PP. A physical/special move with null/undefined/0 power
+// (e.g. Seismic Toss) deliberately falls through to the same non-damaging
 // result as a status move rather than being special-cased here.
 //
 // Wired into live battles since Phase 5B.2 (the player's own attack only —
@@ -163,6 +193,14 @@ export function calculateMoveDamage(input: CalculateMoveDamageInput): CalculateM
     return { kind: "non-damaging", damage: 0, reason: "missing-power" };
   }
 
+  // Phase 5E: every move that reaches this point WOULD deal damage — the
+  // accuracy check runs before any stat validation, the base formula, STAB,
+  // or Type Effectiveness, and a miss skips all of them.
+  const accuracyCheck = checkMoveAccuracy(input.accuracy, input.accuracyRoll);
+  if (!accuracyCheck.hit) {
+    return { kind: "miss", damage: 0, hit: false, accuracy: accuracyCheck.accuracy, accuracyRoll: accuracyCheck.accuracyRoll };
+  }
+
   const category = input.moveCategory;
   const { offensiveStat, defensiveStat } = statsForCategory(category);
   const attackStat = input.attackerStats[offensiveStat];
@@ -186,10 +224,18 @@ export function calculateMoveDamage(input: CalculateMoveDamageInput): CalculateM
       : { multiplier: 1, result: "normal" as const };
 
   const afterEffectiveness = Math.floor(afterStab * effectivenessMultiplier);
+  const isImmune = effectivenessMultiplier === 0;
+
+  // Phase 5F: an immune hit never rolls (or even asks for) a critical —
+  // it's always exactly 0 damage regardless, so there is nothing for a
+  // critical multiplier to apply to. Every other damaging hit gets a real
+  // check.
+  const criticalCheck = isImmune ? { critical: false, criticalRoll: null } : checkCriticalHit(input.criticalRoll);
+  const afterCritical = criticalCheck.critical ? Math.floor(afterEffectiveness * CRITICAL_HIT_MULTIPLIER) : afterEffectiveness;
 
   // A genuine immunity (0x) always yields exactly 0 damage — the "deal at
   // least 1" floor below is never allowed to override it.
-  const damage = effectivenessMultiplier === 0 ? 0 : Math.max(MIN_DAMAGING_RESULT, afterEffectiveness);
+  const damage = isImmune ? 0 : Math.max(MIN_DAMAGING_RESULT, afterCritical);
 
   return {
     kind: "damage",
@@ -202,5 +248,10 @@ export function calculateMoveDamage(input: CalculateMoveDamageInput): CalculateM
     stabApplied,
     effectivenessMultiplier,
     effectivenessResult,
+    hit: true,
+    accuracy: accuracyCheck.accuracy,
+    accuracyRoll: accuracyCheck.accuracyRoll,
+    critical: criticalCheck.critical,
+    criticalRoll: criticalCheck.criticalRoll,
   };
 }

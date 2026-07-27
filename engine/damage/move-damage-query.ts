@@ -30,6 +30,19 @@ export interface CalculateMoveDamageByIdInput {
   // Species Registry). Optional, same convention — omitting it just means
   // no effectiveness multiplier (neutral 1x) is applied.
   defenderTypes?: readonly MoveType[];
+  // Phase 5E — Accuracy: a single pre-rolled integer in [0, 99] from
+  // rollAccuracyCheck() (random.ts). The move's own accuracy (accuracy) is
+  // NOT a caller input here: it's always resolved from the Move Registry
+  // entry itself, below, never passed in separately — same convention as
+  // moveType. Omitting accuracyRoll means "cannot evaluate the check,"
+  // which resolves to an automatic hit (see checkMoveAccuracy's own doc
+  // comment in accuracy.ts).
+  accuracyRoll?: number;
+  // Phase 5F — Critical Hit: a single pre-rolled float in [0, 1) from
+  // rollCriticalHit() (random.ts). There is no per-move registry data for
+  // this (one global CRITICAL_HIT_CHANCE — see critical.ts). Omitting it
+  // means "no critical check requested," which resolves to never critical.
+  criticalRoll?: number;
 }
 
 // Thin adapter between the current Move Registry and the pure formula:
@@ -54,5 +67,8 @@ export function calculateMoveDamageById(input: CalculateMoveDamageByIdInput): Ca
     attackerStats: input.attackerStats,
     defenderStats: input.defenderStats,
     randomFactor: input.randomFactor,
+    accuracy: move.accuracy,
+    accuracyRoll: input.accuracyRoll,
+    criticalRoll: input.criticalRoll,
   });
 }

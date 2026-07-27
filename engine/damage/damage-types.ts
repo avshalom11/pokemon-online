@@ -61,6 +61,33 @@ export interface CalculateMoveDamageInput {
   // type — see type-chart.ts's assertKnownType, which fails loudly instead
   // of silently assuming Normal.
   defenderTypes?: readonly MoveType[];
+
+  // Phase 5E — Accuracy input. accuracy comes from the current Move
+  // Registry's own `accuracy` field (an integer 1-100, or null for a move
+  // that always hits, e.g. Swift/Bide/Struggle). Omitting the field
+  // entirely (every pre-Phase-5E caller/input literal) means "no accuracy
+  // check requested," which resolves to an automatic hit — the same
+  // missing-data convention moveType/attackerTypes/defenderTypes above
+  // already use, so every existing caller keeps compiling and behaving
+  // exactly as before. accuracyRoll is a single pre-rolled integer in
+  // [0, 99] from rollAccuracyCheck() (random.ts); tests inject a literal
+  // integer directly instead of stubbing Math.random. Supplying a numeric
+  // accuracy without a paired accuracyRoll also resolves to an automatic
+  // hit, since the engine can never roll its own random value — see
+  // checkMoveAccuracy's own doc comment in accuracy.ts for the full rule.
+  accuracy?: number | null;
+  accuracyRoll?: number;
+
+  // Phase 5F — Critical Hit input. There is no per-move data to read here
+  // (one single global CRITICAL_HIT_CHANCE — see critical.ts); criticalRoll
+  // is a single pre-rolled float in [0, 1) from rollCriticalHit() (random.ts),
+  // the same raw Math.random()-shaped contract accuracyRoll and randomFactor
+  // are themselves built from. Omitting it entirely (every pre-Phase-5F
+  // caller/input literal) means "no critical check requested," which
+  // resolves to "never critical" — the same missing-data convention every
+  // other optional field above already uses, so every existing caller keeps
+  // compiling and behaving exactly as before.
+  criticalRoll?: number;
 }
 
 export type NonDamagingReason = "status-move" | "missing-power";
@@ -80,6 +107,24 @@ export interface DamagingMoveResult {
   // (1 when effectiveness data wasn't supplied) and its categorical label.
   effectivenessMultiplier: number;
   effectivenessResult: EffectivenessResult;
+  // Phase 5E: the accuracy check always passed here — a failed check
+  // returns MissedMoveResult instead, never this kind (see
+  // calculateMoveDamage). accuracy/accuracyRoll are both null when no
+  // accuracy data was supplied/resolvable at all (see the input field's own
+  // doc comment above); otherwise they're the exact values the hit was
+  // decided from.
+  hit: true;
+  accuracy: number | null;
+  accuracyRoll: number | null;
+  // Phase 5F: whether the flat 1.5x critical-hit multiplier was applied.
+  // Only ever checked (and only ever true) for a hit against a non-immune
+  // target — an immune (0x effectiveness) hit always has critical: false
+  // and criticalRoll: null, exactly like the missing-data case below.
+  // criticalRoll is null when no critical data was supplied/resolvable at
+  // all (see the input field's own doc comment above) or the target was
+  // immune; otherwise it's the exact value the result was decided from.
+  critical: boolean;
+  criticalRoll: number | null;
 }
 
 export interface NonDamagingMoveResult {
@@ -88,4 +133,19 @@ export interface NonDamagingMoveResult {
   reason: NonDamagingReason;
 }
 
-export type CalculateMoveDamageResult = DamagingMoveResult | NonDamagingMoveResult;
+// Phase 5E: a damaging move (physical/special, real power) that failed its
+// accuracy check. Deals exactly 0 damage and never reaches STAB, Type
+// Effectiveness, or the base damage formula at all — see calculateMoveDamage
+// for the exact short-circuit. Kept distinct from NonDamagingMoveResult
+// (status-move/missing-power) since those are the move's own permanent
+// nature, whereas a miss is a per-attempt outcome that could just as easily
+// have hit — see the "hit" test file's own probability tests.
+export interface MissedMoveResult {
+  kind: "miss";
+  damage: 0;
+  hit: false;
+  accuracy: number;
+  accuracyRoll: number;
+}
+
+export type CalculateMoveDamageResult = DamagingMoveResult | NonDamagingMoveResult | MissedMoveResult;

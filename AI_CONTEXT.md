@@ -12,25 +12,37 @@ Every AI assistant working on this repository should read this file before makin
 
 # Current Development Status
 
-_Last updated: end of Phase 5A._
+_Last updated: end of Phase 5D._
 
-**Most recently completed: Phase 5A — Battle Move Selection.**
+**Most recently completed: Phase 5D — Type Effectiveness.**
 
-What Phase 5A delivered:
+What Phase 5A-5D together delivered (the player's own attack only):
 
 - The battle screen's single generic "Attack" button was replaced with the
   active Pokémon's real Known Moves (up to four slots, always rendered, empty
-  slots disabled).
+  slots disabled) — Phase 5A.
 - Known Moves now power the battle UI end-to-end: `PlayerPokemon` → Known
   Moves (`features/known-moves`) → Move Registry (`engine/moves`) → battle
   view (`features/battle/services/battle-view.service.ts`) → UI.
-- Selecting a move now sends its real `moveId` through the Battle Action
-  Pipeline (Server Action → Battle Action Service → validation → result),
-  instead of a moveId-less generic "attack".
-- Damage is still **Temporary Fixed Damage** (`engine/battle/battle-config.ts`
-  — a flat constant, no formula, no accuracy/crit/type-effectiveness yet).
-  Move selection is purely an architecture change so far; every legal move
-  currently deals identical damage.
+- Selecting a move sends its real `moveId` through the Battle Action Pipeline
+  (Server Action → Battle Action Service → validation → result), instead of a
+  moveId-less generic "attack".
+- Damage is no longer Temporary Fixed Damage for the player's attack: a real
+  Damage Engine (`engine/damage`) now computes it from the move's own
+  power/category, the centralized stat system (Attack/Special Attack vs.
+  Defense/Special Defense), and a 0.85-1.00 random factor — Phase 5B.
+- STAB (Same Type Attack Bonus) — a 1.5x multiplier when the move's type
+  matches one of the attacking Pokémon's own species types — Phase 5C.
+- Type Effectiveness — the move's type vs. the wild's own species type(s),
+  looked up in the one canonical Type Chart (`engine/damage/type-chart.ts`,
+  modern Gen 6+ matchups, all 18 types), stacking multiplicatively for dual
+  types (0x/0.25x/0.5x/1x/2x/4x) — Phase 5D.
+- Accuracy, critical hits, abilities (e.g. Adaptability), and the wild's own
+  counter-attack are explicitly still out of scope: the wild still uses the
+  old flat `applyFixedAttack` (`engine/battle/battle-config.ts`) unchanged,
+  since enemy move selection is a separate, not-yet-implemented system. There
+  is also no player-facing "It's super effective!" style message yet — the
+  multiplier is applied to the numeric damage but not otherwise surfaced.
 
 ## Phase history (move & battle systems)
 
@@ -47,16 +59,23 @@ Completed, in order:
    pending move-learning decisions
 7. Battle Action Pipeline (Phase 4F) — moved attack resolution out of React
    and behind a single server-side Battle Action Service
-8. **Battle Move Selection (Phase 5A) — current** — Known Moves now drive the
-   battle UI and flow through the Battle Action Pipeline as above
+8. Battle Move Selection (Phase 5A) — Known Moves now drive the battle UI and
+   flow through the Battle Action Pipeline as above
+9. Physical/Special Damage Formula (Phase 5B) — real stat-based damage
+   replaces Temporary Fixed Damage for the player's own attack
+   (`engine/damage`)
+10. STAB (Phase 5C) — 1.5x same-type attack bonus, computed inside the
+    Damage Engine
+11. **Type Effectiveness (Phase 5D) — current** — the canonical Type Chart
+    (`engine/damage/type-chart.ts`), wired into the same Damage Engine result
 
 Also completed (broader game systems, from earlier development):
 world map & zones, authentication & player profiles, onboarding, party
 system, persisted battle sessions, capture, Pokémon release, player & Pokémon
 XP/leveling (Phase 2 stats rebalance).
 
-**Total completed phases so far: 8** in the move/battle-system sequence above
-(Move Registry through Battle Move Selection), on top of the earlier
+**Total completed phases so far: 11** in the move/battle-system sequence above
+(Move Registry through Type Effectiveness), on top of the earlier
 foundational systems (map, auth, onboarding, party, battle sessions,
 capture, progression).
 
@@ -72,20 +91,22 @@ capture, progression).
   `features/known-moves`, `features/move-learning`, `features/pokemon-progression`,
   ...), each exposing Server Actions on top of a service layer.
 - The live battle loop follows the **Battle Action Pipeline**: Battle UI →
-  Server Action → Battle Action Service → validation → (currently) Temporary
-  Fixed Damage → structured `BattleActionResult`. React (`BattleContent.tsx`)
-  is orchestration-only — it never computes damage or HP itself.
-- Known Moves are real and persisted, and now visibly drive the battle UI,
-  but they do **not** yet affect damage, accuracy, or move behavior — that is
-  explicitly deferred to the next phase.
+  Server Action → Battle Action Service → validation → the Damage Engine
+  (`engine/damage`: power/category + stats + STAB + Type Effectiveness) →
+  structured `BattleActionResult`. React (`BattleContent.tsx`) is
+  orchestration-only — it never computes damage or HP itself.
+- Known Moves are real and persisted, and now drive both the battle UI and
+  the actual damage the player deals (power, category, type, STAB, and
+  effectiveness against the wild's species). Accuracy and move behavior
+  beyond damage (status effects, secondary effects) are still not modeled.
 
 ## Next phase
 
-**Phase 5B — Physical/Special Damage Formula.** Replaces Temporary Fixed
-Damage with a real damage calculation (attacker/defender stats, physical vs.
-special category) inside the existing Battle Action Service — the pipeline
-and move-selection UI built in 4F/5A are not expected to need architectural
-changes for this, only the internal damage step.
+Not yet started. Candidates left out of scope by every phase through 5D:
+accuracy/miss chance, critical hits, abilities (e.g. Adaptability), a
+player-facing effectiveness message ("It's super effective!"), and giving
+the wild an actual move-selection system instead of the flat
+`applyFixedAttack` counter-attack.
 
 ---
 
@@ -177,7 +198,8 @@ The project already contains:
 
 - Home page
 - Map page
-- Battle page (Known-Move-driven attack selection, capture, escape, switch)
+- Battle page (Known-Move-driven attack selection, real damage formula with
+  STAB and Type Effectiveness, capture, escape, switch)
 - Authentication & player profiles (Better Auth)
 - Onboarding & starter Pokémon selection
 - Party system (persisted)
