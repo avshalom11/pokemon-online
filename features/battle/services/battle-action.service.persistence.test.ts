@@ -12,7 +12,6 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
-import { TEMPORARY_ATTACK_DAMAGE } from "@/engine/battle/battle-config";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { executeBattleAction, type BattleActionType } from "@/features/battle/services/battle-action.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
@@ -96,6 +95,63 @@ const BULBASAUR_LEVEL_100_MAX_HP_VALUE = bulbasaurMaxHpAtLevel(100);
 const SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE = 37;
 const EMBER_VS_LEVEL_100_BULBASAUR_DAMAGE = 98;
 
+// Phase 5H — the wild's own counter-attack is no longer a fixed 8: it now
+// selects uniformly among its own Known Moves (derived from species+level
+// via getStartingKnownMoves — the exact same helper
+// create-owned-pokemon.service.ts uses to seed a newly created owned
+// Pokémon's starting moves, not a second move list) and runs the pick
+// through the exact same resolveAttackDamage pipeline the player's own
+// attack above uses. Every constant below was hand-computed against the
+// real formula and independently cross-checked by directly invoking
+// getStartingKnownMoves/selectEnemyMove/resolveAttackDamage with the exact
+// same randomSource these tests already use.
+//
+// getStartingKnownMoves("bulbasaur", 100) -> the 4 most recently learned
+// level-up moves, in learning order: ["sleep-powder", "take-down",
+// "double-edge", "solar-beam"]. MAX_ROLL_RANDOM_SOURCE (0.999999) ->
+// selectEnemyMove index floor(0.999999*4) = 3 -> "solar-beam" (special,
+// Grass, power 120, accuracy 100).
+//   bulbasaur SpecialAttack@100 = 135, charmander SpecialDefense@100 = 105
+//   levelFactor@100 = 42; raw = 42*120*135/105 = 6480
+//   baseDamage = floor(6480/50+2) = floor(131.6) = 131
+//   afterRandom (rf=1.0) = 131; STAB (bulbasaur is Grass, move is Grass):
+//     floor(131*1.5) = 196
+//   Type Effectiveness (Grass vs. Fire = not-very-effective, 0.5x):
+//     floor(196*0.5) = 98
+//   accuracyRoll 99 < accuracy 100 -> hit; criticalRoll 0.999999 -> no crit
+//   final damage = 98
+const SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE = 98;
+
+// getStartingKnownMoves("bulbasaur", 3) -> ["growl", "tackle",
+// "vine-whip"]. MAX_ROLL_RANDOM_SOURCE -> index floor(0.999999*3) = 2 ->
+// "vine-whip" (physical, Grass, power 45, accuracy 100).
+//   bulbasaur Attack@3 = floor(2*49*3/100)+5 = 7, charmander Defense@100 = 91
+//   levelFactor@3 = 2*3/5+2 = 3.2; raw = 3.2*45*7/91 = 11.076...
+//   baseDamage = floor(11.076/50+2) = floor(2.2215...) = 2
+//   afterRandom (rf=1.0) = 2; STAB (bulbasaur is Grass, move is Grass):
+//     floor(2*1.5) = 3
+//   Type Effectiveness (Grass vs. Fire = not-very-effective, 0.5x):
+//     floor(3*0.5) = 1
+//   final damage = 1 (the "at least 1" floor never even triggers here — 1
+//   is already the exact computed result)
+const VINE_WHIP_VS_LEVEL_100_CHARMANDER_DAMAGE = 1;
+
+// bulbasaur@100's first known move (index 0), sleep-powder, is a status
+// move (power null) — both MIN_ROLL_NO_CRIT_RANDOM_SOURCE (0.05) and
+// GUARANTEED_CRITICAL_RANDOM_SOURCE (0) select index floor(random*4) = 0
+// -> "sleep-powder", dealing the Damage Engine's own non-damaging 0,
+// exactly like a player's own status move would.
+const SLEEP_POWDER_DAMAGE = 0;
+
+// A randomSource landing in bulbasaur@3's [2/3, 1) slice (index 2,
+// "vine-whip") — guarantees a real, always-accurate (accuracy 100)
+// damaging hit instead of growl (index 0, status, 0 damage), which the
+// Damage Engine's own "at least 1" floor then guarantees deals >= 1
+// damage no matter how large the attacker/defender level gap is — used to
+// deterministically faint a 1-HP active Pokémon without depending on a
+// removed fixed-damage constant.
+const GUARANTEED_ENEMY_HIT_RANDOM_SOURCE = () => 0.9;
+
 // A randomSource whose Math.random-shaped output rolls the maximum 1.00
 // randomFactor (see engine/damage/random.ts's rollDamageRandomFactor: a
 // value just under 1 rolls the top of the 85-100 integer-percent range).
@@ -127,7 +183,7 @@ function seedLevel100BulbasaurSession(activePlayerPokemonId: string) {
   });
 }
 
-test("executes an attack: applies the Damage Engine's calculated damage to the wild, and the wild's unchanged fixed counter-attack to the party, in the same call", async () => {
+test("executes an attack: applies the Damage Engine's calculated damage to the wild, and the wild's own real Known-Move counter-attack to the party, in the same call", async () => {
   seedPlayerProfile({ id: "owner-1", level: 5, experience: 4000 });
   seedMaxLevelActivePokemon("p1", "owner-1", 100);
   seedLevel100BulbasaurSession("p1");
@@ -139,9 +195,9 @@ test("executes an attack: applies the Damage Engine's calculated damage to the w
 
   assert.equal(result.moveId, "scratch");
   assert.equal(result.playerDamage, SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
-  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.enemyDamage, SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
   assert.equal(result.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE - SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
-  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
   assert.equal(result.wildFainted, false);
   assert.equal(result.partyPokemonFainted, false);
   assert.equal(result.battleEnded, false);
@@ -152,13 +208,13 @@ test("executes an attack: applies the Damage Engine's calculated damage to the w
     getFieldBattleSessionRow("owner-1")?.wildCurrentHp,
     BULBASAUR_LEVEL_100_MAX_HP_VALUE - SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE
   );
-  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 100 - SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
   // Exactly one write to the acting Pokémon's HP — the action was resolved
   // exactly once, not applied twice.
   assert.equal(getPlayerPokemonUpdateCallCount(), 1);
 });
 
-test("a status move (growl) deals zero damage to the wild via the Damage Engine's non-damaging result, but the wild still counter-attacks", async () => {
+test("a status move (growl) deals zero damage to the wild via the Damage Engine's non-damaging result, but the wild still attacks back with one of its own Known Moves", async () => {
   seedPlayerProfile({ id: "owner-1" });
   seedMaxLevelActivePokemon("p1", "owner-1", 100);
   seedFieldBattleSession({
@@ -178,8 +234,8 @@ test("a status move (growl) deals zero damage to the wild via the Damage Engine'
 
   assert.equal(result.playerDamage, 0);
   assert.equal(result.updatedWildHp, 100);
-  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(result.enemyDamage, VINE_WHIP_VS_LEVEL_100_CHARMANDER_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - VINE_WHIP_VS_LEVEL_100_CHARMANDER_DAMAGE);
   assert.equal(result.wildFainted, false);
 });
 
@@ -203,7 +259,12 @@ test("a higher-Attack (higher-level) attacker deals more calculated damage than 
     playerId: "owner-1",
     speciesId: "charmander",
     level: 10,
-    currentHp: 100,
+    // Phase 6B: a level-100 bulbasaur is far faster than a level-10
+    // charmander, so the wild now attacks first. This test only cares
+    // about the player's own calculated damage, not who goes first or
+    // whether the wild's own hit is survivable — an arbitrarily large HP
+    // guarantees the player's attack still happens this turn regardless.
+    currentHp: 100_000,
     partySlot: 1,
   });
   seedKnownMove({ playerPokemonId: lowLevelPokemon.id, moveId: "scratch", slot: 1 });
@@ -403,7 +464,12 @@ test("defeating the wild grants the reward, ends the encounter without a counter
 
 test("the wild's counter-attack ending the player's only usable Pokémon ends the battle and deletes the session", async () => {
   seedPlayerProfile({ id: "owner-1" });
-  seedMaxLevelActivePokemon("p1", "owner-1", TEMPORARY_ATTACK_DAMAGE);
+  // 1 HP is guaranteed lethal against any real damaging hit: the Damage
+  // Engine always deals at least 1 damage for a successful damaging move
+  // (Phase 5B.1), and GUARANTEED_ENEMY_HIT_RANDOM_SOURCE guarantees the
+  // wild picks vine-whip (a real, always-accurate damaging move) rather
+  // than growl (status, 0 damage).
+  seedMaxLevelActivePokemon("p1", "owner-1", 1);
   seedFieldBattleSession({
     playerId: "owner-1",
     zoneId: ZONE_ID,
@@ -414,7 +480,7 @@ test("the wild's counter-attack ending the player's only usable Pokémon ends th
     activePlayerPokemonId: "p1",
   });
 
-  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl");
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl", GUARANTEED_ENEMY_HIT_RANDOM_SOURCE);
 
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
@@ -428,7 +494,9 @@ test("the wild's counter-attack ending the player's only usable Pokémon ends th
 
 test("a fainted Pokémon does not end the battle while another party member is still usable", async () => {
   seedPlayerProfile({ id: "owner-1" });
-  seedMaxLevelActivePokemon("p1", "owner-1", TEMPORARY_ATTACK_DAMAGE);
+  // Same guaranteed-lethal setup as the test above: 1 HP plus a random
+  // source that forces the wild's real vine-whip hit rather than growl.
+  seedMaxLevelActivePokemon("p1", "owner-1", 1);
   seedPlayerPokemon({ id: "p2", playerId: "owner-1", speciesId: "squirtle", currentHp: 30, partySlot: 2 });
   seedFieldBattleSession({
     playerId: "owner-1",
@@ -440,7 +508,7 @@ test("a fainted Pokémon does not end the battle while another party member is s
     activePlayerPokemonId: "p1",
   });
 
-  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl");
+  const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl", GUARANTEED_ENEMY_HIT_RANDOM_SOURCE);
 
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
@@ -568,7 +636,7 @@ test("different known moves produce different damage — a status move deals non
   assert.equal(growlResult.status, "success");
   if (growlResult.status !== "success") return;
   assert.equal(growlResult.playerDamage, 0);
-  assert.equal(growlResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(growlResult.enemyDamage, SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
 
   // Reset the wild back to full before the second hit so both attacks are
   // measured against the same starting HP.
@@ -578,7 +646,7 @@ test("different known moves produce different damage — a status move deals non
   assert.equal(scratchResult.status, "success");
   if (scratchResult.status !== "success") return;
   assert.equal(scratchResult.playerDamage, SCRATCH_VS_LEVEL_100_BULBASAUR_DAMAGE);
-  assert.equal(scratchResult.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  assert.equal(scratchResult.enemyDamage, SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
 
   assert.notEqual(scratchResult.playerDamage, growlResult.playerDamage);
 });
@@ -625,9 +693,11 @@ test("a low-accuracy move (mega-kick, 75) can hit, dealing its calculated damage
   assert.equal(expectedDamage, 91);
   assert.equal(result.playerDamage, expectedDamage);
   assert.equal(result.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE - expectedDamage);
-  // The wild survived, so its own unchanged counter-attack still lands —
-  // a hit changes nothing else about the rest of the turn.
-  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
+  // The wild survived, so it still gets its own turn — a hit changes
+  // nothing else about the rest of the turn. MIN_ROLL_NO_CRIT_RANDOM_SOURCE
+  // selects bulbasaur@100's index-0 Known Move (sleep-powder, a status
+  // move), so the wild's own attack deals 0 here.
+  assert.equal(result.enemyDamage, SLEEP_POWDER_DAMAGE);
 });
 
 test("a low-accuracy move (mega-kick, 75) can miss, dealing zero damage while the battle continues normally", async () => {
@@ -654,11 +724,14 @@ test("a low-accuracy move (mega-kick, 75) can miss, dealing zero damage while th
     "a miss must leave the wild's persisted HP completely untouched"
   );
 
-  // ...but the battle continues normally: the wild's own counter-attack is
-  // entirely unaffected by whether the player's own attack landed.
-  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  // ...but the battle continues normally: the wild still gets its own
+  // turn, entirely unaffected by whether the player's own attack landed.
+  // MAX_ROLL_RANDOM_SOURCE selects bulbasaur@100's index-3 Known Move
+  // (solar-beam) here, same computation as every other MAX_ROLL scenario
+  // against a level 100 charmander.
+  assert.equal(result.enemyDamage, SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
+  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 100 - SOLAR_BEAM_VS_LEVEL_100_CHARMANDER_DAMAGE);
   assert.equal(result.battleEnded, false);
 });
 
@@ -699,6 +772,13 @@ test("a guaranteed critical hit multiplies the live service's calculated damage 
   // difference between the two results.
   assert.equal(normalResult.playerDamage, 31);
 
+  // Phase 6F: the wild's own turn in the call above could have inflicted a
+  // real status (bulbasaur@100's index-0 Known Move, sleep-powder, has a
+  // real chance to put the player's Pokémon to sleep) — re-seeding the
+  // active Pokémon (not just the wild session) keeps this test isolated
+  // to "does a critical hit multiply the player's own damage by 1.5",
+  // never contaminated by a status this test isn't about.
+  seedMaxLevelActivePokemon("p1", "owner-1", 100);
   seedLevel100BulbasaurSession("p1");
 
   const criticalResult = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", GUARANTEED_CRITICAL_RANDOM_SOURCE);
@@ -711,7 +791,7 @@ test("a guaranteed critical hit multiplies the live service's calculated damage 
   assert.equal(criticalResult.updatedWildHp, BULBASAUR_LEVEL_100_MAX_HP_VALUE - 46);
 });
 
-test("a critical hit still lets the wild's own unaffected counter-attack land normally", async () => {
+test("a critical hit on the player's side still lets the wild take its own separate, unaffected turn", async () => {
   seedPlayerProfile({ id: "owner-1" });
   seedMaxLevelActivePokemon("p1", "owner-1", 100);
   seedLevel100BulbasaurSession("p1");
@@ -720,8 +800,12 @@ test("a critical hit still lets the wild's own unaffected counter-attack land no
 
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
-  assert.equal(result.enemyDamage, TEMPORARY_ATTACK_DAMAGE);
-  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  // GUARANTEED_CRITICAL_RANDOM_SOURCE (0) also selects bulbasaur@100's
+  // index-0 Known Move (sleep-powder, a status move) for its own turn —
+  // the player's own critical hit has no bearing on the wild's
+  // independently rolled move selection.
+  assert.equal(result.enemyDamage, SLEEP_POWDER_DAMAGE);
+  assert.equal(result.updatedPartyHp, 100 - SLEEP_POWDER_DAMAGE);
 });
 
 test("a session referencing an unrecognized wild species is treated as battle-inactive rather than crashing", async () => {

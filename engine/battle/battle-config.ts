@@ -5,14 +5,18 @@
 // Phase 5B.2: the player's own attack no longer uses this — it now goes
 // through the real Phase 5B.1 Damage Engine (see
 // features/battle/services/battle-action.service.ts's resolveAttackDamage
-// call). This function is still very much alive, though: it's the wild
-// Pokémon's one counter-attack (both the Battle Action Service's
-// wild-hits-player branch, and battle-turn-rules.ts's
-// resolveWildCounterAttack for the switch-in/failed-capture counter-hit),
-// since enemy move selection doesn't exist yet. Every caller now only ever
-// invokes this in the wild-hits-player direction — see
-// ONE_HIT_KO_PLAYER_POKEMON_ID's own doc comment below for what that means
-// for the one-hit-KO dev override.
+// call).
+//
+// Phase 5H: the Battle Action Service's own wild-hits-player branch no
+// longer uses this either — the wild now selects one of its own Known
+// Moves and runs it through the same real Damage Engine pipeline (see
+// executeBattleAction and features/battle/ai/select-enemy-move.ts). This
+// function is still alive for exactly one remaining caller:
+// battle-turn-rules.ts's resolveWildCounterAttack, the switch-in/
+// failed-capture counter-hit, which real enemy move selection doesn't
+// cover yet. Every remaining caller still only ever invokes this in the
+// wild-hits-player direction — see ONE_HIT_KO_PLAYER_POKEMON_ID's own doc
+// comment below for what that means for the one-hit-KO dev override.
 export const TEMPORARY_ATTACK_DAMAGE = 8;
 
 // TEMPORARY dev/testing override — see battleDevelopmentConfig below for

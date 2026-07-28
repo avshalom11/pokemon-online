@@ -34,6 +34,8 @@ function hydrateOwnedPokemon(row: PlayerPokemonModel): OwnedPokemon | null {
     // See the isShiny doc comment on OwnedPokemon (shared/types/player-pokemon.ts).
     isShiny: false,
     partySlot: row.partySlot,
+    status: row.status,
+    statusTurnsRemaining: row.statusTurnsRemaining,
   };
 }
 

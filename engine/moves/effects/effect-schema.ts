@@ -104,6 +104,10 @@ export const moveEffectSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("random-level-damage") }),
   z.object({ kind: z.literal("weight-based-damage") }),
+  // --- Phase 7 additions (Volatile Conditions) — see the MoveEffect
+  // comment in effect-types.ts ---
+  z.object({ kind: z.literal("protect") }),
+  z.object({ kind: z.literal("encore") }),
 ]);
 
 // The kinds of effect that calculate damage via the power/stat formula —
@@ -146,4 +150,6 @@ export const POWERLESS_EFFECT_KINDS = [
   "current-hp-percent-damage",
   "random-level-damage",
   "weight-based-damage",
+  "protect",
+  "encore",
 ] as const;

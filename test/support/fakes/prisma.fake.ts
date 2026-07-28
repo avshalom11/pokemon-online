@@ -22,6 +22,8 @@ interface PlayerPokemonRow {
   isStarter: boolean;
   partySlot: number | null;
   createdAt: Date;
+  status: string | null;
+  statusTurnsRemaining: number | null;
 }
 
 interface PlayerKnownMoveRow {
@@ -59,6 +61,12 @@ interface FieldBattleSessionRow {
   wildDefeatRewardGranted: boolean;
   activePlayerPokemonId: string;
   participants: unknown;
+  wildStatStages: unknown;
+  playerStatStages: unknown;
+  wildStatus: string | null;
+  wildStatusTurnsRemaining: number | null;
+  wildVolatileState: unknown;
+  playerVolatileState: unknown;
 }
 
 let pokemons = new Map<string, PlayerPokemonRow>();
@@ -113,6 +121,8 @@ export function seedPlayerPokemon(row: {
   isStarter?: boolean;
   partySlot?: number | null;
   createdAt?: Date;
+  status?: string | null;
+  statusTurnsRemaining?: number | null;
 }) {
   const full: PlayerPokemonRow = {
     id: row.id,
@@ -125,6 +135,8 @@ export function seedPlayerPokemon(row: {
     isStarter: row.isStarter ?? false,
     partySlot: row.partySlot ?? null,
     createdAt: row.createdAt ?? new Date(),
+    status: row.status ?? null,
+    statusTurnsRemaining: row.statusTurnsRemaining ?? null,
   };
   pokemons.set(row.id, full);
   return full;
@@ -176,6 +188,12 @@ export function seedFieldBattleSession(row: {
   activePlayerPokemonId: string;
   wildDefeatRewardGranted?: boolean;
   participants?: unknown;
+  wildStatStages?: unknown;
+  playerStatStages?: unknown;
+  wildStatus?: string | null;
+  wildStatusTurnsRemaining?: number | null;
+  wildVolatileState?: unknown;
+  playerVolatileState?: unknown;
 }) {
   const full: FieldBattleSessionRow = {
     playerId: row.playerId,
@@ -187,6 +205,12 @@ export function seedFieldBattleSession(row: {
     activePlayerPokemonId: row.activePlayerPokemonId,
     wildDefeatRewardGranted: row.wildDefeatRewardGranted ?? false,
     participants: row.participants ?? [],
+    wildStatStages: row.wildStatStages ?? {},
+    playerStatStages: row.playerStatStages ?? {},
+    wildStatus: row.wildStatus ?? null,
+    wildStatusTurnsRemaining: row.wildStatusTurnsRemaining ?? null,
+    wildVolatileState: row.wildVolatileState ?? {},
+    playerVolatileState: row.playerVolatileState ?? {},
   };
   sessions.set(row.playerId, full);
   return full;

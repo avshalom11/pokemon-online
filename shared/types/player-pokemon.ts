@@ -39,4 +39,12 @@ export interface OwnedPokemon {
   // battle starter. See getPlayerParty in
   // features/pokemon/services/player-pokemon.ts.
   partySlot: number | null;
+
+  // Phase 6F — the single major status condition this Pokémon currently
+  // carries (persists across battles, exactly like currentHp, until
+  // cured at the Pokémon Center) — see features/battle/status/major-status.ts
+  // for the MajorStatus union this string is validated against.
+  status: string | null;
+  // Sleep's remaining-turn counter; meaningful only while status === "sleep".
+  statusTurnsRemaining: number | null;
 }

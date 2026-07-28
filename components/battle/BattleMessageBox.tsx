@@ -32,7 +32,7 @@ interface BattleMessageBoxProps {
 export function BattleMessageBox({ theme, message }: BattleMessageBoxProps) {
   return (
     <div
-      className={`relative flex min-h-[2.25rem] items-center overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 px-5 py-2 text-sm font-medium tracking-wide text-slate-100 shadow-xl backdrop-blur-md sm:min-h-[2.5rem] sm:text-base ${MESSAGE_BOX_WIDTH_CLASS} ${MESSAGE_BOX_MAX_WIDTH_CLASS}`}
+      className={`relative flex min-h-[2rem] items-center overflow-hidden rounded-lg border border-white/10 bg-slate-900/80 px-4 py-1.5 text-sm font-medium tracking-wide text-slate-100 shadow-xl backdrop-blur-md sm:min-h-[2.25rem] sm:text-base ${MESSAGE_BOX_WIDTH_CLASS} ${MESSAGE_BOX_MAX_WIDTH_CLASS}`}
       style={{ boxShadow: "0 12px 30px -18px rgba(0,0,0,0.7)" }}
     >
       <div className="absolute inset-y-0 start-0 w-1" style={{ backgroundColor: theme.colors.panelAccent }} />

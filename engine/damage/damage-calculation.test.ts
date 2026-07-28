@@ -149,6 +149,7 @@ test("random factor 0.85 (the minimum) is accepted and applied", () => {
     accuracyRoll: null,
     critical: false,
     criticalRoll: null,
+    effectiveness: "normal",
   });
 });
 
@@ -682,7 +683,7 @@ test("a miss leaves no stat-validation side effect — an otherwise-invalid defe
   assert.equal(result.kind, "miss");
 });
 
-test("a status move is never accuracy-checked, even when a real accuracy/accuracyRoll pair would otherwise miss", () => {
+test("Phase 6D/6G: a status move IS now accuracy-checked, and misses exactly like a damaging move would", () => {
   const result = calculateMoveDamage({
     level: 50,
     moveCategory: "status",
@@ -692,6 +693,42 @@ test("a status move is never accuracy-checked, even when a real accuracy/accurac
     randomFactor: 1.0,
     accuracy: 0,
     accuracyRoll: 0,
+  });
+
+  assert.deepEqual(result, {
+    kind: "miss",
+    damage: 0,
+    hit: false,
+    accuracy: 0,
+    accuracyRoll: 0,
+    critical: false,
+    effectiveness: "normal",
+  });
+});
+
+test("a status move with no accuracy data (or accuracy: null) still resolves to its non-damaging result, never a miss", () => {
+  const result = calculateMoveDamage({
+    level: 50,
+    moveCategory: "status",
+    movePower: null,
+    attackerStats: { attack: 50, specialAttack: 50 },
+    defenderStats: { defense: 50, specialDefense: 50 },
+    randomFactor: 1.0,
+  });
+
+  assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "status-move" });
+});
+
+test("a status move that passes its accuracy check still resolves to the non-damaging result", () => {
+  const result = calculateMoveDamage({
+    level: 50,
+    moveCategory: "status",
+    movePower: null,
+    attackerStats: { attack: 50, specialAttack: 50 },
+    defenderStats: { defense: 50, specialDefense: 50 },
+    randomFactor: 1.0,
+    accuracy: 100,
+    accuracyRoll: 99,
   });
 
   assert.deepEqual(result, { kind: "non-damaging", damage: 0, reason: "status-move" });
@@ -789,9 +826,10 @@ test("critical is only checked after a successful hit — a miss never rolls or 
 
   assert.ok(result.kind === "miss");
   assert.equal(result.damage, 0);
-  // MissedMoveResult has no critical field at all — the critical step
-  // never ran.
-  assert.ok(!("critical" in result));
+  // Phase 5G: MissedMoveResult always reports critical: false (the critical
+  // step never actually ran — this is the fixed Battle Outcome value for
+  // any miss, not a real check result).
+  assert.equal(result.critical, false);
 });
 
 test("a missed attack can never become critical, even at the lowest possible criticalRoll", () => {
@@ -969,4 +1007,99 @@ test("a negative criticalRoll is rejected", () => {
     () => calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: -0.1 }),
     DamageValidationError
   );
+});
+
+// --- Phase 5G: Battle Outcome metadata -----------------------------------------------
+//
+// The Damage Engine never generates user-facing strings — these tests only
+// check the structured "effectiveness"/"hit"/"critical"/"damage" fields the
+// UI will later read to decide what to show, never any text itself.
+
+test("a normal-effectiveness hit reports effectiveness: \"normal\"", () => {
+  const result = calculateMoveDamage(PHYSICAL_BASELINE);
+  assert.ok(result.kind === "damage");
+  assert.equal(result.effectiveness, "normal");
+});
+
+test("a super-effective hit reports effectiveness: \"super-effective\"", () => {
+  const result = calculateMoveDamage({ ...SPECIAL_WITH_EFFECTIVENESS, moveType: "fire", defenderTypes: ["grass"] });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.effectiveness, "super-effective");
+});
+
+test("a not-very-effective hit reports effectiveness: \"not-very-effective\"", () => {
+  const result = calculateMoveDamage({ ...SPECIAL_WITH_EFFECTIVENESS, moveType: "fire", defenderTypes: ["water"] });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.effectiveness, "not-very-effective");
+});
+
+test("a type immunity reports effectiveness: \"none\" (not \"immune\") and 0 damage", () => {
+  const result = calculateMoveDamage({ ...SPECIAL_WITH_EFFECTIVENESS, moveType: "electric", defenderTypes: ["ground"] });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.effectiveness, "none");
+  assert.equal(result.hit, true);
+  assert.equal(result.critical, false);
+  assert.equal(result.damage, 0);
+});
+
+test("a miss reports hit: false, critical: false, effectiveness: \"normal\", damage: 0", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_WITH_ACCURACY, accuracyRoll: 70 });
+  assert.ok(result.kind === "miss");
+  assert.equal(result.hit, false);
+  assert.equal(result.critical, false);
+  assert.equal(result.effectiveness, "normal");
+  assert.equal(result.damage, 0);
+});
+
+test("a miss is never critical, even at the guaranteed-critical roll", () => {
+  const result = calculateMoveDamage({
+    ...PHYSICAL_WITH_ACCURACY,
+    accuracyRoll: 70, // miss
+    criticalRoll: 0, // would guarantee a critical, if it were ever checked
+  });
+  assert.ok(result.kind === "miss");
+  assert.equal(result.critical, false);
+});
+
+test("a critical hit still reports critical: true (existing Critical Hit logic unchanged)", () => {
+  const result = calculateMoveDamage({ ...PHYSICAL_GUARANTEED_HIT, criticalRoll: 0 });
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, true);
+  assert.equal(result.effectiveness, "normal");
+});
+
+test("a critical hit combined with super-effective reports both critical: true and effectiveness: \"super-effective\"", () => {
+  const result = calculateMoveDamage({
+    ...SPECIAL_WITH_EFFECTIVENESS,
+    moveType: "fire",
+    defenderTypes: ["grass"],
+    accuracy: 100,
+    accuracyRoll: 0,
+    criticalRoll: 0, // guaranteed critical
+  });
+
+  assert.ok(result.kind === "damage");
+  assert.equal(result.critical, true);
+  assert.equal(result.effectiveness, "super-effective");
+  // Same numbers as the pre-existing "Type Effectiveness and Critical
+  // combine correctly" test above — damage math itself is unchanged.
+  assert.equal(result.damage, 144);
+});
+
+test("damage values are unaffected by the new effectiveness field — same numbers as the pre-Phase-5G formula", () => {
+  const normal = calculateMoveDamage(PHYSICAL_BASELINE);
+  const superEffective = calculateMoveDamage({ ...SPECIAL_WITH_EFFECTIVENESS, moveType: "fire", defenderTypes: ["grass"] });
+  const notVeryEffective = calculateMoveDamage({ ...SPECIAL_WITH_EFFECTIVENESS, moveType: "fire", defenderTypes: ["water"] });
+
+  assert.ok(normal.kind === "damage" && superEffective.kind === "damage" && notVeryEffective.kind === "damage");
+  assert.equal(normal.damage, 19);
+  assert.equal(superEffective.damage, 96);
+  assert.equal(notVeryEffective.damage, 24);
+});
+
+test("the Damage Engine result never contains a user-facing string field", () => {
+  const result = calculateMoveDamage({ ...SPECIAL_WITH_EFFECTIVENESS, moveType: "fire", defenderTypes: ["grass"] });
+  assert.ok(result.kind === "damage");
+  assert.ok(!("message" in result));
+  assert.ok(!("text" in result));
 });

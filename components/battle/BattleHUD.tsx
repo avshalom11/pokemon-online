@@ -12,6 +12,24 @@ interface BattleHUDProps {
   experience?: number;
 }
 
+// Phase 6F — short status badges, same abbreviation convention every
+// mainline Pokémon game uses.
+const STATUS_BADGE: Record<string, string> = {
+  burn: "BRN",
+  poison: "PSN",
+  paralysis: "PAR",
+  sleep: "SLP",
+  freeze: "FRZ",
+};
+
+const STATUS_BADGE_COLOR: Record<string, string> = {
+  burn: "#f97316",
+  poison: "#a855f7",
+  paralysis: "#eab308",
+  sleep: "#64748b",
+  freeze: "#38bdf8",
+};
+
 // Trimmed from the original w-56/sm:w-64 card (width, padding, and name
 // text all reduced slightly) as part of a visual-polish pass — HealthBar
 // itself is untouched, so the HP bar stays exactly as readable as before.
@@ -30,11 +48,27 @@ export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
         <span className="font-fantasy truncate text-xs font-semibold tracking-wide text-slate-50 sm:text-sm">
           {participant.name}
         </span>
-        <span
-          className="shrink-0 rounded border border-white/10 bg-black/30 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-200"
-        >
-          רמה {participant.level}
-        </span>
+        <div className="flex shrink-0 items-baseline gap-1">
+          {participant.status && STATUS_BADGE[participant.status] ? (
+            <span
+              className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white"
+              style={{ backgroundColor: STATUS_BADGE_COLOR[participant.status] }}
+            >
+              {STATUS_BADGE[participant.status]}
+            </span>
+          ) : null}
+          {participant.volatileBadges?.map((badge) => (
+            <span
+              key={badge}
+              className="rounded border border-white/10 bg-slate-700/80 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white"
+            >
+              {badge}
+            </span>
+          ))}
+          <span className="rounded border border-white/10 bg-black/30 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-200">
+            רמה {participant.level}
+          </span>
+        </div>
       </div>
 
       <HealthBar current={participant.currentHealth} max={participant.maxHealth} />

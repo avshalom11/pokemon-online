@@ -17,6 +17,7 @@ import type { BattleKnownMoveSlot } from "@/features/battle/services/battle-view
 import { endBattleSessionAction } from "@/features/battle-session/actions/end-battle-session.action";
 import { syncActivePokemonAction } from "@/features/battle-session/actions/sync-active-pokemon.action";
 import type { BattleVictoryReward } from "@/features/battle-session/services/battle-session.service";
+import type { BattleVolatileSummary } from "@/features/battle/services/battle-action.service";
 import {
   attackMessage,
   captureFailedMessage,
@@ -107,6 +108,36 @@ type BattlePhase =
 // shown there, so it skips this pause entirely — see that branch's own
 // comment.
 
+// Phase 7 — the neutral default for a side's Volatile Conditions (nothing
+// active), used both as playerVolatile/enemyVolatile's initial state and
+// whenever a switch/new encounter resets one side back to it client-side
+// (the server already resets its own persisted copy the same way — see
+// battle-session.service.ts's resetVolatileOnSwitch).
+const EMPTY_VOLATILE_SUMMARY: BattleVolatileSummary = {
+  confused: false,
+  protecting: false,
+  disabledMoveId: null,
+  encoreMoveId: null,
+  leechSeeded: false,
+  trapped: false,
+};
+
+// Flinch is deliberately omitted here — it's a same-turn-only flag the
+// server itself always clears again by the end of the very turn it fires
+// in (see battle-action.service.ts's end-of-turn blanket clear), so by the
+// time this component re-renders it's already false again; a badge for it
+// would never actually be visible.
+function volatileBadges(volatile: BattleVolatileSummary): string[] {
+  const badges: string[] = [];
+  if (volatile.confused) badges.push("CNF");
+  if (volatile.protecting) badges.push("PRT");
+  if (volatile.disabledMoveId) badges.push("DIS");
+  if (volatile.encoreMoveId) badges.push("ENC");
+  if (volatile.leechSeeded) badges.push("SEED");
+  if (volatile.trapped) badges.push("TRAP");
+  return badges;
+}
+
 // HP authority: PlayerPokemon.currentHp in the DB is always the single
 // source of truth. `partyHpMap` here is a live mirror seeded from it at
 // mount — every HP-changing event updates this map immediately (so the UI
@@ -131,6 +162,22 @@ export function BattleContent({
   const [partyHpMap, setPartyHpMap] = useState<Record<string, number>>(() =>
     Object.fromEntries(party.map((pokemon) => [pokemon.id, pokemon.currentHp]))
   );
+  // Phase 6F — same live-mirror pattern as partyHpMap above, for major
+  // status conditions. wildStatusState has no per-id map (only one wild is
+  // ever active) and is reset to null on every new encounter, exactly like
+  // wildState's own HP.
+  const [partyStatusMap, setPartyStatusMap] = useState<Record<string, string | null>>(() =>
+    Object.fromEntries(party.map((pokemon) => [pokemon.id, pokemon.status]))
+  );
+  const [wildStatusState, setWildStatusState] = useState<string | null>(null);
+  // Phase 7 — same live-mirror pattern as wildStatusState above, for
+  // Volatile Conditions. Reset to the neutral default on every new
+  // encounter/switch exactly like status (see resetVolatileSummaries
+  // below); the server (battle-action.service.ts) remains the sole source
+  // of truth — this only drives the attack panel's Disable/Encore
+  // restriction, the switch button's trapped gate, and the HUD badges.
+  const [playerVolatile, setPlayerVolatile] = useState<BattleVolatileSummary>(EMPTY_VOLATILE_SUMMARY);
+  const [enemyVolatile, setEnemyVolatile] = useState<BattleVolatileSummary>(EMPTY_VOLATILE_SUMMARY);
   // Live level/XP/maxHp overrides for owned Pokémon, seeded empty and
   // filled in only when a victory reward actually names a Pokémon (see
   // applyPokemonRewards below) — same "server response applied the instant
@@ -289,6 +336,10 @@ export function BattleContent({
     level: partyProgressMap[pokemon.id]?.level ?? pokemon.level,
     experience: partyProgressMap[pokemon.id]?.experience ?? pokemon.experience,
     maxHp: partyProgressMap[pokemon.id]?.maxHp ?? pokemon.maxHp,
+    // partyStatusMap intentionally holds `null` for a healthy Pokémon —
+    // `??` would wrongly fall back to the (possibly stale) prop in that
+    // case, so this checks membership instead.
+    status: pokemon.id in partyStatusMap ? partyStatusMap[pokemon.id] : pokemon.status,
   }));
   const activePokemon = livePartyList.find((pokemon) => pokemon.id === activeId)!;
   const playerDisplayName = activePokemon.nickname ?? activePokemon.species.name;
@@ -371,6 +422,13 @@ export function BattleContent({
   // wild Pokémon's HP/hit-flash/message, and never heal or reset the party.
   function startNewEncounter(nextWild: EncounterResult) {
     setWildState(nextWild);
+    setWildStatusState(null);
+    // Phase 7 — a new wild is a genuinely new battle instance for
+    // Volatile Conditions too (see battle-session.service.ts's
+    // advanceToNextEncounter, which resets both sides' persisted copy the
+    // same way).
+    setPlayerVolatile(EMPTY_VOLATILE_SUMMARY);
+    setEnemyVolatile(EMPTY_VOLATILE_SUMMARY);
     setMessage(wildAppearedMessage(nextWild.pokemon.name));
     setEnemyHit(false);
     setPlayerHit(false);
@@ -406,6 +464,10 @@ export function BattleContent({
       }
 
       setWildState((prev) => ({ ...prev, currentHealth: result.updatedWildHp }));
+      setWildStatusState(result.enemyStatus);
+      setPartyStatusMap((prev) => ({ ...prev, [activeId]: result.playerStatus }));
+      setPlayerVolatile(result.playerVolatile);
+      setEnemyVolatile(result.enemyVolatile);
       triggerHit("enemy");
 
       if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
@@ -506,11 +568,18 @@ export function BattleContent({
   function handleVoluntarySwitchSelect(pokemonId: string) {
     const target = livePartyList.find((pokemon) => pokemon.id === pokemonId);
     if (!target || !canSwitchTo(target, activeId)) return;
+    // Phase 7 — the active Pokémon can't voluntarily switch out while
+    // trapped (Bind/Wrap/Fire Spin/Clamp); the server enforces this too
+    // (syncActivePokemon's own `force` check) — this is purely a fast,
+    // client-side reflection of the same rule so the UI never even
+    // attempts a switch it already knows will be rejected.
+    if (playerVolatile.trapped) return;
 
     const targetName = target.nickname ?? target.species.name;
     setActiveId(pokemonId);
     setPhase("enemyTurn");
     setMessage(switchInMessage(targetName));
+    setPlayerVolatile(EMPTY_VOLATILE_SUMMARY);
     startSessionSyncTransition(() => {
       syncActivePokemonAction(pokemonId);
     });
@@ -532,8 +601,12 @@ export function BattleContent({
     setActiveId(pokemonId);
     setPhase("playerTurn");
     setMessage(switchInMessage(target.nickname ?? target.species.name));
+    setPlayerVolatile(EMPTY_VOLATILE_SUMMARY);
     startSessionSyncTransition(() => {
-      syncActivePokemonAction(pokemonId);
+      // Phase 7 — force: true. A forced replacement (the active Pokémon
+      // already fainted) must always be allowed, trapped or not — only a
+      // *voluntary* switch is ever rejected for that.
+      syncActivePokemonAction(pokemonId, true);
     });
     // No counter-attack call here — the faint that triggered this forced
     // replacement already consumed the wild Pokémon's attack for the turn.
@@ -569,7 +642,10 @@ export function BattleContent({
     handleAttack(attackId);
   }
 
-  const attackSlots = buildAttackSlots(knownMovesByPokemonId[activeId] ?? []);
+  const attackSlots = buildAttackSlots(knownMovesByPokemonId[activeId] ?? [], {
+    disabledMoveId: playerVolatile.disabledMoveId,
+    encoreMoveId: playerVolatile.encoreMoveId,
+  });
 
   const menuActions: BattleMenuAction[] = [
     { id: "switch", label: "החלפה" },
@@ -588,6 +664,8 @@ export function BattleContent({
           currentHealth: wildState.currentHealth,
           maxHealth: wildState.maximumHealth,
           spriteUrl: getFrontSpritePath(wildState.pokemon.dexNumber),
+          status: wildStatusState,
+          volatileBadges: volatileBadges(enemyVolatile),
         }}
         player={{
           name: playerDisplayName,
@@ -596,6 +674,8 @@ export function BattleContent({
           maxHealth: activePokemon.maxHp,
           spriteUrl: getBackSpritePath(activePokemon.species.dexNumber),
           fallbackSpriteUrl: getFrontSpritePath(activePokemon.species.dexNumber),
+          status: activePokemon.status,
+          volatileBadges: volatileBadges(playerVolatile),
           // Already the live value — activePokemon comes from livePartyList,
           // which merges in partyProgressMap's overrides the instant a
           // victory reward resolves (see applyPokemonRewards below), so this

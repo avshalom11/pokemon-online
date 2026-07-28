@@ -125,7 +125,23 @@ export function BattleScene({
         </div>
       </div>
 
-      <div className="relative flex shrink-0 flex-col gap-2 bg-gradient-to-t from-black/55 to-transparent p-3 pt-6 sm:gap-3 sm:p-4 sm:pt-8">
+      {/* This footer is `shrink-0` and pinned to the BOTTOM of the flex
+          column (its sibling above, the enemy-HUD area, is `flex-1
+          min-h-0` and simply absorbs whatever height this footer doesn't
+          use) — its visible content's distance from the player's HP/XP
+          card above is therefore governed by the footer's own rendered
+          height (padding + the message box/attack/menu content below),
+          NOT by its top padding: a bottom-anchored flex item's top edge
+          always moves to keep its BOTTOM flush, so adding top padding
+          here only shifts the invisible boundary with the flex-1 sibling
+          above, never the actual gap to the player's card. `pb-*` is
+          deliberately smaller than `pt-*` for the same reason — every
+          pixel trimmed from the bottom (or from the content below) is a
+          pixel of real, comfortable breathing room gained above; see
+          BattleMessageBox/BattleAttackPanel/BattleMenu's own trimmed
+          sizing, which exists for this exact purpose, not just visual
+          compactness. */}
+      <div className="relative flex shrink-0 flex-col gap-1 bg-gradient-to-t from-black/55 to-transparent px-2 pt-2 pb-1 sm:gap-1.5 sm:px-3 sm:pt-2.5 sm:pb-1.5">
         <BattleMessageBox theme={theme} message={message} />
 
         {/* Attack Panel + Action Panel side by side on larger screens;
@@ -136,8 +152,12 @@ export function BattleScene({
             TEMPORARY_ATTACK_SLOTS in features/battle/components/
             BattleContent.tsx) leaves the attack panel mostly empty anyway,
             while the two action buttons ("לכידה"/"בריחה") need the room to
-            avoid truncating at the panel's new width. */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+            avoid truncating at the panel's new width. Kept deliberately
+            compact (tight gap, no extra padding beyond the panels' own) so
+            this whole footer stays short enough to never reach up into the
+            player's HP/XP card, which is positioned independently of the
+            footer's height (PLAYER_HUD_TOP_PERCENT, lib/battle/battleLayout.ts). */}
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:gap-2">
           <div className="sm:flex-1">
             <BattleAttackPanel theme={theme} attacks={attacks} onSelect={onAttackSelect} />
           </div>

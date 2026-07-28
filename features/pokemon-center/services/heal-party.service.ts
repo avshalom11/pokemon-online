@@ -33,11 +33,14 @@ export async function healParty(playerId: string, playerPokemonIds: string[]): P
     if (!species) return [];
 
     const maxHp = calculatePokemonHpStat(species.baseStats.health, pokemon.level);
-    // Already full — excluded so a selection of only full-HP Pokémon never
-    // triggers a no-op database write.
-    if (pokemon.currentHp >= maxHp) return [];
+    // Phase 6F: a major status condition also counts as "something to
+    // heal" now, even for an already full-HP Pokémon — otherwise a
+    // poisoned-but-full-HP Pokémon could never be cured here at all.
+    const alreadyFull = pokemon.currentHp >= maxHp;
+    const hasStatus = pokemon.status !== null;
+    if (alreadyFull && !hasStatus) return [];
 
-    return [{ id: pokemon.id, maxHp }];
+    return [{ id: pokemon.id, maxHp, hasStatus }];
   });
 
   if (updates.length === 0) {
@@ -45,7 +48,14 @@ export async function healParty(playerId: string, playerPokemonIds: string[]): P
   }
 
   await prisma.$transaction(
-    updates.map(({ id, maxHp }) => prisma.playerPokemon.update({ where: { id }, data: { currentHp: maxHp } }))
+    updates.map(({ id, maxHp, hasStatus }) =>
+      prisma.playerPokemon.update({
+        where: { id },
+        data: hasStatus
+          ? { currentHp: maxHp, status: null, statusTurnsRemaining: null }
+          : { currentHp: maxHp },
+      })
+    )
   );
 
   return { status: "healed", healedIds: updates.map((update) => update.id) };

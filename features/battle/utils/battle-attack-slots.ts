@@ -10,7 +10,17 @@ import type { BattleAttackSlot } from "@/shared/types/battle-ui";
 // 2, 3, or 4 moves; always render four slots; never reorder moves."
 export const KNOWN_MOVE_SLOT_COUNT = 4;
 
-export function buildAttackSlots(knownMoves: BattleKnownMoveSlot[]): BattleAttackSlot[] {
+// Phase 7 — Disable/Encore restriction, purely client-facing (server
+// validation, features/battle/services/battle-action.service.ts, is the
+// actual source of truth — this only keeps the UI from offering a move
+// the server would reject anyway). disabledMoveId grays out one slot;
+// encoreMoveId (when set) grays out every OTHER slot instead.
+export interface AttackSlotRestriction {
+  disabledMoveId?: string | null;
+  encoreMoveId?: string | null;
+}
+
+export function buildAttackSlots(knownMoves: BattleKnownMoveSlot[], restriction?: AttackSlotRestriction): BattleAttackSlot[] {
   const bySlot = new Map(knownMoves.map((move) => [move.slot, move]));
 
   return Array.from({ length: KNOWN_MOVE_SLOT_COUNT }, (_, index) => {
@@ -21,6 +31,9 @@ export function buildAttackSlots(knownMoves: BattleKnownMoveSlot[]): BattleAttac
       return { id: `empty-slot-${slotNumber}`, name: "—", disabled: true };
     }
 
+    const restricted =
+      move.moveId === restriction?.disabledMoveId || (Boolean(restriction?.encoreMoveId) && move.moveId !== restriction?.encoreMoveId);
+
     return {
       id: move.moveId,
       name: move.name,
@@ -28,6 +41,11 @@ export function buildAttackSlots(knownMoves: BattleKnownMoveSlot[]): BattleAttac
       category: move.category,
       power: move.power,
       accuracy: move.accuracy,
+      // Omitted entirely (never an explicit `disabled: undefined` key)
+      // when not restricted — keeps this identical to the pre-Phase-7
+      // shape for every existing caller/test that never passes a
+      // restriction at all.
+      ...(restricted ? { disabled: true } : {}),
     };
   });
 }

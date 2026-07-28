@@ -11,6 +11,16 @@ export interface BattleParticipantDisplay {
   // shape rather than split per-role to avoid two near-duplicate types.
   spriteUrl?: string;
   fallbackSpriteUrl?: string;
+  // Phase 6F — the participant's current major status condition ("burn" |
+  // "poison" | "paralysis" | "sleep" | "freeze"), or null/undefined when
+  // healthy. BattleHUD renders this as a small BRN/PSN/PAR/SLP/FRZ badge.
+  status?: string | null;
+  // Phase 7 — short Volatile Condition badge codes (e.g. "CNF", "PRT",
+  // "SEED", "TRAP") currently active on this participant, already resolved
+  // by the caller (BattleContent) from the server's own
+  // BattleVolatileSummary — never computed inside BattleHUD itself.
+  // Omitted/empty renders none.
+  volatileBadges?: string[];
 }
 
 export interface PlayerBattleParticipantDisplay extends BattleParticipantDisplay {

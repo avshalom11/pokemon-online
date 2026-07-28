@@ -12,7 +12,6 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
-import { TEMPORARY_ATTACK_DAMAGE } from "@/engine/battle/battle-config";
 import { executeBattleActionAction } from "@/features/battle/actions/battle-action.action";
 import { __setSession } from "../../../test/support/fakes/auth-session.fake.ts";
 import {
@@ -96,10 +95,16 @@ test("resolves a valid, authenticated, owned attack with a real known move and r
   if (result.status !== "success") return;
   assert.equal(result.moveId, "growl");
   // Phase 5B.2: growl is a status move, so it now resolves through the
-  // Damage Engine's non-damaging result — the wild's HP is untouched. The
-  // wild's own counter-attack is still the unchanged fixed amount.
+  // Damage Engine's non-damaging result — the wild's HP is untouched.
   assert.equal(result.updatedWildHp, 100);
-  assert.equal(result.updatedPartyHp, 100 - TEMPORARY_ATTACK_DAMAGE);
+  // Phase 5H: the wild still takes its own real turn — a uniformly random
+  // pick among its own Known Moves. This Server Action layer has no
+  // randomSource test seam (unlike executeBattleAction itself, exercised
+  // deterministically in battle-action.service.persistence.test.ts), so
+  // only the general invariant is checked here: real HP never goes
+  // negative or above its starting value.
+  assert.ok(result.updatedPartyHp >= 0);
+  assert.ok(result.updatedPartyHp <= 100);
 });
 
 test("rejects a moveId the active Pokémon does not know, even though the session is otherwise valid", async () => {

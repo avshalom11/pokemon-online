@@ -1,14 +1,18 @@
 // Public entry point for the pure damage calculation engine (Phase 5B.1:
 // base formula + random factor; Phase 5B.2: wired into live battles;
 // Phase 5C: STAB; Phase 5D: Type Effectiveness; Phase 5E: Accuracy/Miss;
-// Phase 5F: Critical Hits).
+// Phase 5F: Critical Hits; Phase 5G: Battle Outcome metadata; Phase 5H:
+// Enemy Known Moves & Random Move Selection).
 //
 // Wired into live battles since Phase 5B.2 — the player's own attack goes
 // through calculateMoveDamage (features/battle/utils/battle-damage-rules.ts's
-// resolveAttackDamage, called from battle-action.service.ts). The wild's
-// counter-attack still uses the unrelated, unchanged
-// applyFixedAttack (engine/battle/battle-config.ts), since enemy move
-// selection doesn't exist yet.
+// resolveAttackDamage, called from battle-action.service.ts). As of Phase
+// 5H, the wild's own attack goes through the exact same
+// calculateMoveDamage/resolveAttackDamage pipeline too — it picks one of
+// its own Known Moves uniformly at random (features/battle/ai/
+// select-enemy-move.ts) instead of the old fixed applyFixedAttack
+// (engine/battle/battle-config.ts), which remains only for the unrelated
+// switch-in/failed-capture counter-hit (battle-turn-rules.ts).
 //
 // Deliberately independent of the pre-existing, disconnected engine that
 // predates the current Move Registry — engine/battle/battle-engine.ts,
@@ -20,6 +24,7 @@
 // canonical Type Chart, not a reuse of the old data/battle/type-chart.ts.
 
 export type {
+  BattleEffectiveness,
   CalculateMoveDamageInput,
   CalculateMoveDamageResult,
   DamageDefensiveStats,

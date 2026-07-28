@@ -24,12 +24,12 @@ export function BattleAttackPanel({ theme, attacks, onSelect }: BattleAttackPane
   const focusRingStyle = { "--tw-ring-color": theme.colors.panelAccent } as CSSProperties;
 
   return (
-    <div className="h-full rounded-lg border border-white/10 bg-slate-900/70 p-2.5 shadow-xl backdrop-blur-md sm:p-3">
-      <div className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+    <div className="h-full rounded-lg border border-white/10 bg-slate-900/70 p-1.5 shadow-xl backdrop-blur-md">
+      <div className="mb-0.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
         התקפות
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1">
         {attacks.map((attack) => (
           <button
             key={attack.id}
@@ -37,7 +37,7 @@ export function BattleAttackPanel({ theme, attacks, onSelect }: BattleAttackPane
             disabled={attack.disabled}
             onClick={() => onSelect?.(attack.id)}
             style={focusRingStyle}
-            className="group flex flex-col items-start gap-0.5 rounded-lg border border-white/10 bg-slate-800/70 px-3 py-2 text-sm font-semibold tracking-wide text-slate-100 shadow-md transition-all duration-150 hover:border-white/20 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:bg-slate-800/70"
+            className="group flex flex-col items-start gap-0 rounded-lg border border-white/10 bg-slate-800/70 px-2.5 py-1 text-sm font-semibold tracking-wide text-slate-100 shadow-md transition-all duration-150 hover:border-white/20 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:bg-slate-800/70"
           >
             <span className="flex items-center gap-2">
               <span

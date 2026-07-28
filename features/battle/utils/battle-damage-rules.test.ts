@@ -409,3 +409,70 @@ test("a critical hit still combines with STAB and Type Effectiveness through the
   assert.equal(withCritical.critical, true);
   assert.equal(withCritical.damage, Math.floor(withoutCritical.damage * 1.5));
 });
+
+// --- Phase 6E: Stat Stages ----------------------------------------------------------
+
+test("an Attack stage of +1 on the attacker increases physical damage over the neutral baseline", () => {
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const neutral = resolveAttackDamage(PHYSICAL_MOVE, { baseStats: BASE_STATS, level: 50, types: [] }, defender, 1.0);
+  const buffed = resolveAttackDamage(PHYSICAL_MOVE, { baseStats: BASE_STATS, level: 50, types: [], stages: { attack: 1 } }, defender, 1.0);
+
+  assert.ok(neutral.kind === "damage" && buffed.kind === "damage");
+  assert.ok(buffed.damage > neutral.damage);
+});
+
+test("a Defense stage of -1 on the defender increases the physical damage it takes", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const neutral = resolveAttackDamage(PHYSICAL_MOVE, attacker, { baseStats: BASE_STATS, level: 50, types: [] }, 1.0);
+  const debuffed = resolveAttackDamage(PHYSICAL_MOVE, attacker, { baseStats: BASE_STATS, level: 50, types: [], stages: { defense: -1 } }, 1.0);
+
+  assert.ok(neutral.kind === "damage" && debuffed.kind === "damage");
+  assert.ok(debuffed.damage > neutral.damage);
+});
+
+test("an Accuracy stage on the attacker (or Evasion on the defender) shifts hit resolution", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  // LOW_ACCURACY_MOVE has accuracy 70; a roll of 75 alone misses (70 <= 75).
+  const neutralMiss = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, defender, 1.0, 75);
+  assert.equal(neutralMiss.kind, "miss");
+
+  // +2 accuracy stage -> combined-stage multiplier (3+2)/3 -> effective
+  // accuracy floor(70 * 5/3) = 116, clamped to 100 -> the same roll (75)
+  // now hits instead of missing.
+  const buffedAccuracyHits = resolveAttackDamage(
+    LOW_ACCURACY_MOVE,
+    { ...attacker, stages: { accuracy: 2 } },
+    defender,
+    1.0,
+    75
+  );
+  assert.equal(buffedAccuracyHits.kind, "damage");
+
+  // +2 Evasion on the defender lowers the attacker's effective accuracy
+  // instead (combined stage -2 -> multiplier 3/5): floor(70*3/5) = 42, so
+  // a roll of 50 (which would hit at neutral accuracy) now misses.
+  const neutralHit = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, defender, 1.0, 50);
+  assert.equal(neutralHit.kind, "damage");
+  const evasiveMiss = resolveAttackDamage(LOW_ACCURACY_MOVE, attacker, { ...defender, stages: { evasion: 2 } }, 1.0, 50);
+  assert.equal(evasiveMiss.kind, "miss");
+});
+
+// --- Phase 6G: Burn ------------------------------------------------------------------
+
+test("burn halves the burned attacker's physical damage, but never affects a special move", () => {
+  const attacker = { baseStats: BASE_STATS, level: 50, types: [] as const };
+  const burnedAttacker = { ...attacker, status: "burn" as const };
+  const defender = { baseStats: BASE_STATS, level: 50, types: [] as const };
+
+  const normalPhysical = resolveAttackDamage(PHYSICAL_MOVE, attacker, defender, 1.0);
+  const burnedPhysical = resolveAttackDamage(PHYSICAL_MOVE, burnedAttacker, defender, 1.0);
+  assert.ok(normalPhysical.kind === "damage" && burnedPhysical.kind === "damage");
+  assert.ok(burnedPhysical.damage < normalPhysical.damage);
+
+  const normalSpecial = resolveAttackDamage(SPECIAL_MOVE, attacker, defender, 1.0);
+  const burnedSpecial = resolveAttackDamage(SPECIAL_MOVE, burnedAttacker, defender, 1.0);
+  assert.ok(normalSpecial.kind === "damage" && burnedSpecial.kind === "damage");
+  assert.equal(burnedSpecial.damage, normalSpecial.damage, "burn must never reduce special damage");
+});

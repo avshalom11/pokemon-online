@@ -97,6 +97,17 @@ export type MoveEffect =
   | { kind: "no-effect" }
   | { kind: "current-hp-percent-damage"; percent: number }
   | { kind: "random-level-damage" }
-  | { kind: "weight-based-damage" };
+  | { kind: "weight-based-damage" }
+  // --- Phase 7 additions (Volatile Conditions) ---
+  // Confusion/flinch reuse "status"/"damage-with-status-chance" above (both
+  // already carry a StatusCondition, which already includes "confusion" and
+  // "flinch" — see ALL_STATUS_CONDITIONS) rather than a new kind each.
+  // leech-seed, disable-move, and partial-trap (trapping) already existed
+  // from Phase 3B and are reused as-is. "protect" and "encore" are the only
+  // genuinely new kinds this phase needs — self-targeted, no extra data
+  // (which move to protect against / repeat is resolved from battle state,
+  // never move data).
+  | { kind: "protect" }
+  | { kind: "encore" };
 
 export type MoveEffectKind = MoveEffect["kind"];

@@ -78,21 +78,35 @@ model PlayerProfile {
 // species catalog in data/pokemon/pokemon-data.ts, so that catalog stays the
 // only place species facts live.
 model PlayerPokemon {
-  id         String        @id @default(cuid())
-  playerId   String
-  player     PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  speciesId  String
-  nickname   String?
-  level      Int           @default(5)
-  experience Int           @default(0)
-  currentHp  Int
-  isStarter  Boolean       @default(false)
+  id                   String        @id @default(cuid())
+  playerId             String
+  player               PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  speciesId            String
+  nickname             String?
+  level                Int           @default(5)
+  experience           Int           @default(0)
+  currentHp            Int
+  isStarter            Boolean       @default(false)
   // 1-6, null = not in the active party. Range validated in app code
   // (features/party/validation/party.schema.ts) — Prisma's schema DSL has
   // no declarative CHECK constraint support in this setup.
-  partySlot  Int?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  partySlot            Int?
+  // Phase 6F — the single major status condition this Pokémon currently
+  // carries outside of battle-local stat stages (which never persist here
+  // — see FieldBattleSession's own stage fields). Plain string ("burn" |
+  // "poison" | "paralysis" | "sleep" | "freeze" | null), validated at the
+  // app layer against MajorStatus (features/battle/status) — same
+  // no-Prisma-enum precedent as FieldBattleSession.zoneId. Persists exactly
+  // like currentHp already does (it's real Pokémon-state, not ephemeral
+  // battle UI state), and is cleared the same way currentHp is restored:
+  // by the Pokémon Center heal flow.
+  status               String?
+  // Sleep's remaining-turn counter (Phase 6G) — only ever meaningful while
+  // status === "sleep"; null otherwise. Freeze has no counter (it's a
+  // per-turn thaw-chance roll, not a fixed duration).
+  statusTurnsRemaining Int?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   // A PlayerPokemon currently the active battler in a persisted field
   // session (see FieldBattleSession below) — used only to block release
@@ -267,6 +281,40 @@ model FieldBattleSession {
   // than trusted directly, so a malformed/legacy row can never crash a
   // read.
   participants Json @default("[]")
+
+  // Phase 6E/6F — battle-local state for the current wild encounter only,
+  // reset whenever a new wild is set (session creation and
+  // advanceToNextEncounter), exactly like wildDefeatRewardGranted/
+  // participants above. Stat stages (-6..+6 per stat) never touch
+  // PlayerPokemon/species data — they're pure in-battle UI state, unlike
+  // status above which genuinely persists on the Pokémon itself.
+  // playerStatStages holds the CURRENTLY ACTIVE player Pokémon's own
+  // stages (there's only ever one active battler at a time); reset on
+  // switch too (see syncActivePokemon). Shape: Partial<Record<StatName,
+  // number>> (engine/moves's StatName), e.g. {"attack": -1, "speed": 2} —
+  // always parsed through a runtime guard, never trusted raw, same
+  // "invalid -> {}" philosophy parseParticipants already uses.
+  wildStatStages   Json @default("{}")
+  playerStatStages Json @default("{}")
+
+  // Phase 7 — battle-local Volatile Conditions (confusion, flinch,
+  // protect, disable, encore, leech seed, trapping), one JSON blob per
+  // side, same reset-per-encounter/reset-per-switch lifecycle as the
+  // stages above (see features/battle/volatile/volatile-condition.types.ts
+  // for the exact shape — validated through a runtime guard on read,
+  // never trusted raw, same "invalid -> {}" philosophy every other JSON
+  // column on this model already follows).
+  wildVolatileState   Json @default("{}")
+  playerVolatileState Json @default("{}")
+
+  // The wild's own major status this encounter — a wild Pokémon is never a
+  // PlayerPokemon row, so unlike the player's side (PlayerPokemon.status
+  // above) this has nowhere else to live. Same string convention, same
+  // reset-per-encounter lifecycle as the stages above (a status inflicted
+  // on one wild Pokémon must never carry over to the next one that
+  // appears in the same zone session).
+  wildStatus               String?
+  wildStatusTurnsRemaining Int?
 
   // The party member currently active in this battle. onDelete: Restrict —
   // the DB itself refuses to delete a PlayerPokemon row while any session

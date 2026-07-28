@@ -38,6 +38,7 @@ test("a physical move resolved by id (Pound) uses Attack/Defense and matches the
     // cannot be evaluated and resolves to "never critical".
     critical: false,
     criticalRoll: null,
+    effectiveness: "normal",
   });
 });
 

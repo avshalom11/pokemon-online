@@ -88,9 +88,27 @@ export interface CalculateMoveDamageInput {
   // other optional field above already uses, so every existing caller keeps
   // compiling and behaving exactly as before.
   criticalRoll?: number;
+
+  // Phase 6-cleanup — an already-confirmed hit (multi-hit moves resolve
+  // accuracy exactly once for the whole move, then compute each
+  // additional hit's damage independently). When true, the accuracy
+  // check is skipped entirely and this call always hits — accuracyRoll is
+  // ignored in that case (there is nothing to compare it against). False/
+  // omitted (every other caller) means "run the normal accuracy check,"
+  // exactly as before.
+  accuracyAlreadyConfirmed?: boolean;
 }
 
 export type NonDamagingReason = "status-move" | "missing-power";
+
+// Phase 5G — Battle Outcome metadata. A UI-facing categorical label for
+// "what happened," derived entirely from the effectiveness multiplier
+// already computed above (see the mapping in calculateMoveDamage) — never
+// its own gameplay decision, and never a string the engine displays. Same
+// four categories as EffectivenessResult except "immune" is spelled "none"
+// here, since that's the vocabulary the UI/spec for this field uses;
+// "super-effective"/"not-very-effective"/"normal" are shared verbatim.
+export type BattleEffectiveness = "none" | "not-very-effective" | "normal" | "super-effective";
 
 export interface DamagingMoveResult {
   kind: "damage";
@@ -125,6 +143,9 @@ export interface DamagingMoveResult {
   // immune; otherwise it's the exact value the result was decided from.
   critical: boolean;
   criticalRoll: number | null;
+  // Phase 5G: Battle Outcome metadata — the UI-facing mirror of
+  // effectivenessResult above (see BattleEffectiveness's own doc comment).
+  effectiveness: BattleEffectiveness;
 }
 
 export interface NonDamagingMoveResult {
@@ -146,6 +167,12 @@ export interface MissedMoveResult {
   hit: false;
   accuracy: number;
   accuracyRoll: number;
+  // Phase 5G: a miss can never be critical and has no effectiveness to
+  // report — always false/"normal" rather than an omitted field, so the UI
+  // can read every damaging-attempt result (hit or miss) the same way
+  // without a kind-narrowing branch just to find these two fields.
+  critical: false;
+  effectiveness: "normal";
 }
 
 export type CalculateMoveDamageResult = DamagingMoveResult | NonDamagingMoveResult | MissedMoveResult;

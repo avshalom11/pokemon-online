@@ -6,9 +6,11 @@ import type {
   OffensiveStatKind,
 } from "./damage-types.ts";
 import { DamageValidationError } from "./damage-errors.ts";
-import { checkMoveAccuracy } from "./accuracy.ts";
+import { checkMoveAccuracy, type AccuracyCheckResult } from "./accuracy.ts";
 import { CRITICAL_HIT_MULTIPLIER, checkCriticalHit } from "./critical.ts";
 import { calculateTypeEffectiveness } from "./type-chart.ts";
+import type { EffectivenessResult } from "./type-chart.ts";
+import type { BattleEffectiveness } from "./damage-types.ts";
 import type { MoveType } from "../moves/index.ts";
 
 // Re-exported so every existing "./damage-calculation.ts" import path (this
@@ -84,6 +86,12 @@ export { DamageValidationError };
 // missing-power moves are untouched: they still resolve to their existing
 // non-damaging result before the accuracy check ever runs (see the two
 // early returns above), exactly as every phase before this one.
+//
+// Phase 6-cleanup — accuracyAlreadyConfirmed (damage-types.ts) lets a
+// caller that already resolved this exact move's accuracy once (a
+// multi-hit move's second-and-later hits) skip the check entirely and
+// always hit, via resolveAccuracyCheck below, rather than synthesizing a
+// fake guaranteed-hit accuracyRoll.
 //
 // Phase 5F — Critical Hit: checkCriticalHit (critical.ts) only ever runs
 // once a hit has already landed AND the target isn't immune (0x
@@ -176,12 +184,53 @@ function computeStabApplied(moveType: MoveType | undefined, attackerTypes: reado
   return attackerTypes.includes(moveType);
 }
 
+// Phase 5G — Battle Outcome metadata. A direct relabeling of the
+// effectiveness result already computed above; "immune" becomes "none" and
+// every other category passes through unchanged. Never re-derives the
+// multiplier and never inspects Pokémon types itself.
+function toBattleEffectiveness(result: EffectivenessResult): BattleEffectiveness {
+  return result === "immune" ? "none" : result;
+}
+
+// Phase 6-cleanup — a confirmed hit (accuracyAlreadyConfirmed) always
+// resolves to a guaranteed hit without ever consulting accuracyRoll or
+// re-running the check; every other caller runs the normal accuracy gate
+// exactly as before. Kept as one shared helper so both call sites below
+// (the status-move branch and the damaging-move branch) can't drift.
+function resolveAccuracyCheck(input: CalculateMoveDamageInput): AccuracyCheckResult {
+  if (input.accuracyAlreadyConfirmed) {
+    return { hit: true, accuracy: input.accuracy ?? null, accuracyRoll: null };
+  }
+
+  return checkMoveAccuracy(input.accuracy, input.accuracyRoll);
+}
+
 // Pure: same input always produces the same output, no I/O, no registry
 // lookup (see move-damage-query.ts for the moveId-resolving adapter).
 export function calculateMoveDamage(input: CalculateMoveDamageInput): CalculateMoveDamageResult {
   validateLevelAndRandomFactor(input.level, input.randomFactor);
 
   if (input.moveCategory === "status") {
+    // Phase 6D/6G: a status move (growl, thunder-wave, sleep-powder, ...)
+    // now genuinely runs the same Accuracy check a damaging move already
+    // does — previously this branch returned unconditionally, silently
+    // treating every status move as unmissable regardless of its own
+    // Registry accuracy. A miss still applies no effect of any kind (see
+    // features/battle/effects/resolve-move-effects.ts), exactly like a
+    // missed damaging move applies no damage.
+    const accuracyCheck = resolveAccuracyCheck(input);
+    if (!accuracyCheck.hit) {
+      return {
+        kind: "miss",
+        damage: 0,
+        hit: false,
+        accuracy: accuracyCheck.accuracy,
+        accuracyRoll: accuracyCheck.accuracyRoll,
+        critical: false,
+        effectiveness: "normal",
+      };
+    }
+
     return { kind: "non-damaging", damage: 0, reason: "status-move" };
   }
 
@@ -196,9 +245,17 @@ export function calculateMoveDamage(input: CalculateMoveDamageInput): CalculateM
   // Phase 5E: every move that reaches this point WOULD deal damage — the
   // accuracy check runs before any stat validation, the base formula, STAB,
   // or Type Effectiveness, and a miss skips all of them.
-  const accuracyCheck = checkMoveAccuracy(input.accuracy, input.accuracyRoll);
+  const accuracyCheck = resolveAccuracyCheck(input);
   if (!accuracyCheck.hit) {
-    return { kind: "miss", damage: 0, hit: false, accuracy: accuracyCheck.accuracy, accuracyRoll: accuracyCheck.accuracyRoll };
+    return {
+      kind: "miss",
+      damage: 0,
+      hit: false,
+      accuracy: accuracyCheck.accuracy,
+      accuracyRoll: accuracyCheck.accuracyRoll,
+      critical: false,
+      effectiveness: "normal",
+    };
   }
 
   const category = input.moveCategory;
@@ -253,5 +310,6 @@ export function calculateMoveDamage(input: CalculateMoveDamageInput): CalculateM
     accuracyRoll: accuracyCheck.accuracyRoll,
     critical: criticalCheck.critical,
     criticalRoll: criticalCheck.criticalRoll,
+    effectiveness: toBattleEffectiveness(effectivenessResult),
   };
 }

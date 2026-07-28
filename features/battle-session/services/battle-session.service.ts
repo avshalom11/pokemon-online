@@ -3,6 +3,9 @@ import "server-only";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { startPokemonEncounter, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { ZONE_DATA } from "@/data/zones/zone-data";
+import { ALL_STAT_NAMES } from "@/engine/moves";
+import type { StatStages } from "@/features/battle/stats/stat-stages";
+import { resetVolatileOnSwitch, type VolatileState } from "@/features/battle/volatile/volatile-condition.types";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getFirstUsableMember, hasUsableMember, isUsable } from "@/features/party/utils/party-rules";
@@ -52,6 +55,94 @@ function parseParticipants(value: Prisma.JsonValue): BattleParticipantRecord[] {
 function serializeParticipants(participants: BattleParticipantRecord[]): Prisma.InputJsonValue {
   return participants as unknown as Prisma.InputJsonValue;
 }
+
+// Phase 6E — FieldBattleSession.wildStatStages/playerStatStages, stored as
+// Prisma.JsonValue same as participants above: never trusted directly,
+// dropped down to "no stages" ({}) for anything that doesn't match the
+// expected shape (a legacy row from before these columns existed, or any
+// unexpected value) rather than crashing a read.
+export function parseStatStages(value: Prisma.JsonValue): StatStages {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const stages: StatStages = {};
+  for (const stat of ALL_STAT_NAMES) {
+    const raw = (value as Record<string, unknown>)[stat];
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      stages[stat] = raw;
+    }
+  }
+  return stages;
+}
+
+export function serializeStatStages(stages: StatStages): Prisma.InputJsonValue {
+  return stages as unknown as Prisma.InputJsonValue;
+}
+
+const EMPTY_STAT_STAGES: Prisma.InputJsonValue = {};
+
+// Phase 7 — FieldBattleSession.wildVolatileState/playerVolatileState,
+// stored as Prisma.JsonValue same as the stages above: never trusted
+// directly, dropped field-by-field for anything that doesn't match the
+// expected shape (a legacy row from before these columns existed, or any
+// unexpected value) rather than crashing a read. See
+// features/battle/volatile/volatile-condition.types.ts for the shape this
+// mirrors.
+export function parseVolatileState(value: Prisma.JsonValue): VolatileState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const raw = value as Record<string, unknown>;
+  const result: VolatileState = {};
+
+  if (typeof raw.lastUsedMoveId === "string") result.lastUsedMoveId = raw.lastUsedMoveId;
+  if (typeof raw.flinch === "boolean") result.flinch = raw.flinch;
+
+  if (raw.confusion && typeof raw.confusion === "object") {
+    const turnsRemaining = (raw.confusion as Record<string, unknown>).turnsRemaining;
+    if (typeof turnsRemaining === "number") result.confusion = { turnsRemaining };
+  }
+
+  if (raw.protect && typeof raw.protect === "object") {
+    const protect = raw.protect as Record<string, unknown>;
+    if (typeof protect.active === "boolean" && typeof protect.consecutiveUses === "number") {
+      result.protect = { active: protect.active, consecutiveUses: protect.consecutiveUses };
+    }
+  }
+
+  if (raw.disable && typeof raw.disable === "object") {
+    const disable = raw.disable as Record<string, unknown>;
+    if (typeof disable.moveId === "string" && typeof disable.turnsRemaining === "number") {
+      result.disable = { moveId: disable.moveId, turnsRemaining: disable.turnsRemaining };
+    }
+  }
+
+  if (raw.encore && typeof raw.encore === "object") {
+    const encore = raw.encore as Record<string, unknown>;
+    if (typeof encore.moveId === "string" && typeof encore.turnsRemaining === "number") {
+      result.encore = { moveId: encore.moveId, turnsRemaining: encore.turnsRemaining };
+    }
+  }
+
+  if (raw.leechSeed && typeof raw.leechSeed === "object") {
+    const leechSeed = raw.leechSeed as Record<string, unknown>;
+    if (leechSeed.source === "player" || leechSeed.source === "enemy") {
+      result.leechSeed = { source: leechSeed.source };
+    }
+  }
+
+  if (raw.trapping && typeof raw.trapping === "object") {
+    const trapping = raw.trapping as Record<string, unknown>;
+    if ((trapping.source === "player" || trapping.source === "enemy") && typeof trapping.turnsRemaining === "number") {
+      result.trapping = { source: trapping.source, turnsRemaining: trapping.turnsRemaining };
+    }
+  }
+
+  return result;
+}
+
+export function serializeVolatileState(volatile: VolatileState): Prisma.InputJsonValue {
+  return volatile as unknown as Prisma.InputJsonValue;
+}
+
+const EMPTY_VOLATILE_STATE: Prisma.InputJsonValue = resetVolatileOnSwitch() as unknown as Prisma.InputJsonValue;
 
 // Owns the FieldBattleSession row — the authoritative, persisted record of a
 // player's single in-progress wild encounter (see the model's own doc
@@ -265,16 +356,59 @@ export async function syncWildHp(playerId: string, zoneId: ZoneId, currentHp: nu
 // in-flight for a given player at a time. withParticipant is idempotent
 // (a Pokémon switching in and out repeatedly is recorded only once), so
 // even a hypothetical duplicate/racing call is safe.
-export async function syncActivePokemon(playerId: string, playerPokemonId: string): Promise<void> {
+export type SyncActivePokemonResult = { status: "ok" } | { status: "trapped" };
+
+// Phase 7 — `force` must be true for a forced replacement after fainting
+// (never rejected — a fainted Pokémon obviously can't stay trapped-in),
+// and omitted/false for every voluntary switch, which IS rejected while
+// the current active Pokémon is trapped (Bind/Wrap/Fire Spin/Clamp — see
+// features/battle/volatile/volatile-condition.types.ts). Both call sites
+// already exist and are already distinguished in BattleContent
+// (handleVoluntarySwitchSelect vs. handleForcedReplacementSelect); this
+// only adds the trapped check to the voluntary one.
+export async function syncActivePokemon(
+  playerId: string,
+  playerPokemonId: string,
+  options?: { force?: boolean }
+): Promise<SyncActivePokemonResult> {
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
-  if (!session) return;
+  if (!session) return { status: "ok" };
+
+  if (!options?.force) {
+    const currentVolatile = parseVolatileState(session.playerVolatileState);
+    if (currentVolatile.trapping) {
+      return { status: "trapped" };
+    }
+  }
 
   const participants = withParticipant(parseParticipants(session.participants), playerPokemonId);
 
   await prisma.fieldBattleSession.updateMany({
     where: { playerId },
-    data: { activePlayerPokemonId: playerPokemonId, participants: serializeParticipants(participants) },
+    data: {
+      activePlayerPokemonId: playerPokemonId,
+      participants: serializeParticipants(participants),
+      // Phase 6E: battle-local stat stages belong to whichever Pokémon is
+      // currently active, never carried over to whoever switches in next
+      // — the incoming Pokémon (whether newly switched in or switched
+      // back to later) always starts this encounter's stages at neutral.
+      // Major status (PlayerPokemon.status) is untouched here on purpose
+      // — it persists on the Pokémon itself, exactly like currentHp.
+      playerStatStages: EMPTY_STAT_STAGES,
+      // Phase 7: same rule for Volatile Conditions (confusion, flinch,
+      // protect, disable, encore, Leech Seed, trapping) — a freshly
+      // switched-in Pokémon always starts this encounter with none of
+      // them, whether switching out clears them (leaving) or in (never
+      // inherits the previous occupant's). The wild's OWN volatile state
+      // (e.g. Leech Seed it planted on the player, sourced from
+      // "player") is untouched here on purpose — see this project's own
+      // "preserve the seed when the source switches" rule: only the
+      // switching side's own state resets.
+      playerVolatileState: EMPTY_VOLATILE_STATE,
+    },
   });
+
+  return { status: "ok" };
 }
 
 // Marks an existing participant of the current encounter as fainted, making
@@ -328,6 +462,21 @@ export async function advanceToNextEncounter(playerId: string, zoneId: ZoneId): 
       wildMaxHp: wild.maximumHealth,
       wildDefeatRewardGranted: false,
       participants: serializeParticipants([{ playerPokemonId: session.activePlayerPokemonId, fainted: false, order: 0 }]),
+      // Phase 6E/6F: a new wild is a genuinely new battle instance — stat
+      // stages (both sides) and the *wild's own* status/sleep-counter
+      // never carry over from the encounter that just ended. The
+      // player's own PlayerPokemon.status is untouched (it persists on
+      // the Pokémon itself, unrelated to which wild it's currently
+      // fighting).
+      wildStatStages: EMPTY_STAT_STAGES,
+      playerStatStages: EMPTY_STAT_STAGES,
+      wildStatus: null,
+      wildStatusTurnsRemaining: null,
+      // Phase 7: a new wild is a genuinely new battle instance for
+      // Volatile Conditions too — neither side carries confusion, Leech
+      // Seed, trapping, etc. into a fresh encounter.
+      wildVolatileState: EMPTY_VOLATILE_STATE,
+      playerVolatileState: EMPTY_VOLATILE_STATE,
     },
   });
 
