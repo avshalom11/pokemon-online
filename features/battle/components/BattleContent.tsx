@@ -8,6 +8,7 @@ import { BattleWindow } from "./BattleWindow";
 import { PokeballCounter } from "./PokeballCounter";
 import { XpToast } from "./XpToast";
 import { BattleScene } from "@/components/battle/BattleScene";
+import { RarityWarningBanner } from "@/components/battle/RarityWarningBanner";
 import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { executeBattleActionAction } from "@/features/battle/actions/battle-action.action";
 import { attemptCaptureAction } from "@/features/battle/actions/capture.action";
@@ -46,6 +47,7 @@ import { playerXpToastMessage } from "@/features/player-progression/progression-
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { getBackSpritePath, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import type { PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
+import { getRarityPresentation } from "@/lib/battle/battleRarityPresentation";
 import { getBattleTheme } from "@/lib/battle/battleThemes";
 import type { BattleMenuAction } from "@/shared/types/battle-ui";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
@@ -653,11 +655,21 @@ export function BattleContent({
     { id: "run", label: "בריחה" },
   ];
 
+  // Derived fresh every render from the current wild encounter's own
+  // PokemonSpecies.rarity — recomputes automatically whenever wildState
+  // changes (a new encounter after a capture/flee/faint), never cached
+  // separately from that source of truth.
+  const rarityPresentation = getRarityPresentation(wildState.pokemon.rarity);
+
   return (
-    <BattleWindow>
+    <BattleWindow
+      backgroundClassName={rarityPresentation.windowBackgroundClass}
+      banner={<RarityWarningBanner rarity={wildState.pokemon.rarity} />}
+    >
       <BattleScene
         theme={theme}
         message={message}
+        rarityOverlayClassName={rarityPresentation.sceneOverlayClassName}
         enemy={{
           name: wildState.pokemon.name,
           level: wildState.level,
@@ -666,6 +678,7 @@ export function BattleContent({
           spriteUrl: getFrontSpritePath(wildState.pokemon.dexNumber),
           status: wildStatusState,
           volatileBadges: volatileBadges(enemyVolatile),
+          rarity: wildState.pokemon.rarity,
         }}
         player={{
           name: playerDisplayName,

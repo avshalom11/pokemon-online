@@ -38,6 +38,10 @@ export interface BattleSceneProps {
    * them is a no-op for any caller that doesn't need this. */
   enemyHit?: boolean;
   playerHit?: boolean;
+  /** Forwarded straight through to BattleBackground — see its own
+   * `rarityOverlayClassName` doc comment
+   * (components/battle/BattleBackground.tsx). */
+  rarityOverlayClassName?: string;
 }
 
 // Anchors a Pokémon sprite so its feet land exactly on a given point of the
@@ -80,6 +84,7 @@ export function BattleScene({
   onMenuAction,
   enemyHit,
   playerHit,
+  rarityOverlayClassName,
 }: BattleSceneProps) {
   return (
     // `isolate` establishes a new stacking context so BattleBackground's
@@ -87,7 +92,7 @@ export function BattleScene({
     // behind an ancestor's background — without it, a plain `relative`
     // container doesn't contain negative z-index children.
     <div className="relative isolate flex h-full w-full flex-col overflow-hidden">
-      <BattleBackground theme={theme} />
+      <BattleBackground theme={theme} rarityOverlayClassName={rarityOverlayClassName} />
 
       {/* Sprites — percentage-anchored to this theme's two battle-platform
           circles in the art, independent of the HUD/footer layout below. */}

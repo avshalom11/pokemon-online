@@ -1,7 +1,8 @@
 import "server-only";
 
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
-import { startPokemonEncounter, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
+import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
+import { resolveWildEncounter } from "@/engine/encounter/legendary-test-boost";
 import { ZONE_DATA } from "@/data/zones/zone-data";
 import { ALL_STAT_NAMES } from "@/engine/moves";
 import type { StatStages } from "@/features/battle/stats/stat-stages";
@@ -222,9 +223,11 @@ function restoreFromRow(row: PersistedSessionRow, party: OwnedPokemon[]): Restor
 // this zone" — restores an existing session for that zone if one exists,
 // redirects to the player's real session if it's for a different zone,
 // discards and recovers from a stale/invalid session, or starts a brand
-// new one via the existing, unmodified weighted encounter engine
-// (startPokemonEncounter). This is the only place a FieldBattleSession row
-// is ever created.
+// new one via resolveWildEncounter (engine/encounter/legendary-test-boost.ts)
+// — the real, unmodified weighted encounter engine (startPokemonEncounter)
+// unless the dev-only LEGENDARY_ENCOUNTER_TEST_MODE flag is on, in which
+// case behavior is identical to before except in development. This is the
+// only place a FieldBattleSession row is ever created.
 export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId): Promise<GetOrStartBattleResult> {
   const party = await getPlayerParty(playerId);
   const existing = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
@@ -253,7 +256,7 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
 
   const starter = party[0];
   const activePokemon = isUsable(starter) ? starter : getFirstUsableMember(party)!;
-  const wild = startPokemonEncounter(requestedZoneId);
+  const wild = resolveWildEncounter(requestedZoneId);
 
   await prisma.fieldBattleSession.create({
     data: {
@@ -451,7 +454,7 @@ export async function advanceToNextEncounter(playerId: string, zoneId: ZoneId): 
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
   if (!session || session.zoneId !== zoneId) return null;
 
-  const wild = startPokemonEncounter(zoneId);
+  const wild = resolveWildEncounter(zoneId);
 
   const updated = await prisma.fieldBattleSession.updateMany({
     where: { playerId, zoneId },

@@ -2,6 +2,15 @@ import type { CSSProperties, ReactNode } from "react";
 
 interface BattleWindowProps {
   children: ReactNode;
+  /** Replaces the default `bg-slate-950` outer backdrop — see
+   * lib/battle/battleRarityPresentation.ts's `windowBackgroundClass`.
+   * Omitted keeps today's look exactly as-is. */
+  backgroundClassName?: string;
+  /** Rendered above the game panel, inside the same centered column —
+   * e.g. RarityWarningBanner (components/battle/RarityWarningBanner.tsx).
+   * Omitted (the common/rare case) reserves no extra space, so the panel's
+   * position is unchanged from before this prop existed. */
+  banner?: ReactNode;
 }
 
 // The battle screen's own page shell — deliberately not the shared
@@ -37,9 +46,11 @@ const PANEL_STYLE: CSSProperties = {
   aspectRatio: "3 / 2",
 };
 
-export function BattleWindow({ children }: BattleWindowProps) {
+export function BattleWindow({ children, backgroundClassName, banner }: BattleWindowProps) {
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-slate-950 px-4 pb-4 pt-[calc(var(--app-header-height)+1rem)] sm:px-8 sm:pb-8 sm:pt-[calc(var(--app-header-height)+2rem)]">
+    <div
+      className={`relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pb-4 pt-[calc(var(--app-header-height)+1rem)] sm:px-8 sm:pb-8 sm:pt-[calc(var(--app-header-height)+2rem)] ${backgroundClassName ?? "bg-slate-950"}`}
+    >
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -47,11 +58,19 @@ export function BattleWindow({ children }: BattleWindowProps) {
         }}
       />
 
-      <div
-        className="relative overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 [--panel-reserved-height:calc(var(--app-header-height)+32px)] [--panel-width-pct:92%] sm:[--panel-reserved-height:calc(var(--app-header-height)+64px)] sm:[--panel-width-pct:85%] lg:[--panel-width-pct:75%]"
-        style={PANEL_STYLE}
-      >
-        {children}
+      {/* Single flex item of the row above, so it's centered exactly like
+          the panel alone used to be. banner is undefined for common/rare
+          (the vast majority of encounters), which renders this identically
+          to before — no reserved space, no layout shift. */}
+      <div className="relative flex w-full flex-col items-center gap-3">
+        {banner}
+
+        <div
+          className="relative overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 [--panel-reserved-height:calc(var(--app-header-height)+32px)] [--panel-width-pct:92%] sm:[--panel-reserved-height:calc(var(--app-header-height)+64px)] sm:[--panel-width-pct:85%] lg:[--panel-width-pct:75%]"
+          style={PANEL_STYLE}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

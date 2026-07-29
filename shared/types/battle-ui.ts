@@ -1,3 +1,5 @@
+import type { PokemonRarity } from "./pokemon";
+
 export interface BattleParticipantDisplay {
   name: string;
   level: number;
@@ -21,6 +23,11 @@ export interface BattleParticipantDisplay {
   // BattleVolatileSummary — never computed inside BattleHUD itself.
   // Omitted/empty renders none.
   volatileBadges?: string[];
+  // Wild (enemy) participants only, sourced directly from the encounter's
+  // PokemonSpecies.rarity — never set for the player, whose own species
+  // rarity has no bearing on this feature. Optional so it silently renders
+  // no label when absent, rather than requiring every caller to supply one.
+  rarity?: PokemonRarity;
 }
 
 export interface PlayerBattleParticipantDisplay extends BattleParticipantDisplay {

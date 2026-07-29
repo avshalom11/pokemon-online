@@ -26,7 +26,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון זרע. אור השמש מזין את הזרע שעל גבו.",
     dexNumber: 1,
     types: ["grass", "poison"],
-    rarity: "common",
+    rarity: "very-rare",
 
     baseStats: {
       health: 45,
@@ -46,7 +46,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון לטאה. הלהבה בקצה זנבו מסגירה את מצב רוחו.",
     dexNumber: 4,
     types: ["fire"],
-    rarity: "common",
+    rarity: "very-rare",
 
     baseStats: {
       health: 39,
@@ -66,7 +66,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון צב קטן. יורה מים בעוצמה רבה מתוך פיו.",
     dexNumber: 7,
     types: ["water"],
-    rarity: "common",
+    rarity: "very-rare",
 
     baseStats: {
       health: 44,
@@ -185,7 +185,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון כלב אש נאמן, נובח בקול רם כדי להזהיר מפני סכנה.",
     dexNumber: 58,
     types: ["fire"],
-    rarity: "rare",
+    rarity: "common",
     baseStats: { health: 55, attack: 70, defense: 45, specialAttack: 70, specialDefense: 50, speed: 60 },
     imageUrl: "/pokemon/growlithe.png",
   },
@@ -195,7 +195,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון סוס אש שרעמתו בוערת ומתחזקת ככל שהוא מתרגש.",
     dexNumber: 77,
     types: ["fire"],
-    rarity: "rare",
+    rarity: "common",
     baseStats: { health: 50, attack: 85, defense: 55, specialAttack: 65, specialDefense: 65, speed: 90 },
     imageUrl: "/pokemon/ponyta.png",
   },
@@ -239,7 +239,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עשוי גז רעיל, כמעט בלתי נראה ומקיף כל מי שמתקרב.",
     dexNumber: 92,
     types: ["ghost", "poison"],
-    rarity: "rare",
+    rarity: "common",
     baseStats: { health: 30, attack: 35, defense: 30, specialAttack: 100, specialDefense: 35, speed: 80 },
     imageUrl: "/pokemon/gastly.png",
   },
@@ -249,7 +249,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון רוח שמסתתר בצללים ואוהב ללקק את קורבנותיו.",
     dexNumber: 93,
     types: ["ghost", "poison"],
-    rarity: "very-rare",
+    rarity: "common",
     baseStats: { health: 45, attack: 50, defense: 45, specialAttack: 115, specialDefense: 55, speed: 95 },
     imageUrl: "/pokemon/haunter.png",
   },
@@ -259,7 +259,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון בודד שעונד גולגולת על ראשו ובוכה בלילות ירח מלא.",
     dexNumber: 104,
     types: ["ground"],
-    rarity: "rare",
+    rarity: "common",
     baseStats: { health: 50, attack: 50, defense: 95, specialAttack: 40, specialDefense: 50, speed: 35 },
     imageUrl: "/pokemon/cubone.png",
   },
@@ -276,7 +276,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון זרע. הניצן שעל גבו גדל ואוגר אנרגיה לקראת הפריחה הגדולה.",
     dexNumber: 2,
     types: ["grass", "poison"],
-    rarity: "rare",
+    rarity: "very-rare",
 
     baseStats: {
       health: 60,
@@ -316,7 +316,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון לטאה פראי ותוקפני, זנבו הבוער נעשה חזק יותר ככל שהוא נלחם.",
     dexNumber: 5,
     types: ["fire"],
-    rarity: "rare",
+    rarity: "very-rare",
 
     baseStats: {
       health: 58,
@@ -356,7 +356,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון צב עם זנב שעיר, נחשב לסמל אריכות ימים בזכות פרוותו המסתלסלת.",
     dexNumber: 8,
     types: ["water"],
-    rarity: "rare",
+    rarity: "very-rare",
 
     baseStats: {
       health: 59,
@@ -396,7 +396,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון גולם, מקשיח את קליפתו ומחכה בסבלנות להשלמת תהליך ההתגלמות.",
     dexNumber: 11,
     types: ["bug"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 50,
@@ -416,7 +416,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון פרפר, אוסף אבקת פרחים ומאבק את כנפיו כדי לגרש טורפים.",
     dexNumber: 12,
     types: ["bug", "flying"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -436,7 +436,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון גולם כמעט חסר תנועה, אך מתחת לקליפתו הקשה מתרחש שינוי מהיר.",
     dexNumber: 14,
     types: ["bug", "poison"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 45,
@@ -456,7 +456,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון דבורה עם שני עוקצים ארסיים בזרועותיו, תוקף בלהקות מהירות.",
     dexNumber: 15,
     types: ["bug", "poison"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 65,
@@ -496,7 +496,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון ציפור טריטוריאלי, שומר בקנאות על שטח ציד רחב משלו.",
     dexNumber: 17,
     types: ["normal", "flying"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 63,
@@ -516,7 +516,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון ציפור מהיר להפליא, מסוגל לעוף במהירות קרובה למהירות הקול.",
     dexNumber: 18,
     types: ["normal", "flying"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 83,
@@ -556,7 +556,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון מכרסם עם שיניים חדות שגדלות כל הזמן, מכרסם ללא הפסקה כדי לשלוט בהן.",
     dexNumber: 20,
     types: ["normal"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 55,
@@ -596,7 +596,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם מקור ארוך וכנפיים חזקות, מסוגל לעוף כל היום בחיפוש אחר מזון.",
     dexNumber: 22,
     types: ["normal", "flying"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 65,
@@ -636,7 +636,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון נחש מפחיד עם דוגמה על בטנו שנראית כמו פנים מאיימות.",
     dexNumber: 24,
     types: ["poison"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -696,7 +696,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קוצים חדים על גבו, מגן על עצמו על ידי התכווצות לכדור קוצני.",
     dexNumber: 28,
     types: ["ground"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 75,
@@ -736,7 +736,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קוצים רכים יחסית, נעשית תוקפנית יותר כדי להגן על הקבוצה שלה.",
     dexNumber: 30,
     types: ["poison"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 70,
@@ -756,7 +756,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קשקשים קשים כשריון, עורה הקשיח מגן עליה מפני כמעט כל פגיעה.",
     dexNumber: 31,
     types: ["poison", "ground"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 90,
@@ -796,7 +796,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קרן קשה על ראשו, נועץ אותה בכל דבר שמעורר בו חשד.",
     dexNumber: 33,
     types: ["poison"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 61,
@@ -816,7 +816,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עוצמתי עם זנב חזק שיכול להפיל מגדל תאורה במכה אחת.",
     dexNumber: 34,
     types: ["poison", "ground"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 81,
@@ -856,7 +856,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון פיה ביישן ונדיר, נמנע ממגע עם בני אדם ונראה רק לעיתים רחוקות.",
     dexNumber: 36,
     types: ["fairy"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 95,
@@ -896,7 +896,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שועל עם תשעה זנבות מפוארים, נאמר שהוא חי אלף שנים.",
     dexNumber: 38,
     types: ["fire"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 73,
@@ -916,7 +916,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עגול ורך, שר שיר מרדים המסוגל להרדים כל מי ששומע אותו.",
     dexNumber: 39,
     types: ["normal", "fairy"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 115,
@@ -936,7 +936,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם פרווה רכה כענן, עיניו הגדולות רואות במלואה בחשכה מוחלטת.",
     dexNumber: 40,
     types: ["normal", "fairy"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 140,
@@ -956,7 +956,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עטלף עם פה ענק, נושך את קורבנותיו ושואב מהם דם בלי הפסקה.",
     dexNumber: 42,
     types: ["poison", "flying"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 75,
@@ -976,7 +976,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עשב-רעל שמפריש נוזל ריחני חריף כדי להרתיע טורפים.",
     dexNumber: 44,
     types: ["grass", "poison"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -996,7 +996,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם עלי כותרת ענקיים, מפזר אבקת פרחים רעילה ומעורר התעטשות.",
     dexNumber: 45,
     types: ["grass", "poison"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 75,
@@ -1036,7 +1036,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם פטריות ענקיות על גבו השולטות למעשה בגוף הפוקימון עצמו.",
     dexNumber: 47,
     types: ["bug", "grass"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -1076,7 +1076,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עש, קשקשיו הצבעוניים נושרים ומפזרים אבקה רעילה עם כל נפנוף כנף.",
     dexNumber: 49,
     types: ["bug", "poison"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 70,
@@ -1116,7 +1116,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם שלושה ראשים המחוברים תת-קרקעית, חופר מנהרות במהירות מדהימה.",
     dexNumber: 51,
     types: ["ground"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 35,
@@ -1156,7 +1156,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון חתול אלגנטי אך פזיז, שש הזיפים סביב פניו חשים תנודות אוויר עדינות.",
     dexNumber: 53,
     types: ["normal"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 65,
@@ -1176,7 +1176,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שוחה במים בחן רב, אבן על מצחו מפיקה גלי מחשבה חלשים.",
     dexNumber: 55,
     types: ["water"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 80,
@@ -1216,7 +1216,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם כעס בלתי נגמר, ברגע שהתעצבן הוא לא נרגע עד שהניצחון בטוח.",
     dexNumber: 57,
     types: ["fighting"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 65,
@@ -1236,7 +1236,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון כלב אגדי, נחשב עתיק מאוד ונערץ בתרבויות רבות בשל מהירותו.",
     dexNumber: 59,
     types: ["fire"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 90,
@@ -1256,7 +1256,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קרביים שקופים, הספירלה על בטנו מהפנטת כל מי שמסתכל בה.",
     dexNumber: 61,
     types: ["water"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 65,
@@ -1276,7 +1276,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם שרירי בטן חזקים במיוחד, שוחה במים סוערים בלי שום קושי.",
     dexNumber: 62,
     types: ["water", "fighting"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 90,
@@ -1316,7 +1316,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם כוחות טלקינטיים אדירים, גלי המוח שלו גורמים לשעונים בסביבה להשתגע.",
     dexNumber: 64,
     types: ["psychic"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 40,
@@ -1336,7 +1336,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם מוח עצום פי כמה מגוף אדם, מסוגל לזכור כל דבר שראה אי פעם.",
     dexNumber: 65,
     types: ["psychic"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 55,
@@ -1376,7 +1376,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם שרירים אדירים שחוגר חגורה כדי לרסן את כוחו העצום.",
     dexNumber: 67,
     types: ["fighting"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 80,
@@ -1396,7 +1396,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם ארבע זרועות, מסוגל להטיל אלף מכות אגרוף בזמן קצר במיוחד.",
     dexNumber: 68,
     types: ["fighting"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 90,
@@ -1436,7 +1436,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שפיו הפעור מפריש נוזל עיכול חזק כדי להמיס את טרפו.",
     dexNumber: 70,
     types: ["grass", "poison"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 65,
@@ -1456,7 +1456,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם פה ענק שמפתה חרקים בריח מתוק לפני שהוא בולע אותם בשלמות.",
     dexNumber: 71,
     types: ["grass", "poison"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 80,
@@ -1476,7 +1476,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם מאה זרועות מקלעות, ארסן שבקצותיהן חזק דיו לשתק אדם בוגר.",
     dexNumber: 73,
     types: ["water", "poison"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 80,
@@ -1496,7 +1496,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון סלע שמתגלגל במורד הרים, מותיר אחריו שביל של אבנים קטנות.",
     dexNumber: 75,
     types: ["rock", "ground"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 55,
@@ -1516,7 +1516,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון סלע ענק, מפוצץ את עצמו לעיתים כדי לשחרר מתח פנימי שנצבר בגופו.",
     dexNumber: 76,
     types: ["rock", "ground"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 80,
@@ -1536,7 +1536,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון סוס אש מהיר להפליא, יכול לרוץ במהירות של כארבעים קילומטר לדקה.",
     dexNumber: 78,
     types: ["fire"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 65,
@@ -1576,7 +1576,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם צדפה נצמדת לזנבו, כה נינוח ששוכח לעיתים מה הוא עשה רגע קודם.",
     dexNumber: 80,
     types: ["water", "psychic"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 95,
@@ -1616,7 +1616,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם שלושה מגנטים מחוברים, יוצר שדה מגנטי המשבש שידורי טלוויזיה.",
     dexNumber: 82,
     types: ["electric", "steel"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 50,
@@ -1636,7 +1636,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שנודד עם ענף בקק, שומר עליו כמו על אוצר יקר ולא נפרד ממנו לעולם.",
     dexNumber: 83,
     types: ["normal", "flying"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 52,
@@ -1676,7 +1676,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם שלושה ראשים, כל ראש שולט ברגש שונה: כעס, שמחה או עצב.",
     dexNumber: 85,
     types: ["normal", "flying"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -1716,7 +1716,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם עור לבן ורך, שוחה בים בחן על ידי הנעת ארבע סנפירים בעדינות.",
     dexNumber: 87,
     types: ["water", "ice"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 90,
@@ -1756,7 +1756,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עשוי רעל סמיך, ריחו החריף מסוגל להתפשט למרחק של קילומטר שלם.",
     dexNumber: 89,
     types: ["poison"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 105,
@@ -1776,7 +1776,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קונכייה קשה ביותר וקוצים חדים, נחשב לאחד הפוקימונים המוגנים ביותר.",
     dexNumber: 91,
     types: ["water", "ice"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 50,
@@ -1796,7 +1796,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון צל שמתחבא בחשכה, נאמר שהוא מנסה לגנוב את צילם של מי שהוא רודף.",
     dexNumber: 94,
     types: ["ghost", "poison"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 60,
@@ -1836,7 +1836,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם מטוטלת מהפנטת, מסוגל להרדים אנשים תוך שניות בודדות.",
     dexNumber: 97,
     types: ["psychic"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 85,
@@ -1856,7 +1856,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון סרטן עם צבת ענקית וכבדה, מתקשה לפעמים לתפעל אותה בדיוק הרצוי.",
     dexNumber: 99,
     types: ["water"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 55,
@@ -1896,7 +1896,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עגול טעון חשמל סטטי, מתפוצץ בעוצמה רבה כשהוא נדחק לפינה.",
     dexNumber: 101,
     types: ["electric"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -1936,7 +1936,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון דקל עם שלושה ראשים, כל ראש חושב בנפרד וחולק על השאר לעיתים.",
     dexNumber: 103,
     types: ["grass", "psychic"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 95,
@@ -1956,7 +1956,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שנושא עצם של אמו כנשק, למד לשלוט בה כמו לוחם מיומן.",
     dexNumber: 105,
     types: ["ground"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 60,
@@ -1976,7 +1976,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם רגליים שיכולות להתארך זמנית, מתמחה בבעיטות עוצמתיות.",
     dexNumber: 106,
     types: ["fighting"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 50,
@@ -1996,7 +1996,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם אגרופים מהירים ומדויקים, מזכיר אגרופן מקצועי בכל תנועה.",
     dexNumber: 107,
     types: ["fighting"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 50,
@@ -2016,7 +2016,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם לשון ארוכה במיוחד, מלקק כל דבר שסקרן אותו כדי לחקור אותו.",
     dexNumber: 108,
     types: ["normal"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 90,
@@ -2056,7 +2056,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם שני ראשי גז מחוברים, מערבב גזים שונים כדי ליצור ריחות רעילים.",
     dexNumber: 110,
     types: ["poison"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 65,
@@ -2076,7 +2076,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם עור עבה כשריון, כה חסר תבונה שהוא שוכח למה התחיל לרוץ.",
     dexNumber: 111,
     types: ["ground", "rock"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 80,
@@ -2116,7 +2116,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון נדיר ועדין, נושא ביצה שמעניקה אושר לכל מי שמצליח לקבל אותה במתנה.",
     dexNumber: 113,
     types: ["normal"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 250,
@@ -2156,7 +2156,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם כיס בבטנה, שומרת על גורה הקטן בכיס לאורך כל חייו הראשונים.",
     dexNumber: 115,
     types: ["normal"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 105,
@@ -2196,7 +2196,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם קוצי רעל על גבו, שוחה לאחור כדי לשמור על עינו על הטורף.",
     dexNumber: 117,
     types: ["water"],
-    rarity: "rare",
+    rarity: "common",
 
     baseStats: {
       health: 55,
@@ -2236,7 +2236,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון דג עם קרן משוננת, חופר בקרקעית הנהר כדי להטיל את ביציו בבטחה.",
     dexNumber: 119,
     types: ["water"],
-    rarity: "very-rare",
+    rarity: "common",
 
     baseStats: {
       health: 80,
@@ -2256,7 +2256,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון בצורת כוכב ים, מרכזו הזוהר מהבהב באור אדום כשהוא פעיל בלילה.",
     dexNumber: 120,
     types: ["water"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 30,
@@ -2276,7 +2276,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון בצורת כוכב סובב, ליבתו השקופה זוהרת בכל צבעי הקשת בלילה.",
     dexNumber: 121,
     types: ["water", "psychic"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 60,
@@ -2296,7 +2296,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שמבצע פנטומימה, יוצר קירות בלתי נראים באוויר בעזרת תנועות ידיים מדויקות.",
     dexNumber: 122,
     types: ["psychic", "fairy"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 40,
@@ -2316,7 +2316,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם טפריים חדים כתער, נע במהירות רבה כל כך שנראה כמעט בלתי נראה.",
     dexNumber: 123,
     types: ["bug", "flying"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 70,
@@ -2336,7 +2336,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שנע בקצב, נדמה כאילו הוא רוקד כשהוא הולך על שני רגליו.",
     dexNumber: 124,
     types: ["ice", "psychic"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 65,
@@ -2396,7 +2396,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם צבתות ענקיות, מסוגל להרים ולזרוק יריב הכבד ממנו פי כמה.",
     dexNumber: 127,
     types: ["bug"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 65,
@@ -2416,7 +2416,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שור פראי, מצליף בעצמו עם שלושת הזנבות שלו כדי להעלות מוטיבציה לפני מתקפה.",
     dexNumber: 128,
     types: ["normal"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 75,
@@ -2436,7 +2436,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון ענק וזועם, ידוע בהיסטוריה שלו כאחראי להרס כפרים שלמים כשהתעצבן.",
     dexNumber: 130,
     types: ["water", "flying"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 95,
@@ -2456,7 +2456,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עדין וחכם, נושא נוסעים על גבו ושר שירה יפהפייה מעל פני המים.",
     dexNumber: 131,
     types: ["water", "ice"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 130,
@@ -2476,7 +2476,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שיכול לשנות את גופו ולהפוך לכל יצור שהוא רואה, בדיוק בצורתו ובכוחו.",
     dexNumber: 132,
     types: ["normal"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 48,
@@ -2496,7 +2496,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עם מבנה גנטי בלתי יציב, מסוגל להתפתח לצורות שונות בהתאם לסביבתו.",
     dexNumber: 133,
     types: ["normal"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 55,
@@ -2576,7 +2576,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון מלאכותי שנוצר לחלוטין בטכנולוגיית מחשב, מסוגל לנוע בתוך מרחב וירטואלי.",
     dexNumber: 137,
     types: ["normal"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 65,
@@ -2596,7 +2596,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון קדום שהוחיה מאובן, שוחה במים על ידי משיכת קרביו לתוך קונכייתו.",
     dexNumber: 138,
     types: ["rock", "water"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 35,
@@ -2616,7 +2616,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון קדום עם קונכייה מפותלת כבדה, נכחד ככל הנראה בגלל משקלה הרב.",
     dexNumber: 139,
     types: ["rock", "water"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 70,
@@ -2636,7 +2636,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון קדום שהוחיה מאובן, כמעט ולא השתנה במשך שלוש מאות מיליון שנה.",
     dexNumber: 140,
     types: ["rock", "water"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 30,
@@ -2656,7 +2656,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון קדום מהיר, חתך את טרפו בעזרת סכיניים חדים והתיז את הנוזלים שבפנים.",
     dexNumber: 141,
     types: ["rock", "water"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 60,
@@ -2676,7 +2676,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון קדום ועתיק, הוחיה מדגימת ענבר ונחשב לשליט השמיים הפראי מלפני אלפי שנים.",
     dexNumber: 142,
     types: ["rock", "flying"],
-    rarity: "common",
+    rarity: "rare",
 
     baseStats: {
       health: 80,
@@ -2696,7 +2696,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עצום שאוכל כשמונה מאות קילו ביום ואז נרדם בדיוק במקום שבו הוא עומד.",
     dexNumber: 143,
     types: ["normal"],
-    rarity: "very-rare",
+    rarity: "rare",
 
     baseStats: {
       health: 160,
@@ -2776,7 +2776,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון דרקון עדין, מפשיל את עורו שוב ושוב וגדל בכל פעם קצת יותר.",
     dexNumber: 147,
     types: ["dragon"],
-    rarity: "common",
+    rarity: "very-rare",
 
     baseStats: {
       health: 41,
@@ -2796,7 +2796,7 @@ export const POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון דרקון מסתורי, נאמר שהוא מסוגל לשנות את מזג האוויר בכוחו הפנימי.",
     dexNumber: 148,
     types: ["dragon"],
-    rarity: "rare",
+    rarity: "very-rare",
 
     baseStats: {
       health: 61,
