@@ -6,7 +6,7 @@ const NAVIGATION_ITEMS = [
   { title: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },
   { title: "תיק ציוד", icon: "🎒", comingSoon: true },
   { title: "פוקידקס", icon: "📖", comingSoon: true },
-  { title: "חנות", icon: "🛒", comingSoon: true },
+  { title: "חנות", icon: "🛒", href: "/shop" },
 ] as const;
 
 export function NavigationGrid() {

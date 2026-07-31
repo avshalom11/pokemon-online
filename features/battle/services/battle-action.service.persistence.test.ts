@@ -14,6 +14,7 @@ import { test, beforeEach } from "node:test";
 
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { executeBattleAction, type BattleActionType } from "@/features/battle/services/battle-action.service";
+import { getJerusalemDateKey } from "@/features/daily-battles/services/daily-battle-count.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import {
   resetFakeDb,
@@ -24,6 +25,9 @@ import {
   getFieldBattleSessionRow,
   getPlayerPokemonRow,
   getPlayerPokemonUpdateCallCount,
+  getDailyBattleCountRow,
+  getPlayerProfileRow,
+  getNotificationsFor,
 } from "../../../test/support/fakes/prisma.fake.ts";
 
 const ZONE_ID = "grassland";
@@ -453,13 +457,41 @@ test("defeating the wild grants the reward, ends the encounter without a counter
   assert.ok(result.experienceGranted?.player);
   assert.ok(Array.isArray(result.experienceGranted?.pokemon));
 
-  assert.equal(getFieldBattleSessionRow("owner-1")?.wildDefeatRewardGranted, true);
+  // MAX_ROLL_RANDOM_SOURCE is a constant 0.999999 — it also feeds the
+  // currency reward's own drop-chance rolls (syncWildHp threads its
+  // randomSource all the way through to grantFieldBattleCurrencyRewards),
+  // which is above both money's (0.85) and gold's (0.05) dropChance, so
+  // this exact call is a guaranteed currency miss. Confirms the reward is
+  // correctly wired into the real call chain without breaking anything —
+  // rollCurrencyReward/grantCurrencyRewards's own hit-path behavior is
+  // covered in isolation by features/currency's own test suite.
+  assert.equal(getPlayerProfileRow("owner-1")?.coins, 500, "a guaranteed currency miss must never change coins");
+  assert.equal(getPlayerProfileRow("owner-1")?.gold, 0, "a guaranteed currency miss must never change gold");
+  assert.equal(getNotificationsFor("owner-1").filter((n) => n.type.startsWith("CURRENCY_")).length, 0);
 
-  // Re-submitting against the now-already-defeated wild must never grant a
-  // second reward — the battle is inactive from here until the encounter
-  // advances.
+  // The already-prepared next encounter is promoted in this exact same
+  // call — no second round trip, no separate "advance" request — so the
+  // session is immediately active again against a fresh wild rather than
+  // sitting at 0 HP. wildDefeatRewardGranted is back to false because the
+  // *new* encounter's own reward hasn't been claimed yet, not because the
+  // one just granted above was ever undone.
+  assert.ok(result.promotedWild, "the pre-generated next encounter must be promoted immediately");
+  const sessionRow = getFieldBattleSessionRow("owner-1");
+  assert.equal(sessionRow?.wildDefeatRewardGranted, false);
+  assert.ok(sessionRow && sessionRow.wildCurrentHp > 0, "the promoted wild starts at full HP, never 0");
+  assert.equal(sessionRow?.wildSpeciesId, result.promotedWild?.pokemon.id);
+
+  // The promoted encounter becoming the active battle is one of the daily
+  // counter's exactly two increment points (the other is session
+  // creation) — exactly 1 for today, not 0 (never incremented) or 2
+  // (double-counted by this single promotion).
+  assert.equal(getDailyBattleCountRow("owner-1", getJerusalemDateKey())?.count, 1);
+
+  // Re-submitting immediately attacks the newly-promoted wild rather than
+  // being rejected — the encounter genuinely advanced, it didn't just sit
+  // inactive waiting for a separate call.
   const retry = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl");
-  assert.deepEqual(retry, { status: "battle-inactive" });
+  assert.equal(retry.status, "success");
 });
 
 test("the wild's counter-attack ending the player's only usable Pokémon ends the battle and deletes the session", async () => {

@@ -7,6 +7,8 @@ import { ZONE_DATA } from "@/data/zones/zone-data";
 import { ALL_STAT_NAMES } from "@/engine/moves";
 import type { StatStages } from "@/features/battle/stats/stat-stages";
 import { resetVolatileOnSwitch, type VolatileState } from "@/features/battle/volatile/volatile-condition.types";
+import { grantFieldBattleCurrencyRewards } from "@/features/currency/services/field-battle-currency-reward.service";
+import { incrementDailyBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getFirstUsableMember, hasUsableMember, isUsable } from "@/features/party/utils/party-rules";
@@ -178,6 +180,11 @@ interface PersistedSessionRow {
   wildLevel: number;
   wildCurrentHp: number;
   wildMaxHp: number;
+  // Only the species needs checking here (see restoreFromRow) — the row is
+  // treated as stale/invalid the same way a missing wild species already is
+  // if this doesn't resolve, so a restored battle is never one promotion
+  // away from a broken "next" encounter.
+  nextWildSpeciesId: string;
   activePlayerPokemonId: string;
 }
 
@@ -192,6 +199,13 @@ function restoreFromRow(row: PersistedSessionRow, party: OwnedPokemon[]): Restor
 
   const species = getSpeciesById(row.wildSpeciesId);
   if (!species) return null;
+
+  // The pre-generated "next" encounter must resolve too — a restored
+  // battle is only ever handed back once it's genuinely one encounter
+  // ahead again (see the model's own nextWild* doc comment); a row missing
+  // that guarantee is exactly as stale/invalid as one with a broken
+  // current wild.
+  if (!getSpeciesById(row.nextWildSpeciesId)) return null;
 
   // The active battler must still be owned by this player and currently in
   // their party — covers "removed from party", "released", and "row
@@ -257,6 +271,13 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
   const starter = party[0];
   const activePokemon = isUsable(starter) ? starter : getFirstUsableMember(party)!;
   const wild = resolveWildEncounter(requestedZoneId);
+  // The session is created already one encounter ahead — see the model's
+  // own nextWild* doc comment. resolveWildEncounter is a pure, in-memory
+  // weighted pick (no I/O), so precomputing this second encounter up front
+  // costs nothing measurable; it just guarantees a promotion is always
+  // instant, from the very first encounter of the session onward, never
+  // only after the first defeat.
+  const nextWild = resolveWildEncounter(requestedZoneId);
 
   await prisma.fieldBattleSession.create({
     data: {
@@ -266,6 +287,10 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
       wildLevel: wild.level,
       wildCurrentHp: wild.currentHealth,
       wildMaxHp: wild.maximumHealth,
+      nextWildSpeciesId: nextWild.pokemon.id,
+      nextWildLevel: nextWild.level,
+      nextWildCurrentHp: nextWild.currentHealth,
+      nextWildMaxHp: nextWild.maximumHealth,
       activePlayerPokemonId: activePokemon.id,
       // The starting active Pokémon is a participant in this first
       // encounter from the moment the session exists — see
@@ -273,6 +298,11 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
       participants: serializeParticipants([{ playerPokemonId: activePokemon.id, fainted: false, order: 0 }]),
     },
   });
+
+  // The daily battle counter deliberately does NOT increment here — see
+  // promoteToNextEncounter's own doc comment for the one true increment
+  // point. Merely starting a session (or restoring one on refresh/reopen)
+  // is not a victory; only actually defeating a wild Pokémon counts.
 
   return {
     status: "ready",
@@ -306,7 +336,18 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
 // below, which already re-validates ownership/party-membership server-side
 // before persisting it (sync-active-pokemon.action.ts) — so trusting it
 // here carries that same validation forward rather than re-doing it.
-export async function syncWildHp(playerId: string, zoneId: ZoneId, currentHp: number): Promise<BattleVictoryReward | null> {
+export async function syncWildHp(
+  playerId: string,
+  zoneId: ZoneId,
+  currentHp: number,
+  // Test-only seam, same convention executeBattleAction's own randomSource
+  // param already establishes (battle-action.service.ts) — production
+  // callers never pass this, so the currency roll falls back to
+  // Math.random. Threaded through here purely so a test can pin both the
+  // turn's combat rolls and the currency roll to one deterministic
+  // sequence, without needing two separate stubbing mechanisms.
+  randomSource?: () => number
+): Promise<BattleVictoryReward | null> {
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
   if (!session || session.zoneId !== zoneId) return null;
 
@@ -341,6 +382,13 @@ export async function syncWildHp(playerId: string, zoneId: ZoneId, currentHp: nu
       finisherId: session.activePlayerPokemonId,
       source: "wildBattleVictory",
     });
+
+    // Money/gold — same confirmed-victory guarantee as the XP grants above
+    // (this whole branch only ever runs once, having just claimed
+    // wildDefeatRewardGranted): never fires for an escape, a loss, a
+    // capture, or a refresh. See field-battle-currency-reward.service.ts's
+    // own doc comment for the full reward flow.
+    await grantFieldBattleCurrencyRewards(tx, playerId, species.name, randomSource);
 
     return { player, pokemon };
   });
@@ -437,12 +485,33 @@ export async function endBattleSession(playerId: string): Promise<void> {
   await prisma.fieldBattleSession.deleteMany({ where: { playerId } });
 }
 
-// Defeating a wild Pokémon and continuing in the same zone reuses the same
-// session row — only the wild* fields are overwritten — rather than ending
-// and recreating it, so party HP and the active Pokémon carry over
-// untouched. Returns null if there's no matching session to advance
-// (stale/duplicate call after the session already ended), so a caller can
-// never generate a second encounter against a session that isn't there.
+// The result of promoting the pre-generated "next" encounter into place —
+// both halves of the model's own one-ahead invariant: `wild` is what the
+// player now faces (already fully resolved before this call ever ran —
+// see the model's nextWild* doc comment), `nextWild` is its freshly
+// resolved replacement, so the session is immediately one-ahead again the
+// instant this returns.
+export interface AdvancedEncounter {
+  wild: EncounterResult;
+  nextWild: EncounterResult;
+}
+
+// Promotes the already-prepared next encounter (nextWild* on the session
+// row) into the current one, and resolves a brand new replacement for that
+// slot in the same write — called the instant a wild faints (see
+// battle-action.service.ts), inside the SAME request that resolved the
+// killing blow. resolveWildEncounter runs here only to refill the *next*
+// slot; it is never what produces the encounter this call hands back, so
+// there is no "generate, then wait" step on this path at all — the
+// generation for what's returned already happened, earlier, off the
+// critical path (session creation or the previous promotion).
+//
+// Continuing in the same zone reuses the same session row — only the
+// wild*/nextWild* fields are overwritten — rather than ending and
+// recreating it, so party HP and the active Pokémon carry over untouched.
+// Returns null if there's no matching session to advance (stale/duplicate
+// call after the session already ended), so a caller can never promote
+// into a session that isn't there.
 //
 // Also resets `participants` back to just the current active Pokémon —
 // participation is scoped to one encounter (see BattleParticipantRecord's
@@ -450,38 +519,76 @@ export async function endBattleSession(playerId: string): Promise<void> {
 // here: a Pokémon that fought (or merely appeared for) an earlier,
 // already-defeated wild in this same zone session must never remain
 // "eligible" for a completely different wild's reward.
-export async function advanceToNextEncounter(playerId: string, zoneId: ZoneId): Promise<EncounterResult | null> {
+//
+// This is also the daily battle counter's one true increment point (see
+// features/daily-battles/services/daily-battle-count.service.ts) — it only
+// ever runs from battle-action.service.ts's wildFainted && !battleEnded
+// branch, i.e. exactly when the player has just genuinely defeated a wild
+// Pokémon and the encounter is advancing, never on session start/restore
+// (getOrStartBattle), escape, capture, or a party wipe. The updateMany's
+// `wildCurrentHp: 0` WHERE guard is the same "claim, then act" idiom
+// syncWildHp's wildDefeatRewardGranted guard already uses: a racing or
+// retried call for the exact same kill finds the row already promoted
+// (nonzero wildCurrentHp) and matches 0 rows, so it can never promote a
+// second time or increment the counter twice for one victory. Wrapped in a
+// transaction so the promotion and the increment either both happen or
+// neither does.
+export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId): Promise<AdvancedEncounter | null> {
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
   if (!session || session.zoneId !== zoneId) return null;
 
-  const wild = resolveWildEncounter(zoneId);
+  const promotedSpecies = getSpeciesById(session.nextWildSpeciesId);
+  if (!promotedSpecies) return null;
 
-  const updated = await prisma.fieldBattleSession.updateMany({
-    where: { playerId, zoneId },
-    data: {
-      wildSpeciesId: wild.pokemon.id,
-      wildLevel: wild.level,
-      wildCurrentHp: wild.currentHealth,
-      wildMaxHp: wild.maximumHealth,
-      wildDefeatRewardGranted: false,
-      participants: serializeParticipants([{ playerPokemonId: session.activePlayerPokemonId, fainted: false, order: 0 }]),
-      // Phase 6E/6F: a new wild is a genuinely new battle instance — stat
-      // stages (both sides) and the *wild's own* status/sleep-counter
-      // never carry over from the encounter that just ended. The
-      // player's own PlayerPokemon.status is untouched (it persists on
-      // the Pokémon itself, unrelated to which wild it's currently
-      // fighting).
-      wildStatStages: EMPTY_STAT_STAGES,
-      playerStatStages: EMPTY_STAT_STAGES,
-      wildStatus: null,
-      wildStatusTurnsRemaining: null,
-      // Phase 7: a new wild is a genuinely new battle instance for
-      // Volatile Conditions too — neither side carries confusion, Leech
-      // Seed, trapping, etc. into a fresh encounter.
-      wildVolatileState: EMPTY_VOLATILE_STATE,
-      playerVolatileState: EMPTY_VOLATILE_STATE,
-    },
+  const wild: EncounterResult = {
+    zoneId,
+    pokemon: promotedSpecies,
+    level: session.nextWildLevel,
+    currentHealth: session.nextWildCurrentHp,
+    maximumHealth: session.nextWildMaxHp,
+  };
+  const nextWild = resolveWildEncounter(zoneId);
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.fieldBattleSession.updateMany({
+      // wildCurrentHp: 0 — only a session whose current wild is still
+      // exactly where the lethal hit left it gets promoted; see this
+      // function's own doc comment for why that's what makes a racing
+      // duplicate call safe.
+      where: { playerId, zoneId, wildCurrentHp: 0 },
+      data: {
+        wildSpeciesId: wild.pokemon.id,
+        wildLevel: wild.level,
+        wildCurrentHp: wild.currentHealth,
+        wildMaxHp: wild.maximumHealth,
+        nextWildSpeciesId: nextWild.pokemon.id,
+        nextWildLevel: nextWild.level,
+        nextWildCurrentHp: nextWild.currentHealth,
+        nextWildMaxHp: nextWild.maximumHealth,
+        wildDefeatRewardGranted: false,
+        participants: serializeParticipants([{ playerPokemonId: session.activePlayerPokemonId, fainted: false, order: 0 }]),
+        // Phase 6E/6F: a new wild is a genuinely new battle instance — stat
+        // stages (both sides) and the *wild's own* status/sleep-counter
+        // never carry over from the encounter that just ended. The
+        // player's own PlayerPokemon.status is untouched (it persists on
+        // the Pokémon itself, unrelated to which wild it's currently
+        // fighting).
+        wildStatStages: EMPTY_STAT_STAGES,
+        playerStatStages: EMPTY_STAT_STAGES,
+        wildStatus: null,
+        wildStatusTurnsRemaining: null,
+        // Phase 7: a new wild is a genuinely new battle instance for
+        // Volatile Conditions too — neither side carries confusion, Leech
+        // Seed, trapping, etc. into a fresh encounter.
+        wildVolatileState: EMPTY_VOLATILE_STATE,
+        playerVolatileState: EMPTY_VOLATILE_STATE,
+      },
+    });
+
+    if (updated.count === 0) return null;
+
+    await incrementDailyBattleCount(tx, playerId);
+
+    return { wild, nextWild };
   });
-
-  return updated.count > 0 ? wild : null;
 }

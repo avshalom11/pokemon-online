@@ -50,10 +50,6 @@ export function throwPokeballMessage(playerName: string, wildName: string): stri
   return `${playerName} זרק פוכדור על ${wildName}!`;
 }
 
-export function captureFailedMessage(wildName: string): string {
-  return `${wildName} השתחרר מהפוכדור!`;
-}
-
 export function captureSucceededMessage(wildName: string): string {
   return `${wildName} נתפס בהצלחה!`;
 }

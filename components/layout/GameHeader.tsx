@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { ExperienceBar } from "@/components/battle/ExperienceBar";
+import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import type { NotificationBellData } from "@/features/notifications/types";
 import { usePlayerProgression } from "@/features/player/context/player-progression-context";
@@ -72,8 +73,8 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <ResourcePill color="#facc15" label={player.coins.toLocaleString("he-IL")} title="מטבעות" />
-          <ResourcePill color="#f59e0b" label={player.gold.toLocaleString("he-IL")} title="זהב" shape="diamond" />
+          <ResourcePill icon={<CurrencyIcon type="money" />} label={player.coins.toLocaleString("he-IL")} title="מטבעות" />
+          <ResourcePill icon={<CurrencyIcon type="gold" />} label={player.gold.toLocaleString("he-IL")} title="זהב" />
 
           <NotificationBell initial={notifications} />
           <IconButton title="הגדרות">
@@ -104,22 +105,23 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
 }
 
 interface ResourcePillProps {
-  color: string;
+  icon: ReactNode;
   label: string;
   title: string;
-  shape?: "circle" | "diamond";
 }
 
-function ResourcePill({ color, label, title, shape = "circle" }: ResourcePillProps) {
+// Icon-agnostic shell — both current callers pass a CurrencyIcon
+// (features/currency/components/CurrencyIcon.tsx), which is what actually
+// owns each currency's color/shape, so both pills stay visually
+// consistent (same size, shape, spacing, glow) automatically rather than
+// this component re-deriving that styling itself.
+function ResourcePill({ icon, label, title }: ResourcePillProps) {
   return (
     <div
       title={title}
       className="flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-100 sm:px-2.5 sm:text-sm"
     >
-      <span
-        className={shape === "diamond" ? "h-2.5 w-2.5 rotate-45" : "h-2.5 w-2.5 rounded-full"}
-        style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}aa` }}
-      />
+      {icon}
       {label}
     </div>
   );

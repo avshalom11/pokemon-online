@@ -1,6 +1,8 @@
 import { AchievementsPanel } from "./AchievementsPanel";
+import { DailyBattleCounter } from "./DailyBattleCounter";
 import { NavigationGrid } from "./NavigationGrid";
 import { NewsPanel } from "./NewsPanel";
+import { RefreshHomeOnMount } from "./RefreshHomeOnMount";
 import { StatisticsPanel } from "./StatisticsPanel";
 import { PartySection } from "@/features/pokemon/components/PartySection";
 import type { HomeViewData } from "@/features/home/services/home-data.service";
@@ -26,7 +28,11 @@ export function HomeContent({ data }: HomeContentProps) {
         }}
       />
 
+      <RefreshHomeOnMount />
+
       <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <DailyBattleCounter count={data.dailyBattleCount} />
+
         <PartySection party={data.party} />
 
         <NavigationGrid />

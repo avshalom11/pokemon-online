@@ -47,27 +47,29 @@ model User {
 // and the standard hardening option (a citext column or a functional
 // LOWER(username) unique index) if stronger defense-in-depth is ever wanted.
 model PlayerProfile {
-  id                  String              @id @default(cuid())
-  userId              String              @unique
-  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName         String
-  level               Int                 @default(1)
-  experience          Int                 @default(0)
+  id                     String                  @id @default(cuid())
+  userId                 String                  @unique
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName            String
+  level                  Int                     @default(1)
+  experience             Int                     @default(0)
   // Rare/premium currency. Renamed from `gems` — that system was never read
   // or written by any gameplay logic (display-only), and the project's
   // earlier separate `gold` column was equally dead, so this replaces both
   // rather than the game having three currency-ish fields. `coins` (below)
   // is the only other currency.
-  gold                Int                 @default(0)
-  energy              Int                 @default(100)
-  onboardingCompleted Boolean             @default(false)
-  starterPokemonId    String?
-  coins               Int                 @default(500)
-  pokemon             PlayerPokemon[]
-  fieldBattleSession  FieldBattleSession?
-  notifications       Notification[]
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  gold                   Int                     @default(0)
+  energy                 Int                     @default(100)
+  onboardingCompleted    Boolean                 @default(false)
+  starterPokemonId       String?
+  coins                  Int                     @default(500)
+  pokemon                PlayerPokemon[]
+  fieldBattleSession     FieldBattleSession?
+  notifications          Notification[]
+  dailyFieldBattleCounts DailyFieldBattleCount[]
+  inventoryItems         PlayerInventoryItem[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
   @@map("player_profile")
 }
@@ -260,11 +262,25 @@ model FieldBattleSession {
 
   // Whether the player-XP reward for the *current* wild encounter in this
   // row has already been granted — reset to false every time a new wild is
-  // set (session creation, and advanceToNextEncounter). Lets the HP-zero
+  // set (session creation, and promoteToNextEncounter). Lets the HP-zero
   // moment grant XP exactly once even under duplicate/racing requests,
   // without a separate reward ledger table. See
   // battle-session.service.ts's syncWildHp.
   wildDefeatRewardGranted Boolean @default(false)
+
+  // The already-resolved encounter waiting to be promoted the instant the
+  // current wild faints — same fields/meaning as wild*/above, one encounter
+  // ahead. Always populated (session creation and every promotion both fill
+  // this alongside wild* itself) so there is never a moment where "next" is
+  // still being generated: promoteToNextEncounter (battle-session.service.ts)
+  // only ever copies these columns into wild* and immediately resolves a
+  // fresh replacement for this slot, in the same request/transaction that
+  // detected the faint — the server never generates an encounter reactively
+  // on the critical path, only ever to refill this one-ahead buffer.
+  nextWildSpeciesId String
+  nextWildLevel     Int
+  nextWildCurrentHp Int
+  nextWildMaxHp     Int
 
   // Every owned Pokémon that has actually entered the *current* wild
   // encounter (become activePlayerPokemonId at least once since the wild
@@ -284,7 +300,7 @@ model FieldBattleSession {
 
   // Phase 6E/6F — battle-local state for the current wild encounter only,
   // reset whenever a new wild is set (session creation and
-  // advanceToNextEncounter), exactly like wildDefeatRewardGranted/
+  // promoteToNextEncounter), exactly like wildDefeatRewardGranted/
   // participants above. Stat stages (-6..+6 per stat) never touch
   // PlayerPokemon/species data — they're pure in-battle UI state, unlike
   // status above which genuinely persists on the Pokémon itself.
@@ -332,6 +348,38 @@ model FieldBattleSession {
   @@map("field_battle_session")
 }
 
+// A player's wild-Pokémon-victory count for one Asia/Jerusalem calendar
+// day — incremented exactly once per wild Pokémon actually defeated (see
+// features/daily-battles/services/daily-battle-count.service.ts and its
+// one caller, promoteToNextEncounter in battle-session.service.ts). Never
+// incremented by starting or restoring a session (a page refresh/reopen),
+// escaping, capturing, the player's own party fainting, or nextWild merely
+// being pre-generated — only a confirmed wild-victory that promotes the
+// encounter counts, and a racing/retried request for that same victory can
+// never count it twice (see promoteToNextEncounter's own guard).
+//
+// `date` is a plain "YYYY-MM-DD" string in Asia/Jerusalem — computed fresh
+// from the current time on every read/write, not reset by any scheduled
+// job: the day simply rolls over to a new (initially absent) row the
+// instant the Jerusalem calendar date changes, so "starts again from 0 at
+// midnight" falls out for free. Historical rows are never deleted or
+// overwritten — this table is an append-over-time log, one row per
+// player per day, kept for future statistics.
+model DailyFieldBattleCount {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  date  String
+  count Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, date])
+  @@map("daily_field_battle_count")
+}
+
 // Persistent, player-facing notifications for non-blocking meta/progression
 // events (level-ups now; item finds, move learns, evolutions, quests,
 // achievements later — see features/notifications/types.ts's
@@ -363,6 +411,33 @@ model Notification {
   @@index([playerId, isRead])
   @@index([playerId, createdAt])
   @@map("notification")
+}
+
+// One row per (player, shop item) the player has ever purchased at least
+// one of — quantity-only ownership record for consumable/held items bought
+// from the Shop (features/shop). itemId resolves against the static shop
+// catalog (features/shop/data/shop-items.ts), same precedent as every other
+// *Id field in this file that references a static data catalog instead of
+// a DB table (PlayerPokemon.speciesId, PlayerKnownMove.moveId, ...) — so
+// adding a new purchasable item is a data-only change, never a migration.
+// Deliberately its own model rather than nested JSON on PlayerProfile: other
+// systems (e.g. using a Potion mid-battle) will need to read/write one
+// item's quantity independently, the same reasoning PlayerPokemon already
+// gets its own table instead of living on PlayerProfile.
+model PlayerInventoryItem {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  itemId   String
+  quantity Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, itemId])
+  @@index([playerId])
+  @@map("player_inventory_item")
 }
 
 model Session {

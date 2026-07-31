@@ -12,7 +12,6 @@ import { RarityWarningBanner } from "@/components/battle/RarityWarningBanner";
 import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { executeBattleActionAction } from "@/features/battle/actions/battle-action.action";
 import { attemptCaptureAction } from "@/features/battle/actions/capture.action";
-import { getNextEncounterAction } from "@/features/battle/actions/next-encounter.action";
 import { syncPartyHpAction } from "@/features/battle/actions/sync-party-hp.action";
 import type { BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { endBattleSessionAction } from "@/features/battle-session/actions/end-battle-session.action";
@@ -21,7 +20,6 @@ import type { BattleVictoryReward } from "@/features/battle-session/services/bat
 import type { BattleVolatileSummary } from "@/features/battle/services/battle-action.service";
 import {
   attackMessage,
-  captureFailedMessage,
   captureSucceededMessage,
   escapeMessage,
   forcedReplacementMessage,
@@ -32,12 +30,7 @@ import {
 } from "@/features/battle/utils/battle-messages";
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
-import {
-  ATTACK_MESSAGE_DURATION_MS,
-  HIT_FLASH_DURATION_MS,
-  NEXT_ENCOUNTER_DELAY_MS,
-  XP_TOAST_DURATION_MS,
-} from "@/features/battle/utils/battle-timing";
+import { HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
 import { PartySelector } from "@/features/party/components/PartySelector";
 import { canSwitchTo } from "@/features/party/utils/party-rules";
 import { getPlayerProgressAction } from "@/features/player/actions/get-player-progression.action";
@@ -66,6 +59,11 @@ interface BattleContentProps {
   // The authenticated trainer's own name (never hardcoded) — used only for
   // the "<name> threw a Poké Ball at <wild name>!" capture message.
   playerName: string;
+  // Every front-sprite URL this zone could ever roll (see
+  // getZoneFrontSpriteUrls, features/battle/services/battle-view.service.ts)
+  // — preloaded at idle time on mount so a new wild encounter's sprite is
+  // already cached by the browser once the transition reveals it.
+  zonePreloadSpriteUrls: string[];
 }
 
 // Explicit battle state machine. "enemyTurn" is set for documentation/
@@ -81,8 +79,6 @@ type BattlePhase =
   | "capturing"
   | "selectingVoluntarySwitch"
   | "selectingForcedReplacement"
-  | "enemyDefeated"
-  | "loadingNextEncounter"
   | "captured"
   | "escaped"
   | "partyDefeated";
@@ -95,20 +91,15 @@ type BattlePhase =
 // features/battle/utils/battle-attack-slots.ts — pure, independently
 // tested, same pattern as battle-turn-rules.ts.
 
-// All battle timing constants (HIT_FLASH_DURATION_MS, ATTACK_MESSAGE_DURATION_MS,
-// NEXT_ENCOUNTER_DELAY_MS, XP_TOAST_DURATION_MS) live in
-// features/battle/utils/battle-timing.ts — see that file for what each one
-// actually protects. ATTACK_MESSAGE_DURATION_MS is reused by every
-// single-step message sequence below that actually has a message worth
-// reading (a non-lethal attack's own line before the wild's counter-attack
-// replaces it, a switch-in message before the wild's guaranteed counter-hit,
-// a failed capture's message before the wild's counter-hit, an escape
-// message before Map replaces this screen) — deliberately one shared
-// constant so all these pauses stay in step by construction rather than
-// drifting independently over time. The one exception is a *lethal* attack
-// (handleAttack's `newWildHp <= 0` branch): no outcome message is ever
-// shown there, so it skips this pause entirely — see that branch's own
-// comment.
+// The two remaining battle timing constants (HIT_FLASH_DURATION_MS,
+// XP_TOAST_DURATION_MS) live in features/battle/utils/battle-timing.ts —
+// both are purely cosmetic and non-blocking (a sprite flash, an
+// auto-dismissing toast), never gating any phase transition. Every message
+// update below is otherwise immediate: an outcome is revealed the instant
+// its server response is processed, with no artificial reveal delay of any
+// kind — responsiveness takes priority over giving each line its own
+// readable beat. The only "wait" left anywhere in this file is real network
+// latency (the awaited Server Action calls themselves), never a timer.
 
 // Phase 7 — the neutral default for a side's Volatile Conditions (nothing
 // active), used both as playerVolatile/enemyVolatile's initial state and
@@ -155,6 +146,7 @@ export function BattleContent({
   activePokemonId,
   knownMovesByPokemonId,
   playerName,
+  zonePreloadSpriteUrls,
 }: BattleContentProps) {
   const router = useRouter();
   const theme = getBattleTheme(zoneId);
@@ -211,7 +203,6 @@ export function BattleContent({
   const [xpToastMessage, setXpToastMessage] = useState<string | null>(null);
   const [isCapturing, startCaptureTransition] = useTransition();
   const [, startHpSyncTransition] = useTransition();
-  const [, startNextEncounterTransition] = useTransition();
   // Phase 4F: the attack button's own request to the Battle Action Service
   // (features/battle/actions/battle-action.action.ts) — distinct from
   // startSessionSyncTransition below, which only ever fires fire-and-forget
@@ -227,24 +218,45 @@ export function BattleContent({
   const [playerHit, setPlayerHit] = useState(false);
   const enemyHitTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerHitTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const nextEncounterTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Single shared ref for every ATTACK_MESSAGE_DURATION_MS pause (attack,
-  // switch, failed capture, escape) — phase-guarding already ensures only
-  // one such sequence can ever be pending at a time, so one ref covers all
-  // of them.
-  const messageStepTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xpToastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
     () => () => {
       if (enemyHitTimeout.current) clearTimeout(enemyHitTimeout.current);
       if (playerHitTimeout.current) clearTimeout(playerHitTimeout.current);
-      if (nextEncounterTimeout.current) clearTimeout(nextEncounterTimeout.current);
-      if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
       if (xpToastTimeout.current) clearTimeout(xpToastTimeout.current);
     },
     []
   );
+
+  // Warms the browser's image cache for every sprite this zone could ever
+  // roll, once, at idle time — so that whenever a new wild Pokémon is
+  // revealed (including the server-promoted encounter after a defeat —
+  // see handleAttack's wildFainted branch), its sprite is very likely
+  // already cached and decodes instantly instead of popping in. Deliberately
+  // fire-and-forget and off the main thread's urgent work
+  // (requestIdleCallback, falling back to a timeout where unsupported):
+  // this must never compete with anything the player is actually waiting
+  // on, only fill otherwise-idle time.
+  useEffect(() => {
+    if (zonePreloadSpriteUrls.length === 0) return;
+
+    const runWhenIdle =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback
+        : (callback: () => void) => window.setTimeout(callback, 200);
+    const cancelIdle =
+      typeof window.cancelIdleCallback === "function" ? window.cancelIdleCallback : window.clearTimeout;
+
+    const handle = runWhenIdle(() => {
+      for (const src of zonePreloadSpriteUrls) {
+        const image = new Image();
+        image.src = src;
+      }
+    });
+
+    return () => cancelIdle(handle as number);
+  }, [zonePreloadSpriteUrls]);
 
   function triggerHit(side: "enemy" | "player") {
     const setHit = side === "enemy" ? setEnemyHit : setPlayerHit;
@@ -404,21 +416,6 @@ export function BattleContent({
     }
   }
 
-  function scheduleNextEncounter() {
-    if (nextEncounterTimeout.current) clearTimeout(nextEncounterTimeout.current);
-    nextEncounterTimeout.current = setTimeout(() => {
-      setPhase("loadingNextEncounter");
-      startNextEncounterTransition(async () => {
-        const nextWild = await getNextEncounterAction(zoneId);
-        if (!nextWild) {
-          handleReturnToMap();
-          return;
-        }
-        startNewEncounter(nextWild);
-      });
-    }, NEXT_ENCOUNTER_DELAY_MS);
-  }
-
   // Resets only enemy-specific state — party HP/active Pokémon are left
   // completely untouched, so consecutive encounters never leak the previous
   // wild Pokémon's HP/hit-flash/message, and never heal or reset the party.
@@ -427,7 +424,7 @@ export function BattleContent({
     setWildStatusState(null);
     // Phase 7 — a new wild is a genuinely new battle instance for
     // Volatile Conditions too (see battle-session.service.ts's
-    // advanceToNextEncounter, which resets both sides' persisted copy the
+    // promoteToNextEncounter, which resets both sides' persisted copy the
     // same way).
     setPlayerVolatile(EMPTY_VOLATILE_SUMMARY);
     setEnemyVolatile(EMPTY_VOLATILE_SUMMARY);
@@ -472,48 +469,48 @@ export function BattleContent({
       setEnemyVolatile(result.enemyVolatile);
       triggerHit("enemy");
 
-      if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
-
       // Lethal hit: no outcome message is ever shown here — no "fainted",
       // no XP, no victory text (see the Core Design Rule: the battle box
       // only ever carries immediate battle events, and gameplay speed is
-      // the top priority for this exact path). So unlike the non-lethal
-      // branch below, this never schedules the ATTACK_MESSAGE_DURATION_MS
-      // "read the outcome" pause — there is nothing to read. The message
-      // box simply keeps showing the attack line until the next
-      // encounter's own wildAppeared message replaces it.
-      // scheduleNextEncounter's own short delay (NEXT_ENCOUNTER_DELAY_MS)
-      // is the *only* remaining pause in this entire path, purely for
-      // visual stability, not reading time.
+      // the top priority for this exact path). result.promotedWild is the
+      // next encounter the server had already prepared in advance (see
+      // promoteToNextEncounter, battle-session.service.ts) and promoted in
+      // this exact same response — switching to it is a plain, synchronous
+      // local state update, never a second round trip or any artificial
+      // delay of any kind.
       if (result.wildFainted) {
-        setPhase("enemyDefeated");
         applyVictoryReward(result.experienceGranted);
-        scheduleNextEncounter();
+
+        if (result.promotedWild) {
+          startNewEncounter(result.promotedWild);
+        } else {
+          // Only ever null on a same-turn double knockout (see
+          // promotedWild's own doc comment) — the session has already
+          // ended server-side, so there is nothing left to advance into.
+          handleReturnToMap();
+        }
         return;
       }
 
       // Non-lethal: the wild's counter-attack outcome was already resolved
-      // server-side in this same call — only *revealing* it is delayed, by
-      // ATTACK_MESSAGE_DURATION_MS, so the player's own attack line stays
-      // readable first, exactly like before.
-      messageStepTimeout.current = setTimeout(() => {
-        // Already persisted server-side by the Battle Action Service — no
-        // syncPartyHpAction call needed here (unlike the switch/failed-
-        // capture counter-attack paths below, which still compute and sync
-        // client-side; that's unchanged, out-of-scope territory for this
-        // phase).
-        setPartyHpMap((prev) => ({ ...prev, [activeId]: result.updatedPartyHp }));
-        triggerHit("player");
+      // server-side in this same call — revealed the instant this response
+      // is processed, no separate reveal delay.
+      // Already persisted server-side by the Battle Action Service — no
+      // syncPartyHpAction call needed here (unlike the switch/failed-
+      // capture counter-attack paths below, which still compute and sync
+      // client-side; that's unchanged, out-of-scope territory for this
+      // phase).
+      setPartyHpMap((prev) => ({ ...prev, [activeId]: result.updatedPartyHp }));
+      triggerHit("player");
 
-        if (!result.partyPokemonFainted) {
-          setPhase("playerTurn");
-          setMessage(attackMessage(wildState.pokemon.name, playerDisplayName));
-          return;
-        }
+      if (!result.partyPokemonFainted) {
+        setPhase("playerTurn");
+        setMessage(attackMessage(wildState.pokemon.name, playerDisplayName));
+        return;
+      }
 
-        setPhase(result.battleEnded ? "partyDefeated" : "selectingForcedReplacement");
-        setMessage(result.battleEnded ? partyDefeatedMessage() : forcedReplacementMessage(playerDisplayName));
-      }, ATTACK_MESSAGE_DURATION_MS);
+      setPhase(result.battleEnded ? "partyDefeated" : "selectingForcedReplacement");
+      setMessage(result.battleEnded ? partyDefeatedMessage() : forcedReplacementMessage(playerDisplayName));
     });
   }
 
@@ -551,19 +548,13 @@ export function BattleContent({
         return;
       }
 
-      // Failed (or a rare server error) — show the failure line first, held
-      // for ATTACK_MESSAGE_DURATION_MS so it's actually readable, then the
-      // wild Pokémon's counter-attack still lands, exactly like a failed
-      // attack would. Phase stays "capturing" (not "playerTurn") for that
-      // whole pause, so it's still impossible to throw a second ball
-      // mid-sequence.
-      setMessage(captureFailedMessage(wildState.pokemon.name));
+      // Failed (or a rare server error) — the wild Pokémon's counter-attack
+      // lands immediately, exactly like a failed attack would; phase stays
+      // "capturing" (not "playerTurn") until resolveCounterAttackAgainstActive
+      // sets its own next phase below, so it's still impossible to throw a
+      // second ball mid-sequence.
       triggerHit("enemy");
-
-      if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
-      messageStepTimeout.current = setTimeout(() => {
-        resolveCounterAttackAgainstActive(activeId, playerDisplayName);
-      }, ATTACK_MESSAGE_DURATION_MS);
+      resolveCounterAttackAgainstActive(activeId, playerDisplayName);
     });
   }
 
@@ -579,21 +570,15 @@ export function BattleContent({
 
     const targetName = target.nickname ?? target.species.name;
     setActiveId(pokemonId);
-    setPhase("enemyTurn");
-    setMessage(switchInMessage(targetName));
     setPlayerVolatile(EMPTY_VOLATILE_SUMMARY);
     startSessionSyncTransition(() => {
       syncActivePokemonAction(pokemonId);
     });
 
     // Consumes the turn: exactly one wild attack lands on the newly-active
-    // Pokémon before control returns to the player — deferred by
-    // ATTACK_MESSAGE_DURATION_MS so the "X, go!" line is readable before
-    // the wild's counter-attack message replaces it.
-    if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
-    messageStepTimeout.current = setTimeout(() => {
-      resolveCounterAttackAgainstActive(pokemonId, targetName);
-    }, ATTACK_MESSAGE_DURATION_MS);
+    // Pokémon immediately — resolveCounterAttackAgainstActive sets its own
+    // phase/message below.
+    resolveCounterAttackAgainstActive(pokemonId, targetName);
   }
 
   function handleForcedReplacementSelect(pokemonId: string) {
@@ -621,8 +606,10 @@ export function BattleContent({
       endBattleSessionAction();
     });
 
-    if (messageStepTimeout.current) clearTimeout(messageStepTimeout.current);
-    messageStepTimeout.current = setTimeout(handleReturnToMap, ATTACK_MESSAGE_DURATION_MS);
+    // No artificial pause here — handleReturnToMap's own router.replace is
+    // real (non-instant) navigation, so the "escaped" message above still
+    // gets a genuine, if brief, on-screen moment while Map's route loads.
+    handleReturnToMap();
   }
 
   function handleMenuAction(actionId: string) {

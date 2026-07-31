@@ -4,11 +4,20 @@
 // carries ephemeral, immediate battle events. See this module's
 // notification-service.ts for where these are created.
 //
-// A one-member union today; grow it here (never with a migration — see the
-// `type` field's own comment in prisma/schema.prisma) as future systems
-// need it: "ITEM_FOUND" | "MOVE_LEARNED" | "POKEMON_EVOLVED" |
-// "QUEST_COMPLETED" | "ACHIEVEMENT_UNLOCKED" | ...
-export type NotificationType = "PLAYER_LEVEL_UP";
+// Grow this union here (never with a migration — see the `type` field's
+// own comment in prisma/schema.prisma) as future systems need it:
+// "ITEM_FOUND" | "MOVE_LEARNED" | "POKEMON_EVOLVED" | "QUEST_COMPLETED" |
+// "ACHIEVEMENT_UNLOCKED" | ...
+//
+// CURRENCY_MONEY_REWARD / CURRENCY_GOLD_REWARD: created by
+// features/currency/services/field-battle-currency-reward.service.ts
+// whenever a confirmed wild-Pokémon victory rolls a currency drop — see
+// that file's own doc comment for exactly when (and, just as importantly,
+// when not).
+//
+// SHOP_PURCHASE: created by features/shop/services/shop-purchase.service.ts
+// on every successful item purchase.
+export type NotificationType = "PLAYER_LEVEL_UP" | "CURRENCY_MONEY_REWARD" | "CURRENCY_GOLD_REWARD" | "SHOP_PURCHASE";
 
 export interface NotificationSummary {
   id: string;

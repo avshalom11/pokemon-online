@@ -5,7 +5,7 @@ import type { MoveCategory, MoveType } from "@/engine/moves";
 import { getOrStartBattle } from "@/features/battle-session/services/battle-session.service";
 import { getKnownMoves } from "@/features/known-moves/known-moves-queries";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
-import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
+import { getZoneFrontSpriteUrls, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { ZoneId } from "@/shared/types/zone";
 
@@ -38,6 +38,13 @@ export interface BattleViewData {
   // elsewhere as "the player's name"), threaded down so BattleContent's
   // capture message never hardcodes a username.
   playerName: string;
+  // Every front-sprite URL this zone could ever roll (see
+  // getZoneFrontSpriteUrls) — resolved server-side from the static
+  // zone/species catalogs so the client never needs to import them itself
+  // just to preload images. BattleContent warms the browser's image cache
+  // with these at idle time so a new wild encounter's sprite is already
+  // cached by the time it's revealed.
+  zonePreloadSpriteUrls: string[];
 }
 
 // Resolves one Pokémon's Known Moves against the Move Registry, preserving
@@ -102,6 +109,7 @@ export async function getBattleViewData(userId: string, zoneId: ZoneId): Promise
       activePokemonId: result.battle.activePokemonId,
       knownMovesByPokemonId,
       playerName: profile.displayName,
+      zonePreloadSpriteUrls: getZoneFrontSpriteUrls(zoneId),
     },
   };
 }

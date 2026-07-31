@@ -10,12 +10,14 @@ import {
 } from "@/engine/damage";
 import { getStartingKnownMoves } from "@/engine/known-moves";
 import { getMoveById, type Move, type MoveEffect } from "@/engine/moves";
+import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { selectEnemyMove } from "@/features/battle/ai/select-enemy-move";
 import {
   endBattleSession,
   markParticipantFainted,
   parseStatStages,
   parseVolatileState,
+  promoteToNextEncounter,
   serializeStatStages,
   serializeVolatileState,
   syncWildHp,
@@ -86,7 +88,7 @@ function isVolatileEffect(effect: MoveEffect): boolean {
 // Phase 6E: stat stages (-6..+6) are battle-local only — stored on
 // FieldBattleSession (wildStatStages for the wild, playerStatStages for
 // whichever Pokémon is currently active), reset on switch
-// (syncActivePokemon) and on a new encounter (advanceToNextEncounter).
+// (syncActivePokemon) and on a new encounter (promoteToNextEncounter).
 // Speed stages affect turn order below; Attack/Defense/SpecialAttack/
 // SpecialDefense stages are applied inside resolveAttackDamage
 // (battle-damage-rules.ts) rather than duplicating the damage formula.
@@ -213,6 +215,18 @@ export interface BattleActionSuccess {
   // null whenever this action didn't newly defeat the wild.
   experienceGranted: BattleVictoryReward | null;
 
+  // The already-prepared encounter the session was one-ahead on, promoted
+  // in this exact same request the instant wildFainted is true (see
+  // promoteToNextEncounter, battle-session.service.ts) — the client never
+  // makes a second round trip to fetch what comes next, it's simply
+  // already here. Null whenever wildFainted is false (nothing to promote),
+  // and also null on the rare double-knockout where battleEnded is true in
+  // the same turn — the session has already been deleted by then, so
+  // there's nothing left to advance into; the client falls back to
+  // returning to the map, exactly as it already does whenever a session
+  // turns out not to exist.
+  promotedWild: EncounterResult | null;
+
   // Phase 6A/6D-6I: the whole turn's structured Battle Events, in the
   // exact order they happened — see
   // features/battle/events/battle-event.types.ts. The UI (BattleContent.tsx)
@@ -277,9 +291,12 @@ export async function executeBattleAction(
   }
 
   // Validate the battle is active: a wild already at 0 HP means this
-  // encounter has already concluded (advancing to the next one, or ending
-  // the session, is a separate flow) — attacking it again is rejected
-  // rather than silently no-oped.
+  // encounter has already concluded. This can't actually happen in normal
+  // play any more — a lethal hit promotes the next encounter (nonzero HP)
+  // or ends the session (no row at all) in this same request, before this
+  // function ever returns — but the check stays as defense-in-depth
+  // against a stale/racing duplicate request rather than trusting that
+  // invariant blindly.
   if (session.wildCurrentHp <= 0) {
     return { status: "battle-inactive" };
   }
@@ -1077,7 +1094,7 @@ export async function executeBattleAction(
     },
   });
 
-  const experienceGranted = await syncWildHp(playerId, zoneId, updatedWildHp);
+  const experienceGranted = await syncWildHp(playerId, zoneId, updatedWildHp, randomSource);
 
   await prisma.playerPokemon.update({
     where: { id: activePokemon.id },
@@ -1101,6 +1118,16 @@ export async function executeBattleAction(
       await endBattleSession(playerId);
     }
   }
+
+  // Promotes the already-prepared next encounter the instant the wild is
+  // defeated, in this exact same request — never a second round trip, and
+  // never a fresh resolveWildEncounter call on this path (see
+  // promoteToNextEncounter's own doc comment). Skipped when the battle is
+  // also ending this same turn (a mutual knockout): endBattleSession above
+  // already deleted the session row, so there's nothing left to advance —
+  // the client falls back to its existing "no session" -> return-to-map
+  // handling for that case.
+  const advancedEncounter = wildFainted && !battleEnded ? await promoteToNextEncounter(playerId, zoneId) : null;
 
   // Phase 6-cleanup — explicit double-faint resolution. Both sides can
   // faint in the very same action (the wild from the hit, the player's
@@ -1146,6 +1173,7 @@ export async function executeBattleAction(
     battleEnded,
     winner,
     experienceGranted,
+    promotedWild: advancedEncounter?.wild ?? null,
     events,
   };
 }

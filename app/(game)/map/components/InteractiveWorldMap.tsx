@@ -9,12 +9,18 @@ interface InteractiveWorldMapProps {
   config: WorldMapConfig;
   onZoneSelect: (zoneId: ZoneId) => void;
   getZoneLabel?: (zoneId: ZoneId) => string;
+  // Fired on hover, before any click — lets a caller prefetch the zone's
+  // destination route (see MapContent's router.prefetch) so it's already
+  // warm by the time the player actually clicks. Optional/no-op by default
+  // so this component stays usable without navigation concerns too.
+  onZoneHover?: (zoneId: ZoneId) => void;
 }
 
 export function InteractiveWorldMap({
   config,
   onZoneSelect,
   getZoneLabel,
+  onZoneHover,
 }: InteractiveWorldMapProps) {
   const [hoveredZoneId, setHoveredZoneId] = useState<ZoneId | null>(null);
 
@@ -44,7 +50,10 @@ export function InteractiveWorldMap({
             <polygon
               key={`${region.zoneId}-${index}`}
               points={region.points}
-              onMouseEnter={() => setHoveredZoneId(region.zoneId)}
+              onMouseEnter={() => {
+                setHoveredZoneId(region.zoneId);
+                onZoneHover?.(region.zoneId);
+              }}
               onMouseLeave={() => setHoveredZoneId(null)}
               onClick={() => onZoneSelect(region.zoneId)}
               style={{

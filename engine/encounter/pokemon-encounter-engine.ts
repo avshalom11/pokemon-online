@@ -2,6 +2,7 @@ import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { RARITY_ENCOUNTER_PROBABILITIES } from "@/data/encounter/rarity-config";
 import { ZONE_DATA } from "@/data/zones/zone-data";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
 
@@ -48,6 +49,33 @@ function groupByRarity(encounters: ZoneEncounter[]): EncountersByRarity {
 const ZONE_ENCOUNTERS_BY_RARITY: Map<ZoneId, EncountersByRarity> = new Map(
   ZONE_DATA.map((zone) => [zone.id, groupByRarity(zone.encounters)])
 );
+
+// pokemonId -> dexNumber, same "build once, O(1) lookups after" precedent as
+// SPECIES_RARITY_BY_ID above.
+const DEX_NUMBER_BY_SPECIES_ID: Map<string, number> = new Map(
+  POKEMON_DATA.map((species) => [species.id, species.dexNumber])
+);
+
+// zoneId -> every distinct front-sprite URL that zone could ever roll, built
+// once at module load from the same static catalogs every encounter roll
+// already reads. Lets a caller (see BattleContent's zone-roster preload)
+// warm the browser's image cache for a whole zone up front, entirely from
+// data already known before any specific encounter is rolled.
+const ZONE_FRONT_SPRITE_URLS: Map<ZoneId, string[]> = new Map(
+  ZONE_DATA.map((zone) => {
+    const dexNumbers = new Set(
+      zone.encounters
+        .map((encounter) => DEX_NUMBER_BY_SPECIES_ID.get(encounter.pokemonId))
+        .filter((dexNumber): dexNumber is number => dexNumber !== undefined)
+    );
+
+    return [zone.id, Array.from(dexNumbers, getFrontSpritePath)];
+  })
+);
+
+export function getZoneFrontSpriteUrls(zoneId: ZoneId): string[] {
+  return ZONE_FRONT_SPRITE_URLS.get(zoneId) ?? [];
+}
 
 // Single generic weighted-pick, shared by both stages (rarity tiers in
 // Stage 1, ZoneEncounter entries in Stage 2) — encounterWeight and rarity

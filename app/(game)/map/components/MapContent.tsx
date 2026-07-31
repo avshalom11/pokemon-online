@@ -39,6 +39,14 @@ export function MapContent({ notice }: MapContentProps) {
     router.replace(`/battle?zone=${zoneId}`);
   }
 
+  // Warms the Battle route the instant a player hovers a zone — by the time
+  // they actually click, the route is often already prefetched, so
+  // handleZoneSelect's navigation above resolves as fast as a same-layout
+  // client transition rather than a cold server round trip.
+  function handleZoneHover(zoneId: ZoneId) {
+    router.prefetch(`/battle?zone=${zoneId}`);
+  }
+
   // "/" is only the current start page — it will become the real Home page
   // later, so this fallback stays correct without changes once that happens.
   function handleBack() {
@@ -140,6 +148,7 @@ export function MapContent({ notice }: MapContentProps) {
         <InteractiveWorldMap
           config={WORLD_MAP_CONFIG}
           onZoneSelect={handleZoneSelect}
+          onZoneHover={handleZoneHover}
           getZoneLabel={getZoneLabel}
         />
       </div>
