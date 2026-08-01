@@ -2,8 +2,15 @@ import { redirect } from "next/navigation";
 
 import { BattleContent } from "@/features/battle/components/BattleContent";
 import { getBattleViewData } from "@/features/battle/services/battle-view.service";
+import { getInventoryView } from "@/features/inventory/services/inventory-view.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
+import { getPlayerProfile } from "@/lib/auth/player-profile";
 import type { ZoneId } from "@/shared/types/zone";
+
+// The Bag only ever shows Poké Balls + Medicine (Stones have no in-battle
+// use) — see BattleContent's own doc comment on why Stones is excluded
+// rather than the Bag panel silently filtering a third tab no one asked for.
+const BAG_CATEGORY_IDS = new Set(["poke-balls", "potions"]);
 
 const VALID_ZONE_IDS: ZoneId[] = ["grassland", "water", "cave", "lava", "beach", "haunted-house"];
 
@@ -51,6 +58,14 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
 
   const { data } = result;
 
+  // Resolved once here (not inside getBattleViewData) so the well-tested
+  // battle-view assembler stays untouched — the Bag is purely additive.
+  // getPlayerProfile is cache()-wrapped, so this costs no extra DB round
+  // trip beyond what getBattleViewData already triggered.
+  const profile = await getPlayerProfile(session.user.id);
+  const inventoryView = await getInventoryView(profile.id);
+  const bagItems = inventoryView.filter((view) => BAG_CATEGORY_IDS.has(view.item.categoryId));
+
   return (
     <BattleContent
       zoneId={zone}
@@ -60,6 +75,7 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
       knownMovesByPokemonId={data.knownMovesByPokemonId}
       playerName={data.playerName}
       zonePreloadSpriteUrls={data.zonePreloadSpriteUrls}
+      bagItems={bagItems}
     />
   );
 }

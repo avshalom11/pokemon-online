@@ -4,7 +4,7 @@ const NAVIGATION_ITEMS = [
   { title: "מפה", icon: "🗺️", href: "/map" },
   { title: "הפוקימונים שלי", icon: "🐾", href: "/my-pokemon" },
   { title: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },
-  { title: "תיק ציוד", icon: "🎒", comingSoon: true },
+  { title: "תיק ציוד", icon: "🎒", href: "/inventory" },
   { title: "פוקידקס", icon: "📖", comingSoon: true },
   { title: "חנות", icon: "🛒", href: "/shop" },
 ] as const;

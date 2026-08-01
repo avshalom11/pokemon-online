@@ -3,6 +3,12 @@ import type { ShopItem } from "@/features/shop/types/shop.types";
 
 interface ShopItemGridProps {
   categoryName?: string;
+  // Optional flavor/guidance banner for whichever category is currently
+  // showing — always read from that category's own canonical `tip` field
+  // (features/shop/data/shop-categories.ts), never a category-id check
+  // hardcoded in this component, so a future category's tip (or lack of
+  // one) needs no code change here.
+  categoryTip?: string;
   items: ShopItem[];
   selectedItemId: string | null;
   onSelectItem: (itemId: string) => void;
@@ -13,11 +19,17 @@ interface ShopItemGridProps {
 // own data source. A category with zero items (possible the moment a new
 // category is added to the data before any item references it yet) shows
 // an explicit empty state instead of silently rendering nothing.
-export function ShopItemGrid({ categoryName, items, selectedItemId, onSelectItem }: ShopItemGridProps) {
+export function ShopItemGrid({ categoryName, categoryTip, items, selectedItemId, onSelectItem }: ShopItemGridProps) {
   return (
     <div dir="rtl" className="min-w-0 flex-1">
       {categoryName ? (
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">{categoryName}</h2>
+      ) : null}
+
+      {categoryTip ? (
+        <p className="mb-3 whitespace-pre-line rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-3 text-xs leading-relaxed text-indigo-200">
+          {categoryTip}
+        </p>
       ) : null}
 
       {items.length === 0 ? (

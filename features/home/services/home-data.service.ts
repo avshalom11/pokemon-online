@@ -1,6 +1,8 @@
 import "server-only";
 
 import { getTodayBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
+import { getFirstPendingEvolutionView } from "@/features/evolution/queries/evolution-queries";
+import type { PendingEvolutionView } from "@/features/evolution/types/evolution.types";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
@@ -20,6 +22,13 @@ export interface HomeViewData {
   // restoring a battle, escaping, or capturing). Home-only: never fetched
   // or shown by Map/Battle.
   dailyBattleCount: number;
+
+  // The safety-net evolution prompt (features/evolution/components/
+  // PendingEvolutionGate.tsx) — null unless the player has an unresolved
+  // evolution decision left over from a battle they didn't finish
+  // deciding on (the primary trigger is in-battle, BattleContent itself;
+  // see features/evolution's own architecture notes for why both exist).
+  pendingEvolution: PendingEvolutionView | null;
 }
 
 // Single aggregator for everything app/(game)/home/page.tsx needs, so the
@@ -31,10 +40,11 @@ export interface HomeViewData {
 // so they're not duplicated here.
 export async function getHomeViewData(userId: string): Promise<HomeViewData> {
   const profile = await getPlayerProfile(userId);
-  const [party, stats, dailyBattleCount] = await Promise.all([
+  const [party, stats, dailyBattleCount, pendingEvolution] = await Promise.all([
     getPlayerParty(profile.id),
     getOwnedPokemonStats(profile.id),
     getTodayBattleCount(profile.id),
+    getFirstPendingEvolutionView(profile.id),
   ]);
 
   const dexSize = POKEMON_DATA.length;
@@ -47,5 +57,6 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
       dexCompletionPercent,
     },
     dailyBattleCount,
+    pendingEvolution,
   };
 }

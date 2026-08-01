@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+import { SpriteImage } from "@/components/media/SpriteImage";
 import type { BattleTheme } from "@/shared/types/battle-theme";
 import type { BattleMenuAction } from "@/shared/types/battle-ui";
 
@@ -80,14 +81,19 @@ export function BattleMenu({ theme, actions, onSelect }: BattleMenuProps) {
             key={action.id}
             type="button"
             onClick={() => onSelect?.(action.id)}
+            disabled={action.disabled}
             style={focusRingStyle}
-            className="group flex items-center gap-2 rounded-lg border border-white/10 bg-slate-800/70 px-2.5 py-1 text-sm font-semibold tracking-wide text-slate-100 shadow-md transition-all duration-150 hover:border-white/20 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:outline-none active:scale-[0.98]"
+            className="group flex items-center gap-2 rounded-lg border border-white/10 bg-slate-800/70 px-2.5 py-1 text-sm font-semibold tracking-wide text-slate-100 shadow-md transition-all duration-150 hover:border-white/20 hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:bg-slate-800/70"
           >
             <span
-              className="transition-transform duration-150 group-hover:scale-110"
+              className="flex shrink-0 items-center justify-center transition-transform duration-150 group-hover:scale-110"
               style={{ color: theme.colors.panelAccent }}
             >
-              {ACTION_ICONS[action.id] ?? null}
+              {action.iconImageUrl ? (
+                <SpriteImage src={action.iconImageUrl} alt="" className="h-[18px] w-[18px] object-contain" />
+              ) : (
+                (ACTION_ICONS[action.id] ?? null)
+              )}
             </span>
             <span className="truncate">{action.label}</span>
           </button>

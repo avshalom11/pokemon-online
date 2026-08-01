@@ -50,6 +50,10 @@ export function throwPokeballMessage(playerName: string, wildName: string): stri
   return `${playerName} זרק פוכדור על ${wildName}!`;
 }
 
+export function medicineUseMessage(playerName: string, itemName: string, targetName: string): string {
+  return `${playerName} השתמש ב${itemName} על ${targetName}!`;
+}
+
 export function captureSucceededMessage(wildName: string): string {
   return `${wildName} נתפס בהצלחה!`;
 }

@@ -17,7 +17,21 @@
 //
 // SHOP_PURCHASE: created by features/shop/services/shop-purchase.service.ts
 // on every successful item purchase.
-export type NotificationType = "PLAYER_LEVEL_UP" | "CURRENCY_MONEY_REWARD" | "CURRENCY_GOLD_REWARD" | "SHOP_PURCHASE";
+//
+// SHOP_SELL: created by features/inventory/services/inventory-sell.service.ts
+// on every successful sale of an owned item back for currency.
+//
+// POKEMON_EVOLVED: created by
+// features/evolution/services/accept-evolution.service.ts on every
+// successfully accepted evolution — never on rejection, and never for the
+// pending decision itself (see that file's own doc comment).
+export type NotificationType =
+  | "PLAYER_LEVEL_UP"
+  | "CURRENCY_MONEY_REWARD"
+  | "CURRENCY_GOLD_REWARD"
+  | "SHOP_PURCHASE"
+  | "SHOP_SELL"
+  | "POKEMON_EVOLVED";
 
 export interface NotificationSummary {
   id: string;

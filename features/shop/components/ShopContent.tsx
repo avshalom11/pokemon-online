@@ -130,6 +130,7 @@ export function ShopContent() {
           <ShopCategoryMenu categories={categories} selectedCategoryId={selectedCategoryId} onSelect={handleCategorySelect} />
           <ShopItemGrid
             categoryName={selectedCategory?.name}
+            categoryTip={selectedCategory?.tip}
             items={items}
             selectedItemId={selectedItemId}
             onSelectItem={handleSelectItem}

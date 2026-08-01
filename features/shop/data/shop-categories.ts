@@ -8,6 +8,11 @@ import type { ShopCategory } from "@/features/shop/types/shop.types";
 // and ShopContent both just map over this array.
 export const SHOP_CATEGORIES: ShopCategory[] = [
   { id: "poke-balls", name: "פוכדורים", icon: "🔴" },
-  { id: "potions", name: "שיקויים", icon: "🧪" },
+  {
+    id: "potions",
+    name: "שיקויים",
+    icon: "🧪",
+    tip: "💡 טיפ למאמן:\nשיקויים מתקדמים עולים יותר, אך חוסכים תורות יקרים בקרב ומאפשרים לחזור ללחימה מהר יותר.",
+  },
   { id: "stones", name: "אבנים", icon: "💎" },
 ];

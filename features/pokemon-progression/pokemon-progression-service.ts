@@ -3,6 +3,7 @@ import "server-only";
 import { calculateBaseBattlePokemonXp, distributeBattlePokemonXp, getPokemonLevelProgress } from "./pokemon-progression-calculations";
 import type { PokemonLevelUpResult, PokemonXpRewardRole, PokemonXpSource } from "./pokemon-progression-types";
 import { applyLevelUpToCurrentHp, calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { tryCreatePendingEvolution } from "@/features/evolution/services/evolution-progress.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { applyLevelUpMoveLearning } from "@/features/move-learning/move-learning-service";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -81,6 +82,23 @@ export async function applyPokemonXpGrant(
     throw new Error(`applyLevelUpMoveLearning failed unexpectedly: ${JSON.stringify(moveLearningResult)}`);
   }
 
+  // Deliberately AFTER move learning above — the documented, deterministic
+  // order for when both a pending move and a pending evolution could exist
+  // from the same grant (see tryCreatePendingEvolution's own doc comment
+  // for why that ordering is safe even though the two are surfaced to the
+  // player through entirely different UI moments). Checked against the
+  // Pokémon's OWN current species/level/evolution-state — never
+  // client-supplied, never re-derived from anything other than this same
+  // transaction's own reads.
+  const pendingEvolutionSpeciesId = await tryCreatePendingEvolution(
+    tx,
+    playerPokemonId,
+    pokemon.speciesId,
+    progress.level,
+    pokemon.pendingEvolutionSpeciesId,
+    pokemon.evolutionPermanentlyBlocked
+  );
+
   return {
     playerPokemonId,
     speciesId: pokemon.speciesId,
@@ -101,6 +119,7 @@ export async function applyPokemonXpGrant(
     newMaxHp,
     newCurrentHp,
     moveLearning: moveLearningResult.plan,
+    pendingEvolutionSpeciesId,
   };
 }
 

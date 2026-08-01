@@ -107,6 +107,26 @@ model PlayerPokemon {
   // status === "sleep"; null otherwise. Freeze has no counter (it's a
   // per-turn thaw-chance roll, not a fixed duration).
   statusTurnsRemaining Int?
+  // Level-Based Evolution — the smallest clean design for "at most one
+  // pending decision, plus a permanent yes/no" (deliberately not a
+  // separate table like PlayerPendingMoveLearning: that model's queue
+  // needs multiple historical rows per Pokémon, evolution never does — see
+  // features/evolution's own architecture notes). Non-null exactly when
+  // this Pokémon reached a level-evolution threshold and hasn't yet
+  // accepted or rejected it; always the target species id, validated
+  // against data/pokemon/pokemon-evolutions.ts before being trusted for
+  // anything. Cleared (set back to null) the instant either decision is
+  // made — see features/evolution/services/accept-evolution.service.ts
+  // and reject-evolution.service.ts.
+  pendingEvolutionSpeciesId String?
+  // Once true, this specific PlayerPokemon instance can never be offered
+  // evolution again — set only by a player's explicit rejection, never
+  // automatically, and never cleared by anything (a permanent decision per
+  // the phase spec). Scoped to this one owned instance only: another owned
+  // Pokémon of the same species, or this same Pokémon's own future
+  // evolutionary stages once it *does* evolve, are never affected by
+  // another instance's block.
+  evolutionPermanentlyBlocked Boolean @default(false)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 

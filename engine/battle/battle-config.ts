@@ -46,10 +46,11 @@ export function applyFixedAttack(currentHp: number, attackerPlayerPokemonId?: st
   return Math.max(0, currentHp - TEMPORARY_ATTACK_DAMAGE);
 }
 
-// Development-only Poké Ball behavior. Every capture-availability check
-// (UI and server) must read this flag rather than hardcoding `true` —
-// flipping it to `false` (once a real Bag/inventory system exists) is
-// meant to be the only change needed to require real ball counts again.
+// Development-only Poké Ball behavior. A real Bag/inventory system now
+// gates capture (features/battle/services/capture.service.ts consumes a
+// real PlayerInventoryItem ball on every attempt) — flipped to `false` to
+// match; kept as a named export rather than deleted in case a future dev/
+// testing override needs a single flag to reintroduce free captures.
 export const battleDevelopmentConfig = {
-  unlimitedPokeballs: true,
+  unlimitedPokeballs: false,
 } as const;

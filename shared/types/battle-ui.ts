@@ -43,6 +43,16 @@ export interface PlayerBattleParticipantDisplay extends BattleParticipantDisplay
 export interface BattleMenuAction {
   id: string;
   label: string;
+  // Blocks the click and dims the button — used by "capture" once the
+  // player has no owned Poké Ball left to throw (BattleContent derives this
+  // from the live Bag inventory, never a static/hardcoded rule).
+  disabled?: boolean;
+  // Optional sprite shown instead of this action's built-in ACTION_ICONS
+  // glyph (components/battle/BattleMenu.tsx) — used by "capture" to show
+  // the currently selected Poké Ball's own artwork instead of the generic
+  // capture-orb icon. Omitted for every other action, which keeps its
+  // existing icon unchanged.
+  iconImageUrl?: string;
 }
 
 // Phase 5A: id is the actual Known Move's moveId for a real slot — never a

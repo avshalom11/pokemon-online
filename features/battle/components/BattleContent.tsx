@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { BattleBagPanel, type MedicineResultView } from "./BattleBagPanel";
 import { BattleResultOverlay } from "./BattleResultOverlay";
 import { BattleWindow } from "./BattleWindow";
-import { PokeballCounter } from "./PokeballCounter";
+import { MasterBallConfirmDialog } from "./MasterBallConfirmDialog";
 import { XpToast } from "./XpToast";
 import { BattleScene } from "@/components/battle/BattleScene";
 import { RarityWarningBanner } from "@/components/battle/RarityWarningBanner";
@@ -13,6 +14,7 @@ import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engin
 import { executeBattleActionAction } from "@/features/battle/actions/battle-action.action";
 import { attemptCaptureAction } from "@/features/battle/actions/capture.action";
 import { syncPartyHpAction } from "@/features/battle/actions/sync-party-hp.action";
+import { applyMedicineItemAction } from "@/features/battle/actions/use-medicine.action";
 import type { BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { endBattleSessionAction } from "@/features/battle-session/actions/end-battle-session.action";
 import { syncActivePokemonAction } from "@/features/battle-session/actions/sync-active-pokemon.action";
@@ -23,6 +25,7 @@ import {
   captureSucceededMessage,
   escapeMessage,
   forcedReplacementMessage,
+  medicineUseMessage,
   partyDefeatedMessage,
   switchInMessage,
   throwPokeballMessage,
@@ -31,6 +34,10 @@ import {
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
 import { HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
+import { EvolutionPromptDialog } from "@/features/evolution/components/EvolutionPromptDialog";
+import { acceptEvolutionAction, rejectEvolutionAction } from "@/features/evolution/actions/evolution.actions";
+import type { PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { PartySelector } from "@/features/party/components/PartySelector";
 import { canSwitchTo } from "@/features/party/utils/party-rules";
 import { getPlayerProgressAction } from "@/features/player/actions/get-player-progression.action";
@@ -39,12 +46,28 @@ import { progressFromLevelUpResult } from "@/features/player-progression/progres
 import { playerXpToastMessage } from "@/features/player-progression/progression-messages";
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { getBackSpritePath, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
+import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import type { PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
 import { getRarityPresentation } from "@/lib/battle/battleRarityPresentation";
 import { getBattleTheme } from "@/lib/battle/battleThemes";
 import type { BattleMenuAction } from "@/shared/types/battle-ui";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { ZoneId } from "@/shared/types/zone";
+
+// Fallback order the Bag auto-switches through as the selected ball's stock
+// hits zero (requirement: Poké Ball -> Great Ball -> Ultra Ball -> Master
+// Ball) — never derived from the Shop catalog's own array order, which
+// isn't guaranteed to match this specific gameplay progression.
+const BALL_FALLBACK_ORDER = ["poke-ball", "great-ball", "ultra-ball", "master-ball"] as const;
+
+const MASTER_BALL_ITEM_ID = "master-ball";
+
+// The first owned ball (quantity > 0) in BALL_FALLBACK_ORDER, or null if
+// none remain — used both for the initial selection on mount and for the
+// automatic fallback once the currently selected ball runs out.
+function pickNextBall(qtyMap: Record<string, number>): string | null {
+  return BALL_FALLBACK_ORDER.find((id) => (qtyMap[id] ?? 0) > 0) ?? null;
+}
 
 interface BattleContentProps {
   zoneId: ZoneId;
@@ -64,6 +87,13 @@ interface BattleContentProps {
   // — preloaded at idle time on mount so a new wild encounter's sprite is
   // already cached by the browser once the transition reveals it.
   zonePreloadSpriteUrls: string[];
+  // The player's owned Poké Balls + Medicine, server-fetched once up front
+  // (app/(game)/battle/page.tsx, via features/inventory's own
+  // getInventoryView — Stones excluded, they have no in-battle use) and
+  // kept as a live client-side mirror from here on (see inventoryQtyMap
+  // below), same "DB authoritative at mount, live-mirrored during battle"
+  // rule this component already uses for HP/status/volatile.
+  bagItems: InventoryItemView[];
 }
 
 // Explicit battle state machine. "enemyTurn" is set for documentation/
@@ -147,6 +177,7 @@ export function BattleContent({
   knownMovesByPokemonId,
   playerName,
   zonePreloadSpriteUrls,
+  bagItems,
 }: BattleContentProps) {
   const router = useRouter();
   const theme = getBattleTheme(zoneId);
@@ -183,7 +214,58 @@ export function BattleContent({
   // newCurrentHp into partyHpMap in the same update, since the DB's
   // currentHp was already rescaled server-side (see applyPokemonXpGrant's
   // applyLevelUpToCurrentHp) in that same transaction.
-  const [partyProgressMap, setPartyProgressMap] = useState<Record<string, { level: number; experience: number; maxHp: number }>>({});
+  // speciesId is optional and only ever set by a completed evolution (see
+  // handleAcceptEvolution) — an evolution keeps level/experience unchanged
+  // (only species and derived maxHp change), so every write to this map
+  // must spread the previous entry first rather than replacing it whole,
+  // or an evolved Pokémon's species override would be silently wiped out
+  // the next time this same map is updated for an unrelated XP reward (see
+  // applyPokemonRewards below).
+  const [partyProgressMap, setPartyProgressMap] = useState<
+    Record<string, { level: number; experience: number; maxHp: number; speciesId?: string }>
+  >({});
+  // Non-null exactly while the evolution decision modal is showing — set
+  // by applyVictoryReward the instant a battle-victory response reports a
+  // freshly-created pending evolution (PokemonLevelUpResult.
+  // pendingEvolutionSpeciesId), cleared the instant the player answers
+  // (handleAcceptEvolution/handleRejectEvolution). Deliberately its own
+  // state, never folded into BattlePhase: it's a modal overlay layered on
+  // top of whatever phase battle is already in after a win (same
+  // "sub-menu, not a battle-phase transition" reasoning the Bag's own
+  // isBagOpen/medicineResult already use), and — like those — its opaque
+  // fixed-inset backdrop is what actually blocks interaction underneath,
+  // not a phase change.
+  const [pendingEvolution, setPendingEvolution] = useState<PendingEvolutionView | null>(null);
+  const [isResolvingEvolution, startEvolutionTransition] = useTransition();
+  // The Bag's live quantity mirror — seeded from the server-fetched
+  // `bagItems` prop at mount, decremented the instant a capture/medicine
+  // action's response confirms exactly how many remain (never optimistic,
+  // never guessed client-side: both attemptCaptureAction and
+  // applyMedicineItemAction always return the post-decrement quantity).
+  const [inventoryQtyMap, setInventoryQtyMap] = useState<Record<string, number>>(() =>
+    Object.fromEntries(bagItems.map((view) => [view.item.id, view.quantity]))
+  );
+  // The Bag's currently active ball for Capture — defaults to the first
+  // owned ball in BALL_FALLBACK_ORDER, null when the player owns none (in
+  // which case Capture starts out disabled). Never persisted server-side:
+  // this is a pure in-session UI preference, re-derived fresh from
+  // inventory every time it needs a fallback (see applyBallConsumption).
+  const [selectedBallItemId, setSelectedBallItemId] = useState<string | null>(() => pickNextBall(inventoryQtyMap));
+  const [isBagOpen, setIsBagOpen] = useState(false);
+  // Set the instant a medicine use's server response confirms success —
+  // never before, never faked. While non-null, the Bag shows a dedicated
+  // result screen (the healed Pokémon's updated HP/HP bar, how much was
+  // restored, which item was used, and a "חזור לקרב" button) INSTEAD OF the
+  // party-selection picker, and battle stays fully paused: the wild's
+  // counter-attack is only resolved once the player explicitly confirms
+  // (see handleConfirmMedicineResult) — never automatically, never on a
+  // timer. `previousHp` is the HP just before this heal (captured
+  // client-side at the moment the request was fired) — the only thing this
+  // state carries that isn't already re-derivable from partyHpMap, needed
+  // to display "restored X HP" without recomputing it from a stale value.
+  const [medicineResult, setMedicineResult] = useState<MedicineResultView | null>(null);
+  const [pendingMasterBallConfirm, setPendingMasterBallConfirm] = useState(false);
+  const [isUsingItem, startUseItemTransition] = useTransition();
   const [activeId, setActiveId] = useState(activePokemonId);
   // A restored (post-refresh) battle must reopen onto whatever phase the
   // persisted facts actually imply, not always a fresh "playerTurn" — the
@@ -310,7 +392,16 @@ export function BattleContent({
     setPartyProgressMap((prev) => {
       const next = { ...prev };
       for (const result of results) {
-        next[result.playerPokemonId] = { level: result.newLevel, experience: result.newTotalXp, maxHp: result.newMaxHp };
+        // Spreads any existing entry first (see this map's own doc
+        // comment) so a Pokémon that already evolved earlier this battle
+        // keeps its speciesId override across a later, unrelated XP
+        // reward for the same Pokémon.
+        next[result.playerPokemonId] = {
+          ...next[result.playerPokemonId],
+          level: result.newLevel,
+          experience: result.newTotalXp,
+          maxHp: result.newMaxHp,
+        };
       }
       return next;
     });
@@ -327,6 +418,38 @@ export function BattleContent({
       }
       return next;
     });
+
+    // The evolution prompt — this phase's own trigger point: only ever
+    // checked here, after XP/level (above) and pending move learning
+    // (already resolved server-side inside the same grant, before this
+    // response was even produced — see pokemon-progression-service.ts's
+    // applyPokemonXpGrant for the documented ordering) are both fully
+    // resolved. "Handle only one evolution decision at a time" (phase
+    // spec): the first result that reports a freshly-created pending
+    // evolution wins; any others simply stay pending in the DB and
+    // surface later (the next time this same check runs, or via the
+    // Home-page safety net) once the first is resolved. Never re-shown
+    // for a decision that already exists from an earlier reward —
+    // pendingEvolutionSpeciesId is only ever set on the exact grant that
+    // created it (see that field's own doc comment), so a stale/already-
+    // pending decision from a previous battle never re-triggers this.
+    if (!pendingEvolution) {
+      const justBecamePending = results.find((result) => result.pendingEvolutionSpeciesId);
+      if (justBecamePending?.pendingEvolutionSpeciesId) {
+        const currentSpecies = getSpeciesById(justBecamePending.speciesId);
+        const evolvedSpecies = getSpeciesById(justBecamePending.pendingEvolutionSpeciesId);
+        const owner = party.find((pokemon) => pokemon.id === justBecamePending.playerPokemonId);
+
+        if (currentSpecies && evolvedSpecies) {
+          setPendingEvolution({
+            playerPokemonId: justBecamePending.playerPokemonId,
+            nickname: owner?.nickname ?? null,
+            currentSpecies,
+            evolvedSpecies,
+          });
+        }
+      }
+    }
   }
 
   // The lethal-attack path's single reward-application entry point: both
@@ -344,19 +467,42 @@ export function BattleContent({
   // Derived every render from the party prop + the live HP/progress maps —
   // never a separately stored copy, so there is exactly one place HP or
   // level/XP can drift from.
-  const livePartyList = party.map((pokemon) => ({
-    ...pokemon,
-    currentHp: partyHpMap[pokemon.id] ?? pokemon.currentHp,
-    level: partyProgressMap[pokemon.id]?.level ?? pokemon.level,
-    experience: partyProgressMap[pokemon.id]?.experience ?? pokemon.experience,
-    maxHp: partyProgressMap[pokemon.id]?.maxHp ?? pokemon.maxHp,
-    // partyStatusMap intentionally holds `null` for a healthy Pokémon —
-    // `??` would wrongly fall back to the (possibly stale) prop in that
-    // case, so this checks membership instead.
-    status: pokemon.id in partyStatusMap ? partyStatusMap[pokemon.id] : pokemon.status,
-  }));
+  const livePartyList = party.map((pokemon) => {
+    // An accepted evolution overrides species — see handleAcceptEvolution
+    // and applyPokemonRewards' own doc comment on why partyProgressMap's
+    // speciesId field must survive later unrelated writes. Falls back to
+    // the original species if the override id somehow doesn't resolve
+    // (should never happen — acceptEvolutionAction only ever returns a
+    // real catalog id — but never worth crashing the battle screen over).
+    const overrideSpeciesId = partyProgressMap[pokemon.id]?.speciesId;
+    const species = overrideSpeciesId ? (getSpeciesById(overrideSpeciesId) ?? pokemon.species) : pokemon.species;
+
+    return {
+      ...pokemon,
+      species,
+      currentHp: partyHpMap[pokemon.id] ?? pokemon.currentHp,
+      level: partyProgressMap[pokemon.id]?.level ?? pokemon.level,
+      experience: partyProgressMap[pokemon.id]?.experience ?? pokemon.experience,
+      maxHp: partyProgressMap[pokemon.id]?.maxHp ?? pokemon.maxHp,
+      // partyStatusMap intentionally holds `null` for a healthy Pokémon —
+      // `??` would wrongly fall back to the (possibly stale) prop in that
+      // case, so this checks membership instead.
+      status: pokemon.id in partyStatusMap ? partyStatusMap[pokemon.id] : pokemon.status,
+    };
+  });
   const activePokemon = livePartyList.find((pokemon) => pokemon.id === activeId)!;
   const playerDisplayName = activePokemon.nickname ?? activePokemon.species.name;
+
+  // The Bag's live view — same catalog objects the `bagItems` prop already
+  // carries, quantities overridden from inventoryQtyMap, zero-quantity
+  // items dropped (never shown, same "no zero-quantity rows" rule
+  // features/inventory's own screen already follows).
+  const liveInventoryItems: InventoryItemView[] = bagItems
+    .map((view) => ({ ...view, quantity: inventoryQtyMap[view.item.id] ?? view.quantity }))
+    .filter((view) => view.quantity > 0);
+  const selectedBallView = selectedBallItemId
+    ? liveInventoryItems.find((view) => view.item.id === selectedBallItemId)
+    : undefined;
 
   // The one shared exit path for every session-ending state (run, capture,
   // full-party defeat) — router.replace (not push) so a finished battle
@@ -379,11 +525,21 @@ export function BattleContent({
   }
 
   // Shared by: a normal attack's counter-hit, a failed capture's
-  // counter-hit, and the one guaranteed hit after a *voluntary* switch.
-  // Never called after a forced replacement — that faint already consumed
-  // the wild Pokémon's one attack for the turn.
-  function resolveCounterAttackAgainstActive(targetId: string, targetName: string) {
-    const currentHp = partyHpMap[targetId] ?? 0;
+  // counter-hit, the one guaranteed hit after a *voluntary* switch, and a
+  // successful medicine use. Never called after a forced replacement —
+  // that faint already consumed the wild Pokémon's one attack for the turn.
+  //
+  // `currentHp` is always passed in by the caller rather than read from
+  // `partyHpMap[targetId]` here — React state updates queued via setState
+  // (e.g. the medicine flow's own setPartyHpMap right before this call,
+  // see handleSelectMedicineTarget) never land in this closure's own
+  // `partyHpMap` until the next render, so reading the map here would use
+  // a stale, pre-update HP as the counter-attack's baseline. That exact bug
+  // is what made a freshly-healed Pokémon "faint" instead of healing: the
+  // counter-attack was computed against the old low HP the potion was
+  // meant to fix, then that (wrong) result overwrote the just-applied heal
+  // in state. Every call site below now passes the actual just-known HP.
+  function resolveCounterAttackAgainstActive(targetId: string, targetName: string, currentHp: number) {
     const { newHp, fainted } = resolveWildCounterAttack(currentHp);
 
     setPartyHpMap((prev) => ({ ...prev, [targetId]: newHp }));
@@ -514,6 +670,30 @@ export function BattleContent({
     });
   }
 
+  // Applies a capture/medicine action's confirmed post-decrement quantity
+  // to the live inventory mirror, then — for a ball specifically — falls
+  // back to the next owned ball in BALL_FALLBACK_ORDER the instant the just-
+  // consumed one hits zero (requirement: auto-switch when the selected
+  // ball runs out; disable Capture entirely once no ball remains at all).
+  // A medicine item reaching zero never triggers any fallback — there is
+  // no "selected medicine" concept, only Poké Balls persist a selection.
+  function applyInventoryConsumption(itemId: string, remainingQuantity: number, isBall: boolean) {
+    const nextQtyMap = { ...inventoryQtyMap, [itemId]: remainingQuantity };
+    setInventoryQtyMap(nextQtyMap);
+
+    if (isBall && remainingQuantity <= 0 && selectedBallItemId === itemId) {
+      setSelectedBallItemId(pickNextBall(nextQtyMap));
+    }
+  }
+
+  // Ball selection is pure client-side Bag state — see selectedBallItemId's
+  // own doc comment. Closes the Bag immediately, same "select and return to
+  // battle" flow the requirement describes.
+  function handleSelectBall(itemId: string) {
+    setSelectedBallItemId(itemId);
+    setIsBagOpen(false);
+  }
+
   function handleCapture() {
     // phase-guarded exactly like every other action handler (attack,
     // escape, switch) — set to "capturing" synchronously below, for the
@@ -522,8 +702,30 @@ export function BattleContent({
     // (isCapturing from useTransition is also checked as an extra guard,
     // but the phase lock alone is what actually closes the gap: it's set
     // synchronously here, not after a render/transition flush).
-    if (phase !== "playerTurn" || isCapturing) return;
+    if (phase !== "playerTurn" || isCapturing || !selectedBallItemId) return;
 
+    // Master Ball guards behind its own confirmation — see
+    // MasterBallConfirmDialog's own doc comment. Nothing is consumed (or
+    // even requested from the server) until the player explicitly confirms;
+    // Cancel leaves phase/message/inventory completely untouched.
+    if (selectedBallItemId === MASTER_BALL_ITEM_ID) {
+      setPendingMasterBallConfirm(true);
+      return;
+    }
+
+    proceedCapture(selectedBallItemId);
+  }
+
+  function handleConfirmMasterBall() {
+    setPendingMasterBallConfirm(false);
+    proceedCapture(MASTER_BALL_ITEM_ID);
+  }
+
+  function handleCancelMasterBall() {
+    setPendingMasterBallConfirm(false);
+  }
+
+  function proceedCapture(ballItemId: string) {
     setPhase("capturing");
     // Shown immediately (before the server round-trip resolves) through the
     // exact same message state/box every other battle message uses — never
@@ -534,9 +736,10 @@ export function BattleContent({
     setMessage(throwPokeballMessage(playerName, wildState.pokemon.name));
 
     startCaptureTransition(async () => {
-      const result = await attemptCaptureAction();
+      const result = await attemptCaptureAction(ballItemId);
 
       if (result.status === "captured") {
+        applyInventoryConsumption(ballItemId, result.remainingQuantity, true);
         // Short, battle-only message — the capture result itself, no
         // player-XP/level-up suffix (same Core Design Rule as the defeat
         // path above). The ending behavior (modal, manual return-to-map)
@@ -548,14 +751,121 @@ export function BattleContent({
         return;
       }
 
-      // Failed (or a rare server error) — the wild Pokémon's counter-attack
-      // lands immediately, exactly like a failed attack would; phase stays
-      // "capturing" (not "playerTurn") until resolveCounterAttackAgainstActive
-      // sets its own next phase below, so it's still impossible to throw a
-      // second ball mid-sequence.
+      if (result.status !== "failed") {
+        // "no-balls" (a race against this exact ball running out
+        // elsewhere) or a rare server error — never trust the client's own
+        // belief that a ball was available. Recover to a safe, interactive
+        // state rather than pretending a turn was spent on nothing.
+        setPhase("playerTurn");
+        return;
+      }
+
+      applyInventoryConsumption(ballItemId, result.remainingQuantity, true);
+
+      // The wild Pokémon's counter-attack lands immediately, exactly like a
+      // failed attack would; phase stays "capturing" (not "playerTurn")
+      // until resolveCounterAttackAgainstActive sets its own next phase
+      // below, so it's still impossible to throw a second ball mid-sequence.
       triggerHit("enemy");
-      resolveCounterAttackAgainstActive(activeId, playerDisplayName);
+      resolveCounterAttackAgainstActive(activeId, playerDisplayName, activePokemon.currentHp);
     });
+  }
+
+  // Bag -> Medicine -> target-picker's final step. The Bag stays OPEN
+  // through the server round-trip and — once success confirms — switches
+  // to a dedicated result screen (medicineResult, rendered by
+  // BattleBagPanel) instead of closing on its own: closing automatically
+  // (this component's earlier behavior, first via an immediate close, then
+  // via a timed auto-close) either hid the heal entirely or gave the player
+  // no real control over when battle resumes. Now nothing past this point
+  // happens until the player explicitly clicks "חזור לקרב" — see
+  // handleConfirmMedicineResult, the only place the wild's counter-attack
+  // for a medicine use is ever triggered.
+  function handleSelectMedicineTarget(itemId: string, playerPokemonId: string) {
+    if (phase !== "playerTurn" || isUsingItem || medicineResult) return;
+
+    const itemView = liveInventoryItems.find((view) => view.item.id === itemId);
+    const target = livePartyList.find((pokemon) => pokemon.id === playerPokemonId);
+    const targetName = target ? (target.nickname ?? target.species.name) : "";
+    // Captured now, before the request fires — the one piece of "how much
+    // did this heal" the server response doesn't itself carry (it only
+    // returns the new HP, not the delta). Reading it here (not later, after
+    // the await) is what makes it accurate: nothing else can change this
+    // Pokémon's HP between this click and the response landing, since the
+    // phase lock below blocks every other action for the whole request.
+    const previousHp = target?.currentHp ?? 0;
+
+    setPhase("enemyTurn");
+    setMessage(medicineUseMessage(playerName, itemView?.item.name ?? "", targetName));
+
+    startUseItemTransition(async () => {
+      const result = await applyMedicineItemAction(itemId, playerPokemonId);
+
+      if (result.status !== "success") {
+        // Nothing changed server-side — close the Bag and recover
+        // immediately, exactly like every other action's rejection path.
+        // No result screen: there is nothing to show.
+        setIsBagOpen(false);
+        setPhase("playerTurn");
+        return;
+      }
+
+      applyInventoryConsumption(itemId, result.remainingQuantity, false);
+      // Already persisted server-side by use-medicine.service.ts — no
+      // syncPartyHpAction call needed here, same precedent handleAttack's
+      // own lethal-hit path already established for a server-authoritative
+      // HP write. Applied while the Bag is STILL OPEN: livePartyList (and
+      // the `party` prop it flows into BattleBagPanel as) re-derives from
+      // this map every render, so the result screen's HP number/bar (read
+      // live off that same party list, never duplicated into
+      // medicineResult itself) reflect this the instant it lands.
+      setPartyHpMap((prev) => ({ ...prev, [playerPokemonId]: result.newHp }));
+
+      // Shows the result screen — battle stays paused here until the
+      // player clicks "חזור לקרב" (handleConfirmMedicineResult). itemName
+      // comes from the server's own response (authoritative), imageUrl
+      // from the Bag's own already-loaded catalog view (pure display
+      // asset, no authority concern).
+      setMedicineResult({
+        itemName: result.itemName,
+        itemImageUrl: itemView?.item.imageUrl ?? "",
+        pokemonId: playerPokemonId,
+        previousHp,
+      });
+    });
+  }
+
+  // The sole trigger for "חזור לקרב" — closes the result screen/Bag and
+  // resolves the wild's counter-attack, exactly once, only on an explicit
+  // click (never automatically, never on a timer). Reads the healed
+  // Pokémon's HP from partyHpMap rather than from medicineResult itself:
+  // by the time this fires, at least one render has already happened since
+  // the heal was applied (the player had to see the result screen and
+  // click a button), so partyHpMap here is guaranteed fresh — unlike the
+  // synchronous back-to-back setState calls this codebase's earlier
+  // medicine bug was caused by (see resolveCounterAttackAgainstActive's own
+  // doc comment), there is no stale-closure risk on a handler that only
+  // ever runs in response to a real user click.
+  function handleConfirmMedicineResult() {
+    if (!medicineResult) return;
+
+    const { pokemonId, previousHp } = medicineResult;
+    const newHp = partyHpMap[pokemonId] ?? previousHp;
+
+    setMedicineResult(null);
+    setIsBagOpen(false);
+
+    // The wild's counter-attack always lands on the currently ACTIVE
+    // Pokémon (unchanged rule — same as every other counter-attack call
+    // site), which may or may not be the one just healed. When it IS the
+    // same Pokémon, its baseline HP for that counter-attack must be the
+    // just-healed value — never a pre-heal value — see
+    // resolveCounterAttackAgainstActive's own doc comment for the exact
+    // bug this guards against. When a *different* (benched) Pokémon was
+    // healed, the active one's own HP was never touched by this action, so
+    // its already-known value is correct as-is.
+    const activeHpAfterHeal = pokemonId === activeId ? newHp : activePokemon.currentHp;
+    resolveCounterAttackAgainstActive(activeId, playerDisplayName, activeHpAfterHeal);
   }
 
   function handleVoluntarySwitchSelect(pokemonId: string) {
@@ -578,7 +888,7 @@ export function BattleContent({
     // Consumes the turn: exactly one wild attack lands on the newly-active
     // Pokémon immediately — resolveCounterAttackAgainstActive sets its own
     // phase/message below.
-    resolveCounterAttackAgainstActive(pokemonId, targetName);
+    resolveCounterAttackAgainstActive(pokemonId, targetName, target.currentHp);
   }
 
   function handleForcedReplacementSelect(pokemonId: string) {
@@ -597,6 +907,51 @@ export function BattleContent({
     });
     // No counter-attack call here — the faint that triggered this forced
     // replacement already consumed the wild Pokémon's attack for the turn.
+  }
+
+  // Accepting evolves the same PlayerPokemon row in place, server-side
+  // (accept-evolution.service.ts) — this only ever applies whatever the
+  // server actually returns to the live battle state (species override +
+  // recalculated maxHp/currentHp), never assumes success client-side. A
+  // rejection (result.status !== "success") just closes the dialog with
+  // nothing changed — the pending state was already what it was; this
+  // component doesn't need to distinguish *why* it failed to still recover
+  // safely.
+  function handleAcceptEvolution() {
+    if (!pendingEvolution) return;
+    const targetId = pendingEvolution.playerPokemonId;
+
+    startEvolutionTransition(async () => {
+      const result = await acceptEvolutionAction(targetId);
+      setPendingEvolution(null);
+
+      if (result.status !== "success") return;
+
+      setPartyProgressMap((prev) => ({
+        ...prev,
+        [targetId]: {
+          level: result.level,
+          experience: result.experience,
+          maxHp: result.newMaxHp,
+          speciesId: result.newSpeciesId,
+        },
+      }));
+      setPartyHpMap((prev) => ({ ...prev, [targetId]: result.newCurrentHp }));
+    });
+  }
+
+  // Rejecting is permanent server-side (reject-evolution.service.ts) —
+  // nothing here needs to remember that fact locally beyond closing the
+  // dialog: the Pokémon's species/HP were never touched, so livePartyList
+  // already reflects "unchanged" with zero extra state.
+  function handleRejectEvolution() {
+    if (!pendingEvolution) return;
+    const targetId = pendingEvolution.playerPokemonId;
+
+    startEvolutionTransition(async () => {
+      await rejectEvolutionAction(targetId);
+      setPendingEvolution(null);
+    });
   }
 
   function handleEscape() {
@@ -621,6 +976,8 @@ export function BattleContent({
       handleCapture();
     } else if (actionId === "switch") {
       setPhase("selectingVoluntarySwitch");
+    } else if (actionId === "bag") {
+      setIsBagOpen(true);
     }
   }
 
@@ -636,9 +993,26 @@ export function BattleContent({
     encoreMoveId: playerVolatile.encoreMoveId,
   });
 
+  // The capture button must show the currently selected ball's own image,
+  // name, and quantity (requirement) — never just a generic "לכידה" label —
+  // and disables the instant no ball remains at all (selectedBallView is
+  // undefined exactly then, since liveInventoryItems only ever holds
+  // quantity > 0 rows).
+  const captureLabel = isCapturing
+    ? "תופס..."
+    : selectedBallView
+      ? `${selectedBallView.item.name} ×${selectedBallView.quantity}`
+      : "אין פוכדורים";
+
   const menuActions: BattleMenuAction[] = [
     { id: "switch", label: "החלפה" },
-    { id: "capture", label: isCapturing ? "תופס..." : "לכידה" },
+    {
+      id: "capture",
+      label: captureLabel,
+      disabled: !selectedBallView || isCapturing,
+      iconImageUrl: selectedBallView?.item.imageUrl,
+    },
+    { id: "bag", label: "תיק" },
     { id: "run", label: "בריחה" },
   ];
 
@@ -690,7 +1064,6 @@ export function BattleContent({
         playerHit={playerHit}
       />
 
-      <PokeballCounter />
       <XpToast message={xpToastMessage} />
 
       {phase === "selectingVoluntarySwitch" ? (
@@ -713,6 +1086,40 @@ export function BattleContent({
           title={phase === "captured" ? "נתפס בהצלחה!" : "הצוות הובס"}
           message={message}
           onReturnToMap={handleReturnToMap}
+        />
+      ) : null}
+
+      {isBagOpen ? (
+        <BattleBagPanel
+          items={liveInventoryItems}
+          selectedBallItemId={selectedBallItemId}
+          party={livePartyList}
+          onSelectBall={handleSelectBall}
+          onSelectMedicineTarget={handleSelectMedicineTarget}
+          onClose={() => setIsBagOpen(false)}
+          // Locks the whole panel's chrome (tabs, close button, target
+          // picking) while a medicine request is in flight, AND for as
+          // long as the result screen is showing — the latter is what
+          // forces "חזור לקרב" to be the only way out of a completed heal,
+          // rather than letting the player dismiss the Bag (and softlock
+          // the turn — see handleConfirmMedicineResult, the only place
+          // that ever actually resumes battle) via the ✕ button instead.
+          pending={isUsingItem || Boolean(medicineResult)}
+          medicineResult={medicineResult}
+          onConfirmMedicineResult={handleConfirmMedicineResult}
+        />
+      ) : null}
+
+      {pendingMasterBallConfirm ? (
+        <MasterBallConfirmDialog pending={isCapturing} onCancel={handleCancelMasterBall} onConfirm={handleConfirmMasterBall} />
+      ) : null}
+
+      {pendingEvolution ? (
+        <EvolutionPromptDialog
+          pending={pendingEvolution}
+          isSubmitting={isResolvingEvolution}
+          onAccept={handleAcceptEvolution}
+          onReject={handleRejectEvolution}
         />
       ) : null}
     </BattleWindow>

@@ -29,19 +29,30 @@ export interface CaptureChanceParams {
 
 // Exact chance is intentionally never surfaced to the player — callers
 // should only ever branch on rollCapture's boolean result.
-export function calculateCaptureChance({ currentHp, maxHp, rarity }: CaptureChanceParams): number {
+//
+// ballMultiplier (Great/Ultra Ball) scales the rarity/HP-derived chance
+// before the final clamp — applied here, not at each call site, so a ball's
+// advantage is still bounded by the same [MIN, MAX] safety range as a
+// Poké Ball. Master Ball's guaranteed capture is deliberately NOT modeled
+// as a multiplier (no finite multiplier could reach exactly 1.0 through
+// this clamp) — see capture.service.ts's own guaranteed-capture branch,
+// which bypasses this function entirely for that ball.
+export function calculateCaptureChance(
+  { currentHp, maxHp, rarity }: CaptureChanceParams,
+  ballMultiplier = 1
+): number {
   const baseChance = RARITY_BASE_CAPTURE_CHANCE[rarity];
   const missingHpRatio = maxHp > 0 ? 1 - Math.max(0, Math.min(1, currentHp / maxHp)) : 1;
 
   const chance = baseChance + missingHpRatio * LOW_HP_BONUS_WEIGHT * (MAX_CAPTURE_CHANCE - baseChance);
 
-  return Math.max(MIN_CAPTURE_CHANCE, Math.min(MAX_CAPTURE_CHANCE, chance));
+  return Math.max(MIN_CAPTURE_CHANCE, Math.min(MAX_CAPTURE_CHANCE, chance * ballMultiplier));
 }
 
 // The actual RNG roll lives here (not inline at each call site) so every
 // capture attempt in the codebase goes through the same random source.
 // Must only ever be called server-side — see
 // features/battle/services/capture.service.ts.
-export function rollCapture(params: CaptureChanceParams): boolean {
-  return Math.random() < calculateCaptureChance(params);
+export function rollCapture(params: CaptureChanceParams, ballMultiplier = 1): boolean {
+  return Math.random() < calculateCaptureChance(params, ballMultiplier);
 }

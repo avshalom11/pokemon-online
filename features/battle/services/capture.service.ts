@@ -1,19 +1,36 @@
 import "server-only";
 
 import { rollCapture } from "@/engine/battle/capture";
+import { getInventoryItemQuantity, removeInventoryItem } from "@/features/inventory/services/inventory.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
 import { getTotalXpRequiredForPokemonLevel } from "@/features/pokemon-progression/pokemon-progression-calculations";
 import { calculateCaptureXpReward } from "@/features/player-progression/progression-calculations";
 import { addPlayerExperience } from "@/features/player-progression/progression-service";
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
+import { getShopItemById } from "@/features/shop/services/shop-catalog.service";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { prisma } from "@/lib/db/prisma";
 
 export type AttemptCaptureResult =
-  | { status: "captured"; speciesName: string; xpResult: LevelUpResult }
-  | { status: "failed" }
-  | { status: "invalid-encounter" };
+  | { status: "captured"; speciesName: string; xpResult: LevelUpResult; remainingQuantity: number }
+  | { status: "failed"; remainingQuantity: number }
+  | { status: "invalid-encounter" }
+  | { status: "invalid-item" }
+  | { status: "no-balls" };
+
+// Every catalog Poké Ball's capture-chance multiplier, keyed by its
+// shop-catalog itemId (features/shop/data/shop-items.ts) — never by name.
+// "guaranteed" is handled as its own branch below (never passed through
+// engine/battle/capture.ts's clamped multiplier math, which can't reach
+// exactly 1.0 through a finite multiplier — see that module's own doc
+// comment on calculateCaptureChance).
+const CAPTURE_MULTIPLIER_BY_BALL_ID: Record<string, number | "guaranteed"> = {
+  "poke-ball": 1,
+  "great-ball": 2,
+  "ultra-ball": 3,
+  "master-ball": "guaranteed",
+};
 
 // Server-side capture resolution — the only place the capture RNG
 // (rollCapture, engine/battle/capture.ts) is ever invoked, and the only
@@ -31,7 +48,20 @@ export type AttemptCaptureResult =
 // lock, so two concurrent calls racing this same transaction can never
 // both see a row to delete — the loser's deleteMany reports 0 rows and
 // aborts before ever creating a second Pokémon from one throw.
-export async function attemptCapture(userId: string): Promise<AttemptCaptureResult> {
+//
+// Ball ownership/price/multiplier are always resolved server-side against
+// the static Shop catalog by ballItemId (features/shop/data/shop-items.ts)
+// — a client-sent multiplier is never trusted. The ball decrement
+// (removeInventoryItem, features/inventory/services/inventory.service.ts —
+// the same atomic gte-guarded idiom the Shop's own sell flow uses) and the
+// capture's effect (creating the Pokémon, or simply doing nothing on a
+// miss) always happen inside the one transaction below, so "exactly one
+// ball consumed per attempt, whether it succeeds or fails" can never
+// desync from what actually happened to the encounter — see this
+// function's own callers for why that guarantee matters (the Bag lets a
+// player keep pressing Capture until either outcome, so a lost/duplicated
+// decrement would silently give free throws or overcharge one).
+export async function attemptCapture(userId: string, ballItemId: string): Promise<AttemptCaptureResult> {
   const profile = await getPlayerProfile(userId);
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId: profile.id } });
 
@@ -44,23 +74,39 @@ export async function attemptCapture(userId: string): Promise<AttemptCaptureResu
     return { status: "invalid-encounter" };
   }
 
-  const captured = rollCapture({
-    currentHp: session.wildCurrentHp,
-    maxHp: session.wildMaxHp,
-    rarity: species.rarity,
-  });
-
-  if (!captured) {
-    return { status: "failed" };
+  const ball = getShopItemById(ballItemId);
+  const multiplier = ball && ball.categoryId === "poke-balls" ? CAPTURE_MULTIPLIER_BY_BALL_ID[ball.id] : undefined;
+  if (!ball || multiplier === undefined) {
+    return { status: "invalid-item" };
   }
 
-  const captureOutcome = await prisma.$transaction(async (tx) => {
+  // Master Ball bypasses the RNG entirely (never rolled) rather than being
+  // modeled as some very large multiplier — see this module's own
+  // CAPTURE_MULTIPLIER_BY_BALL_ID doc comment.
+  const captured =
+    multiplier === "guaranteed"
+      ? true
+      : rollCapture({ currentHp: session.wildCurrentHp, maxHp: session.wildMaxHp, rarity: species.rarity }, multiplier);
+
+  return prisma.$transaction(async (tx) => {
+    const removed = await removeInventoryItem(tx, profile.id, ballItemId, 1);
+    if (!removed) {
+      return { status: "no-balls" };
+    }
+    const remainingQuantity = await getInventoryItemQuantity(tx, profile.id, ballItemId);
+
+    if (!captured) {
+      return { status: "failed", remainingQuantity };
+    }
+
     const ended = await tx.fieldBattleSession.deleteMany({ where: { playerId: profile.id } });
     if (ended.count === 0) {
       // Already ended by a racing duplicate request (or some other
       // battle-ending action) — never create a second Pokémon (or grant a
-      // second XP reward) from this one throw.
-      return null;
+      // second XP reward) from this one throw. The ball itself is still
+      // spent (already decremented above, same transaction) — from the
+      // player's perspective this throw simply didn't land.
+      return { status: "failed", remainingQuantity };
     }
 
     // createOwnedPokemon (shared with select-starter.service.ts) also
@@ -89,12 +135,6 @@ export async function attemptCapture(userId: string): Promise<AttemptCaptureResu
     // exactly-once guarantee for free.
     const xpResult = await addPlayerExperience(tx, profile.id, calculateCaptureXpReward(session.wildLevel));
 
-    return { xpResult };
+    return { status: "captured", speciesName: species.name, xpResult, remainingQuantity };
   });
-
-  if (!captureOutcome) {
-    return { status: "invalid-encounter" };
-  }
-
-  return { status: "captured", speciesName: species.name, xpResult: captureOutcome.xpResult };
 }

@@ -24,6 +24,8 @@ interface PlayerPokemonRow {
   createdAt: Date;
   status: string | null;
   statusTurnsRemaining: number | null;
+  pendingEvolutionSpeciesId: string | null;
+  evolutionPermanentlyBlocked: boolean;
 }
 
 interface PlayerKnownMoveRow {
@@ -172,6 +174,8 @@ export function seedPlayerPokemon(row: {
   createdAt?: Date;
   status?: string | null;
   statusTurnsRemaining?: number | null;
+  pendingEvolutionSpeciesId?: string | null;
+  evolutionPermanentlyBlocked?: boolean;
 }) {
   const full: PlayerPokemonRow = {
     id: row.id,
@@ -186,6 +190,8 @@ export function seedPlayerPokemon(row: {
     createdAt: row.createdAt ?? new Date(),
     status: row.status ?? null,
     statusTurnsRemaining: row.statusTurnsRemaining ?? null,
+    pendingEvolutionSpeciesId: row.pendingEvolutionSpeciesId ?? null,
+    evolutionPermanentlyBlocked: row.evolutionPermanentlyBlocked ?? false,
   };
   pokemons.set(row.id, full);
   return full;
@@ -336,11 +342,18 @@ export function getInventoryItemRow(playerId: string, itemId: string) {
   return row ? { ...row } : undefined;
 }
 
+export function seedInventoryItem(row: { playerId: string; itemId: string; quantity: number }) {
+  const full: PlayerInventoryItemRow = { id: nextId("inventory"), ...row };
+  inventoryItems.set(inventoryItemKey(row.playerId, row.itemId), full);
+  return full;
+}
+
 function matchesValue(actual: unknown, expected: unknown): boolean {
   if (expected !== null && typeof expected === "object") {
     const operators = expected as Record<string, unknown>;
     if ("not" in operators) return actual !== operators.not;
     if ("gte" in operators) return (actual as number) >= (operators.gte as number);
+    if ("gt" in operators) return (actual as number) > (operators.gt as number);
   }
   return actual === expected;
 }
@@ -420,6 +433,21 @@ const client = {
       Object.assign(row, data);
       return { ...row };
     },
+    // Mirrors currency-reward.service.ts's spendCurrency / evolution-
+    // progress.service.ts's tryCreatePendingEvolution: the precondition is
+    // encoded directly in `where`, so a call whose precondition no longer
+    // holds (e.g. a pending evolution already exists) matches zero rows
+    // and returns `{ count: 0 }` rather than throwing.
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of pokemons.values()) {
+        if (matches(row, where)) {
+          Object.assign(row, data);
+          count += 1;
+        }
+      }
+      return { count };
+    },
   },
   playerProfile: {
     async findUniqueOrThrow({ where }: { where: { id: string } }) {
@@ -473,6 +501,29 @@ const client = {
     async findUnique({ where }: { where: { playerId_itemId: { playerId: string; itemId: string } } }) {
       const row = inventoryItems.get(inventoryItemKey(where.playerId_itemId.playerId, where.playerId_itemId.itemId));
       return row ? { ...row } : null;
+    },
+    async findMany({ where }: { where: Record<string, unknown> }) {
+      return [...inventoryItems.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of inventoryItems.values()) {
+        if (matches(row, where)) {
+          applyNumericOperators(row as unknown as Record<string, unknown>, data);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [key, row] of inventoryItems) {
+        if (matches(row, where)) {
+          inventoryItems.delete(key);
+          count += 1;
+        }
+      }
+      return { count };
     },
   },
   fieldBattleSession: {

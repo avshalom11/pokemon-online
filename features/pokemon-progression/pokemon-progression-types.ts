@@ -101,6 +101,17 @@ export interface PokemonLevelUpResult {
   // only, never preformatted display text — a future UI derives messages
   // like "X learned Y" from this itself.
   moveLearning: LevelUpMoveLearningPlan;
+
+  // Non-null exactly when this exact XP grant just created a new pending
+  // evolution decision for this Pokémon (features/evolution/services/
+  // evolution-progress.service.ts's tryCreatePendingEvolution, called from
+  // applyPokemonXpGrant right after moveLearning above — see that
+  // function's own doc comment for the deterministic ordering rule). Never
+  // set merely because a pending decision already existed from an earlier
+  // grant — only the grant that actually created it reports it, so the
+  // battle UI shows the evolution prompt exactly once, the moment it
+  // becomes true, never repeatedly on every subsequent reward.
+  pendingEvolutionSpeciesId: string | null;
 }
 
 // Where a Pokémon-XP grant originated — only "wildBattleVictory" exists

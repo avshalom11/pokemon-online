@@ -37,8 +37,24 @@ export function NotificationBell({ initial }: NotificationBellProps) {
     setUnreadCount(initial.unreadCount);
   }
 
+  // Opening the panel is now what marks everything read — no more manual
+  // "mark all as read" button (see the removed handleMarkAllRead below;
+  // markAllAsRead is what it became). Reads `isOpen`/`unreadCount` straight
+  // from this render's closure, exactly like every other handler here
+  // (handleMarkRead, the old handleMarkAllRead) — safe because a click only
+  // ever calls this once per user action, so there's no risk of the toggle
+  // itself firing markAllAsRead twice in a row. Closing never calls it: the
+  // guard is `next` (about to open), not `isOpen` (already open), so
+  // repeatedly toggling the panel — open, close, open again — only ever
+  // marks-as-read on each fresh *open*, never on close, and each of those
+  // opens is its own single click, never a repeated request while the panel
+  // merely stays open.
   function handleToggle() {
-    setIsOpen((prev) => !prev);
+    const next = !isOpen;
+    setIsOpen(next);
+    if (next) {
+      markAllAsRead();
+    }
   }
 
   function handleClose() {
@@ -57,7 +73,14 @@ export function NotificationBell({ initial }: NotificationBellProps) {
     });
   }
 
-  function handleMarkAllRead() {
+  // Server-side source of truth: markAllNotificationsReadAction ->
+  // markAllNotificationsRead (features/notifications/services/
+  // notification-service.ts) already scopes its update to the caller's own
+  // playerId (resolved server-side from the session, never trusted from
+  // the client) and never deletes anything — reused as-is here, unchanged.
+  // The local state update is optimistic (instant badge/dot clearing); the
+  // fire-and-forget server call is what actually persists it.
+  function markAllAsRead() {
     if (unreadCount === 0) return;
 
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
@@ -91,17 +114,8 @@ export function NotificationBell({ initial }: NotificationBellProps) {
             dir="rtl"
             className="absolute end-0 top-full z-50 mt-2 w-72 max-w-[85vw] overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 shadow-2xl backdrop-blur-md"
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+            <div className="border-b border-white/10 px-3 py-2">
               <span className="text-sm font-semibold text-slate-100">התראות</span>
-              {unreadCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={handleMarkAllRead}
-                  className="text-xs font-medium text-indigo-300 transition-colors hover:text-indigo-200"
-                >
-                  סמן הכל כנקרא
-                </button>
-              ) : null}
             </div>
 
             <div className="max-h-80 overflow-y-auto">
