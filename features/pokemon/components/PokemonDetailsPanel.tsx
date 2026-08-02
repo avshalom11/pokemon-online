@@ -7,7 +7,7 @@ import { releasePokemonAction } from "@/features/pokemon/actions/release-pokemon
 import { ReleaseConfirmDialog } from "@/features/pokemon/components/ReleaseConfirmDialog";
 import { PendingMoveLearningPanel } from "@/features/pokemon/components/PendingMoveLearningPanel";
 import { assignPartySlotAction, removePartySlotAction, swapPartySlotsAction } from "@/features/party/actions/party.actions";
-import { formatDexNumber, getArtworkPath } from "@/features/pokemon/media/pokemon-media-paths";
+import { formatDexNumber, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
 import { POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
@@ -164,7 +164,7 @@ export function PokemonDetailsPanel({
 
           <div className="flex flex-col items-center gap-3 text-center">
             <SpriteImage
-              src={getArtworkPath(pokemon.species.dexNumber)}
+              src={getFrontSpritePath(pokemon.species.dexNumber)}
               alt={displayName}
               className="h-40 w-40 object-contain drop-shadow-[0_0_20px_rgba(99,102,241,0.35)]"
               fallbackClassName="flex h-40 w-40 items-center justify-center rounded-xl border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

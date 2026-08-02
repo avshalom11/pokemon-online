@@ -1,6 +1,9 @@
 import { isAPIError } from "better-auth/api";
 
-const USERNAME_TAKEN_MESSAGE = "שם המשתמש כבר תפוס. נסה שם אחר.";
+// Exported so any other caller mapping a username-conflict error (e.g.
+// features/profile's own profile-edit username change) shows the exact
+// same wording, rather than a slightly different re-typed message.
+export const USERNAME_TAKEN_MESSAGE = "שם המשתמש כבר תפוס. נסה שם אחר.";
 const GENERIC_LOGIN_ERROR_MESSAGE = "שם המשתמש, האימייל או הסיסמה שגויים.";
 const GENERIC_REGISTRATION_ERROR_MESSAGE = "לא ניתן להשלים את ההרשמה עם הפרטים שסופקו. נסה שוב.";
 const UNEXPECTED_ERROR_MESSAGE = "משהו השתבש. נסה שוב מאוחר יותר.";
@@ -16,31 +19,43 @@ function isPrismaUniqueConstraintError(error: unknown): boolean {
   );
 }
 
+// Race-condition backstop: verified from the installed better-auth source
+// (plugins/username/index.mjs's validateUsername, db/with-hooks.mjs) that
+// Better Auth's own check-then-insert has a TOCTOU window, and confirmed
+// (grepped the installed better-auth/@better-auth packages) that it does
+// not itself catch a raw Prisma unique-constraint violation. The DB-level
+// @@unique([username]) constraint (prisma/schema.prisma) is the real
+// backstop for that race; this turns *its* failure into the same clear
+// message the app-level pre-check already produces for the non-race case.
+//
+// Exported so every caller that can trigger a username write through
+// Better Auth (registration here, and features/profile's own profile-edit
+// username change) maps the same failure the same way, rather than each
+// re-implementing this exact detection.
+export function isUsernameTakenError(error: unknown): boolean {
+  if (isPrismaUniqueConstraintError(error)) {
+    return true;
+  }
+
+  if (isAPIError(error)) {
+    const code = (error.body as { code?: string } | undefined)?.code;
+    return code === "USERNAME_IS_ALREADY_TAKEN";
+  }
+
+  return false;
+}
+
 // Maps every registration failure to a Hebrew message. Username conflicts
 // get a specific, clear message — usernames are meant to be claimed/checked,
 // so confirming one is taken isn't a privacy concern. Everything else, most
 // importantly an already-registered email, gets the same generic message,
 // so registration never confirms which specific email is already in use.
 export function getRegistrationErrorMessage(error: unknown): string {
-  // Race-condition backstop: verified from the installed better-auth source
-  // (plugins/username/index.mjs's validateUsername, db/with-hooks.mjs) that
-  // Better Auth's own check-then-insert has a TOCTOU window, and confirmed
-  // (grepped the installed better-auth/@better-auth packages) that it does
-  // not itself catch a raw Prisma unique-constraint violation. The DB-level
-  // @@unique([username]) constraint (prisma/schema.prisma) is the real
-  // backstop for that race; this turns *its* failure into the same clear
-  // message the app-level pre-check already produces for the non-race case.
-  if (isPrismaUniqueConstraintError(error)) {
+  if (isUsernameTakenError(error)) {
     return USERNAME_TAKEN_MESSAGE;
   }
 
   if (isAPIError(error)) {
-    const code = (error.body as { code?: string } | undefined)?.code;
-
-    if (code === "USERNAME_IS_ALREADY_TAKEN") {
-      return USERNAME_TAKEN_MESSAGE;
-    }
-
     // Any other registration failure — including an already-registered
     // email — is deliberately generic.
     return GENERIC_REGISTRATION_ERROR_MESSAGE;

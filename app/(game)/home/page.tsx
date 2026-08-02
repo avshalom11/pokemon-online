@@ -22,7 +22,7 @@ export default async function HomePage() {
 
   return (
     <GameScreen>
-      <HomeContent data={data} />
+      <HomeContent data={data} username={session.user.username ?? null} />
     </GameScreen>
   );
 }

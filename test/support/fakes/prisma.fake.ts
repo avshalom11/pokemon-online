@@ -68,6 +68,13 @@ interface PlayerInventoryItemRow {
   quantity: number;
 }
 
+interface PlayerSeenSpeciesRow {
+  id: string;
+  playerId: string;
+  speciesId: string;
+  createdAt: Date;
+}
+
 interface NotificationRow {
   id: string;
   playerId: string;
@@ -108,6 +115,7 @@ let sessions = new Map<string, FieldBattleSessionRow>();
 let dailyBattleCounts = new Map<string, DailyFieldBattleCountRow>();
 let notifications = new Map<string, NotificationRow>();
 let inventoryItems = new Map<string, PlayerInventoryItemRow>();
+let seenSpecies = new Map<string, PlayerSeenSpeciesRow>();
 let idCounter = 0;
 let playerPokemonUpdateCallCount = 0;
 
@@ -124,6 +132,10 @@ function inventoryItemKey(playerId: string, itemId: string): string {
   return `${playerId}::${itemId}`;
 }
 
+function seenSpeciesKey(playerId: string, speciesId: string): string {
+  return `${playerId}::${speciesId}`;
+}
+
 function cloneState() {
   return {
     pokemons: new Map([...pokemons].map(([id, row]) => [id, { ...row }])),
@@ -134,6 +146,7 @@ function cloneState() {
     dailyBattleCounts: new Map([...dailyBattleCounts].map(([id, row]) => [id, { ...row }])),
     notifications: new Map([...notifications].map(([id, row]) => [id, { ...row }])),
     inventoryItems: new Map([...inventoryItems].map(([id, row]) => [id, { ...row }])),
+    seenSpecies: new Map([...seenSpecies].map(([id, row]) => [id, { ...row }])),
   };
 }
 
@@ -146,6 +159,7 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   dailyBattleCounts = snapshot.dailyBattleCounts;
   notifications = snapshot.notifications;
   inventoryItems = snapshot.inventoryItems;
+  seenSpecies = snapshot.seenSpecies;
 }
 
 export function resetFakeDb() {
@@ -157,6 +171,7 @@ export function resetFakeDb() {
   dailyBattleCounts = new Map();
   notifications = new Map();
   inventoryItems = new Map();
+  seenSpecies = new Map();
   idCounter = 0;
   playerPokemonUpdateCallCount = 0;
 }
@@ -348,6 +363,16 @@ export function seedInventoryItem(row: { playerId: string; itemId: string; quant
   return full;
 }
 
+export function getSeenSpeciesRows(playerId: string) {
+  return [...seenSpecies.values()].filter((row) => row.playerId === playerId).map((row) => ({ ...row }));
+}
+
+export function seedSeenSpecies(row: { playerId: string; speciesId: string }) {
+  const full: PlayerSeenSpeciesRow = { id: nextId("seen"), createdAt: new Date(), ...row };
+  seenSpecies.set(seenSpeciesKey(row.playerId, row.speciesId), full);
+  return full;
+}
+
 function matchesValue(actual: unknown, expected: unknown): boolean {
   if (expected !== null && typeof expected === "object") {
     const operators = expected as Record<string, unknown>;
@@ -524,6 +549,33 @@ const client = {
         }
       }
       return { count };
+    },
+  },
+  playerSeenSpecies: {
+    // Mirrors markSpeciesSeen's own real-Prisma call exactly: create on
+    // first encounter, a no-op update (never any data change) on every
+    // call after — the fake's own way of proving "calling this again is
+    // always harmless" without a real unique-constraint violation to catch
+    // it.
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { playerId_speciesId: { playerId: string; speciesId: string } };
+      create: { playerId: string; speciesId: string };
+      update: Record<string, unknown>;
+    }) {
+      const key = seenSpeciesKey(where.playerId_speciesId.playerId, where.playerId_speciesId.speciesId);
+      const existing = seenSpecies.get(key);
+      if (existing) {
+        return { ...existing };
+      }
+      const full: PlayerSeenSpeciesRow = { id: nextId("seen"), createdAt: new Date(), ...create };
+      seenSpecies.set(key, full);
+      return { ...full };
+    },
+    async findMany({ where }: { where: Record<string, unknown> }) {
+      return [...seenSpecies.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
     },
   },
   fieldBattleSession: {

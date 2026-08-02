@@ -5,8 +5,9 @@ import { getPlayerProfile } from "@/lib/auth/player-profile";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 export interface MyPokemonViewData {
-  // Kept (unlike trainerId/level/xp/coins/gold, which the now-shared global
-  // header owns instead — see features/player/services/player-header-data.service.ts):
+  // Kept (unlike username/regionLabel/level/xp/coins/gold, which the
+  // now-shared global header owns instead — see
+  // features/player/services/player-header-data.service.ts):
   // MyPokemonContent passes this to PokemonDetailsPanel's trainerName prop,
   // a genuine use independent of any header.
   displayName: string;

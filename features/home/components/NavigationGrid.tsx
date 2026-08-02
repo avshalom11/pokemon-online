@@ -1,28 +1,39 @@
 import { NavigationCard } from "./NavigationCard";
 
-const NAVIGATION_ITEMS = [
+interface NavigationGridProps {
+  // Null only if the session somehow lacks a username (never expected in
+  // practice) — the Profile card falls back to a disabled "coming soon"
+  // state in that case rather than linking to a broken route.
+  username: string | null;
+}
+
+const STATIC_NAVIGATION_ITEMS = [
   { title: "מפה", icon: "🗺️", href: "/map" },
   { title: "הפוקימונים שלי", icon: "🐾", href: "/my-pokemon" },
   { title: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },
   { title: "תיק ציוד", icon: "🎒", href: "/inventory" },
-  { title: "פוקידקס", icon: "📖", comingSoon: true },
+  { title: "פוקדקס", icon: "📖", href: "/pokedex" },
   { title: "חנות", icon: "🛒", href: "/shop" },
 ] as const;
 
-export function NavigationGrid() {
+export function NavigationGrid({ username }: NavigationGridProps) {
   return (
     <section dir="rtl">
       <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">תפריט המשחק</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {NAVIGATION_ITEMS.map((item) => (
-          <NavigationCard
-            key={item.title}
-            title={item.title}
-            icon={item.icon}
-            href={"href" in item ? item.href : undefined}
-            comingSoon={"comingSoon" in item ? item.comingSoon : undefined}
-          />
+        {STATIC_NAVIGATION_ITEMS.map((item) => (
+          <NavigationCard key={item.title} title={item.title} icon={item.icon} href={item.href} />
         ))}
+        {/* Opens the authenticated player's own public profile page
+            (/profile/[username] — features/profile) — the same page every
+            other player's profile uses, with Edit Profile controls visible
+            only because this player IS the owner viewing it. */}
+        <NavigationCard
+          title="פרופיל"
+          icon="🧑"
+          href={username ? `/profile/${username}` : undefined}
+          comingSoon={!username}
+        />
       </div>
     </section>
   );

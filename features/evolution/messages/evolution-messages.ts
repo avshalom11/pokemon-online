@@ -19,3 +19,14 @@ export const evolutionRejectWarning =
 export function evolutionSucceededMessage(oldName: string, newName: string): string {
   return `מזל טוב! ${oldName} התפתח ל־${newName}!`;
 }
+
+// Stone-Based Evolution (Inventory) — reuses evolutionPromptTitle above
+// as-is (same dialog title either way), but has its own message (names the
+// stone) and deliberately no reject-warning counterpart: cancelling a stone
+// evolution is never permanent, so StoneEvolutionConfirmDialog has nothing
+// equivalent to show.
+export function stoneEvolutionPromptMessage(currentPokemonName: string, evolvedPokemonName: string, stoneName: string): string {
+  return `${currentPokemonName} יכול להתפתח ל־${evolvedPokemonName} באמצעות ${stoneName}. האם לאפשר את ההתפתחות?`;
+}
+
+export const noEligibleStonePokemonMessage = "אין לך כרגע פוקימונים שיכולים להתפתח באמצעות אבן זו.";

@@ -1,25 +1,28 @@
+import { CAPTURE_RATE_TABLE, type CaptureBallId, type HpBracket } from "@/data/battle/capture-rate-config";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 
-// TEMPORARY MVP capture formula — deliberately simple and replaceable (no
-// ball-type modifiers, status conditions, etc.; see PROJECT_RULES'
-// "DO NOT IMPLEMENT YET" list). Keyed off the existing PokemonRarity union
-// (shared/types/pokemon.ts) so rarity strings are never duplicated.
-//
-// Rule: each rarity has a base chance at full HP, which ramps up toward
-// MAX_CAPTURE_CHANCE as the wild Pokémon's HP drops — weighted heavily
-// (0.7) so "wear it down first" is always the dominant, intuitive strategy
-// regardless of rarity. The result is always clamped to a safe
-// [MIN, MAX] range so a capture is never guaranteed nor impossible.
-const RARITY_BASE_CAPTURE_CHANCE: Record<PokemonRarity, number> = {
-  common: 0.6,
-  rare: 0.4,
-  "very-rare": 0.25,
-  legendary: 0.1,
-};
+// Capture-rate lookup — reads the canonical CAPTURE_RATE_TABLE
+// (data/battle/capture-rate-config.ts) directly; never computes a chance
+// from a formula and never hardcodes a percentage here. Master Ball is
+// handled entirely outside this module (see capture.service.ts's own
+// guaranteed-capture branch, which never calls rollCapture at all) — this
+// file only ever covers the three rollable balls (CaptureBallId).
 
-const MIN_CAPTURE_CHANCE = 0.05;
-const MAX_CAPTURE_CHANCE = 0.95;
-const LOW_HP_BONUS_WEIGHT = 0.7;
+// Determines which HP-percentage bracket a wild Pokémon's remaining HP
+// falls into — see HpBracket's own doc comment (data/battle/
+// capture-rate-config.ts) for the exact (lowerBound, upperBound] boundary
+// rule this implements. Clamped to [0, 100] first so an out-of-range
+// currentHp/maxHp pair (never expected, but never trusted either) can't
+// fall through without a matching bracket.
+export function getHpBracket(currentHp: number, maxHp: number): HpBracket {
+  const hpPercent = maxHp > 0 ? Math.max(0, Math.min(100, (currentHp / maxHp) * 100)) : 0;
+
+  if (hpPercent > 75) return "100-75";
+  if (hpPercent > 50) return "75-50";
+  if (hpPercent > 25) return "50-25";
+  if (hpPercent > 10) return "25-10";
+  return "10-0";
+}
 
 export interface CaptureChanceParams {
   currentHp: number;
@@ -29,30 +32,15 @@ export interface CaptureChanceParams {
 
 // Exact chance is intentionally never surfaced to the player — callers
 // should only ever branch on rollCapture's boolean result.
-//
-// ballMultiplier (Great/Ultra Ball) scales the rarity/HP-derived chance
-// before the final clamp — applied here, not at each call site, so a ball's
-// advantage is still bounded by the same [MIN, MAX] safety range as a
-// Poké Ball. Master Ball's guaranteed capture is deliberately NOT modeled
-// as a multiplier (no finite multiplier could reach exactly 1.0 through
-// this clamp) — see capture.service.ts's own guaranteed-capture branch,
-// which bypasses this function entirely for that ball.
-export function calculateCaptureChance(
-  { currentHp, maxHp, rarity }: CaptureChanceParams,
-  ballMultiplier = 1
-): number {
-  const baseChance = RARITY_BASE_CAPTURE_CHANCE[rarity];
-  const missingHpRatio = maxHp > 0 ? 1 - Math.max(0, Math.min(1, currentHp / maxHp)) : 1;
-
-  const chance = baseChance + missingHpRatio * LOW_HP_BONUS_WEIGHT * (MAX_CAPTURE_CHANCE - baseChance);
-
-  return Math.max(MIN_CAPTURE_CHANCE, Math.min(MAX_CAPTURE_CHANCE, chance * ballMultiplier));
+export function calculateCaptureChance({ currentHp, maxHp, rarity }: CaptureChanceParams, ballId: CaptureBallId): number {
+  const bracket = getHpBracket(currentHp, maxHp);
+  return CAPTURE_RATE_TABLE[rarity][bracket][ballId];
 }
 
 // The actual RNG roll lives here (not inline at each call site) so every
-// capture attempt in the codebase goes through the same random source.
-// Must only ever be called server-side — see
+// (non-Master-Ball) capture attempt in the codebase goes through the same
+// random source. Must only ever be called server-side — see
 // features/battle/services/capture.service.ts.
-export function rollCapture(params: CaptureChanceParams, ballMultiplier = 1): boolean {
-  return Math.random() < calculateCaptureChance(params, ballMultiplier);
+export function rollCapture(params: CaptureChanceParams, ballId: CaptureBallId): boolean {
+  return Math.random() < calculateCaptureChance(params, ballId);
 }

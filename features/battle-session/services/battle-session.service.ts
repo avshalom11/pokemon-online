@@ -9,6 +9,7 @@ import type { StatStages } from "@/features/battle/stats/stat-stages";
 import { resetVolatileOnSwitch, type VolatileState } from "@/features/battle/volatile/volatile-condition.types";
 import { grantFieldBattleCurrencyRewards } from "@/features/currency/services/field-battle-currency-reward.service";
 import { incrementDailyBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
+import { markSpeciesSeen } from "@/features/pokedex/services/mark-species-seen.service";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getFirstUsableMember, hasUsableMember, isUsable } from "@/features/party/utils/party-rules";
@@ -16,7 +17,7 @@ import { getEligibleParticipantIds, withParticipant, withParticipantFainted } fr
 import { grantBattlePokemonXp } from "@/features/pokemon-progression/pokemon-progression-service";
 import type { BattleParticipantRecord, PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
 import { calculateVictoryXpReward } from "@/features/player-progression/progression-calculations";
-import { addPlayerExperience } from "@/features/player-progression/progression-service";
+import { addPlayerExperience, getPlayerLevel } from "@/features/player-progression/progression-service";
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -270,14 +271,18 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
 
   const starter = party[0];
   const activePokemon = isUsable(starter) ? starter : getFirstUsableMember(party)!;
-  const wild = resolveWildEncounter(requestedZoneId);
+  // Phase 1 — Wild Pokémon level scaling: read once and reused for both
+  // rolls below, so the current and precomputed-next encounter are always
+  // scaled to the same player-level snapshot.
+  const playerLevel = await getPlayerLevel(playerId);
+  const wild = resolveWildEncounter(requestedZoneId, playerLevel);
   // The session is created already one encounter ahead — see the model's
   // own nextWild* doc comment. resolveWildEncounter is a pure, in-memory
   // weighted pick (no I/O), so precomputing this second encounter up front
   // costs nothing measurable; it just guarantees a promotion is always
   // instant, from the very first encounter of the session onward, never
   // only after the first defeat.
-  const nextWild = resolveWildEncounter(requestedZoneId);
+  const nextWild = resolveWildEncounter(requestedZoneId, playerLevel);
 
   await prisma.fieldBattleSession.create({
     data: {
@@ -298,6 +303,14 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
       participants: serializeParticipants([{ playerPokemonId: activePokemon.id, fainted: false, order: 0 }]),
     },
   });
+
+  // Pokédex — this is the wild the player actually sees on this fresh
+  // session's very first render; the pre-generated nextWild is never
+  // marked here (it isn't shown yet). Restoring an EXISTING session
+  // (the branch above) never reaches this line at all, so a refresh/reopen
+  // can never re-mark anything — see markSpeciesSeen's own doc comment for
+  // why calling it again would be harmless anyway.
+  await markSpeciesSeen(prisma, playerId, wild.pokemon.id);
 
   // The daily battle counter deliberately does NOT increment here — see
   // promoteToNextEncounter's own doc comment for the one true increment
@@ -547,7 +560,11 @@ export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId): 
     currentHealth: session.nextWildCurrentHp,
     maximumHealth: session.nextWildMaxHp,
   };
-  const nextWild = resolveWildEncounter(zoneId);
+  // Phase 1 — Wild Pokémon level scaling: the promoted `wild` above was
+  // already generated (and leveled) earlier, off this critical path — only
+  // the freshly-generated replacement `nextWild` needs today's player level.
+  const playerLevel = await getPlayerLevel(playerId);
+  const nextWild = resolveWildEncounter(zoneId, playerLevel);
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.fieldBattleSession.updateMany({
@@ -588,6 +605,14 @@ export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId): 
     if (updated.count === 0) return null;
 
     await incrementDailyBattleCount(tx, playerId);
+
+    // Pokédex — `wild` here is the just-promoted species, actually shown to
+    // the player for the first time at this exact moment; the freshly
+    // generated replacement `nextWild` is never marked (not shown yet).
+    // Inside the same race guard as the promotion itself, so a losing
+    // duplicate/racing call (updated.count === 0, returned above) never
+    // reaches this line.
+    await markSpeciesSeen(tx, playerId, wild.pokemon.id);
 
     return { wild, nextWild };
   });

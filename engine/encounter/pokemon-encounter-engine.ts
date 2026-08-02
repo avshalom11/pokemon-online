@@ -2,6 +2,10 @@ import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { RARITY_ENCOUNTER_PROBABILITIES } from "@/data/encounter/rarity-config";
 import { ZONE_DATA } from "@/data/zones/zone-data";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effective-encounter-rarity";
+import { getEligibleWildLevelRange } from "@/engine/evolution-stage-scaling/species-eligibility";
+import { getWildLevelRangeForPlayerLevel, type WildLevelRange } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
+import { rollLevelInRange } from "@/engine/player-level-scaling/wild-level-generator";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
@@ -18,26 +22,25 @@ export interface EncounterResult {
 // separate hardcoded list) — used to bound the Stage 1 retry loop below.
 const ALL_RARITIES = Object.keys(RARITY_ENCOUNTER_PROBABILITIES) as PokemonRarity[];
 
-// pokemonId -> rarity, built once from the static species catalog at module
-// load (POKEMON_DATA never changes at runtime) so Stage 2's zone/rarity
-// grouping below is a single O(species) pass, not a `.find()` per encounter
-// entry, and every later lookup is an O(1) Map read.
-const SPECIES_RARITY_BY_ID: Map<string, PokemonRarity> = new Map(
-  POKEMON_DATA.map((species) => [species.id, species.rarity])
-);
-
 // zoneId -> (rarity -> that zone's own ZoneEncounter entries of that
 // rarity). Built once at module load, not per encounter roll — this is the
 // "preprocess per zone" caching step: every call to startPokemonEncounter
 // after the first pays only a Map lookup here, never a fresh filter/scan of
 // a zone's encounters array. ZONE_DATA is static, so this never goes stale.
+//
+// Phase 3 — grouped by EFFECTIVE encounter rarity (engine/encounter-rarity),
+// never PokemonSpecies.rarity directly: a stone-evolved form (e.g.
+// Ninetales, Raichu) is bucketed as "very-rare" here regardless of its own
+// real catalog rarity, so it draws from the global very-rare tier
+// probability while EncounterResult.pokemon still carries that species'
+// real, unmodified PokemonSpecies.rarity for battle UI/capture to read.
 type EncountersByRarity = Partial<Record<PokemonRarity, ZoneEncounter[]>>;
 
 function groupByRarity(encounters: ZoneEncounter[]): EncountersByRarity {
   const grouped: EncountersByRarity = {};
 
   for (const encounter of encounters) {
-    const rarity = SPECIES_RARITY_BY_ID.get(encounter.pokemonId);
+    const rarity = getEffectiveEncounterRarity(encounter.pokemonId);
     if (!rarity) continue; // defensive only — every real pokemonId resolves
 
     (grouped[rarity] ??= []).push(encounter);
@@ -50,8 +53,9 @@ const ZONE_ENCOUNTERS_BY_RARITY: Map<ZoneId, EncountersByRarity> = new Map(
   ZONE_DATA.map((zone) => [zone.id, groupByRarity(zone.encounters)])
 );
 
-// pokemonId -> dexNumber, same "build once, O(1) lookups after" precedent as
-// SPECIES_RARITY_BY_ID above.
+// pokemonId -> dexNumber, same "build once, O(1) lookups after" precedent
+// engine/encounter-rarity/get-effective-encounter-rarity.ts's own
+// SPECIES_RARITY_BY_ID uses.
 const DEX_NUMBER_BY_SPECIES_ID: Map<string, number> = new Map(
   POKEMON_DATA.map((species) => [species.id, species.dexNumber])
 );
@@ -107,60 +111,99 @@ function pickRarity(excluded: ReadonlySet<PokemonRarity>): PokemonRarity {
   return pickWeighted(candidates, (rarity) => RARITY_ENCOUNTER_PROBABILITIES[rarity]);
 }
 
+// Thrown when every rarity tier has been tried and none of them had even
+// one species whose legal evolution-stage range (engine/evolution-stage-
+// scaling) overlaps the player's current wild-level bracket — i.e. this
+// zone genuinely has no legal encounter at all for this player right now.
+// A dedicated, named error (never a silently-illegal species/level, never a
+// generic throw) so a caller can distinguish this from "zone not found" or
+// "zone has no encounters at all" above.
+export class NoEligibleWildEncounterError extends Error {
+  constructor(zoneId: ZoneId, playerRange: WildLevelRange) {
+    super(
+      `No encounter in zone "${zoneId}" has a species whose legal evolution-stage level range overlaps the player's wild-level bracket [${playerRange.minimumLevel}, ${playerRange.maximumLevel}].`
+    );
+    this.name = "NoEligibleWildEncounterError";
+  }
+}
+
+interface SelectedZoneEncounter {
+  encounter: ZoneEncounter;
+  // The overlap between this specific encounter's species' own legal
+  // evolution-stage range and the player's bracket — already computed as
+  // part of eligibility (see pickEncounterOfRarity below), reused as-is to
+  // roll the final level so the two can never disagree or be recomputed
+  // out of sync.
+  eligibleRange: WildLevelRange;
+}
+
 // Stage 2 — weighted pick using encounterWeight, restricted to the current
-// zone's entries of one specific rarity. encounterWeight now only ever
-// decides odds between Pokémon that already share the same rarity tier;
-// which tier gets picked at all is entirely Stage 1's job.
-function pickEncounterOfRarity(zoneId: ZoneId, rarity: PokemonRarity): ZoneEncounter | undefined {
+// zone's entries of one specific rarity AND (Phase 2) further restricted to
+// only those entries whose species is actually legal at the player's
+// current wild-level bracket (evolution-stage filtering — see
+// engine/evolution-stage-scaling). encounterWeight only ever decides odds
+// between Pokémon that already share the same rarity tier AND already
+// passed this eligibility filter; which tier gets picked at all is entirely
+// Stage 1's job, and eligibility is never influenced by weight.
+function pickEncounterOfRarity(zoneId: ZoneId, rarity: PokemonRarity, playerRange: WildLevelRange): SelectedZoneEncounter | undefined {
   const bucket = ZONE_ENCOUNTERS_BY_RARITY.get(zoneId)?.[rarity];
 
   if (!bucket || bucket.length === 0) {
     return undefined;
   }
 
-  return pickWeighted(bucket, (encounter) => encounter.encounterWeight);
+  const eligible: SelectedZoneEncounter[] = [];
+  for (const encounter of bucket) {
+    const eligibleRange = getEligibleWildLevelRange(encounter.pokemonId, playerRange);
+    if (eligibleRange) {
+      eligible.push({ encounter, eligibleRange });
+    }
+  }
+
+  if (eligible.length === 0) {
+    return undefined;
+  }
+
+  return pickWeighted(eligible, (candidate) => candidate.encounter.encounterWeight);
 }
 
-// Orchestrates both stages for one zone. If the rarity Stage 1 lands on
-// has zero matching Pokémon in this zone, retries with another rarity —
-// simple and deterministic: at most ALL_RARITIES.length attempts (4 today),
-// each rarity tried at most once, so this always terminates and never
-// loops unboundedly. Given startPokemonEncounter already guarantees the
-// zone has at least one encounter overall, at least one rarity tier is
-// always non-empty, so the loop always succeeds before running out of
-// rarities to try — the trailing throw exists only as a defensive
-// unreachable guard, matching this file's existing throw-on-invariant-
-// violation style below.
-function selectZoneEncounter(zoneId: ZoneId): ZoneEncounter {
+// Orchestrates both stages for one zone. If the rarity Stage 1 lands on has
+// zero matching Pokémon in this zone, OR has matching Pokémon but none of
+// them are legal at the player's current wild-level bracket (Phase 2),
+// retries with another rarity — simple and deterministic: at most
+// ALL_RARITIES.length attempts (4 today), each rarity tried at most once,
+// so this always terminates and never loops unboundedly. Unlike before
+// Phase 2, exhausting every rarity is no longer purely a defensive-
+// unreachable case (a real zone can genuinely have no legal encounter for
+// some player levels) — see NoEligibleWildEncounterError above.
+function selectZoneEncounter(zoneId: ZoneId, playerRange: WildLevelRange): SelectedZoneEncounter {
   const tried = new Set<PokemonRarity>();
 
   while (tried.size < ALL_RARITIES.length) {
     const rarity = pickRarity(tried);
-    const encounter = pickEncounterOfRarity(zoneId, rarity);
+    const selected = pickEncounterOfRarity(zoneId, rarity, playerRange);
 
-    if (encounter) {
-      return encounter;
+    if (selected) {
+      return selected;
     }
 
     tried.add(rarity);
   }
 
-  throw new Error(`No populated rarity tier found for zone: ${zoneId}`);
+  throw new NoEligibleWildEncounterError(zoneId, playerRange);
 }
 
-function getRandomLevel(
-  minimumLevel: number,
-  maximumLevel: number
-): number {
-  return (
-    Math.floor(
-      Math.random() * (maximumLevel - minimumLevel + 1)
-    ) + minimumLevel
-  );
-}
-
+// Phase 1 — Wild Pokémon level scaling; Phase 2 — Evolution-stage-aware
+// wild encounters. The generated level comes from the overlap between the
+// player's own level bracket (engine/player-level-scaling) and the
+// selected species' own legal evolution-stage range (engine/evolution-
+// stage-scaling) — never from the selected ZoneEncounter's own
+// minimumLevel/maximumLevel. Those fields are kept on ZoneEncounter (and
+// still populate rarity/species selection above unaffected) for possible
+// future systems, but are deliberately no longer read here.
 export function startPokemonEncounter(
-  zoneId: ZoneId
+  zoneId: ZoneId,
+  playerLevel: number
 ): EncounterResult {
   const zone = ZONE_DATA.find(
     (currentZone) => currentZone.id === zoneId
@@ -174,7 +217,8 @@ export function startPokemonEncounter(
     throw new Error(`Zone has no encounters: ${zoneId}`);
   }
 
-  const selectedEncounter = selectZoneEncounter(zoneId);
+  const playerRange = getWildLevelRangeForPlayerLevel(playerLevel);
+  const { encounter: selectedEncounter, eligibleRange } = selectZoneEncounter(zoneId, playerRange);
 
   const pokemon = POKEMON_DATA.find(
     (currentPokemon) =>
@@ -187,10 +231,7 @@ export function startPokemonEncounter(
     );
   }
 
-  const level = getRandomLevel(
-    selectedEncounter.minimumLevel,
-    selectedEncounter.maximumLevel
-  );
+  const level = rollLevelInRange(eligibleRange);
 
   const maximumHealth = calculatePokemonHpStat(pokemon.baseStats.health, level);
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createLevelUpNotification } from "@/features/notifications/services/notification-service";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { prisma } from "@/lib/db/prisma";
 import { getPlayerProgress } from "./progression-calculations";
 import type { LevelUpResult } from "./progression-types";
 
@@ -58,4 +59,16 @@ export async function addPlayerExperience(
     currentLevelXp: progress.currentLevelXp,
     xpRequiredForNextLevel: progress.xpRequiredForNextLevel,
   };
+}
+
+// Plain read of the player's canonical, already-stored account level —
+// PlayerProfile.level is only ever written by addPlayerExperience above, so
+// this is always the same single source of truth that the Home XP bar and
+// every other level display already reads, never independently recomputed
+// from party/owned-Pokémon data. Used by Phase 1 wild-level scaling
+// (features/battle-session/services/battle-session.service.ts) to look up
+// the player level a new encounter should scale to.
+export async function getPlayerLevel(playerId: string): Promise<number> {
+  const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { id: playerId }, select: { level: true } });
+  return profile.level;
 }

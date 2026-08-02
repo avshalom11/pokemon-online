@@ -93,3 +93,104 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
 export function getLevelEvolution(speciesId: string): LevelEvolution | undefined {
   return LEVEL_EVOLUTIONS[speciesId];
 }
+
+export interface LevelEvolutionEntry {
+  speciesId: string;
+  evolution: LevelEvolution;
+}
+
+// The one way to traverse the WHOLE Level Evolution table (rather than
+// looking up a single species via getLevelEvolution above) — used by
+// engine/evolution-stage-scaling to build its own reverse index ("which
+// level was THIS species reached at", the mirror image of the forward
+// speciesId -> evolvesToSpeciesId/requiredLevel lookup above). Returns a
+// fresh array view over the same single LEVEL_EVOLUTIONS table, never a
+// second/duplicated evolution catalog.
+export function getAllLevelEvolutionEntries(): LevelEvolutionEntry[] {
+  return Object.entries(LEVEL_EVOLUTIONS).map(([speciesId, evolution]) => ({ speciesId, evolution }));
+}
+
+// Stone-Based Evolution — the second (and, for this phase, last) evolution
+// method alongside LEVEL_EVOLUTIONS above, kept in this same canonical file
+// rather than a second catalog. `stoneItemId` is always one of the Shop's
+// own canonical Stone item ids (features/shop/data/shop-items.ts) — never a
+// duplicated/derived id — so a stone-evolution lookup and an inventory
+// quantity check always agree on what "this stone" means.
+//
+// One species can have more than one stone branch (Eevee only, in this
+// phase), so every entry is an array — a single-stone species just has one
+// element. Every species below is deliberately absent from LEVEL_EVOLUTIONS
+// (see that table's own scope note) — the two tables are mutually
+// exclusive per species in this phase, so a lookup never has to choose
+// between a level and a stone result for the same species.
+export type EvolutionStoneId = "fire-stone" | "water-stone" | "thunder-stone" | "leaf-stone";
+
+export interface StoneEvolution {
+  method: "stone";
+  evolvesToSpeciesId: string;
+  stoneItemId: EvolutionStoneId;
+}
+
+const STONE_EVOLUTIONS: Record<string, StoneEvolution[]> = {
+  vulpix: [{ method: "stone", evolvesToSpeciesId: "ninetales", stoneItemId: "fire-stone" }],
+  growlithe: [{ method: "stone", evolvesToSpeciesId: "arcanine", stoneItemId: "fire-stone" }],
+  poliwhirl: [{ method: "stone", evolvesToSpeciesId: "poliwrath", stoneItemId: "water-stone" }],
+  shellder: [{ method: "stone", evolvesToSpeciesId: "cloyster", stoneItemId: "water-stone" }],
+  staryu: [{ method: "stone", evolvesToSpeciesId: "starmie", stoneItemId: "water-stone" }],
+  pikachu: [{ method: "stone", evolvesToSpeciesId: "raichu", stoneItemId: "thunder-stone" }],
+  gloom: [{ method: "stone", evolvesToSpeciesId: "vileplume", stoneItemId: "leaf-stone" }],
+  weepinbell: [{ method: "stone", evolvesToSpeciesId: "victreebel", stoneItemId: "leaf-stone" }],
+  exeggcute: [{ method: "stone", evolvesToSpeciesId: "exeggutor", stoneItemId: "leaf-stone" }],
+  eevee: [
+    { method: "stone", evolvesToSpeciesId: "flareon", stoneItemId: "fire-stone" },
+    { method: "stone", evolvesToSpeciesId: "vaporeon", stoneItemId: "water-stone" },
+    { method: "stone", evolvesToSpeciesId: "jolteon", stoneItemId: "thunder-stone" },
+  ],
+};
+
+// Every stone branch a species has, regardless of which stone — used by the
+// Inventory's eligibility list (features/evolution/services/
+// stone-evolution-eligibility.ts) to check a species against one particular
+// selected stone. Returns an empty array (never undefined) for a species
+// with no stone evolution at all, so callers can always `.find(...)` /
+// `.some(...)` without a separate existence check.
+export function getStoneEvolutions(speciesId: string): StoneEvolution[] {
+  return STONE_EVOLUTIONS[speciesId] ?? [];
+}
+
+// The one place a species' evolution for one EXACT stone is ever resolved —
+// used both by the client-side eligibility filter and, authoritatively, by
+// accept-stone-evolution.service.ts's server-side re-validation. Returns
+// undefined whenever the species has no stone evolution at all, or has one
+// but not for this particular stone (e.g. Vulpix + Water Stone).
+export function getStoneEvolutionByItem(speciesId: string, stoneItemId: string): StoneEvolution | undefined {
+  return getStoneEvolutions(speciesId).find((evolution) => evolution.stoneItemId === stoneItemId);
+}
+
+export interface StoneEvolutionEntry {
+  speciesId: string;
+  evolution: StoneEvolution;
+}
+
+// The one way to traverse the WHOLE Stone Evolution table (rather than
+// looking up one species via getStoneEvolutions/getStoneEvolutionByItem
+// above) — same "flat entries view over the single canonical table" idiom
+// as getAllLevelEvolutionEntries above. Flattened because one species
+// (Eevee) can have more than one stone branch. Used by
+// engine/encounter-rarity to derive "every species reachable only via a
+// stone evolution" without a second/duplicated species list.
+export function getAllStoneEvolutionEntries(): StoneEvolutionEntry[] {
+  return Object.entries(STONE_EVOLUTIONS).flatMap(([speciesId, evolutions]) =>
+    evolutions.map((evolution) => ({ speciesId, evolution }))
+  );
+}
+
+const EVOLUTION_STONE_ITEM_IDS: readonly EvolutionStoneId[] = ["fire-stone", "water-stone", "thunder-stone", "leaf-stone"];
+
+// Narrows an arbitrary Shop/Inventory itemId to the EvolutionStoneId union —
+// the only place that narrowing happens, so a non-stone itemId (a Poké Ball,
+// a Potion) can never be trusted as a stone by the accept-flow's own
+// server-side validation.
+export function isEvolutionStoneItemId(itemId: string): itemId is EvolutionStoneId {
+  return (EVOLUTION_STONE_ITEM_IDS as readonly string[]).includes(itemId);
+}

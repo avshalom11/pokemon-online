@@ -23,8 +23,11 @@
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { ZONE_DATA } from "@/data/zones/zone-data";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { getEligibleWildLevelRange, isSpeciesEligibleForWildRange } from "@/engine/evolution-stage-scaling/species-eligibility";
+import { getWildLevelRangeForPlayerLevel, type WildLevelRange } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
+import { rollLevelInRange } from "@/engine/player-level-scaling/wild-level-generator";
 import { startPokemonEncounter, type EncounterResult } from "./pokemon-encounter-engine";
-import type { ZoneId } from "@/shared/types/zone";
+import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
 
 // ~20% combined legendary-tier probability, per the manual-testing request
 // this override exists for — a deliberately large, obviously-not-production
@@ -50,8 +53,13 @@ export function isLegendaryEncounterTestModeEnabled(): boolean {
 
 interface WeightedCandidate {
   pokemonId: string;
-  minimumLevel: number;
-  maximumLevel: number;
+  // The overlap between this species' own legal evolution-stage range
+  // (engine/evolution-stage-scaling) and the player's current wild-level
+  // bracket — never the raw ZoneEncounter minimumLevel/maximumLevel, and
+  // never recomputed later: rollLevelInRange in buildEncounterResult below
+  // rolls directly from this same overlap, exactly like
+  // pokemon-encounter-engine.ts's own SelectedZoneEncounter.eligibleRange.
+  eligibleRange: WildLevelRange;
   weight: number;
 }
 
@@ -69,14 +77,31 @@ function pickWeighted(candidates: WeightedCandidate[]): WeightedCandidate {
   return candidates[candidates.length - 1];
 }
 
-function rollLevel(minimumLevel: number, maximumLevel: number): number {
-  return Math.floor(Math.random() * (maximumLevel - minimumLevel + 1)) + minimumLevel;
+// Turns a list of real ZoneEncounter entries into WeightedCandidates,
+// keeping only the ones whose species is actually legal (Phase 2's
+// evolution-stage eligibility — engine/evolution-stage-scaling, the exact
+// same helper pokemon-encounter-engine.ts's own Stage 2 filter uses) at
+// `playerRange`. This is the one place that guarantees the dev boost can
+// never offer an unevolved species above its legal evolution level or an
+// evolved species below its legal minimum — never a separate/duplicated
+// eligibility check.
+function toEligibleCandidates(encounters: ZoneEncounter[], playerRange: WildLevelRange): WeightedCandidate[] {
+  const candidates: WeightedCandidate[] = [];
+
+  for (const encounter of encounters) {
+    const eligibleRange = getEligibleWildLevelRange(encounter.pokemonId, playerRange);
+    if (eligibleRange) {
+      candidates.push({ pokemonId: encounter.pokemonId, eligibleRange, weight: encounter.encounterWeight });
+    }
+  }
+
+  return candidates;
 }
 
 // Exported for tests only (probability-math verification without needing
 // Math.random determinism) — not meant to be called from app code, which
 // should use resolveWildEncounter below.
-export function buildBoostedCandidates(zoneId: ZoneId): WeightedCandidate[] | null {
+export function buildBoostedCandidates(zoneId: ZoneId, playerRange: WildLevelRange): WeightedCandidate[] | null {
   const zone = ZONE_DATA.find((currentZone) => currentZone.id === zoneId);
 
   if (!zone || zone.encounters.length === 0) {
@@ -94,45 +119,61 @@ export function buildBoostedCandidates(zoneId: ZoneId): WeightedCandidate[] | nu
     return null;
   }
 
+  // Legendaries have no level-evolution relationship in this game's roster
+  // (final/standalone), so this filter is a no-op in practice today — kept
+  // here anyway rather than assumed, so this boost stays correct even if a
+  // future legendary ever gained one, without needing its own special case.
+  const eligibleLegendaryEncounters = legendaryEncounters.filter((encounter) =>
+    isSpeciesEligibleForWildRange(encounter.pokemonId, playerRange)
+  );
+
+  if (eligibleLegendaryEncounters.length === 0) {
+    return null;
+  }
+
   const nonLegendaryEncounters = zone.encounters.filter(
     (encounter) => !isLegendarySpecies(encounter.pokemonId)
   );
 
-  const nonLegendaryCandidates: WeightedCandidate[] = nonLegendaryEncounters.map((encounter) => ({
-    pokemonId: encounter.pokemonId,
-    minimumLevel: encounter.minimumLevel,
-    maximumLevel: encounter.maximumLevel,
-    weight: encounter.encounterWeight,
-  }));
-
+  const nonLegendaryCandidates = toEligibleCandidates(nonLegendaryEncounters, playerRange);
   const nonLegendaryTotalWeight = nonLegendaryCandidates.reduce((sum, candidate) => sum + candidate.weight, 0);
 
   // Solve for the legendary tier's combined weight L such that
   // L / (nonLegendaryTotalWeight + L) == LEGENDARY_TEST_MODE_SHARE, then
-  // split it evenly across however many legendary entries this zone
-  // already has — their own real level ranges are kept as-is, only the
-  // weight is overridden for the boost.
+  // split it evenly across however many ELIGIBLE legendary entries this
+  // zone has right now — their own real level ranges are kept as-is
+  // (via getEligibleWildLevelRange below), only the weight is overridden
+  // for the boost.
   const legendaryTierWeight =
     (nonLegendaryTotalWeight * LEGENDARY_TEST_MODE_SHARE) / (1 - LEGENDARY_TEST_MODE_SHARE);
-  const perLegendaryWeight = legendaryTierWeight / legendaryEncounters.length;
+  const perLegendaryWeight = legendaryTierWeight / eligibleLegendaryEncounters.length;
 
-  const legendaryCandidates: WeightedCandidate[] = legendaryEncounters.map((encounter) => ({
+  const legendaryCandidates: WeightedCandidate[] = eligibleLegendaryEncounters.map((encounter) => ({
     pokemonId: encounter.pokemonId,
-    minimumLevel: encounter.minimumLevel,
-    maximumLevel: encounter.maximumLevel,
+    // Guaranteed non-null — this encounter already passed the exact same
+    // eligibility check just above.
+    eligibleRange: getEligibleWildLevelRange(encounter.pokemonId, playerRange)!,
     weight: perLegendaryWeight,
   }));
 
-  return [...nonLegendaryCandidates, ...legendaryCandidates];
+  const allCandidates = [...nonLegendaryCandidates, ...legendaryCandidates];
+
+  return allCandidates.length > 0 ? allCandidates : null;
 }
 
+// Level generation rolls from THIS specific candidate's own eligible
+// overlap (computed once, in buildBoostedCandidates/toEligibleCandidates
+// above) via the same rollLevelInRange primitive the real engine uses —
+// never the player's raw bracket, and never the ZoneEncounter's own stale
+// minimumLevel/maximumLevel, so a dev-boosted encounter is levelled exactly
+// like any other wild encounter would be for this same player and species.
 function buildEncounterResult(zoneId: ZoneId, candidate: WeightedCandidate): EncounterResult {
   const pokemon = POKEMON_DATA.find((species) => species.id === candidate.pokemonId);
   if (!pokemon) {
     throw new Error(`Pokemon not found: ${candidate.pokemonId}`);
   }
 
-  const level = rollLevel(candidate.minimumLevel, candidate.maximumLevel);
+  const level = rollLevelInRange(candidate.eligibleRange);
   const maximumHealth = calculatePokemonHpStat(pokemon.baseStats.health, level);
 
   return { zoneId, pokemon, level, currentHealth: maximumHealth, maximumHealth };
@@ -141,16 +182,18 @@ function buildEncounterResult(zoneId: ZoneId, candidate: WeightedCandidate): Enc
 // The one function callers should use — transparently returns the real,
 // unmodified production encounter (startPokemonEncounter, byte-for-byte
 // the same function/behavior as always) unless the dev flag is on AND this
-// zone already has at least one legendary ZoneEncounter entry of its own;
-// in every other case behavior is identical to calling
-// startPokemonEncounter directly.
-export function resolveWildEncounter(zoneId: ZoneId): EncounterResult {
+// zone already has at least one legendary ZoneEncounter entry of its own
+// that's also evolution-stage-eligible at the player's current bracket; in
+// every other case behavior is identical to calling startPokemonEncounter
+// directly.
+export function resolveWildEncounter(zoneId: ZoneId, playerLevel: number): EncounterResult {
   if (isLegendaryEncounterTestModeEnabled()) {
-    const candidates = buildBoostedCandidates(zoneId);
+    const playerRange = getWildLevelRangeForPlayerLevel(playerLevel);
+    const candidates = buildBoostedCandidates(zoneId, playerRange);
     if (candidates) {
       return buildEncounterResult(zoneId, pickWeighted(candidates));
     }
   }
 
-  return startPokemonEncounter(zoneId);
+  return startPokemonEncounter(zoneId, playerLevel);
 }

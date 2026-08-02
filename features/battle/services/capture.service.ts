@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isCaptureBallId } from "@/data/battle/capture-rate-config";
 import { rollCapture } from "@/engine/battle/capture";
 import { getInventoryItemQuantity, removeInventoryItem } from "@/features/inventory/services/inventory.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
@@ -19,18 +20,11 @@ export type AttemptCaptureResult =
   | { status: "invalid-item" }
   | { status: "no-balls" };
 
-// Every catalog Poké Ball's capture-chance multiplier, keyed by its
-// shop-catalog itemId (features/shop/data/shop-items.ts) — never by name.
-// "guaranteed" is handled as its own branch below (never passed through
-// engine/battle/capture.ts's clamped multiplier math, which can't reach
-// exactly 1.0 through a finite multiplier — see that module's own doc
-// comment on calculateCaptureChance).
-const CAPTURE_MULTIPLIER_BY_BALL_ID: Record<string, number | "guaranteed"> = {
-  "poke-ball": 1,
-  "great-ball": 2,
-  "ultra-ball": 3,
-  "master-ball": "guaranteed",
-};
+// Master Ball's own shop-catalog itemId (features/shop/data/shop-items.ts)
+// — the one ball that bypasses CAPTURE_RATE_TABLE (data/battle/
+// capture-rate-config.ts) entirely rather than being looked up in it (see
+// this file's own guaranteed-capture branch below).
+const MASTER_BALL_ITEM_ID = "master-ball";
 
 // Server-side capture resolution — the only place the capture RNG
 // (rollCapture, engine/battle/capture.ts) is ever invoked, and the only
@@ -49,9 +43,11 @@ const CAPTURE_MULTIPLIER_BY_BALL_ID: Record<string, number | "guaranteed"> = {
 // both see a row to delete — the loser's deleteMany reports 0 rows and
 // aborts before ever creating a second Pokémon from one throw.
 //
-// Ball ownership/price/multiplier are always resolved server-side against
-// the static Shop catalog by ballItemId (features/shop/data/shop-items.ts)
-// — a client-sent multiplier is never trusted. The ball decrement
+// Ball ownership/price/capture-rate are always resolved server-side
+// against the static Shop catalog (by ballItemId) and CAPTURE_RATE_TABLE
+// (features/shop/data/shop-items.ts, data/battle/capture-rate-config.ts)
+// — a client can only ever say which ball it used, never what chance that
+// implies. The ball decrement
 // (removeInventoryItem, features/inventory/services/inventory.service.ts —
 // the same atomic gte-guarded idiom the Shop's own sell flow uses) and the
 // capture's effect (creating the Pokémon, or simply doing nothing on a
@@ -75,18 +71,26 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
   }
 
   const ball = getShopItemById(ballItemId);
-  const multiplier = ball && ball.categoryId === "poke-balls" ? CAPTURE_MULTIPLIER_BY_BALL_ID[ball.id] : undefined;
-  if (!ball || multiplier === undefined) {
+  if (!ball || ball.categoryId !== "poke-balls") {
     return { status: "invalid-item" };
   }
 
-  // Master Ball bypasses the RNG entirely (never rolled) rather than being
-  // modeled as some very large multiplier — see this module's own
-  // CAPTURE_MULTIPLIER_BY_BALL_ID doc comment.
-  const captured =
-    multiplier === "guaranteed"
-      ? true
-      : rollCapture({ currentHp: session.wildCurrentHp, maxHp: session.wildMaxHp, rarity: species.rarity }, multiplier);
+  // Master Ball bypasses the RNG entirely (never rolled, never looked up in
+  // CAPTURE_RATE_TABLE) rather than being modeled as some percentage that
+  // could round to less than 100 — see this module's own
+  // MASTER_BALL_ITEM_ID doc comment. Every other ball must resolve to a
+  // real CaptureBallId (data/battle/capture-rate-config.ts) or the attempt
+  // is rejected — a Shop item that's somehow categorized "poke-balls" but
+  // isn't one of the three rollable balls or Master Ball can never reach
+  // rollCapture with an untyped id.
+  let captured: boolean;
+  if (ball.id === MASTER_BALL_ITEM_ID) {
+    captured = true;
+  } else if (isCaptureBallId(ball.id)) {
+    captured = rollCapture({ currentHp: session.wildCurrentHp, maxHp: session.wildMaxHp, rarity: species.rarity }, ball.id);
+  } else {
+    return { status: "invalid-item" };
+  }
 
   return prisma.$transaction(async (tx) => {
     const removed = await removeInventoryItem(tx, profile.id, ballItemId, 1);

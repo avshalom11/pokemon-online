@@ -3,13 +3,15 @@
 import { revalidatePath } from "next/cache";
 
 import { acceptEvolution, type AcceptEvolutionResult } from "@/features/evolution/services/accept-evolution.service";
+import { acceptStoneEvolution, type AcceptStoneEvolutionResult } from "@/features/evolution/services/accept-stone-evolution.service";
 import { rejectEvolution, type RejectEvolutionResult } from "@/features/evolution/services/reject-evolution.service";
-import { evolutionDecisionSchema } from "@/features/evolution/validation/evolution.schema";
+import { evolutionDecisionSchema, stoneEvolutionDecisionSchema } from "@/features/evolution/validation/evolution.schema";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 
 export type AcceptEvolutionActionResult = AcceptEvolutionResult | { status: "error" };
 export type RejectEvolutionActionResult = RejectEvolutionResult | { status: "error" };
+export type AcceptStoneEvolutionActionResult = AcceptStoneEvolutionResult | { status: "error" };
 
 // Both thin Server Action wrappers — same shape as every other action file
 // in this codebase (resolve the session, resolve the profile, validate,
@@ -50,6 +52,38 @@ export async function rejectEvolutionAction(playerPokemonId: string): Promise<Re
   if (result.status === "success") {
     revalidatePath("/home");
     revalidatePath("/my-pokemon");
+  }
+
+  return result;
+}
+
+// Inventory's Stone-Based Evolution accept — same thin wrapper shape as
+// acceptEvolutionAction above (resolve session, resolve profile, validate,
+// delegate to the service, revalidate on success), reused as-is rather than
+// forking a new pattern. Ownership, stone ownership/quantity, and the
+// species/stone pairing are all re-enforced inside acceptStoneEvolution
+// regardless of what the client sends.
+export async function acceptStoneEvolutionAction(
+  playerPokemonId: string,
+  stoneItemId: string
+): Promise<AcceptStoneEvolutionActionResult> {
+  const session = await getCurrentSession();
+  if (!session) return { status: "error" };
+
+  const parsed = stoneEvolutionDecisionSchema.safeParse({ playerPokemonId, stoneItemId });
+  if (!parsed.success) return { status: "error" };
+
+  const profile = await getPlayerProfile(session.user.id);
+  const result = await acceptStoneEvolution(profile.id, parsed.data.playerPokemonId, parsed.data.stoneItemId);
+
+  if (result.status === "success") {
+    // Stone quantity + species/HP changed — same revalidation set
+    // acceptEvolutionAction already uses, plus /inventory itself (the stone
+    // count shown there must never go stale).
+    revalidatePath("/inventory");
+    revalidatePath("/home");
+    revalidatePath("/my-pokemon");
+    revalidatePath("/pokemon-center");
   }
 
   return result;

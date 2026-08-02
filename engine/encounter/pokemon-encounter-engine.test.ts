@@ -6,12 +6,20 @@ import { startPokemonEncounter } from "./pokemon-encounter-engine.ts";
 import { RARITY_ENCOUNTER_PROBABILITIES } from "@/data/encounter/rarity-config";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { ZONE_DATA } from "@/data/zones/zone-data";
+import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effective-encounter-rarity";
+import { isSpeciesEligibleForWildRange } from "@/engine/evolution-stage-scaling/species-eligibility";
+import { getWildLevelRangeForPlayerLevel } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 import type { ZoneId } from "@/shared/types/zone";
 
 const RARITY_BY_ID: Map<string, PokemonRarity> = new Map(
   POKEMON_DATA.map((species) => [species.id, species.rarity])
 );
+
+// An arbitrary fixed player level used by every test below that doesn't
+// itself care about level scaling (rarity/weight/fallback behavior) — only
+// the dedicated level-range test cares about its exact value.
+const TEST_PLAYER_LEVEL = 20;
 
 // Mutates the live, shared RARITY_ENCOUNTER_PROBABILITIES object (the exact
 // object the engine itself imports and reads) so a test can force Stage 1
@@ -30,17 +38,30 @@ function withRarityProbabilities(overrides: Partial<Record<PokemonRarity, number
 }
 
 test("throws for an unknown zone", () => {
-  assert.throws(() => startPokemonEncounter("not-a-real-zone" as ZoneId));
+  assert.throws(() => startPokemonEncounter("not-a-real-zone" as ZoneId, TEST_PLAYER_LEVEL));
 });
 
-test("the returned level always falls within the picked encounter's own min/max range for that zone", () => {
+test("the returned level always falls within the player's own level bracket, never the picked encounter's stale zone min/max", () => {
+  const { minimumLevel, maximumLevel } = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
+
   for (let i = 0; i < 300; i++) {
-    const result = startPokemonEncounter("lava");
-    const ownEntry = ZONE_DATA.find((z) => z.id === "lava")!.encounters.find(
-      (e) => e.pokemonId === result.pokemon.id
-    )!;
-    assert.ok(result.level >= ownEntry.minimumLevel && result.level <= ownEntry.maximumLevel);
+    const result = startPokemonEncounter("lava", TEST_PLAYER_LEVEL);
+    assert.ok(
+      result.level >= minimumLevel && result.level <= maximumLevel,
+      `level ${result.level} outside player-level bracket [${minimumLevel}, ${maximumLevel}]`
+    );
     assert.equal(result.zoneId, "lava");
+  }
+});
+
+test("a different player level produces levels from that level's own bracket, not the previous one", () => {
+  const lowLevelRange = getWildLevelRangeForPlayerLevel(3);
+  const highLevelRange = getWildLevelRangeForPlayerLevel(56);
+  assert.notDeepEqual(lowLevelRange, highLevelRange, "test assumption: brackets differ");
+
+  for (let i = 0; i < 100; i++) {
+    const result = startPokemonEncounter("lava", 56);
+    assert.ok(result.level >= highLevelRange.minimumLevel && result.level <= highLevelRange.maximumLevel);
   }
 });
 
@@ -73,7 +94,7 @@ test("no pity/streak mechanism: the legendary rate does not drift between an ear
     let earlyLegendary = 0;
     let lateLegendary = 0;
     for (let i = 0; i < trials; i++) {
-      const result = startPokemonEncounter("haunted-house");
+      const result = startPokemonEncounter("haunted-house", TEST_PLAYER_LEVEL);
       const isLegendary = result.pokemon.id === "mew" || result.pokemon.id === "mewtwo";
       if (i < half) {
         if (isLegendary) earlyLegendary++;
@@ -90,21 +111,96 @@ test("no pity/streak mechanism: the legendary rate does not drift between an ear
   });
 });
 
-test("encounterWeight only decides odds within the same rarity: grassland's very-rare tier (ivysaur weight 10 vs bulbasaur/venusaur/raichu/jolteon weight 5 each) splits proportionally", () => {
+test("encounterWeight only decides odds among species that are ALSO evolution-stage-eligible at the player's level: grassland's EFFECTIVE very-rare tier excludes Venusaur (legal range 32+, not reachable at this player level) and splits proportionally among the rest", () => {
+  // Before Phase 2, grassland's very-rare tier was assumed to always offer
+  // all five of Bulbasaur/Ivysaur/Venusaur/Raichu/Jolteon — no longer true:
+  // Bulbasaur (1-15) and Venusaur (32+) can never be simultaneously legal
+  // for any single player-level bracket, so "all five always eligible" is
+  // not just wrong at TEST_PLAYER_LEVEL, it's structurally impossible at
+  // ANY player level.
+  //
+  // Phase 3 additionally means this tier is no longer just "every real
+  // PokemonSpecies.rarity: very-rare entry" — grassland also has stone-
+  // evolved forms (Vileplume, Victreebel, Exeggutor) whose OWN
+  // PokemonSpecies.rarity is "rare"/"common" but whose EFFECTIVE encounter
+  // rarity is "very-rare" (getEffectiveEncounterRarity). This test derives
+  // tier membership the same way the real engine's own Stage 2 grouping
+  // does — by effective rarity, never real rarity — and asserts
+  // encounterWeight still controls relative odds among exactly those.
+  const playerRange = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
+  const grassland = ZONE_DATA.find((zone) => zone.id === "grassland")!;
+  const veryRareEncounters = grassland.encounters.filter(
+    (encounter) => getEffectiveEncounterRarity(encounter.pokemonId) === "very-rare"
+  );
+  const eligibleEncounters = veryRareEncounters.filter((encounter) => isSpeciesEligibleForWildRange(encounter.pokemonId, playerRange));
+
+  assert.ok(
+    veryRareEncounters.some((encounter) => encounter.pokemonId === "venusaur"),
+    "test assumption: grassland's effective very-rare tier includes venusaur"
+  );
+  assert.ok(
+    !eligibleEncounters.some((encounter) => encounter.pokemonId === "venusaur"),
+    "venusaur (legal range 32+) must not be eligible at this player level"
+  );
+  assert.ok(
+    eligibleEncounters.some((encounter) => encounter.pokemonId === "ivysaur") &&
+      eligibleEncounters.some((encounter) => encounter.pokemonId === "bulbasaur"),
+    "test assumption: ivysaur and bulbasaur are both eligible at this player level"
+  );
+  // Regression guard for Phase 3 itself: a stone-evolved form whose OWN
+  // species rarity is NOT "very-rare" (Exeggutor is real-rarity "common")
+  // must still be grouped into this effective tier — otherwise this test
+  // would keep passing even if getEffectiveEncounterRarity were never
+  // actually wired into the engine's Stage 2 grouping.
+  assert.ok(
+    eligibleEncounters.some((encounter) => encounter.pokemonId === "exeggutor"),
+    "test assumption: exeggutor (stone-evolved, real rarity common) is in the effective very-rare tier"
+  );
+  assert.equal(RARITY_BY_ID.get("exeggutor"), "common", "test assumption: exeggutor's OWN species rarity is unaffected");
+
+  const totalEligibleWeight = eligibleEncounters.reduce((sum, encounter) => sum + encounter.encounterWeight, 0);
+
   withRarityProbabilities({ common: 0, rare: 0, "very-rare": 1, legendary: 0 }, () => {
     const counts: Record<string, number> = {};
     const trials = 4000;
     for (let i = 0; i < trials; i++) {
-      const result = startPokemonEncounter("grassland");
-      assert.equal(RARITY_BY_ID.get(result.pokemon.id), "very-rare");
+      const result = startPokemonEncounter("grassland", TEST_PLAYER_LEVEL);
+      // The TIER Stage 1 drew from is always effectively very-rare — but
+      // the returned species' own PokemonSpecies.rarity (what battle UI/
+      // capture actually read) is deliberately left untouched by Phase 3,
+      // so it must never be asserted here.
+      assert.equal(getEffectiveEncounterRarity(result.pokemon.id), "very-rare");
+      assert.ok(
+        eligibleEncounters.some((encounter) => encounter.pokemonId === result.pokemon.id),
+        `${result.pokemon.id} is not evolution-stage-eligible at this player level and must never be returned`
+      );
       counts[result.pokemon.id] = (counts[result.pokemon.id] ?? 0) + 1;
     }
-    // Total very-rare weight in grassland is 5+10+5+5+5 = 30, so ivysaur
-    // (weight 10) should land close to double any of the weight-5 entries.
+
+    // At least one stone-evolved, non-"very-rare"-species result must
+    // actually occur across 4000 trials — proving the effective-rarity
+    // tier is genuinely reachable, not just theoretically eligible.
+    assert.ok((counts.exeggutor ?? 0) > 0, "exeggutor must be reachable from the effective very-rare tier");
+
+    // Ivysaur (weight 10) vs Bulbasaur (weight 5) — the same 2x-weight
+    // relationship the original, pre-Phase-2 version of this test asserted,
+    // still true among whichever species are currently eligible; expected
+    // shares are derived from the real, currently-eligible total weight
+    // rather than a hardcoded assumption, so future data changes can't make
+    // this pass or fail for the wrong reason.
     const ivysaurShare = (counts.ivysaur ?? 0) / trials;
     const bulbasaurShare = (counts.bulbasaur ?? 0) / trials;
-    assert.ok(ivysaurShare > 0.2 && ivysaurShare < 0.45, `ivysaur share ${ivysaurShare} not near 1/3`);
-    assert.ok(bulbasaurShare > 0.08 && bulbasaurShare < 0.25, `bulbasaur share ${bulbasaurShare} not near 1/6`);
+    const expectedIvysaurShare = (veryRareEncounters.find((e) => e.pokemonId === "ivysaur")!.encounterWeight) / totalEligibleWeight;
+    const expectedBulbasaurShare = (veryRareEncounters.find((e) => e.pokemonId === "bulbasaur")!.encounterWeight) / totalEligibleWeight;
+
+    assert.ok(
+      Math.abs(ivysaurShare - expectedIvysaurShare) < 0.12,
+      `ivysaur share ${ivysaurShare} not near expected ${expectedIvysaurShare}`
+    );
+    assert.ok(
+      Math.abs(bulbasaurShare - expectedBulbasaurShare) < 0.12,
+      `bulbasaur share ${bulbasaurShare} not near expected ${expectedBulbasaurShare}`
+    );
     assert.ok(ivysaurShare > bulbasaurShare * 1.3, "ivysaur (weight 10) should clearly outpace bulbasaur (weight 5)");
   });
 });
@@ -112,7 +208,7 @@ test("encounterWeight only decides odds within the same rarity: grassland's very
 test("forcing a rarity to zero probability means it is never selected, even when the zone has entries for it", () => {
   withRarityProbabilities({ common: 1, rare: 0, "very-rare": 0, legendary: 0 }, () => {
     for (let i = 0; i < 300; i++) {
-      const result = startPokemonEncounter("grassland");
+      const result = startPokemonEncounter("grassland", TEST_PLAYER_LEVEL);
       assert.equal(RARITY_BY_ID.get(result.pokemon.id), "common");
     }
   });
@@ -123,7 +219,7 @@ test("haunted-house's two equal-weight legendary entries (Mew, Mewtwo) split rou
     const counts: Record<string, number> = { mew: 0, mewtwo: 0 };
     const trials = 2000;
     for (let i = 0; i < trials; i++) {
-      const result = startPokemonEncounter("haunted-house");
+      const result = startPokemonEncounter("haunted-house", TEST_PLAYER_LEVEL);
       assert.ok(result.pokemon.id === "mew" || result.pokemon.id === "mewtwo");
       counts[result.pokemon.id]++;
     }
@@ -140,7 +236,7 @@ test("fallback retry: a zone with no legendary or very-rare entries (cave) never
 
   withRarityProbabilities({ common: 1, rare: 1, "very-rare": 1000, legendary: 1000 }, () => {
     for (let i = 0; i < 300; i++) {
-      const result = startPokemonEncounter("cave");
+      const result = startPokemonEncounter("cave", TEST_PLAYER_LEVEL);
       const rarity = RARITY_BY_ID.get(result.pokemon.id);
       assert.ok(rarity === "common" || rarity === "rare", `cave must never yield ${rarity}`);
     }

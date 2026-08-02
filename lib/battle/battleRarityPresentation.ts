@@ -29,9 +29,9 @@ export interface RarityPresentation {
 
 // One entry per PokemonRarity value (shared/types/pokemon.ts) — a Record
 // keyed by the full union, so adding a rarity to that type is a compile
-// error here until it's given a presentation, the same safety the
-// engine/battle/capture.ts RARITY_BASE_CAPTURE_CHANCE map already relies
-// on. common/rare intentionally keep the game's existing look untouched;
+// error here until it's given a presentation, the same safety
+// data/battle/capture-rate-config.ts's own CAPTURE_RATE_TABLE already
+// relies on. common/rare intentionally keep the game's existing look untouched;
 // only very-rare/legendary get a distinct background + warning banner.
 export const RARITY_PRESENTATION: Record<PokemonRarity, RarityPresentation> = {
   common: {

@@ -2,12 +2,15 @@ import "server-only";
 
 import { getPlayerProgress } from "@/features/player-progression/progression-calculations";
 import type { PlayerProgress } from "@/features/player-progression/progression-types";
-import { formatTrainerId } from "@/features/home/services/trainer-id";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 
 export interface PlayerHeaderData {
   displayName: string;
-  trainerId: string;
+  // Null only if the session somehow lacks one (never expected in
+  // practice — registration always sets it) — PlayerProfileLink already
+  // renders a safe non-interactive fallback for that case.
+  username: string | null;
+  regionLabel: string;
 
   // The header's level/XP display never reads this directly after the
   // initial server render — it's only the seed value for
@@ -26,13 +29,23 @@ export interface PlayerHeaderData {
 // (components/layout/GameHeader.tsx), fetched once by app/(game)/layout.tsx.
 // getPlayerProfile is cache()-wrapped (lib/auth/player-profile.ts), so this
 // sharing the profile row with each page's own view-data service costs one
-// DB round trip per request, not two.
-export async function getPlayerHeaderData(userId: string): Promise<PlayerHeaderData> {
+// DB round trip per request, not two. `username` is passed in rather than
+// independently queried — the caller already has it from getCurrentSession()
+// (better-auth's own session.user), so this never needs its own User table
+// read just for that one field.
+export async function getPlayerHeaderData(userId: string, username: string | null): Promise<PlayerHeaderData> {
   const profile = await getPlayerProfile(userId);
 
   return {
     displayName: profile.displayName,
-    trainerId: formatTrainerId(profile.id),
+    username,
+    // Deliberately the literal English name, never REGION_LABELS[regionId]
+    // (still "מחוז קנטו" everywhere else, e.g. the public profile page's own
+    // regionLabel in public-profile-view.service.ts) — this header display
+    // is the one place asked to show "Kanto" instead. The stored
+    // profile.regionId ("kanto") and the rest of the region architecture
+    // are untouched.
+    regionLabel: "Kanto",
     progress: getPlayerProgress(profile.experience),
     coins: profile.coins,
     gold: profile.gold,

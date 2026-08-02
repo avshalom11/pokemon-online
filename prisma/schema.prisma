@@ -63,11 +63,66 @@ model PlayerProfile {
   onboardingCompleted    Boolean                 @default(false)
   starterPokemonId       String?
   coins                  Int                     @default(500)
+
+  // Public Profile / Showcase (Phase 1) — features/profile. Every field
+  // below is read by the PUBLIC profile view (features/profile/services/
+  // public-profile-view.service.ts) subject to its own show*OnProfile
+  // toggle; none of it is sensitive (no email, password, currency, or
+  // inventory data lives here) — see that service's own doc comment for
+  // the exact privacy rules. All validated server-side against a closed
+  // set of allowed values before being written (features/profile/
+  // validation/profile.schema.ts) — never free-form user input.
+  //
+  // regionId: plain string, not a Prisma enum — same "no enum synced to a
+  // TS union in this setup" precedent as FieldBattleSession.zoneId
+  // elsewhere in this file. Every player is "kanto" for now (see
+  // shared/types/region.ts); the column exists so the game never has to
+  // hardcode the Hebrew region label in UI code, and so more regions can
+  // be added later without a schema change.
+  regionId               String                  @default("kanto")
+  // Short public biography — plain text only, rendered as text content
+  // (never dangerouslySetInnerHTML), so it can never carry HTML/links as
+  // markup regardless of what characters it contains. Length-capped at the
+  // validation layer (150 chars), trimmed before storage. Empty string
+  // (never null) means "no bio set" — see showAboutMeOnProfile below for
+  // the separate visibility toggle.
+  aboutMe                String                  @default("")
+  // One of the small curated set of Pokémon front-sprite avatars
+  // (features/profile/themes/profile-avatars.ts) — null means "no avatar
+  // chosen", which the UI renders as the existing initial-letter fallback.
+  // Deliberately a dex number (validated against a fixed allow-list), never
+  // a raw image URL, so an arbitrary/external image can never be injected.
+  avatarDexNumber        Int?
+  // One of the fixed theme ids (features/profile/themes/profile-themes.ts)
+  // — a lookup key into a server-defined style map, never free-form CSS/
+  // class names from the client.
+  profileThemeId         String                  @default("default")
+  // Privacy toggles for the public profile's three optional sections — see
+  // public-profile-view.service.ts for exactly what each one gates.
+  showPartyOnProfile     Boolean                 @default(true)
+  showStatsOnProfile     Boolean                 @default(true)
+  showAboutMeOnProfile   Boolean                 @default(true)
+
+  // The owner's structured public showcase content — an ARRAY of
+  // ProfileContentBlock (features/profile/types/profile-content.types.ts),
+  // never HTML/CSS/a rich-text document. One JSON field is deliberately
+  // enough for Phase 1 (never a separate per-block table): blocks are
+  // always read/written as one whole ordered list (order IS the array
+  // order), never queried or updated individually, so a normalized table
+  // would only add a join for no benefit. Never trusted raw on read —
+  // always re-validated through the exact same Zod schema that guards
+  // writes (features/profile/validation/profile-content.schema.ts's
+  // parseProfileContentBlocks) — same "invalid -> safe empty fallback"
+  // philosophy this schema's other JSON columns (e.g.
+  // FieldBattleSession.participants) already follow.
+  profileContentBlocks   Json                    @default("[]")
+
   pokemon                PlayerPokemon[]
   fieldBattleSession     FieldBattleSession?
   notifications          Notification[]
   dailyFieldBattleCounts DailyFieldBattleCount[]
   inventoryItems         PlayerInventoryItem[]
+  seenSpecies            PlayerSeenSpecies[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -458,6 +513,41 @@ model PlayerInventoryItem {
   @@unique([playerId, itemId])
   @@index([playerId])
   @@map("player_inventory_item")
+}
+
+// The persistent "seen" half of Pokédex progress (features/pokedex) — one
+// row per (player, species) the player has ever actually encountered in a
+// wild field battle. "Caught" is deliberately never stored here (or
+// anywhere of its own): it's always derived live from whether any
+// PlayerPokemon row for this player has this speciesId — party or storage,
+// same "ownership state lives on PlayerPokemon, never duplicated
+// elsewhere" rule every other model in this file already follows (see e.g.
+// PlayerInventoryItem's own doc comment for the same reasoning applied to
+// items). speciesId resolves against the static Species Registry
+// (data/pokemon/pokemon-data.ts), never a duplicated species fact.
+//
+// Existence of a row *is* "seen" — there is no boolean to flip and no
+// second write ever needed for the same (player, species) pair, which is
+// exactly what makes "refreshing/reopening the same battle must not create
+// a duplicate record" trivial: every write here is an upsert keyed by the
+// unique constraint below (create on the first encounter, a harmless no-op
+// update on every one after), so calling it again for a species already
+// seen is always safe. See features/pokedex/services/mark-species-seen.service.ts,
+// the only place this table is ever written, and
+// features/battle-session/services/battle-session.service.ts's own two
+// call sites (a brand-new session's wild, and a promoted wild) — never the
+// pre-generated nextWild*, which the player hasn't actually seen yet.
+model PlayerSeenSpecies {
+  id        String        @id @default(cuid())
+  playerId  String
+  player    PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  speciesId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([playerId, speciesId])
+  @@index([playerId])
+  @@map("player_seen_species")
 }
 
 model Session {

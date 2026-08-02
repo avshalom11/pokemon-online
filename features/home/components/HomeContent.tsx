@@ -10,12 +10,13 @@ import type { HomeViewData } from "@/features/home/services/home-data.service";
 
 interface HomeContentProps {
   data: HomeViewData;
+  username: string | null;
 }
 
 // The home hub's body, inside GameScreen's centered/rounded shell (same as
 // MapContent/BattleContent). Owns its own scroll + background atmosphere;
 // GameScreen just gives it a fixed-height container to fill.
-export function HomeContent({ data }: HomeContentProps) {
+export function HomeContent({ data, username }: HomeContentProps) {
   return (
     <div
       dir="rtl"
@@ -37,7 +38,7 @@ export function HomeContent({ data }: HomeContentProps) {
 
         <PartySection party={data.party} />
 
-        <NavigationGrid />
+        <NavigationGrid username={username} />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <AchievementsPanel />

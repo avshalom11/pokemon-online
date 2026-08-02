@@ -42,7 +42,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // getNotificationBellData is scoped by.
   const profile = await getPlayerProfile(session.user.id);
   const [player, notifications] = await Promise.all([
-    getPlayerHeaderData(session.user.id),
+    getPlayerHeaderData(session.user.id, session.user.username ?? null),
     getNotificationBellData(profile.id),
   ]);
 

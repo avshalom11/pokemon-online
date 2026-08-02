@@ -8,6 +8,7 @@ import { NotificationBell } from "@/features/notifications/components/Notificati
 import type { NotificationBellData } from "@/features/notifications/types";
 import { usePlayerProgression } from "@/features/player/context/player-progression-context";
 import type { PlayerHeaderData } from "@/features/player/services/player-header-data.service";
+import { PlayerProfileLink } from "@/features/profile/components/PlayerProfileLink";
 import { logoutAction } from "@/lib/auth/actions";
 
 interface GameHeaderProps {
@@ -37,8 +38,9 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
   // Level/XP come from the shared client-side progression context, not
   // straight off `player` — see player-progression-context.tsx's own doc
   // comment for why: it's what lets a battle reward update this bar live,
-  // without a refresh, while displayName/trainerId/coins/gold (rarely
-  // change mid-session) still come directly from the server-rendered prop.
+  // without a refresh, while displayName/username/regionLabel/coins/gold
+  // (rarely change mid-session) still come directly from the
+  // server-rendered prop.
   const { progress } = usePlayerProgression();
   const avatarInitial = player.displayName.trim().charAt(0).toUpperCase() || "?";
   const remainingXp = progress.xpRequiredForNextLevel - progress.currentLevelXp;
@@ -60,8 +62,13 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
           </div>
 
           <div className="hidden min-w-0 flex-col leading-tight sm:flex">
-            <span className="truncate text-sm font-semibold text-slate-100">{player.displayName}</span>
-            <span className="text-[11px] text-slate-500">{player.trainerId}</span>
+            <PlayerProfileLink
+              username={player.username}
+              className="truncate text-sm font-semibold text-slate-100 hover:underline"
+            >
+              {player.displayName}
+            </PlayerProfileLink>
+            <span className="text-[11px] text-slate-500">{player.regionLabel}</span>
           </div>
 
           <div className="hidden w-32 shrink-0 flex-col gap-0.5 sm:flex" title={remainingXpLabel}>

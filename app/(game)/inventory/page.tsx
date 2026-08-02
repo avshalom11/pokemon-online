@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { GameScreen } from "@/components/layout/GameScreen";
 import { InventoryContent } from "@/features/inventory/components/InventoryContent";
 import { getInventoryView } from "@/features/inventory/services/inventory-view.service";
+import { getAllOwnedPokemon } from "@/features/pokemon/services/player-pokemon";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 
@@ -20,11 +21,11 @@ export default async function InventoryPage() {
   }
 
   const profile = await getPlayerProfile(session.user.id);
-  const views = await getInventoryView(profile.id);
+  const [views, ownedPokemon] = await Promise.all([getInventoryView(profile.id), getAllOwnedPokemon(profile.id)]);
 
   return (
     <GameScreen>
-      <InventoryContent views={views} />
+      <InventoryContent views={views} ownedPokemon={ownedPokemon} />
     </GameScreen>
   );
 }

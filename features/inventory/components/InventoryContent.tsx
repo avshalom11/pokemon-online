@@ -8,12 +8,19 @@ import { InventorySellPanel } from "@/features/inventory/components/InventorySel
 import { BackButton } from "@/components/layout/BackButton";
 import { sellInventoryItemAction } from "@/features/inventory/actions/sell-inventory-item.action";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
+import { StoneEvolutionPanel } from "@/features/evolution/components/StoneEvolutionPanel";
 import { ShopCategoryMenu } from "@/features/shop/components/ShopCategoryMenu";
 import { getDefaultShopCategoryId, getShopCategories } from "@/features/shop/services/shop-catalog.service";
 import type { ShopCategoryId } from "@/features/shop/types/shop.types";
+import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 interface InventoryContentProps {
   views: InventoryItemView[];
+  // Party AND storage (features/pokemon/services/player-pokemon.ts's
+  // getAllOwnedPokemon) — only ever read by StoneEvolutionPanel below, to
+  // filter down to which owned Pokémon a selected Stone can evolve. Every
+  // other Inventory flow (selling) never touches this.
+  ownedPokemon: OwnedPokemon[];
 }
 
 // Page composition root for /inventory — same shell/flow convention as
@@ -33,7 +40,7 @@ interface InventoryContentProps {
 // fetch and flows a fresh `views` prop back down here automatically — same
 // mechanism release-pokemon.action.ts's revalidatePath already relies on
 // for MyPokemonContent (see that file's own doc comment).
-export function InventoryContent({ views }: InventoryContentProps) {
+export function InventoryContent({ views, ownedPokemon }: InventoryContentProps) {
   const categories = getShopCategories();
   const [selectedCategoryId, setSelectedCategoryId] = useState<ShopCategoryId | undefined>(
     getDefaultShopCategoryId()
@@ -148,6 +155,10 @@ export function InventoryContent({ views }: InventoryContentProps) {
                 onSellClick={handleSellClick}
                 disabled={isPending}
               />
+            ) : null}
+
+            {selectedView && selectedView.item.categoryId === "stones" ? (
+              <StoneEvolutionPanel stone={selectedView.item} ownedPokemon={ownedPokemon} />
             ) : null}
           </>
         ) : (
