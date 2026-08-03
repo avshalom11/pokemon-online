@@ -1,7 +1,9 @@
 import type { WorldMapConfig } from "@/shared/types/map";
 
-// Polygons manually traced against the real public/images/world-map.png
-// (1254x1254), then geometry-corrected: shared corners between neighboring
+// Polygons manually traced against the real public/images/kanto-map.png
+// (1254x1254, renamed from world-map.png when the Region Registry's
+// per-region map images were introduced — the image itself is unchanged),
+// then geometry-corrected: shared corners between neighboring
 // zones were snapped to identical coordinates, vertices meant to lie on the
 // canvas edge were pinned to it exactly, and unintended cross-zone edge
 // crossings were resolved. See PROJECT_RULES.md change log / conversation
@@ -11,7 +13,7 @@ import type { WorldMapConfig } from "@/shared/types/map";
 // points rather than a small coordinate correction; refine with the
 // /dev/map-editor tool if pixel-perfect coverage is needed there.
 export const WORLD_MAP_CONFIG: WorldMapConfig = {
-  imageSrc: "/images/world-map.png",
+  imageSrc: "/images/kanto-map.png",
 
   viewBox: {
     width: 1254,

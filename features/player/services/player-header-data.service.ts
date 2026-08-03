@@ -2,7 +2,9 @@ import "server-only";
 
 import { getPlayerProgress } from "@/features/player-progression/progression-calculations";
 import type { PlayerProgress } from "@/features/player-progression/progression-types";
+import { getRegionDefinition } from "@/features/regions/data/region-registry";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
+import { toRegionId } from "@/shared/types/region";
 
 export interface PlayerHeaderData {
   displayName: string;
@@ -39,13 +41,14 @@ export async function getPlayerHeaderData(userId: string, username: string | nul
   return {
     displayName: profile.displayName,
     username,
-    // Deliberately the literal English name, never REGION_LABELS[regionId]
-    // (still "מחוז קנטו" everywhere else, e.g. the public profile page's own
+    // The Region Registry's englishName, never REGION_LABELS[regionId]
+    // (still Hebrew everywhere else, e.g. the public profile page's own
     // regionLabel in public-profile-view.service.ts) — this header display
-    // is the one place asked to show "Kanto" instead. The stored
-    // profile.regionId ("kanto") and the rest of the region architecture
-    // are untouched.
-    regionLabel: "Kanto",
+    // is the one place asked to show the English region name ("Kanto",
+    // "Johto", ...) instead. Reads the player's actual active region rather
+    // than a hardcoded value, so this updates the moment
+    // features/regions/actions/select-region.action.ts changes it.
+    regionLabel: getRegionDefinition(toRegionId(profile.regionId)).englishName,
     progress: getPlayerProgress(profile.experience),
     coins: profile.coins,
     gold: profile.gold,

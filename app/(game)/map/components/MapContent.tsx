@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { InteractiveWorldMap } from "./InteractiveWorldMap";
-import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
 import { ZONE_DATA } from "@/data/zones/zone-data";
+import { RegionMapImage } from "@/features/regions/components/RegionMapImage";
+import { RegionMapPlaceholder } from "@/features/regions/components/RegionMapPlaceholder";
+import type { RegionDefinition } from "@/features/regions/types/region-registry.types";
 import type { ZoneId } from "@/shared/types/zone";
 
 interface MapContentProps {
@@ -14,6 +16,14 @@ interface MapContentProps {
   // party has fainted). Plain conditional banner, not a toast library —
   // dismissible, never re-triggers itself.
   notice?: string;
+
+  // The player's active region (Region Registry) — decides which of three
+  // things this renders: Kanto's interactive map/zone behavior
+  // (region.mapConfig present), a plain non-interactive map image for a
+  // region with a map but no zones yet (region.hasMap true, mapConfig
+  // absent — Johto), or RegionMapPlaceholder's "Coming Soon" screen
+  // (region.hasMap false — every other region).
+  region: RegionDefinition;
 }
 
 const NOTICE_MESSAGES: Record<string, string> = {
@@ -22,9 +32,13 @@ const NOTICE_MESSAGES: Record<string, string> = {
 
 // Moved verbatim from app/map/page.tsx when that page became a server
 // component (session check + redirect) — this component's own internals
-// and behavior are unchanged. The only tweak is extra top padding so the
-// existing back button clears the newly-added fixed GameHeader above it.
-export function MapContent({ notice }: MapContentProps) {
+// and behavior for Kanto (region.mapConfig present) are unchanged. The only
+// tweak is extra top padding so the existing back button clears the
+// newly-added fixed GameHeader above it. A region with a map image but no
+// zones yet (Johto) renders RegionMapImage instead — a plain <img>, no
+// polygons, no click handlers, so it can never reuse Kanto's zone overlays
+// or start a battle. Everything else renders RegionMapPlaceholder.
+export function MapContent({ notice, region }: MapContentProps) {
   const router = useRouter();
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const noticeMessage = notice && !dismissedNotice ? NOTICE_MESSAGES[notice] : undefined;
@@ -63,6 +77,62 @@ export function MapContent({ notice }: MapContentProps) {
     );
 
     return zone?.name ?? zoneId;
+  }
+
+  if (!region.mapConfig) {
+    if (region.hasMap && region.mapImageSrc) {
+      return (
+        <main
+          dir="rtl"
+          style={{
+            minHeight: "100vh",
+            backgroundColor: "#14532d",
+            color: "white",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "40px",
+            paddingTop: "calc(var(--app-header-height) + 40px)",
+            fontFamily: "Arial",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleBack}
+            style={{
+              alignSelf: "flex-start",
+              padding: "10px 20px",
+              cursor: "pointer",
+              backgroundColor: "transparent",
+              border: "1px solid white",
+              borderRadius: "6px",
+              color: "white",
+              fontFamily: "Arial",
+              fontSize: "16px",
+            }}
+          >
+            ⬅ חזור
+          </button>
+
+          <h1 dir="ltr">{region.englishName}</h1>
+
+          <p>אין עדיין אזורים זמינים למחוז הזה.</p>
+
+          <div
+            style={{
+              marginTop: "40px",
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <RegionMapImage englishName={region.englishName} mapImageSrc={region.mapImageSrc} />
+          </div>
+        </main>
+      );
+    }
+
+    return <RegionMapPlaceholder englishName={region.englishName} />;
   }
 
   return (
@@ -146,7 +216,7 @@ export function MapContent({ notice }: MapContentProps) {
         }}
       >
         <InteractiveWorldMap
-          config={WORLD_MAP_CONFIG}
+          config={region.mapConfig}
           onZoneSelect={handleZoneSelect}
           onZoneHover={handleZoneHover}
           getZoneLabel={getZoneLabel}

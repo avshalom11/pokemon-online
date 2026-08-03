@@ -6,4 +6,12 @@ import type { RegionId } from "./region";
 // error here until it's given a label.
 export const REGION_LABELS: Record<RegionId, string> = {
   kanto: "מחוז קנטו",
+  johto: "מחוז ג'וטו",
+  hoenn: "מחוז הואן",
+  sinnoh: "מחוז סינו",
+  unova: "מחוז יונובה",
+  kalos: "מחוז קאלוס",
+  alola: "מחוז אלולה",
+  galar: "מחוז גאלר",
+  paldea: "מחוז פלדיאה",
 };

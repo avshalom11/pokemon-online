@@ -8,6 +8,7 @@ interface NavigationGridProps {
 }
 
 const STATIC_NAVIGATION_ITEMS = [
+  { title: "עולם", icon: "🌍", href: "/world" },
   { title: "מפה", icon: "🗺️", href: "/map" },
   { title: "הפוקימונים שלי", icon: "🐾", href: "/my-pokemon" },
   { title: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },

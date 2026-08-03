@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { BattleContent } from "@/features/battle/components/BattleContent";
 import { getBattleViewData } from "@/features/battle/services/battle-view.service";
 import { getInventoryView } from "@/features/inventory/services/inventory-view.service";
+import { getRegionDefinition } from "@/features/regions/data/region-registry";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
+import { toRegionId } from "@/shared/types/region";
 import type { ZoneId } from "@/shared/types/zone";
 
 // The Bag only ever shows Poké Balls + Medicine (Stones have no in-battle
@@ -34,6 +36,24 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
     redirect("/");
   }
 
+  // getPlayerProfile is cache()-wrapped, so resolving it this early (needed
+  // for the region gate below) costs no extra DB round trip beyond what
+  // this page already needed further down for the Bag's inventory view.
+  const profile = await getPlayerProfile(session.user.id);
+  const region = getRegionDefinition(toRegionId(profile.regionId));
+
+  // A wild encounter only exists for a region with real, clickable zones —
+  // the Region Registry's mapConfig, not just hasMap (Johto has a map image
+  // now but no zones yet, so hasMap alone would wrongly let it through).
+  // Only "kanto" has a mapConfig today. This refuses a direct /battle?zone=
+  // deep link while a zoneless region is active, on top of Map itself never
+  // rendering zones/InteractiveWorldMap for one — Kanto's own
+  // zones/encounters must never be reachable while a different region is
+  // selected.
+  if (!region.mapConfig) {
+    redirect("/map");
+  }
+
   const { zone } = await searchParams;
 
   if (!isValidZoneId(zone)) {
@@ -60,9 +80,8 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
 
   // Resolved once here (not inside getBattleViewData) so the well-tested
   // battle-view assembler stays untouched — the Bag is purely additive.
-  // getPlayerProfile is cache()-wrapped, so this costs no extra DB round
-  // trip beyond what getBattleViewData already triggered.
-  const profile = await getPlayerProfile(session.user.id);
+  // Reuses the same `profile` fetched above for the region gate
+  // (getPlayerProfile is cache()-wrapped either way).
   const inventoryView = await getInventoryView(profile.id);
   const bagItems = inventoryView.filter((view) => BAG_CATEGORY_IDS.has(view.item.categoryId));
 
