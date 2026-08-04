@@ -1,4 +1,4 @@
-import { getLevelEvolution, getStoneEvolutions } from "@/data/pokemon/pokemon-evolutions";
+import { getEvolutionItemEvolutions, getLevelEvolution } from "@/data/pokemon/pokemon-evolutions";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { formatDexNumber, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
@@ -38,8 +38,8 @@ export function PokedexDetailPanel({ entry, onClose }: PokedexDetailPanelProps) 
   // from the section below (e.g. a final evolution, or one with no
   // evolution relationship at all).
   const levelEvolution = getLevelEvolution(species.id);
-  const stoneEvolutions = getStoneEvolutions(species.id);
-  const hasEvolutionInfo = levelEvolution !== undefined || stoneEvolutions.length > 0;
+  const evolutionItemEvolutions = getEvolutionItemEvolutions(species.id);
+  const hasEvolutionInfo = levelEvolution !== undefined || evolutionItemEvolutions.length > 0;
 
   return (
     <div
@@ -123,11 +123,11 @@ export function PokedexDetailPanel({ entry, onClose }: PokedexDetailPanelProps) 
                     detail={`ברמה ${levelEvolution.requiredLevel}`}
                   />
                 ) : null}
-                {stoneEvolutions.map((evolution) => (
+                {evolutionItemEvolutions.map((evolution) => (
                   <EvolutionLine
-                    key={evolution.stoneItemId}
+                    key={evolution.itemId}
                     targetSpeciesId={evolution.evolvesToSpeciesId}
-                    detail={`באמצעות ${getShopItemById(evolution.stoneItemId)?.name ?? evolution.stoneItemId}`}
+                    detail={`באמצעות ${getShopItemById(evolution.itemId)?.name ?? evolution.itemId}`}
                   />
                 ))}
               </ul>

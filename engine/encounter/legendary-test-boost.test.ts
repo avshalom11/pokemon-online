@@ -7,7 +7,7 @@ import {
   isLegendaryEncounterTestModeEnabled,
   resolveWildEncounter,
 } from "./legendary-test-boost.ts";
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { KANTO_ZONE_DATA } from "@/data/zones/kanto-zone-data";
 import { isSpeciesEligibleForWildRange } from "@/engine/evolution-stage-scaling/species-eligibility";
 import { getWildLevelRangeForPlayerLevel } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 
@@ -74,13 +74,13 @@ test("never enabled in production, even if the flag is \"true\"", () => {
 });
 
 test("zones with no legendary ZoneEncounter entry of their own (cave, beach) get no boosted candidate list", () => {
-  assert.equal(buildBoostedCandidates("cave", TEST_PLAYER_RANGE), null);
-  assert.equal(buildBoostedCandidates("beach", TEST_PLAYER_RANGE), null);
+  assert.equal(buildBoostedCandidates("kanto", "cave", TEST_PLAYER_RANGE), null);
+  assert.equal(buildBoostedCandidates("kanto", "beach", TEST_PLAYER_RANGE), null);
 });
 
 test("boosted candidates include every evolution-stage-eligible real production encounter for the zone (and exclude ineligible ones); non-legendary weights stay unmodified, legendary weight is intentionally overridden", () => {
-  const zone = ZONE_DATA.find((z) => z.id === "lava")!;
-  const candidates = buildBoostedCandidates("lava", TEST_PLAYER_RANGE)!;
+  const zone = KANTO_ZONE_DATA.find((z) => z.id === "lava")!;
+  const candidates = buildBoostedCandidates("kanto", "lava", TEST_PLAYER_RANGE)!;
 
   // Charizard's legal range (36+) does not overlap this player's bracket —
   // the dev boost must exclude it exactly like the real engine would,
@@ -105,7 +105,7 @@ test("boosted candidates include every evolution-stage-eligible real production 
     if (LEGENDARY_IDS.has(encounter.pokemonId)) {
       // This is the whole point of the boost — its weight is deliberately
       // replaced to reach the ~20% legendary-tier share (see the dedicated
-      // share-math test below), not preserved from ZONE_DATA.
+      // share-math test below), not preserved from the real zone data.
       continue;
     }
 
@@ -119,17 +119,17 @@ test("boosted candidates include every evolution-stage-eligible real production 
 
 test("legendary tier weight is boosted on top of the zone's own ELIGIBLE non-legendary total, totaling ~20% combined probability (exact by construction)", () => {
   for (const zoneId of ["lava", "grassland", "water", "haunted-house"] as const) {
-    const zone = ZONE_DATA.find((z) => z.id === zoneId)!;
+    const zone = KANTO_ZONE_DATA.find((z) => z.id === zoneId)!;
     // Only eligible non-legendary encounters ever become candidates (Phase
     // 2) — e.g. grassland's Venusaur (32+) is excluded at this player
     // level, so the "real" total this boost is computed against must
-    // already reflect that, not every ZONE_DATA entry regardless of
+    // already reflect that, not every zone-data entry regardless of
     // eligibility.
     const nonLegendaryTotalWeight = zone.encounters
       .filter((e) => !LEGENDARY_IDS.has(e.pokemonId) && isSpeciesEligibleForWildRange(e.pokemonId, TEST_PLAYER_RANGE))
       .reduce((sum, e) => sum + e.encounterWeight, 0);
 
-    const candidates = buildBoostedCandidates(zoneId, TEST_PLAYER_RANGE)!;
+    const candidates = buildBoostedCandidates("kanto", zoneId, TEST_PLAYER_RANGE)!;
     const legendaryWeight = candidates
       .filter((c) => LEGENDARY_IDS.has(c.pokemonId))
       .reduce((sum, c) => sum + c.weight, 0);
@@ -151,13 +151,13 @@ test("boosting never offers a legendary that isn't already a real encounter entr
   // module used to have (a stale hardcoded zone->legendary table). Every
   // legendary in this game's roster is a level-evolution-unrestricted final
   // form, so this assertion is unaffected by evolution-stage eligibility.
-  const grasslandCandidates = buildBoostedCandidates("grassland", TEST_PLAYER_RANGE)!;
+  const grasslandCandidates = buildBoostedCandidates("kanto", "grassland", TEST_PLAYER_RANGE)!;
   const grasslandLegendaryIds = grasslandCandidates
     .filter((c) => LEGENDARY_IDS.has(c.pokemonId))
     .map((c) => c.pokemonId);
   assert.deepEqual(grasslandLegendaryIds, ["zapdos"]);
 
-  const hauntedHouseCandidates = buildBoostedCandidates("haunted-house", TEST_PLAYER_RANGE)!;
+  const hauntedHouseCandidates = buildBoostedCandidates("kanto", "haunted-house", TEST_PLAYER_RANGE)!;
   const hauntedHouseLegendaryIds = hauntedHouseCandidates
     .filter((c) => LEGENDARY_IDS.has(c.pokemonId))
     .map((c) => c.pokemonId)
@@ -165,7 +165,7 @@ test("boosting never offers a legendary that isn't already a real encounter entr
   assert.deepEqual(hauntedHouseLegendaryIds, ["mew", "mewtwo"]);
 });
 
-test("no hardcoded zone->legendary table exists in this module (candidates are re-derived from ZONE_DATA every call)", () => {
+test("no hardcoded zone->legendary table exists in this module (candidates are re-derived from the real zone data every call)", () => {
   const source = readFileSync(new URL("./legendary-test-boost.ts", import.meta.url), "utf8");
   assert.ok(
     !/DEV_LEGENDARY_CANDIDATES_BY_ZONE/.test(source),
@@ -187,7 +187,7 @@ test("with test mode disabled, resolveWildEncounter's legendary rate is the real
     const trials = 1000;
     let legendaryCount = 0;
     for (let i = 0; i < trials; i++) {
-      const result = resolveWildEncounter("lava", TEST_PLAYER_LEVEL);
+      const result = resolveWildEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
       if (LEGENDARY_IDS.has(result.pokemon.id)) {
         assert.equal(result.pokemon.id, "moltres", "lava's only legendary entry is moltres");
         legendaryCount++;
@@ -203,7 +203,7 @@ test("with test mode enabled in development, legendary probability is boosted to
     const trials = 2000;
     let legendaryCount = 0;
     for (let i = 0; i < trials; i++) {
-      const result = resolveWildEncounter("lava", TEST_PLAYER_LEVEL);
+      const result = resolveWildEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
       if (LEGENDARY_IDS.has(result.pokemon.id)) {
         assert.equal(result.pokemon.id, "moltres", "lava's only thematic legendary is moltres");
         legendaryCount++;
@@ -221,7 +221,7 @@ test("the boost's extra ~20% never activates in production even when explicitly 
     const trials = 1000;
     let legendaryCount = 0;
     for (let i = 0; i < trials; i++) {
-      const result = resolveWildEncounter("lava", TEST_PLAYER_LEVEL);
+      const result = resolveWildEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
       if (LEGENDARY_IDS.has(result.pokemon.id)) {
         legendaryCount++;
       }

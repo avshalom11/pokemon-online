@@ -23,8 +23,11 @@ test("a lookup by pokemonId returns that species' learnset", () => {
   assert.equal(registry.get("bulbasaur"), BULBASAUR_LEARNSET);
 });
 
-test("the real registry loads the full Generation 1 learnset database without throwing", () => {
-  assert.equal(getAllLearnsets().length, 151);
+test("the real registry loads the full learnset database (every generation) without throwing", () => {
+  // 151 Generation 1 learnsets + 100 Generation 2 learnsets (Phase 3) = 251.
+  // Update this number deliberately whenever a new generation's learnset
+  // data is registered — see engine/learnsets/data/index.ts.
+  assert.equal(getAllLearnsets().length, 251);
 });
 
 test("getLearnsetByPokemonId finds a real Generation 1 Pokémon's learnset by its permanent id", () => {

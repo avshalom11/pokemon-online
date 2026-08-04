@@ -90,12 +90,13 @@ export async function applyPokemonXpGrant(
   // Pokémon's OWN current species/level/evolution-state — never
   // client-supplied, never re-derived from anything other than this same
   // transaction's own reads.
-  const pendingEvolutionSpeciesId = await tryCreatePendingEvolution(
+  const pendingEvolutionCreation = await tryCreatePendingEvolution(
     tx,
     playerPokemonId,
     pokemon.speciesId,
     progress.level,
     pokemon.pendingEvolutionSpeciesId,
+    pokemon.pendingEvolutionBranch,
     pokemon.evolutionPermanentlyBlocked
   );
 
@@ -119,7 +120,8 @@ export async function applyPokemonXpGrant(
     newMaxHp,
     newCurrentHp,
     moveLearning: moveLearningResult.plan,
-    pendingEvolutionSpeciesId,
+    pendingEvolutionSpeciesId: pendingEvolutionCreation.pendingEvolutionSpeciesId,
+    pendingEvolutionBranch: pendingEvolutionCreation.pendingEvolutionBranch,
   };
 }
 

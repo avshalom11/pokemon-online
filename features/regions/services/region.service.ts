@@ -14,6 +14,19 @@ export async function getActiveRegionId(userId: string): Promise<RegionId> {
   return toRegionId(profile.regionId);
 }
 
+// Same "which region is this player currently in" read as getActiveRegionId
+// above, but keyed by the PlayerProfile row's own id (playerId) rather than
+// the auth session's userId — for server-side call sites that only ever
+// receive playerId (e.g. features/battle/services/battle-action.service.ts's
+// executeBattleAction, whose own signature is deliberately left unchanged
+// by Phase 4 rather than threading a new regionId parameter through its ~70
+// existing call sites). getPlayerProfile can't be reused here since it's
+// keyed by userId, not id.
+export async function getActiveRegionIdByPlayerId(playerId: string): Promise<RegionId> {
+  const profile = await prisma.playerProfile.findUniqueOrThrow({ where: { id: playerId } });
+  return toRegionId(profile.regionId);
+}
+
 // The only place PlayerProfile.regionId is ever written. Also ends any
 // in-progress field battle session for this player in the same transaction
 // — changing region while mid-battle must never leave a session whose

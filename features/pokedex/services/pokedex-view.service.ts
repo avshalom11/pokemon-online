@@ -12,8 +12,8 @@ import type { PokedexEntryView } from "../types/pokedex.types";
 const SPECIES_IN_DEX_ORDER = [...POKEMON_DATA].sort((a, b) => a.dexNumber - b.dexNumber);
 
 // The Pokédex page's one data source — exactly two lightweight queries
-// (never one per species, never 151 round trips) combined against the
-// static catalog:
+// (never one per species, never one round trip per catalog entry) combined
+// against the static catalog:
 //   - PlayerSeenSpecies: every species this player has ever encountered in
 //     a field battle (features/pokedex/services/mark-species-seen.service.ts).
 //   - PlayerPokemon, distinct by speciesId: every species this player
@@ -63,7 +63,7 @@ export interface PokedexCounts {
 }
 
 // A lightweight counts-only alternative to getPokedexView — never fetches
-// or builds all 151 species objects, just the two counts features/profile's
+// or builds every species object, just the two counts features/profile's
 // public statistics section needs. Reuses the exact same query/Set logic
 // getPokedexView itself uses, so the two can never drift apart on what
 // counts as "seen".

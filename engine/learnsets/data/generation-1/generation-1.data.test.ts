@@ -31,8 +31,13 @@ test("every Pokémon has exactly one learnset in the registry", () => {
     assert.equal(hasLearnset(learnset.pokemonId), true);
     assert.equal(getLearnsetByPokemonId(learnset.pokemonId)?.pokemonId, learnset.pokemonId);
   }
-  // and the registry has no more, no fewer, than the 151 loaded.
-  assert.equal(getAllLearnsets().length, GENERATION_1_LEARNSETS.length);
+  // The real registry is every generation's learnsets combined (see
+  // engine/learnsets/data/index.ts) — Generation 2 exists alongside
+  // Generation 1 as of Phase 3, so this only asserts the
+  // Generation-1-tagged subset of the real registry matches this file's
+  // own GENERATION_1_LEARNSETS array, never a raw getAllLearnsets().length
+  // equality.
+  assert.equal(getAllLearnsets().filter((l) => l.generation === 1).length, GENERATION_1_LEARNSETS.length);
 });
 
 test("every learnset references only existing moves", () => {
@@ -75,8 +80,11 @@ test("every level-up entry has a positive integer level (never 0)", () => {
   }
 });
 
-test("the real registry loads all 151 Generation 1 learnsets", () => {
-  assert.equal(getAllLearnsets().length, 151);
+test("the real registry loads all Generation 1 and Generation 2 learnsets", () => {
+  // 151 Generation 1 + 100 Generation 2 (Phase 3) = 251. Update this number
+  // deliberately whenever a new generation's learnset data is registered —
+  // see engine/learnsets/data/index.ts.
+  assert.equal(getAllLearnsets().length, 251);
 });
 
 test("queries continue to work correctly against the populated registry", () => {

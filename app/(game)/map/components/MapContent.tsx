@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { InteractiveWorldMap } from "./InteractiveWorldMap";
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { getZoneData } from "@/data/zones/zone-data";
 import { RegionMapImage } from "@/features/regions/components/RegionMapImage";
 import { RegionMapPlaceholder } from "@/features/regions/components/RegionMapPlaceholder";
 import type { RegionDefinition } from "@/features/regions/types/region-registry.types";
@@ -71,8 +71,13 @@ export function MapContent({ notice, region }: MapContentProps) {
     }
   }
 
+  // Region-aware (the same zoneId resolves to a different Zone — and a
+  // different display name — per region, e.g. "grassland" in Kanto vs.
+  // Johto): always reads `region.id` (the RegionDefinition already passed
+  // into this component), never a flat/global zone table. See
+  // data/zones/zone-data.ts's own getZoneData doc comment.
   function getZoneLabel(zoneId: ZoneId) {
-    const zone = ZONE_DATA.find(
+    const zone = getZoneData(region.id).find(
       (currentZone) => currentZone.id === zoneId
     );
 

@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent } from "react";
 
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { getZoneData } from "@/data/zones/zone-data";
 import type { MapPoint, WorldMapConfig } from "@/shared/types/map";
 import type { ZoneId } from "@/shared/types/zone";
 
@@ -12,11 +12,16 @@ interface MapHitAreaEditorProps {
 
 type CopyStatus = "idle" | "copied" | "failed";
 
+// This editor is only ever fed WORLD_MAP_CONFIG (Kanto — see
+// app/dev/map-editor/page.tsx) — hardcoded to "kanto" rather than a prop
+// since Johto has its own dedicated editor (app/dev/johto-map-editor).
+const EDITOR_ZONES = getZoneData("kanto");
+
 export function MapHitAreaEditor({ config }: MapHitAreaEditorProps) {
   const { imageSrc, viewBox, regions } = config;
 
   const [selectedZoneId, setSelectedZoneId] = useState<ZoneId>(
-    ZONE_DATA[0]?.id ?? "grassland"
+    EDITOR_ZONES[0]?.id ?? "grassland"
   );
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [showExistingRegions, setShowExistingRegions] = useState(true);
@@ -176,7 +181,7 @@ export function MapHitAreaEditor({ config }: MapHitAreaEditorProps) {
             }
             style={{ padding: "8px", fontSize: "16px" }}
           >
-            {ZONE_DATA.map((zone) => (
+            {EDITOR_ZONES.map((zone) => (
               <option key={zone.id} value={zone.id}>
                 {zone.name} ({zone.id})
               </option>

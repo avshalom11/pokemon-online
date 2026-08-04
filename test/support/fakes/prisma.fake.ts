@@ -25,6 +25,7 @@ interface PlayerPokemonRow {
   status: string | null;
   statusTurnsRemaining: number | null;
   pendingEvolutionSpeciesId: string | null;
+  pendingEvolutionBranch: boolean;
   evolutionPermanentlyBlocked: boolean;
 }
 
@@ -53,6 +54,7 @@ interface PlayerProfileRow {
   experience: number;
   coins: number;
   gold: number;
+  regionId: string;
 }
 
 interface DailyFieldBattleCountRow {
@@ -190,6 +192,7 @@ export function seedPlayerPokemon(row: {
   status?: string | null;
   statusTurnsRemaining?: number | null;
   pendingEvolutionSpeciesId?: string | null;
+  pendingEvolutionBranch?: boolean;
   evolutionPermanentlyBlocked?: boolean;
 }) {
   const full: PlayerPokemonRow = {
@@ -206,6 +209,7 @@ export function seedPlayerPokemon(row: {
     status: row.status ?? null,
     statusTurnsRemaining: row.statusTurnsRemaining ?? null,
     pendingEvolutionSpeciesId: row.pendingEvolutionSpeciesId ?? null,
+    pendingEvolutionBranch: row.pendingEvolutionBranch ?? false,
     evolutionPermanentlyBlocked: row.evolutionPermanentlyBlocked ?? false,
   };
   pokemons.set(row.id, full);
@@ -242,13 +246,17 @@ export function seedPendingMove(row: {
   return full;
 }
 
-export function seedPlayerProfile(row: { id: string; level?: number; experience?: number; coins?: number; gold?: number }) {
+export function seedPlayerProfile(row: { id: string; level?: number; experience?: number; coins?: number; gold?: number; regionId?: string }) {
   const full: PlayerProfileRow = {
     id: row.id,
     level: row.level ?? 1,
     experience: row.experience ?? 0,
     coins: row.coins ?? 500,
     gold: row.gold ?? 0,
+    // Matches PlayerProfile.regionId's own @default("kanto") in
+    // prisma/schema.prisma — every existing test that never explicitly
+    // seeds a region keeps behaving exactly as it did before Phase 4.
+    regionId: row.regionId ?? "kanto",
   };
   profiles.set(row.id, full);
   return full;

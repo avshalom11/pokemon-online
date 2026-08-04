@@ -47,7 +47,7 @@ function matchesStatusFilter(status: PokedexStatus, filter: StatusFilter): boole
 
 // Page composition root for /pokedex — same shell/flow convention as
 // MyPokemonContent (gradient background, radial overlay, BackButton,
-// centered max-width column). All 151 entries are fetched ONCE, server-side
+// centered max-width column). All entries are fetched ONCE, server-side
 // (see app/(game)/pokedex/page.tsx); every filter/search/sort below is pure
 // client-side array filtering over that single already-loaded list — never
 // a re-fetch, never a per-keystroke server round trip. Search only ever

@@ -3,7 +3,6 @@ import "server-only";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { resolveWildEncounter } from "@/engine/encounter/legendary-test-boost";
-import { ZONE_DATA } from "@/data/zones/zone-data";
 import { ALL_STAT_NAMES } from "@/engine/moves";
 import type { StatStages } from "@/features/battle/stats/stat-stages";
 import { resetVolatileOnSwitch, type VolatileState } from "@/features/battle/volatile/volatile-condition.types";
@@ -22,7 +21,8 @@ import type { LevelUpResult } from "@/features/player-progression/progression-ty
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
-import type { ZoneId } from "@/shared/types/zone";
+import type { RegionId } from "@/shared/types/region";
+import { ALL_ZONE_IDS, type ZoneId } from "@/shared/types/zone";
 
 // The authoritative result of a wild-Pokémon victory: both the
 // player-account reward (unchanged) and every eligible owned Pokémon's own
@@ -171,8 +171,14 @@ export type GetOrStartBattleResult =
   | { status: "redirect"; zoneId: ZoneId }
   | { status: "no-usable-party" };
 
+// Structural check only — "is this string shaped like one of the six known
+// zone ids at all", never "does it resolve in a specific region's own zone
+// data" (that's getZone's job, called with a real RegionId once one is
+// known). The same six zone ids exist in every region (see shared/types/
+// zone.ts's own ALL_ZONE_IDS doc comment), so this is deliberately
+// region-independent.
 function isValidZoneId(value: string): value is ZoneId {
-  return ZONE_DATA.some((zone) => zone.id === value);
+  return (ALL_ZONE_IDS as readonly string[]).includes(value);
 }
 
 interface PersistedSessionRow {
@@ -243,7 +249,18 @@ function restoreFromRow(row: PersistedSessionRow, party: OwnedPokemon[]): Restor
 // unless the dev-only LEGENDARY_ENCOUNTER_TEST_MODE flag is on, in which
 // case behavior is identical to before except in development. This is the
 // only place a FieldBattleSession row is ever created.
-export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId): Promise<GetOrStartBattleResult> {
+//
+// `regionId` (Phase 4) is only ever consulted on the "start a brand new
+// session" path below — restoring an existing row never needs it, since
+// PlayerProfile.regionId can only ever change via setActiveRegion
+// (features/regions/services/region.service.ts), which always deletes any
+// in-progress FieldBattleSession in the same transaction. That means a
+// session can only ever exist while the player's region has stayed exactly
+// what it was when the session (or its last promotion) was created — so a
+// restored row is guaranteed to still belong to the caller's own current
+// region without this function needing to store or re-check regionId
+// itself.
+export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId, regionId: RegionId): Promise<GetOrStartBattleResult> {
   const party = await getPlayerParty(playerId);
   const existing = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
 
@@ -275,14 +292,14 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
   // rolls below, so the current and precomputed-next encounter are always
   // scaled to the same player-level snapshot.
   const playerLevel = await getPlayerLevel(playerId);
-  const wild = resolveWildEncounter(requestedZoneId, playerLevel);
+  const wild = resolveWildEncounter(regionId, requestedZoneId, playerLevel);
   // The session is created already one encounter ahead — see the model's
   // own nextWild* doc comment. resolveWildEncounter is a pure, in-memory
   // weighted pick (no I/O), so precomputing this second encounter up front
   // costs nothing measurable; it just guarantees a promotion is always
   // instant, from the very first encounter of the session onward, never
   // only after the first defeat.
-  const nextWild = resolveWildEncounter(requestedZoneId, playerLevel);
+  const nextWild = resolveWildEncounter(regionId, requestedZoneId, playerLevel);
 
   await prisma.fieldBattleSession.create({
     data: {
@@ -546,7 +563,12 @@ export interface AdvancedEncounter {
 // second time or increment the counter twice for one victory. Wrapped in a
 // transaction so the promotion and the increment either both happen or
 // neither does.
-export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId): Promise<AdvancedEncounter | null> {
+// `regionId` (Phase 4) is only needed for the freshly-generated replacement
+// `nextWild` below — the promoted `wild` was already fully resolved earlier
+// (session creation or the previous promotion) and is read as-is from the
+// row. Same "region can only ever be what it was when the session was
+// created" guarantee as getOrStartBattle's own doc comment explains.
+export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId, regionId: RegionId): Promise<AdvancedEncounter | null> {
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
   if (!session || session.zoneId !== zoneId) return null;
 
@@ -564,7 +586,7 @@ export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId): 
   // already generated (and leveled) earlier, off this critical path — only
   // the freshly-generated replacement `nextWild` needs today's player level.
   const playerLevel = await getPlayerLevel(playerId);
-  const nextWild = resolveWildEncounter(zoneId, playerLevel);
+  const nextWild = resolveWildEncounter(regionId, zoneId, playerLevel);
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.fieldBattleSession.updateMany({

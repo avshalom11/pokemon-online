@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { startPokemonEncounter } from "./pokemon-encounter-engine.ts";
 import { RARITY_ENCOUNTER_PROBABILITIES } from "@/data/encounter/rarity-config";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { KANTO_ZONE_DATA } from "@/data/zones/kanto-zone-data";
 import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effective-encounter-rarity";
 import { isSpeciesEligibleForWildRange } from "@/engine/evolution-stage-scaling/species-eligibility";
 import { getWildLevelRangeForPlayerLevel } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
@@ -38,14 +38,14 @@ function withRarityProbabilities(overrides: Partial<Record<PokemonRarity, number
 }
 
 test("throws for an unknown zone", () => {
-  assert.throws(() => startPokemonEncounter("not-a-real-zone" as ZoneId, TEST_PLAYER_LEVEL));
+  assert.throws(() => startPokemonEncounter("kanto", "not-a-real-zone" as ZoneId, TEST_PLAYER_LEVEL));
 });
 
 test("the returned level always falls within the player's own level bracket, never the picked encounter's stale zone min/max", () => {
   const { minimumLevel, maximumLevel } = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
 
   for (let i = 0; i < 300; i++) {
-    const result = startPokemonEncounter("lava", TEST_PLAYER_LEVEL);
+    const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
     assert.ok(
       result.level >= minimumLevel && result.level <= maximumLevel,
       `level ${result.level} outside player-level bracket [${minimumLevel}, ${maximumLevel}]`
@@ -60,7 +60,7 @@ test("a different player level produces levels from that level's own bracket, no
   assert.notDeepEqual(lowLevelRange, highLevelRange, "test assumption: brackets differ");
 
   for (let i = 0; i < 100; i++) {
-    const result = startPokemonEncounter("lava", 56);
+    const result = startPokemonEncounter("kanto", "lava", 56);
     assert.ok(result.level >= highLevelRange.minimumLevel && result.level <= highLevelRange.maximumLevel);
   }
 });
@@ -94,7 +94,7 @@ test("no pity/streak mechanism: the legendary rate does not drift between an ear
     let earlyLegendary = 0;
     let lateLegendary = 0;
     for (let i = 0; i < trials; i++) {
-      const result = startPokemonEncounter("haunted-house", TEST_PLAYER_LEVEL);
+      const result = startPokemonEncounter("kanto", "haunted-house", TEST_PLAYER_LEVEL);
       const isLegendary = result.pokemon.id === "mew" || result.pokemon.id === "mewtwo";
       if (i < half) {
         if (isLegendary) earlyLegendary++;
@@ -128,7 +128,7 @@ test("encounterWeight only decides odds among species that are ALSO evolution-st
   // does — by effective rarity, never real rarity — and asserts
   // encounterWeight still controls relative odds among exactly those.
   const playerRange = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
-  const grassland = ZONE_DATA.find((zone) => zone.id === "grassland")!;
+  const grassland = KANTO_ZONE_DATA.find((zone) => zone.id === "grassland")!;
   const veryRareEncounters = grassland.encounters.filter(
     (encounter) => getEffectiveEncounterRarity(encounter.pokemonId) === "very-rare"
   );
@@ -164,7 +164,7 @@ test("encounterWeight only decides odds among species that are ALSO evolution-st
     const counts: Record<string, number> = {};
     const trials = 4000;
     for (let i = 0; i < trials; i++) {
-      const result = startPokemonEncounter("grassland", TEST_PLAYER_LEVEL);
+      const result = startPokemonEncounter("kanto", "grassland", TEST_PLAYER_LEVEL);
       // The TIER Stage 1 drew from is always effectively very-rare — but
       // the returned species' own PokemonSpecies.rarity (what battle UI/
       // capture actually read) is deliberately left untouched by Phase 3,
@@ -208,7 +208,7 @@ test("encounterWeight only decides odds among species that are ALSO evolution-st
 test("forcing a rarity to zero probability means it is never selected, even when the zone has entries for it", () => {
   withRarityProbabilities({ common: 1, rare: 0, "very-rare": 0, legendary: 0 }, () => {
     for (let i = 0; i < 300; i++) {
-      const result = startPokemonEncounter("grassland", TEST_PLAYER_LEVEL);
+      const result = startPokemonEncounter("kanto", "grassland", TEST_PLAYER_LEVEL);
       assert.equal(RARITY_BY_ID.get(result.pokemon.id), "common");
     }
   });
@@ -219,7 +219,7 @@ test("haunted-house's two equal-weight legendary entries (Mew, Mewtwo) split rou
     const counts: Record<string, number> = { mew: 0, mewtwo: 0 };
     const trials = 2000;
     for (let i = 0; i < trials; i++) {
-      const result = startPokemonEncounter("haunted-house", TEST_PLAYER_LEVEL);
+      const result = startPokemonEncounter("kanto", "haunted-house", TEST_PLAYER_LEVEL);
       assert.ok(result.pokemon.id === "mew" || result.pokemon.id === "mewtwo");
       counts[result.pokemon.id]++;
     }
@@ -229,14 +229,14 @@ test("haunted-house's two equal-weight legendary entries (Mew, Mewtwo) split rou
 });
 
 test("fallback retry: a zone with no legendary or very-rare entries (cave) never crashes and never returns those tiers, even when they're forced heavily favored", () => {
-  const zoneHasNoLegendaryOrVeryRare = !ZONE_DATA.find((z) => z.id === "cave")!.encounters.some((e) =>
+  const zoneHasNoLegendaryOrVeryRare = !KANTO_ZONE_DATA.find((z) => z.id === "cave")!.encounters.some((e) =>
     ["very-rare", "legendary"].includes(RARITY_BY_ID.get(e.pokemonId) ?? "")
   );
   assert.ok(zoneHasNoLegendaryOrVeryRare, "test assumption: cave has no very-rare/legendary entries today");
 
   withRarityProbabilities({ common: 1, rare: 1, "very-rare": 1000, legendary: 1000 }, () => {
     for (let i = 0; i < 300; i++) {
-      const result = startPokemonEncounter("cave", TEST_PLAYER_LEVEL);
+      const result = startPokemonEncounter("kanto", "cave", TEST_PLAYER_LEVEL);
       const rarity = RARITY_BY_ID.get(result.pokemon.id);
       assert.ok(rarity === "common" || rarity === "rare", `cave must never yield ${rarity}`);
     }

@@ -8,7 +8,7 @@ import { InventorySellPanel } from "@/features/inventory/components/InventorySel
 import { BackButton } from "@/components/layout/BackButton";
 import { sellInventoryItemAction } from "@/features/inventory/actions/sell-inventory-item.action";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
-import { StoneEvolutionPanel } from "@/features/evolution/components/StoneEvolutionPanel";
+import { EvolutionItemPanel } from "@/features/evolution/components/EvolutionItemPanel";
 import { ShopCategoryMenu } from "@/features/shop/components/ShopCategoryMenu";
 import { getDefaultShopCategoryId, getShopCategories } from "@/features/shop/services/shop-catalog.service";
 import type { ShopCategoryId } from "@/features/shop/types/shop.types";
@@ -17,7 +17,7 @@ import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 interface InventoryContentProps {
   views: InventoryItemView[];
   // Party AND storage (features/pokemon/services/player-pokemon.ts's
-  // getAllOwnedPokemon) — only ever read by StoneEvolutionPanel below, to
+  // getAllOwnedPokemon) — only ever read by EvolutionItemPanel below, to
   // filter down to which owned Pokémon a selected Stone can evolve. Every
   // other Inventory flow (selling) never touches this.
   ownedPokemon: OwnedPokemon[];
@@ -158,7 +158,7 @@ export function InventoryContent({ views, ownedPokemon }: InventoryContentProps)
             ) : null}
 
             {selectedView && selectedView.item.categoryId === "stones" ? (
-              <StoneEvolutionPanel stone={selectedView.item} ownedPokemon={ownedPokemon} />
+              <EvolutionItemPanel item={selectedView.item} ownedPokemon={ownedPokemon} />
             ) : null}
           </>
         ) : (

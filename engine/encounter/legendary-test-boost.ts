@@ -2,17 +2,20 @@
 // DEV-ONLY MANUAL-TESTING OVERRIDE — NOT part of production encounter
 // balance. Lets a developer reach a legendary encounter quickly while
 // manually verifying the rarity UI (background/banner/name label), without
-// touching PokemonSpecies.rarity, ZONE_DATA, or pokemon-encounter-engine.ts
-// itself (that file is completely untouched by this feature).
+// touching PokemonSpecies.rarity, a region's own zone data (data/zones/
+// kanto-zone-data.ts, data/zones/johto-zone-data.ts), or
+// pokemon-encounter-engine.ts itself (that file is completely untouched by
+// this feature).
 //
 // This module never invents which legendary "belongs" to a zone — that
 // used to be a hardcoded zone->legendary table here, which silently went
-// stale the moment ZONE_DATA's real legendary placements changed (Zapdos
+// stale the moment a region's real legendary placements changed (Zapdos
 // moved to grassland, Mew/Mewtwo to haunted-house, etc.) and the table
 // wasn't updated to match, so the boost kept offering a legendary that no
 // longer belonged in that zone while ignoring the real one that did. To
 // make that class of bug impossible, this always re-derives "which
-// legendary encounters exist in this zone" fresh from ZONE_DATA itself
+// legendary encounters exist in this region+zone" fresh from that region's
+// own real zone data (via getZone(regionId, zoneId) — Phase 4)
 // (filtered by PokemonSpecies.rarity) on every call — never from a
 // separate list, and never from every legendary species in the game,
 // only whichever legendary ZoneEncounter entries the current zone already
@@ -21,12 +24,13 @@
 // back to the real, unmodified encounter — same as before this feature
 // existed.
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { getZone } from "@/data/zones/zone-data";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { getEligibleWildLevelRange, isSpeciesEligibleForWildRange } from "@/engine/evolution-stage-scaling/species-eligibility";
 import { getWildLevelRangeForPlayerLevel, type WildLevelRange } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 import { rollLevelInRange } from "@/engine/player-level-scaling/wild-level-generator";
 import { startPokemonEncounter, type EncounterResult } from "./pokemon-encounter-engine";
+import type { RegionId } from "@/shared/types/region";
 import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
 
 // ~20% combined legendary-tier probability, per the manual-testing request
@@ -100,9 +104,13 @@ function toEligibleCandidates(encounters: ZoneEncounter[], playerRange: WildLeve
 
 // Exported for tests only (probability-math verification without needing
 // Math.random determinism) — not meant to be called from app code, which
-// should use resolveWildEncounter below.
-export function buildBoostedCandidates(zoneId: ZoneId, playerRange: WildLevelRange): WeightedCandidate[] | null {
-  const zone = ZONE_DATA.find((currentZone) => currentZone.id === zoneId);
+// should use resolveWildEncounter below. `regionId` (Phase 4) resolves
+// which region's own zone data this boost reads from — same "never
+// defaulted" rule startPokemonEncounter's own regionId parameter follows,
+// so a dev-mode boost can never leak a Kanto legendary into a Johto zone or
+// vice versa.
+export function buildBoostedCandidates(regionId: RegionId, zoneId: ZoneId, playerRange: WildLevelRange): WeightedCandidate[] | null {
+  const zone = getZone(regionId, zoneId);
 
   if (!zone || zone.encounters.length === 0) {
     return null;
@@ -182,18 +190,20 @@ function buildEncounterResult(zoneId: ZoneId, candidate: WeightedCandidate): Enc
 // The one function callers should use — transparently returns the real,
 // unmodified production encounter (startPokemonEncounter, byte-for-byte
 // the same function/behavior as always) unless the dev flag is on AND this
-// zone already has at least one legendary ZoneEncounter entry of its own
-// that's also evolution-stage-eligible at the player's current bracket; in
-// every other case behavior is identical to calling startPokemonEncounter
-// directly.
-export function resolveWildEncounter(zoneId: ZoneId, playerLevel: number): EncounterResult {
+// region+zone already has at least one legendary ZoneEncounter entry of its
+// own that's also evolution-stage-eligible at the player's current bracket;
+// in every other case behavior is identical to calling startPokemonEncounter
+// directly. `regionId` is threaded straight through to both paths (Phase 4)
+// — the dev-only boost must resolve the exact same region+zone pool the
+// real engine would have.
+export function resolveWildEncounter(regionId: RegionId, zoneId: ZoneId, playerLevel: number): EncounterResult {
   if (isLegendaryEncounterTestModeEnabled()) {
     const playerRange = getWildLevelRangeForPlayerLevel(playerLevel);
-    const candidates = buildBoostedCandidates(zoneId, playerRange);
+    const candidates = buildBoostedCandidates(regionId, zoneId, playerRange);
     if (candidates) {
       return buildEncounterResult(zoneId, pickWeighted(candidates));
     }
   }
 
-  return startPokemonEncounter(zoneId, playerLevel);
+  return startPokemonEncounter(regionId, zoneId, playerLevel);
 }

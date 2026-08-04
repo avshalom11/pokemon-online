@@ -102,16 +102,28 @@ export interface PokemonLevelUpResult {
   // like "X learned Y" from this itself.
   moveLearning: LevelUpMoveLearningPlan;
 
-  // Non-null exactly when this exact XP grant just created a new pending
-  // evolution decision for this Pokémon (features/evolution/services/
-  // evolution-progress.service.ts's tryCreatePendingEvolution, called from
-  // applyPokemonXpGrant right after moveLearning above — see that
-  // function's own doc comment for the deterministic ordering rule). Never
-  // set merely because a pending decision already existed from an earlier
-  // grant — only the grant that actually created it reports it, so the
-  // battle UI shows the evolution prompt exactly once, the moment it
-  // becomes true, never repeatedly on every subsequent reward.
+  // Non-null exactly when this exact XP grant just created a new
+  // single-target pending evolution decision for this Pokémon (features/
+  // evolution/services/evolution-progress.service.ts's
+  // tryCreatePendingEvolution, called from applyPokemonXpGrant right after
+  // moveLearning above — see that function's own doc comment for the
+  // deterministic ordering rule). Never set merely because a pending
+  // decision already existed from an earlier grant — only the grant that
+  // actually created it reports it, so the battle UI shows the evolution
+  // prompt exactly once, the moment it becomes true, never repeatedly on
+  // every subsequent reward.
   pendingEvolutionSpeciesId: string | null;
+
+  // True exactly when this exact XP grant just created a new pending
+  // BRANCH evolution CHOICE for this Pokémon (Eevee's Espeon/Umbreon fork
+  // today — see data/pokemon/pokemon-evolutions.ts's BRANCH_EVOLUTIONS).
+  // Mutually exclusive with pendingEvolutionSpeciesId being non-null for
+  // the same grant — a species resolves to either a single target or a
+  // branch choice, never both (tryCreatePendingEvolution's own doc
+  // comment). The battle UI shows the branch-choice prompt
+  // (EvolutionBranchChoiceDialog) instead of the normal confirm dialog
+  // whenever this is true.
+  pendingEvolutionBranch: boolean;
 }
 
 // Where a Pokémon-XP grant originated — only "wildBattleVictory" exists

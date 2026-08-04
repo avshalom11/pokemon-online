@@ -42,7 +42,7 @@ test("starting a brand new session does not increment the daily counter", async 
   seedPlayerProfile({ id: "owner-1" });
   seedStarter("owner-1");
 
-  const result = await getOrStartBattle("owner-1", ZONE_ID);
+  const result = await getOrStartBattle("owner-1", ZONE_ID, "kanto");
 
   assert.equal(result.status, "ready");
   assert.equal(getDailyBattleCountRow("owner-1", TODAY), undefined, "no row should exist yet — nothing has been defeated");
@@ -52,8 +52,8 @@ test("restoring an existing session (a refresh/reopen) does not increment the co
   seedPlayerProfile({ id: "owner-1" });
   seedStarter("owner-1");
 
-  await getOrStartBattle("owner-1", ZONE_ID);
-  await getOrStartBattle("owner-1", ZONE_ID); // the "refresh" — restores the same row
+  await getOrStartBattle("owner-1", ZONE_ID, "kanto");
+  await getOrStartBattle("owner-1", ZONE_ID, "kanto"); // the "refresh" — restores the same row
 
   assert.equal(getDailyBattleCountRow("owner-1", TODAY), undefined);
 });
@@ -62,7 +62,7 @@ test("escaping (ending the session without a defeat) never touches the counter",
   seedPlayerProfile({ id: "owner-1" });
   seedStarter("owner-1");
 
-  await getOrStartBattle("owner-1", ZONE_ID);
+  await getOrStartBattle("owner-1", ZONE_ID, "kanto");
   await endBattleSession("owner-1");
 
   assert.equal(getDailyBattleCountRow("owner-1", TODAY), undefined);
@@ -71,10 +71,10 @@ test("escaping (ending the session without a defeat) never touches the counter",
 test("promoting after a genuine defeat increments the counter by exactly 1", async () => {
   seedPlayerProfile({ id: "owner-1" });
   seedStarter("owner-1");
-  await getOrStartBattle("owner-1", ZONE_ID);
+  await getOrStartBattle("owner-1", ZONE_ID, "kanto");
   await markWildDefeated("owner-1");
 
-  const promoted = await promoteToNextEncounter("owner-1", ZONE_ID);
+  const promoted = await promoteToNextEncounter("owner-1", ZONE_ID, "kanto");
 
   assert.ok(promoted, "a promotion must happen once the wild is at 0 HP");
   assert.equal(getDailyBattleCountRow("owner-1", TODAY)?.count, 1);
@@ -83,29 +83,29 @@ test("promoting after a genuine defeat increments the counter by exactly 1", asy
 test("two consecutive victories increment the counter by exactly 1 each time", async () => {
   seedPlayerProfile({ id: "owner-1" });
   seedStarter("owner-1");
-  await getOrStartBattle("owner-1", ZONE_ID);
+  await getOrStartBattle("owner-1", ZONE_ID, "kanto");
 
   await markWildDefeated("owner-1");
-  await promoteToNextEncounter("owner-1", ZONE_ID);
+  await promoteToNextEncounter("owner-1", ZONE_ID, "kanto");
   assert.equal(getDailyBattleCountRow("owner-1", TODAY)?.count, 1);
 
   await markWildDefeated("owner-1");
-  await promoteToNextEncounter("owner-1", ZONE_ID);
+  await promoteToNextEncounter("owner-1", ZONE_ID, "kanto");
   assert.equal(getDailyBattleCountRow("owner-1", TODAY)?.count, 2);
 });
 
 test("a racing/retried promotion call for the same kill never double-counts", async () => {
   seedPlayerProfile({ id: "owner-1" });
   seedStarter("owner-1");
-  await getOrStartBattle("owner-1", ZONE_ID);
+  await getOrStartBattle("owner-1", ZONE_ID, "kanto");
   await markWildDefeated("owner-1");
 
   // Two calls racing (or a duplicate retry) against the exact same 0-HP
   // wild — only the first should actually promote/increment; the second
   // finds wildCurrentHp already nonzero (promoted) and is a safe no-op.
   const [first, second] = await Promise.all([
-    promoteToNextEncounter("owner-1", ZONE_ID),
-    promoteToNextEncounter("owner-1", ZONE_ID),
+    promoteToNextEncounter("owner-1", ZONE_ID, "kanto"),
+    promoteToNextEncounter("owner-1", ZONE_ID, "kanto"),
   ]);
 
   const successes = [first, second].filter((result) => result !== null);

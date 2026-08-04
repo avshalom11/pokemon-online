@@ -54,7 +54,7 @@ test("another player's seen/caught progress is never visible", async () => {
   assert.equal(bulbasaurEntry?.status, "unseen");
 });
 
-test("returns all 151 species, sorted in Pokédex (dex number) order", async () => {
+test("returns all species, sorted in Pokédex (dex number) order", async () => {
   const view = await getPokedexView("owner-1");
 
   assert.equal(view.length, POKEMON_DATA.length);

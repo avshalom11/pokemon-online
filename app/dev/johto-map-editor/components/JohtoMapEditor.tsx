@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { getZoneData } from "@/data/zones/zone-data";
 import type { MapPoint } from "@/shared/types/map";
 import type { ZoneId } from "@/shared/types/zone";
+
+// This editor is explicitly Johto's own (see this file's own doc comment
+// below) — hardcoded to "johto" rather than a prop, mirroring
+// MapHitAreaEditor.tsx's own "kanto" constant for the Kanto editor.
+const EDITOR_ZONES = getZoneData("johto");
 
 const JOHTO_IMAGE_SRC = "/images/johto-map.png";
 const STORAGE_KEY = "johto-map-editor:points-v1";
@@ -66,7 +71,7 @@ function formatPointsAttribute(points: MapPoint[]): string {
 // this only ever produces text for a human to review and paste into a new
 // data/maps/johto-map-config.ts themselves.
 export function JohtoMapEditor() {
-  const [selectedZoneId, setSelectedZoneId] = useState<ZoneId>(ZONE_DATA[0]?.id ?? "grassland");
+  const [selectedZoneId, setSelectedZoneId] = useState<ZoneId>(EDITOR_ZONES[0]?.id ?? "grassland");
   const [pointsByZone, setPointsByZone] = useState<PointsByZone>({});
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
@@ -150,7 +155,7 @@ export function JohtoMapEditor() {
   }
 
   const fullConfigSnippet = useMemo(() => {
-    const regionEntries = ZONE_DATA.map((zone) => {
+    const regionEntries = EDITOR_ZONES.map((zone) => {
       const zonePoints = pointsByZone[zone.id] ?? [];
       if (zonePoints.length < 3) return null;
 
@@ -172,7 +177,7 @@ export function JohtoMapEditor() {
     ].join("\n");
   }, [pointsByZone, effectiveImageSize]);
 
-  const zonesWithEnoughPoints = ZONE_DATA.filter((zone) => (pointsByZone[zone.id]?.length ?? 0) >= 3).length;
+  const zonesWithEnoughPoints = EDITOR_ZONES.filter((zone) => (pointsByZone[zone.id]?.length ?? 0) >= 3).length;
 
   function handleCopyFullConfig() {
     void copyText(fullConfigSnippet, "config");
@@ -298,7 +303,7 @@ export function JohtoMapEditor() {
             onChange={(event) => setSelectedZoneId(event.target.value as ZoneId)}
             style={{ padding: "8px", fontSize: "16px" }}
           >
-            {ZONE_DATA.map((zone) => (
+            {EDITOR_ZONES.map((zone) => (
               <option key={zone.id} value={zone.id}>
                 {zone.name} ({zone.id}) — {pointsByZone[zone.id]?.length ?? 0} pt
                 {(pointsByZone[zone.id]?.length ?? 0) === 1 ? "" : "s"}
@@ -380,7 +385,7 @@ export function JohtoMapEditor() {
 
         <div>
           <h2 style={{ fontSize: "16px" }}>
-            Full Johto config ({zonesWithEnoughPoints}/{ZONE_DATA.length} zones ready)
+            Full Johto config ({zonesWithEnoughPoints}/{EDITOR_ZONES.length} zones ready)
           </h2>
           <p style={{ color: "#94a3b8", fontSize: "13px" }}>
             Only zones with 3+ points are included — a zone with fewer points is skipped until you finish it.

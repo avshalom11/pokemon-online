@@ -1,8 +1,10 @@
 import "server-only";
 
+import { getBranchEvolution } from "@/data/pokemon/pokemon-evolutions";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
-import type { PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import type { PendingEvolutionBranchView, PendingEvolutionView } from "@/features/evolution/types/evolution.types";
 import { prisma } from "@/lib/db/prisma";
+import type { PokemonSpecies } from "@/shared/types/pokemon";
 
 // Read-only lookup for "does this player currently have an unresolved
 // evolution decision" — the Home-page safety net (features/evolution/
@@ -36,5 +38,45 @@ export async function getFirstPendingEvolutionView(playerId: string): Promise<Pe
     nickname: pokemon.nickname,
     currentSpecies,
     evolvedSpecies,
+  };
+}
+
+// Same safety-net role as getFirstPendingEvolutionView above, for a pending
+// BRANCH evolution choice instead (Eevee's Espeon/Umbreon fork today — see
+// data/pokemon/pokemon-evolutions.ts's BRANCH_EVOLUTIONS). Independent
+// query because the two pending states are mutually exclusive per Pokémon
+// (see tryCreatePendingEvolution's own doc comment) but not necessarily
+// across a player's whole party — getHomeViewData (features/home/services/
+// home-data.service.ts) calls both and only ever renders whichever one
+// PendingEvolutionGate finds first.
+export async function getFirstPendingEvolutionBranchView(playerId: string): Promise<PendingEvolutionBranchView | null> {
+  const pokemon = await prisma.playerPokemon.findFirst({
+    where: { playerId, pendingEvolutionBranch: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!pokemon) {
+    return null;
+  }
+
+  const currentSpecies = getSpeciesById(pokemon.speciesId);
+  const branchEvolution = getBranchEvolution(pokemon.speciesId);
+  if (!currentSpecies || !branchEvolution) {
+    return null;
+  }
+
+  const targets = branchEvolution.targets
+    .map((targetSpeciesId) => getSpeciesById(targetSpeciesId))
+    .filter((species): species is PokemonSpecies => species !== undefined);
+
+  if (targets.length === 0) {
+    return null;
+  }
+
+  return {
+    playerPokemonId: pokemon.id,
+    nickname: pokemon.nickname,
+    currentSpecies,
+    targets,
   };
 }

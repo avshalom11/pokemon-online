@@ -19,7 +19,7 @@ const CAPTURE_BALL_IDS: readonly CaptureBallId[] = ["poke-ball", "great-ball", "
 // Narrows an arbitrary Shop/Inventory itemId to CaptureBallId — the only
 // place that narrowing happens, so a non-capture-ball itemId (Master Ball,
 // a Potion, a Stone) can never be trusted as a table key. Same idiom
-// data/pokemon/pokemon-evolutions.ts's isEvolutionStoneItemId already uses.
+// data/pokemon/pokemon-evolutions.ts's isEvolutionItemId already uses.
 export function isCaptureBallId(itemId: string): itemId is CaptureBallId {
   return (CAPTURE_BALL_IDS as readonly string[]).includes(itemId);
 }

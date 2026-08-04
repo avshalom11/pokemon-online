@@ -1,9 +1,8 @@
 import "server-only";
 
-import { getLevelEvolution } from "@/data/pokemon/pokemon-evolutions";
-import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
-import { evolutionSucceededMessage } from "@/features/evolution/messages/evolution-messages";
-import { createNotification } from "@/features/notifications/services/notification-service";
+import { isPendingEvolutionTargetValid } from "@/data/pokemon/pokemon-evolutions";
+import { calculatePokemonNonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { applyEvolutionToPlayerPokemon, calculateEvolutionHpOutcome } from "@/features/evolution/services/apply-evolution.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { prisma } from "@/lib/db/prisma";
 
@@ -24,23 +23,20 @@ export type AcceptEvolutionResult =
   | { status: "invalid-target" };
 
 // Server-side resolution of an accepted evolution — the only place a
-// PlayerPokemon row's speciesId is ever changed by evolution (same
-// instance evolves in place; no new row is ever created — unlike a
-// capture, this is not a new owned Pokémon). Ownership, the pending
-// decision's continued existence, and the target species are all
-// re-validated here against the DB/registry, never trusted from the
-// client — a client can only ever say "I accept", never which species.
-//
-// HP: missing HP (oldMaxHp - currentHp) is preserved exactly, then
-// re-applied against the evolved species' own max HP — never a full heal,
-// per this phase's own explicit rule. A fainted Pokémon (currentHp === 0)
-// stays at exactly 0; otherwise the result is clamped to at least 1 (an
-// evolution can never itself reduce a conscious Pokémon to 0) and never
-// above the new max.
+// PlayerPokemon row's speciesId is ever changed by a LEVEL, Tyrogue
+// LEVEL-STAT, or (post-choice) BRANCH evolution (same instance evolves in
+// place; no new row is ever created — unlike a capture, this is not a new
+// owned Pokémon). Evolution-item evolution has its own always-independent
+// flow (accept-evolution-item.service.ts, Inventory-initiated, never
+// touches pendingEvolutionSpeciesId). Ownership, the pending decision's
+// continued existence, and the target species are all re-validated here
+// against the DB/registry, never trusted from the client — a client can
+// only ever say "I accept", never which species.
 //
 // Species change, HP write, pending-state clear, and the notification are
-// all one transaction — a partial evolution (e.g. species changed but HP
-// left stale, or the pending flag left dangling) can never be observed.
+// all one transaction (via applyEvolutionToPlayerPokemon) — a partial
+// evolution (e.g. species changed but HP left stale, or the pending flag
+// left dangling) can never be observed.
 export async function acceptEvolution(playerId: string, playerPokemonId: string): Promise<AcceptEvolutionResult> {
   const pokemon = await prisma.playerPokemon.findUnique({ where: { id: playerPokemonId } });
 
@@ -52,58 +48,62 @@ export async function acceptEvolution(playerId: string, playerPokemonId: string)
     return { status: "no-pending-evolution" };
   }
 
-  // Re-derived from the canonical Level Evolution table, never trusted
-  // from the stored pendingEvolutionSpeciesId column alone — that column
-  // was only ever written by this codebase's own trusted server code
-  // (evolution-progress.service.ts), but this still re-checks it against
-  // the Species Registry's own current evolution data as the single source
-  // of truth, per this phase's own explicit "validate the target matches
-  // the canonical Species Registry evolution data" requirement.
-  const canonicalEvolution = getLevelEvolution(pokemon.speciesId);
-  if (!canonicalEvolution || canonicalEvolution.evolvesToSpeciesId !== pokemon.pendingEvolutionSpeciesId) {
-    return { status: "invalid-target" };
-  }
+  // Captured into a local (rather than re-reading pokemon.pendingEvolutionSpeciesId
+  // below) so its narrowed `string` type survives into the prisma.$transaction
+  // closure further down — TypeScript can't carry a property-access narrowing
+  // like the null check above into a nested closure, even though the object
+  // itself is never reassigned.
+  const pendingEvolutionSpeciesId = pokemon.pendingEvolutionSpeciesId;
 
   const currentSpecies = getSpeciesById(pokemon.speciesId);
-  const evolvedSpecies = getSpeciesById(pokemon.pendingEvolutionSpeciesId);
-  if (!currentSpecies || !evolvedSpecies) {
+  if (!currentSpecies) {
     return { status: "invalid-target" };
   }
 
-  const oldMaxHp = calculatePokemonHpStat(currentSpecies.baseStats.health, pokemon.level);
-  const newMaxHp = calculatePokemonHpStat(evolvedSpecies.baseStats.health, pokemon.level);
-  const missingHp = Math.max(0, oldMaxHp - pokemon.currentHp);
+  // Re-derived from the canonical evolution tables (level, Tyrogue's
+  // level-stat branch, or an already-chosen Branch Evolution target — see
+  // isPendingEvolutionTargetValid's own doc comment for why checking all
+  // three here is safe), never trusted from the stored
+  // pendingEvolutionSpeciesId column alone — that column was only ever
+  // written by this codebase's own trusted server code (evolution-progress.
+  // service.ts), but this still re-checks it against the Species Registry's
+  // own current evolution data as the single source of truth, per this
+  // phase's own explicit "validate the target matches the canonical
+  // Species Registry evolution data" requirement. Re-computing the actual
+  // Attack/Defense stats here (rather than trusting a stored decision) is
+  // what makes Tyrogue's branch resolve from the Pokémon's real calculated
+  // stats at accept time, exactly like at creation time.
+  const attackStat = calculatePokemonNonHpStat(currentSpecies.baseStats.attack, pokemon.level);
+  const defenseStat = calculatePokemonNonHpStat(currentSpecies.baseStats.defense, pokemon.level);
 
-  const newCurrentHp =
-    pokemon.currentHp <= 0 ? 0 : Math.max(1, Math.min(newMaxHp, newMaxHp - missingHp));
+  const isValidTarget = isPendingEvolutionTargetValid(
+    { speciesId: pokemon.speciesId, level: pokemon.level, attackStat, defenseStat },
+    pendingEvolutionSpeciesId
+  );
 
-  const applied = await prisma.$transaction(async (tx) => {
-    const updated = await tx.playerPokemon.updateMany({
-      where: { id: playerPokemonId, pendingEvolutionSpeciesId: pokemon.pendingEvolutionSpeciesId },
-      data: {
-        speciesId: evolvedSpecies.id,
-        currentHp: newCurrentHp,
-        pendingEvolutionSpeciesId: null,
-      },
-    });
+  if (!isValidTarget) {
+    return { status: "invalid-target" };
+  }
 
-    // Guards the same race the pending-creation side guards (see
-    // evolution-progress.service.ts) — a concurrent/duplicate accept for
-    // the same Pokémon can only ever apply once; the loser's updateMany
-    // matches zero rows and this whole transaction becomes a no-op
-    // (nothing to roll back, since nothing was written, and nothing below
-    // is trusted to have happened either).
-    if (updated.count === 0) return false;
+  const evolvedSpecies = getSpeciesById(pendingEvolutionSpeciesId);
+  if (!evolvedSpecies) {
+    return { status: "invalid-target" };
+  }
 
-    await createNotification(
+  const { newMaxHp, newCurrentHp } = calculateEvolutionHpOutcome(currentSpecies, evolvedSpecies, pokemon.level, pokemon.currentHp);
+
+  const applied = await prisma.$transaction((tx) =>
+    applyEvolutionToPlayerPokemon({
       tx,
       playerId,
-      "POKEMON_EVOLVED",
-      evolutionSucceededMessage(currentSpecies.name, evolvedSpecies.name)
-    );
-
-    return true;
-  });
+      playerPokemonId,
+      expectedCurrentSpeciesId: pokemon.speciesId,
+      currentSpeciesName: currentSpecies.name,
+      evolvedSpecies,
+      newCurrentHp,
+      pendingEvolution: { expectedPendingEvolutionSpeciesId: pendingEvolutionSpeciesId },
+    })
+  );
 
   if (!applied) {
     return { status: "no-pending-evolution" };

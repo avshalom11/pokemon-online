@@ -18,8 +18,11 @@ test("buildMoveRegistry on an empty list produces an empty map", () => {
   assert.equal(registry.size, 0);
 });
 
-test("the real registry loads the full Generation 1 move database without throwing", () => {
-  assert.equal(getAllMoves().length, 165);
+test("the real registry loads the full move database (every generation) without throwing", () => {
+  // 165 Generation 1 moves + 36 Generation 2 moves (Phase 3) = 201. Update
+  // this number deliberately whenever a new generation's move data is
+  // registered — see engine/moves/data/index.ts.
+  assert.equal(getAllMoves().length, 201);
 });
 
 test("getMoveById finds a real Generation 1 move by its permanent id", () => {

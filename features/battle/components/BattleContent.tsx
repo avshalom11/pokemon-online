@@ -34,9 +34,12 @@ import {
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
 import { HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
+import { EvolutionBranchChoiceDialog } from "@/features/evolution/components/EvolutionBranchChoiceDialog";
 import { EvolutionPromptDialog } from "@/features/evolution/components/EvolutionPromptDialog";
-import { acceptEvolutionAction, rejectEvolutionAction } from "@/features/evolution/actions/evolution.actions";
-import type { PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import { acceptEvolutionAction, chooseEvolutionBranchAction, rejectEvolutionAction } from "@/features/evolution/actions/evolution.actions";
+import { getBranchEvolution } from "@/data/pokemon/pokemon-evolutions";
+import type { PendingEvolutionBranchView, PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import type { PokemonSpecies } from "@/shared/types/pokemon";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { PartySelector } from "@/features/party/components/PartySelector";
 import { canSwitchTo } from "@/features/party/utils/party-rules";
@@ -236,6 +239,14 @@ export function BattleContent({
   // fixed-inset backdrop is what actually blocks interaction underneath,
   // not a phase change.
   const [pendingEvolution, setPendingEvolution] = useState<PendingEvolutionView | null>(null);
+  // Non-null exactly while the Branch Evolution choice dialog is showing
+  // (Eevee's Espeon/Umbreon fork today) — mutually exclusive with
+  // pendingEvolution above (a single grant only ever creates one or the
+  // other, never both — see tryCreatePendingEvolution's own doc comment).
+  // Choosing a target (handleChooseEvolutionBranch) clears this and
+  // populates pendingEvolution instead, reusing the normal confirm dialog
+  // for the second, explicit step.
+  const [pendingEvolutionBranch, setPendingEvolutionBranch] = useState<PendingEvolutionBranchView | null>(null);
   const [isResolvingEvolution, startEvolutionTransition] = useTransition();
   // The Bag's live quantity mirror — seeded from the server-fetched
   // `bagItems` prop at mount, decremented the instant a capture/medicine
@@ -433,8 +444,9 @@ export function BattleContent({
     // pendingEvolutionSpeciesId is only ever set on the exact grant that
     // created it (see that field's own doc comment), so a stale/already-
     // pending decision from a previous battle never re-triggers this.
-    if (!pendingEvolution) {
-      const justBecamePending = results.find((result) => result.pendingEvolutionSpeciesId);
+    if (!pendingEvolution && !pendingEvolutionBranch) {
+      const justBecamePending = results.find((result) => result.pendingEvolutionSpeciesId || result.pendingEvolutionBranch);
+
       if (justBecamePending?.pendingEvolutionSpeciesId) {
         const currentSpecies = getSpeciesById(justBecamePending.speciesId);
         const evolvedSpecies = getSpeciesById(justBecamePending.pendingEvolutionSpeciesId);
@@ -446,6 +458,22 @@ export function BattleContent({
             nickname: owner?.nickname ?? null,
             currentSpecies,
             evolvedSpecies,
+          });
+        }
+      } else if (justBecamePending?.pendingEvolutionBranch) {
+        const currentSpecies = getSpeciesById(justBecamePending.speciesId);
+        const branchEvolution = getBranchEvolution(justBecamePending.speciesId);
+        const owner = party.find((pokemon) => pokemon.id === justBecamePending.playerPokemonId);
+        const targets = branchEvolution?.targets
+          .map((targetSpeciesId) => getSpeciesById(targetSpeciesId))
+          .filter((species): species is PokemonSpecies => species !== undefined);
+
+        if (currentSpecies && targets && targets.length > 0) {
+          setPendingEvolutionBranch({
+            playerPokemonId: justBecamePending.playerPokemonId,
+            nickname: owner?.nickname ?? null,
+            currentSpecies,
+            targets,
           });
         }
       }
@@ -954,6 +982,42 @@ export function BattleContent({
     });
   }
 
+  // Step one of the Branch Evolution flow (Eevee's Espeon/Umbreon fork) —
+  // on success, swaps the branch-choice dialog for the normal
+  // EvolutionPromptDialog (via pendingEvolution) so the player still gives
+  // an explicit final confirmation, exactly like any other level
+  // evolution — this never evolves the Pokémon by itself.
+  function handleChooseEvolutionBranch(targetSpeciesId: string) {
+    if (!pendingEvolutionBranch) return;
+    const targetId = pendingEvolutionBranch.playerPokemonId;
+    const currentSpecies = pendingEvolutionBranch.currentSpecies;
+    const nickname = pendingEvolutionBranch.nickname;
+    const chosenSpecies = pendingEvolutionBranch.targets.find((target) => target.id === targetSpeciesId);
+
+    startEvolutionTransition(async () => {
+      const result = await chooseEvolutionBranchAction(targetId, targetSpeciesId);
+      setPendingEvolutionBranch(null);
+
+      if (result.status === "success" && chosenSpecies) {
+        setPendingEvolution({ playerPokemonId: targetId, nickname, currentSpecies, evolvedSpecies: chosenSpecies });
+      }
+    });
+  }
+
+  // Rejecting a branch choice is permanent, exactly like rejecting a
+  // normal level evolution (reject-evolution.service.ts handles both
+  // pending states) — the Pokémon stays Eevee (or whatever species) with
+  // no further evolution ever offered for this specific instance.
+  function handleRejectEvolutionBranch() {
+    if (!pendingEvolutionBranch) return;
+    const targetId = pendingEvolutionBranch.playerPokemonId;
+
+    startEvolutionTransition(async () => {
+      await rejectEvolutionAction(targetId);
+      setPendingEvolutionBranch(null);
+    });
+  }
+
   function handleEscape() {
     setPhase("escaped");
     setMessage(escapeMessage());
@@ -1120,6 +1184,15 @@ export function BattleContent({
           isSubmitting={isResolvingEvolution}
           onAccept={handleAcceptEvolution}
           onReject={handleRejectEvolution}
+        />
+      ) : null}
+
+      {pendingEvolutionBranch ? (
+        <EvolutionBranchChoiceDialog
+          pending={pendingEvolutionBranch}
+          isSubmitting={isResolvingEvolution}
+          onChoose={handleChooseEvolutionBranch}
+          onReject={handleRejectEvolutionBranch}
         />
       ) : null}
     </BattleWindow>

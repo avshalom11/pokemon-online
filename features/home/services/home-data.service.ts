@@ -1,8 +1,8 @@
 import "server-only";
 
 import { getTodayBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
-import { getFirstPendingEvolutionView } from "@/features/evolution/queries/evolution-queries";
-import type { PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import { getFirstPendingEvolutionBranchView, getFirstPendingEvolutionView } from "@/features/evolution/queries/evolution-queries";
+import type { PendingEvolutionBranchView, PendingEvolutionView } from "@/features/evolution/types/evolution.types";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
@@ -29,6 +29,13 @@ export interface HomeViewData {
   // deciding on (the primary trigger is in-battle, BattleContent itself;
   // see features/evolution's own architecture notes for why both exist).
   pendingEvolution: PendingEvolutionView | null;
+
+  // Same safety net, for an unresolved Branch Evolution CHOICE instead
+  // (Eevee's Espeon/Umbreon fork) — mutually exclusive with pendingEvolution
+  // above for any one Pokémon, but both are independently queried since two
+  // different owned Pokémon could theoretically each have one pending at
+  // once; PendingEvolutionGate only ever surfaces the first one it's given.
+  pendingEvolutionBranch: PendingEvolutionBranchView | null;
 }
 
 // Single aggregator for everything app/(game)/home/page.tsx needs, so the
@@ -40,11 +47,12 @@ export interface HomeViewData {
 // so they're not duplicated here.
 export async function getHomeViewData(userId: string): Promise<HomeViewData> {
   const profile = await getPlayerProfile(userId);
-  const [party, stats, dailyBattleCount, pendingEvolution] = await Promise.all([
+  const [party, stats, dailyBattleCount, pendingEvolution, pendingEvolutionBranch] = await Promise.all([
     getPlayerParty(profile.id),
     getOwnedPokemonStats(profile.id),
     getTodayBattleCount(profile.id),
     getFirstPendingEvolutionView(profile.id),
+    getFirstPendingEvolutionBranchView(profile.id),
   ]);
 
   const dexSize = POKEMON_DATA.length;
@@ -58,5 +66,6 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
     },
     dailyBattleCount,
     pendingEvolution,
+    pendingEvolutionBranch,
   };
 }

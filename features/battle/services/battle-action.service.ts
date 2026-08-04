@@ -46,6 +46,7 @@ import { getKnownMoveIds } from "@/features/known-moves/known-moves-queries";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { isPartyDefeated } from "@/features/party/utils/party-rules";
+import { getActiveRegionIdByPlayerId } from "@/features/regions/services/region.service";
 import { prisma } from "@/lib/db/prisma";
 import type { ZoneId } from "@/shared/types/zone";
 
@@ -1127,7 +1128,18 @@ export async function executeBattleAction(
   // already deleted the session row, so there's nothing left to advance —
   // the client falls back to its existing "no session" -> return-to-map
   // handling for that case.
-  const advancedEncounter = wildFainted && !battleEnded ? await promoteToNextEncounter(playerId, zoneId) : null;
+  //
+  // Phase 4 — regionId is only fetched here, lazily, on the one path that
+  // actually needs it (a promotion, which resolves a brand new encounter),
+  // never on every ordinary attack — this keeps the common case (no wild
+  // defeated this turn) at zero extra DB round trips. See
+  // getActiveRegionIdByPlayerId's own doc comment for why this looks up by
+  // playerId rather than reusing getPlayerProfile (which is keyed by the
+  // auth session's userId, not available at this layer).
+  const advancedEncounter =
+    wildFainted && !battleEnded
+      ? await promoteToNextEncounter(playerId, zoneId, await getActiveRegionIdByPlayerId(playerId))
+      : null;
 
   // Phase 6-cleanup — explicit double-faint resolution. Both sides can
   // faint in the very same action (the wild from the hit, the player's

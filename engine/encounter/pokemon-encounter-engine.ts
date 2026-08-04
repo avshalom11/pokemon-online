@@ -1,12 +1,13 @@
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { RARITY_ENCOUNTER_PROBABILITIES } from "@/data/encounter/rarity-config";
-import { ZONE_DATA } from "@/data/zones/zone-data";
+import { getAllRegionsWithZoneData, getZone, getZoneData } from "@/data/zones/zone-data";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effective-encounter-rarity";
 import { getEligibleWildLevelRange } from "@/engine/evolution-stage-scaling/species-eligibility";
 import { getWildLevelRangeForPlayerLevel, type WildLevelRange } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 import { rollLevelInRange } from "@/engine/player-level-scaling/wild-level-generator";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
+import type { RegionId } from "@/shared/types/region";
 import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
 
@@ -22,18 +23,23 @@ export interface EncounterResult {
 // separate hardcoded list) — used to bound the Stage 1 retry loop below.
 const ALL_RARITIES = Object.keys(RARITY_ENCOUNTER_PROBABILITIES) as PokemonRarity[];
 
-// zoneId -> (rarity -> that zone's own ZoneEncounter entries of that
-// rarity). Built once at module load, not per encounter roll — this is the
-// "preprocess per zone" caching step: every call to startPokemonEncounter
-// after the first pays only a Map lookup here, never a fresh filter/scan of
-// a zone's encounters array. ZONE_DATA is static, so this never goes stale.
+// regionId -> zoneId -> (rarity -> that region+zone's own ZoneEncounter
+// entries of that rarity). Built once at module load, not per encounter
+// roll — this is the "preprocess per zone" caching step: every call to
+// startPokemonEncounter after the first pays only two Map lookups here,
+// never a fresh filter/scan of a zone's encounters array. Region-scoped
+// (Phase 4) — the same zoneId (e.g. "grassland") resolves to a completely
+// different bucket set per region, since getZoneData(regionId) itself
+// returns a different Zone[] per region. Zone data is static, so this
+// never goes stale.
 //
 // Phase 3 — grouped by EFFECTIVE encounter rarity (engine/encounter-rarity),
 // never PokemonSpecies.rarity directly: a stone-evolved form (e.g.
-// Ninetales, Raichu) is bucketed as "very-rare" here regardless of its own
-// real catalog rarity, so it draws from the global very-rare tier
-// probability while EncounterResult.pokemon still carries that species'
-// real, unmodified PokemonSpecies.rarity for battle UI/capture to read.
+// Ninetales, Raichu, Bellossom, Sunflora) is bucketed as "very-rare" here
+// regardless of its own real catalog rarity, so it draws from the global
+// very-rare tier probability while EncounterResult.pokemon still carries
+// that species' real, unmodified PokemonSpecies.rarity for battle UI/
+// capture to read.
 type EncountersByRarity = Partial<Record<PokemonRarity, ZoneEncounter[]>>;
 
 function groupByRarity(encounters: ZoneEncounter[]): EncountersByRarity {
@@ -49,36 +55,48 @@ function groupByRarity(encounters: ZoneEncounter[]): EncountersByRarity {
   return grouped;
 }
 
-const ZONE_ENCOUNTERS_BY_RARITY: Map<ZoneId, EncountersByRarity> = new Map(
-  ZONE_DATA.map((zone) => [zone.id, groupByRarity(zone.encounters)])
+const ZONE_ENCOUNTERS_BY_REGION_AND_RARITY: Map<RegionId, Map<ZoneId, EncountersByRarity>> = new Map(
+  getAllRegionsWithZoneData().map((regionId) => [
+    regionId,
+    new Map(getZoneData(regionId).map((zone) => [zone.id, groupByRarity(zone.encounters)])),
+  ])
 );
 
 // pokemonId -> dexNumber, same "build once, O(1) lookups after" precedent
 // engine/encounter-rarity/get-effective-encounter-rarity.ts's own
-// SPECIES_RARITY_BY_ID uses.
+// SPECIES_RARITY_BY_ID uses. Species ids are globally unique across every
+// generation/region (see data/pokemon/pokemon-data.ts), so this one flat
+// map already covers Kanto and Johto together — no region-scoping needed
+// here.
 const DEX_NUMBER_BY_SPECIES_ID: Map<string, number> = new Map(
   POKEMON_DATA.map((species) => [species.id, species.dexNumber])
 );
 
-// zoneId -> every distinct front-sprite URL that zone could ever roll, built
-// once at module load from the same static catalogs every encounter roll
-// already reads. Lets a caller (see BattleContent's zone-roster preload)
-// warm the browser's image cache for a whole zone up front, entirely from
-// data already known before any specific encounter is rolled.
-const ZONE_FRONT_SPRITE_URLS: Map<ZoneId, string[]> = new Map(
-  ZONE_DATA.map((zone) => {
-    const dexNumbers = new Set(
-      zone.encounters
-        .map((encounter) => DEX_NUMBER_BY_SPECIES_ID.get(encounter.pokemonId))
-        .filter((dexNumber): dexNumber is number => dexNumber !== undefined)
-    );
+// regionId -> zoneId -> every distinct front-sprite URL that region+zone
+// could ever roll, built once at module load from the same static catalogs
+// every encounter roll already reads. Lets a caller (see BattleContent's
+// zone-roster preload) warm the browser's image cache for a whole zone up
+// front, entirely from data already known before any specific encounter is
+// rolled.
+const FRONT_SPRITE_URLS_BY_REGION_AND_ZONE: Map<RegionId, Map<ZoneId, string[]>> = new Map(
+  getAllRegionsWithZoneData().map((regionId) => [
+    regionId,
+    new Map(
+      getZoneData(regionId).map((zone) => {
+        const dexNumbers = new Set(
+          zone.encounters
+            .map((encounter) => DEX_NUMBER_BY_SPECIES_ID.get(encounter.pokemonId))
+            .filter((dexNumber): dexNumber is number => dexNumber !== undefined)
+        );
 
-    return [zone.id, Array.from(dexNumbers, getFrontSpritePath)];
-  })
+        return [zone.id, Array.from(dexNumbers, getFrontSpritePath)];
+      })
+    ),
+  ])
 );
 
-export function getZoneFrontSpriteUrls(zoneId: ZoneId): string[] {
-  return ZONE_FRONT_SPRITE_URLS.get(zoneId) ?? [];
+export function getZoneFrontSpriteUrls(regionId: RegionId, zoneId: ZoneId): string[] {
+  return FRONT_SPRITE_URLS_BY_REGION_AND_ZONE.get(regionId)?.get(zoneId) ?? [];
 }
 
 // Single generic weighted-pick, shared by both stages (rarity tiers in
@@ -114,14 +132,14 @@ function pickRarity(excluded: ReadonlySet<PokemonRarity>): PokemonRarity {
 // Thrown when every rarity tier has been tried and none of them had even
 // one species whose legal evolution-stage range (engine/evolution-stage-
 // scaling) overlaps the player's current wild-level bracket — i.e. this
-// zone genuinely has no legal encounter at all for this player right now.
-// A dedicated, named error (never a silently-illegal species/level, never a
-// generic throw) so a caller can distinguish this from "zone not found" or
-// "zone has no encounters at all" above.
+// region+zone genuinely has no legal encounter at all for this player right
+// now. A dedicated, named error (never a silently-illegal species/level,
+// never a generic throw) so a caller can distinguish this from "zone not
+// found" or "zone has no encounters at all" above.
 export class NoEligibleWildEncounterError extends Error {
-  constructor(zoneId: ZoneId, playerRange: WildLevelRange) {
+  constructor(regionId: RegionId, zoneId: ZoneId, playerRange: WildLevelRange) {
     super(
-      `No encounter in zone "${zoneId}" has a species whose legal evolution-stage level range overlaps the player's wild-level bracket [${playerRange.minimumLevel}, ${playerRange.maximumLevel}].`
+      `No encounter in zone "${zoneId}" (region "${regionId}") has a species whose legal evolution-stage level range overlaps the player's wild-level bracket [${playerRange.minimumLevel}, ${playerRange.maximumLevel}].`
     );
     this.name = "NoEligibleWildEncounterError";
   }
@@ -138,15 +156,20 @@ interface SelectedZoneEncounter {
 }
 
 // Stage 2 — weighted pick using encounterWeight, restricted to the current
-// zone's entries of one specific rarity AND (Phase 2) further restricted to
-// only those entries whose species is actually legal at the player's
-// current wild-level bracket (evolution-stage filtering — see
+// region+zone's entries of one specific rarity AND (Phase 2) further
+// restricted to only those entries whose species is actually legal at the
+// player's current wild-level bracket (evolution-stage filtering — see
 // engine/evolution-stage-scaling). encounterWeight only ever decides odds
 // between Pokémon that already share the same rarity tier AND already
 // passed this eligibility filter; which tier gets picked at all is entirely
 // Stage 1's job, and eligibility is never influenced by weight.
-function pickEncounterOfRarity(zoneId: ZoneId, rarity: PokemonRarity, playerRange: WildLevelRange): SelectedZoneEncounter | undefined {
-  const bucket = ZONE_ENCOUNTERS_BY_RARITY.get(zoneId)?.[rarity];
+function pickEncounterOfRarity(
+  regionId: RegionId,
+  zoneId: ZoneId,
+  rarity: PokemonRarity,
+  playerRange: WildLevelRange
+): SelectedZoneEncounter | undefined {
+  const bucket = ZONE_ENCOUNTERS_BY_REGION_AND_RARITY.get(regionId)?.get(zoneId)?.[rarity];
 
   if (!bucket || bucket.length === 0) {
     return undefined;
@@ -176,12 +199,12 @@ function pickEncounterOfRarity(zoneId: ZoneId, rarity: PokemonRarity, playerRang
 // Phase 2, exhausting every rarity is no longer purely a defensive-
 // unreachable case (a real zone can genuinely have no legal encounter for
 // some player levels) — see NoEligibleWildEncounterError above.
-function selectZoneEncounter(zoneId: ZoneId, playerRange: WildLevelRange): SelectedZoneEncounter {
+function selectZoneEncounter(regionId: RegionId, zoneId: ZoneId, playerRange: WildLevelRange): SelectedZoneEncounter {
   const tried = new Set<PokemonRarity>();
 
   while (tried.size < ALL_RARITIES.length) {
     const rarity = pickRarity(tried);
-    const selected = pickEncounterOfRarity(zoneId, rarity, playerRange);
+    const selected = pickEncounterOfRarity(regionId, zoneId, rarity, playerRange);
 
     if (selected) {
       return selected;
@@ -190,35 +213,41 @@ function selectZoneEncounter(zoneId: ZoneId, playerRange: WildLevelRange): Selec
     tried.add(rarity);
   }
 
-  throw new NoEligibleWildEncounterError(zoneId, playerRange);
+  throw new NoEligibleWildEncounterError(regionId, zoneId, playerRange);
 }
 
 // Phase 1 — Wild Pokémon level scaling; Phase 2 — Evolution-stage-aware
-// wild encounters. The generated level comes from the overlap between the
-// player's own level bracket (engine/player-level-scaling) and the
-// selected species' own legal evolution-stage range (engine/evolution-
-// stage-scaling) — never from the selected ZoneEncounter's own
-// minimumLevel/maximumLevel. Those fields are kept on ZoneEncounter (and
-// still populate rarity/species selection above unaffected) for possible
-// future systems, but are deliberately no longer read here.
+// wild encounters; Phase 4 — region-aware zone resolution. The generated
+// level comes from the overlap between the player's own level bracket
+// (engine/player-level-scaling) and the selected species' own legal
+// evolution-stage range (engine/evolution-stage-scaling) — never from the
+// selected ZoneEncounter's own minimumLevel/maximumLevel. Those fields are
+// kept on ZoneEncounter (and still populate rarity/species selection above
+// unaffected) for possible future systems, but are deliberately no longer
+// read here.
+//
+// `regionId` is REQUIRED (never defaulted) — the same zoneId string
+// resolves to a completely different Zone (and therefore a completely
+// different Pokémon pool) depending on which region is passed here, so a
+// caller can never accidentally roll a Kanto encounter while the player is
+// in Johto (or vice versa) by simply forgetting this argument.
 export function startPokemonEncounter(
+  regionId: RegionId,
   zoneId: ZoneId,
   playerLevel: number
 ): EncounterResult {
-  const zone = ZONE_DATA.find(
-    (currentZone) => currentZone.id === zoneId
-  );
+  const zone = getZone(regionId, zoneId);
 
   if (!zone) {
-    throw new Error(`Zone not found: ${zoneId}`);
+    throw new Error(`Zone not found: "${zoneId}" in region "${regionId}"`);
   }
 
   if (zone.encounters.length === 0) {
-    throw new Error(`Zone has no encounters: ${zoneId}`);
+    throw new Error(`Zone has no encounters: "${zoneId}" in region "${regionId}"`);
   }
 
   const playerRange = getWildLevelRangeForPlayerLevel(playerLevel);
-  const { encounter: selectedEncounter, eligibleRange } = selectZoneEncounter(zoneId, playerRange);
+  const { encounter: selectedEncounter, eligibleRange } = selectZoneEncounter(regionId, zoneId, playerRange);
 
   const pokemon = POKEMON_DATA.find(
     (currentPokemon) =>

@@ -1,5 +1,5 @@
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
-import { getAllStoneEvolutionEntries } from "@/data/pokemon/pokemon-evolutions";
+import { getAllEvolutionItemEvolutionEntries, type EvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 
 // Phase 3 — Stone-evolved wild Pokémon use Very-Rare encounter odds without
@@ -12,14 +12,35 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // reads, neither of which this module is ever wired into). No Prisma, no
 // React, no UI strings, no randomness — a pure lookup, exactly like
 // engine/evolution-stage-scaling's own species-wild-level-range.ts.
+//
+// Deliberately scoped to the original five elemental/mood Stones only
+// (fire/water/thunder/leaf/sun-stone) — NOT the former Trade-item
+// evolutions (King's Rock/Metal Coat/Dragon Scale/Upgrade) that the
+// Evolution Simplification phase merged into the same
+// EVOLUTION_ITEM_EVOLUTIONS table as these Stones. That phase's own explicit
+// "do not change rarity, encounter weights" rule means Politoed/Slowking/
+// Steelix/Scizor/Kingdra/Porygon2 must keep resolving to their own real
+// catalog rarity here exactly as before, unaffected by simply sharing a
+// table with the Stones now.
+const STONE_ITEM_IDS: ReadonlySet<EvolutionItemId> = new Set([
+  "fire-stone",
+  "water-stone",
+  "thunder-stone",
+  "leaf-stone",
+  "sun-stone",
+]);
 
 // Built once at module load: every species id that is the TARGET of at
-// least one stone evolution (data/pokemon/pokemon-evolutions.ts's own
-// STONE_EVOLUTIONS table, read via getAllStoneEvolutionEntries) — never a
-// second/duplicated species list. A Set, not a Map: only membership
-// matters here, never which stone or which pre-evolution led to it.
+// least one of the five Stones above (data/pokemon/pokemon-evolutions.ts's
+// own EVOLUTION_ITEM_EVOLUTIONS table, read via
+// getAllEvolutionItemEvolutionEntries and filtered to STONE_ITEM_IDS) —
+// never a second/duplicated species list. A Set, not a Map: only
+// membership matters here, never which stone or which pre-evolution led to
+// it.
 const STONE_EVOLVED_SPECIES_IDS: ReadonlySet<string> = new Set(
-  getAllStoneEvolutionEntries().map((entry) => entry.evolution.evolvesToSpeciesId)
+  getAllEvolutionItemEvolutionEntries()
+    .filter((entry) => STONE_ITEM_IDS.has(entry.evolution.itemId))
+    .map((entry) => entry.evolution.evolvesToSpeciesId)
 );
 
 // pokemonId -> real catalog rarity, built once at module load — the same

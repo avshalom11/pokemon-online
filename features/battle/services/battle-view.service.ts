@@ -7,6 +7,7 @@ import { getKnownMoves } from "@/features/known-moves/known-moves-queries";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { getZoneFrontSpriteUrls, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
+import { toRegionId } from "@/shared/types/region";
 import type { ZoneId } from "@/shared/types/zone";
 
 // Phase 5A: one resolved Known Move slot, ready for battle display —
@@ -91,7 +92,13 @@ export type BattleViewResult =
 // on top, same role assign-slot/view services elsewhere already play.
 export async function getBattleViewData(userId: string, zoneId: ZoneId): Promise<BattleViewResult> {
   const profile = await getPlayerProfile(userId);
-  const result = await getOrStartBattle(profile.id, zoneId);
+  // Phase 4 — resolved once here (profile is already fetched for
+  // playerName below; getPlayerProfile is cache()-wrapped either way) and
+  // threaded into every region-aware call below, so this page can never
+  // roll a different region's encounter pool than the one
+  // app/(game)/battle/page.tsx's own region gate already validated.
+  const regionId = toRegionId(profile.regionId);
+  const result = await getOrStartBattle(profile.id, zoneId, regionId);
 
   if (result.status !== "ready") {
     return result;
@@ -109,7 +116,7 @@ export async function getBattleViewData(userId: string, zoneId: ZoneId): Promise
       activePokemonId: result.battle.activePokemonId,
       knownMovesByPokemonId,
       playerName: profile.displayName,
-      zonePreloadSpriteUrls: getZoneFrontSpriteUrls(zoneId),
+      zonePreloadSpriteUrls: getZoneFrontSpriteUrls(regionId, zoneId),
     },
   };
 }

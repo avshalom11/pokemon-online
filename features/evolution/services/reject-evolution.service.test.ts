@@ -1,5 +1,7 @@
 // Focused regression tests for rejecting an evolution — permanent, and
-// scoped to exactly the one PlayerPokemon instance rejected.
+// scoped to exactly the one PlayerPokemon instance rejected. Covers both
+// pending states: a normal single-target pending evolution, and a pending
+// Branch Evolution choice (Eevee's Espeon/Umbreon fork).
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
@@ -27,9 +29,21 @@ test("rejecting permanently blocks future evolution for that PlayerPokemon", asy
   // multi-level grant) a later stage's own level — must never be offered
   // again, not even for that later stage of the same evolutionary family.
   const laterAttempt = await prisma.$transaction((tx) =>
-    tryCreatePendingEvolution(tx, "mon-1", "charmander", 99, row?.pendingEvolutionSpeciesId ?? null, true)
+    tryCreatePendingEvolution(tx, "mon-1", "charmander", 99, row?.pendingEvolutionSpeciesId ?? null, false, true)
   );
-  assert.equal(laterAttempt, null);
+  assert.deepEqual(laterAttempt, { pendingEvolutionSpeciesId: null, pendingEvolutionBranch: false });
+});
+
+test("rejecting a pending BRANCH choice permanently blocks the Pokémon, exactly like a normal pending evolution", async () => {
+  seedPlayerPokemon({ id: "mon-1", playerId: "owner-1", speciesId: "eevee", level: 16, pendingEvolutionBranch: true });
+
+  const result = await rejectEvolution("owner-1", "mon-1");
+
+  assert.equal(result.status, "success");
+  const row = getPlayerPokemonRow("mon-1");
+  assert.equal(row?.speciesId, "eevee", "species left unchanged — never evolves into either Espeon or Umbreon");
+  assert.equal(row?.pendingEvolutionBranch, false);
+  assert.equal(row?.evolutionPermanentlyBlocked, true);
 });
 
 test("an unauthorized player cannot reject another player's pending evolution", async () => {
@@ -41,7 +55,7 @@ test("an unauthorized player cannot reject another player's pending evolution", 
   assert.equal(getPlayerPokemonRow("mon-1")?.evolutionPermanentlyBlocked, false, "unaffected by the unauthorized attempt");
 });
 
-test("rejecting without a pending evolution is rejected", async () => {
+test("rejecting without a pending evolution (single or branch) is rejected", async () => {
   seedPlayerPokemon({ id: "mon-1", playerId: "owner-1", speciesId: "charmander", level: 16 });
 
   const result = await rejectEvolution("owner-1", "mon-1");

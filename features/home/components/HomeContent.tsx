@@ -31,7 +31,7 @@ export function HomeContent({ data, username }: HomeContentProps) {
       />
 
       <RefreshHomeOnMount />
-      <PendingEvolutionGate initialPending={data.pendingEvolution} />
+      <PendingEvolutionGate initialPending={data.pendingEvolution} initialPendingBranch={data.pendingEvolutionBranch} />
 
       <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
         <DailyBattleCounter count={data.dailyBattleCount} />

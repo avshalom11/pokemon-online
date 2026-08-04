@@ -38,10 +38,13 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // mapConfig.imageSrc ("/images/johto-map.png") is the one source for
     // the map image; mapImageSrc is left unset since mapConfig already
     // covers it (MapContent renders from mapConfig whenever it's present).
-    // Battle access (app/(game)/battle/page.tsx's region gate) now follows
-    // automatically from mapConfig being set — temporarily reusing Kanto's
-    // own zone encounter tables (grassland/cave/lava/haunted-house/water/
-    // beach), same as every other zone-based encounter today.
+    // Battle access (app/(game)/battle/page.tsx's region gate) follows
+    // automatically from mapConfig being set. As of Phase 4, Johto has its
+    // own real zone encounter tables (data/zones/johto-zone-data.ts) — the
+    // same six zone ids as Kanto (grassland/cave/lava/haunted-house/water/
+    // beach), but each one's own Johto-only Pokémon pool; resolved by
+    // region via data/zones/zone-data.ts's getZoneData/getZone, never by
+    // reusing Kanto's own table.
     mapConfig: JOHTO_MAP_CONFIG,
   },
   hoenn: { id: "hoenn", englishName: "Hoenn", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },

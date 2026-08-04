@@ -96,7 +96,12 @@ test("every Generation 1 move appears in the registry by id", () => {
 });
 
 test("getAllMoves() includes the full Generation 1 set", () => {
-  assert.equal(getAllMoves().length, GENERATION_1_MOVES.length);
+  // The real registry is every generation's moves combined (see
+  // engine/moves/data/index.ts) — Generation 2 exists alongside Generation 1
+  // as of Phase 3, so this only asserts the Generation-1-tagged subset of
+  // the real registry matches this file's own GENERATION_1_MOVES array,
+  // never a raw getAllMoves().length equality.
+  assert.equal(getAllMoves().filter((move) => move.generation === 1).length, GENERATION_1_MOVES.length);
 });
 
 test("getMovesByGeneration(1) returns every move", () => {
@@ -104,9 +109,14 @@ test("getMovesByGeneration(1) returns every move", () => {
 });
 
 test("getMovesByType returns only moves of that type, and totals 165 across all types", () => {
+  // Explicitly scoped to GENERATION_1_MOVES (never getMovesByType's own
+  // default of the real, now-multi-generation getAllMoves() registry) —
+  // Generation 2 (Phase 3) reuses several of these same type names, so the
+  // default global scope would otherwise pull in Generation 2 moves too and
+  // inflate this count past 165.
   let total = 0;
   for (const [fileType] of TYPE_FILES) {
-    const results = getMovesByType(fileType as never);
+    const results = getMovesByType(fileType as never, GENERATION_1_MOVES);
     assert.ok(results.every((move) => move.type === fileType));
     total += results.length;
   }
@@ -114,9 +124,11 @@ test("getMovesByType returns only moves of that type, and totals 165 across all 
 });
 
 test("getMovesByCategory partitions all 165 moves across physical/special/status with no overlap", () => {
-  const physical = getMovesByCategory("physical");
-  const special = getMovesByCategory("special");
-  const status = getMovesByCategory("status");
+  // Same explicit-scope reasoning as getMovesByType above — the real
+  // registry now spans Generation 1 and Generation 2.
+  const physical = getMovesByCategory("physical", GENERATION_1_MOVES);
+  const special = getMovesByCategory("special", GENERATION_1_MOVES);
+  const status = getMovesByCategory("status", GENERATION_1_MOVES);
   assert.equal(physical.length + special.length + status.length, 165);
 });
 

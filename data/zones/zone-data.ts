@@ -1,220 +1,40 @@
-import type { Zone } from "@/shared/types/zone";
+import { JOHTO_ZONE_DATA } from "./johto-zone-data";
+import { KANTO_ZONE_DATA } from "./kanto-zone-data";
+import type { RegionId } from "@/shared/types/region";
+import type { Zone, ZoneId } from "@/shared/types/zone";
 
-// Encounter weights (Milestone 8): common species carry high weights, rare
-// species medium, very-rare low. Starters may appear in their thematic
-// zone but always at a low weight, so they read as a rare special find
-// despite their catalog `rarity` staying "common" (that field is the
-// species' permanent classification, independent of how often a specific
-// zone rolls it). Every entry's pokemonId belongs only to that zone's own
-// roster, so startPokemonEncounter can never cross zones (e.g. a Cave roll
-// can never select a Beach-only species) — nothing beyond correct data
-// here is required to guarantee that.
-export const ZONE_DATA: Zone[] = [
-  {
-    id: "grassland",
-    name: "אזור הדשא",
-    description: "מרחבים ירוקים שבהם חיים פוקימונים נפוצים.",
-    imageUrl: "/zones/grassland.png",
+// The canonical region -> zone-data resolver (Phase 4) — the one place a
+// region's own six-zone encounter table is ever looked up. Kanto and Johto
+// each keep their own file (kanto-zone-data.ts / johto-zone-data.ts); this
+// module never merges them into one flat list, and nothing downstream
+// (engine/encounter/pokemon-encounter-engine.ts, engine/encounter/
+// legendary-test-boost.ts, features/battle-session) is allowed to read a
+// zone's encounters without first saying which region it means — the same
+// zoneId (e.g. "grassland") intentionally resolves to a completely
+// different Pokémon pool depending on which region is passed in here.
+//
+// Regions with no zone data yet (every RegionId besides "kanto"/"johto" —
+// see features/regions/data/region-registry.ts's own `hasMap`/`mapConfig`
+// flags) resolve to an empty array rather than throwing, the same
+// "unknown/not-yet-built -> safe empty result" precedent every other
+// region-aware lookup in this codebase already follows.
+const ZONE_DATA_BY_REGION: Partial<Record<RegionId, Zone[]>> = {
+  kanto: KANTO_ZONE_DATA,
+  johto: JOHTO_ZONE_DATA,
+};
 
-    recommendedTypes: ["grass", "electric"],
+export function getZoneData(regionId: RegionId): Zone[] {
+  return ZONE_DATA_BY_REGION[regionId] ?? [];
+}
 
-    encounters: [
-      { pokemonId: "bulbasaur", minimumLevel: 5, maximumLevel: 7, encounterWeight: 5 },
-      { pokemonId: "caterpie", minimumLevel: 2, maximumLevel: 5, encounterWeight: 22 },
-      { pokemonId: "weedle", minimumLevel: 2, maximumLevel: 5, encounterWeight: 22 },
-      { pokemonId: "oddish", minimumLevel: 3, maximumLevel: 6, encounterWeight: 15 },
-      { pokemonId: "ivysaur", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "venusaur", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "metapod", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "butterfree", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "kakuna", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "beedrill", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "pidgey", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "pidgeotto", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "pidgeot", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "rattata", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "raticate", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "spearow", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "fearow", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "ekans", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "arbok", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "pikachu", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "raichu", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "sandshrew", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "sandslash", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "jigglypuff", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "wigglytuff", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "gloom", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "vileplume", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "venonat", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "venomoth", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "meowth", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "bellsprout", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "weepinbell", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "victreebel", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "farfetchd", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "doduo", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "dodrio", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "exeggcute", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "exeggutor", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "lickitung", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "chansey", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "tangela", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "kangaskhan", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "scyther", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "electabuzz", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "pinsir", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "tauros", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "ditto", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "eevee", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "jolteon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "snorlax", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "zapdos", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
-      { pokemonId: "nidoran-f", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "nidorina", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "nidoqueen", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "nidoran-m", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "nidorino", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "nidoking", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "mankey", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "primeape", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "persian", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-    ],
-  },
-  {
-    id: "water",
-    name: "אזור המים",
-    description: "מרחבי מים שקטים שבהם מסתתרים פוקימונים.",
-    imageUrl: "/zones/water.png",
+export function getZone(regionId: RegionId, zoneId: ZoneId): Zone | undefined {
+  return getZoneData(regionId).find((zone) => zone.id === zoneId);
+}
 
-    encounters: [
-      { pokemonId: "squirtle", minimumLevel: 5, maximumLevel: 7, encounterWeight: 5 },
-      { pokemonId: "psyduck", minimumLevel: 2, maximumLevel: 5, encounterWeight: 20 },
-      { pokemonId: "poliwag", minimumLevel: 2, maximumLevel: 5, encounterWeight: 20 },
-      { pokemonId: "magikarp", minimumLevel: 2, maximumLevel: 5, encounterWeight: 25 },
-      { pokemonId: "wartortle", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "blastoise", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "golduck", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "poliwhirl", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "poliwrath", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "slowpoke", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "slowbro", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "gyarados", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "lapras", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "vaporeon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "dratini", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "dragonair", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "dragonite", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "articuno", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
-      { pokemonId: "tentacool", minimumLevel: 2, maximumLevel: 5, encounterWeight: 22 },
-      { pokemonId: "tentacruel", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "horsea", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "seadra", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "goldeen", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "seaking", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "staryu", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "starmie", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-    ],
-  },
-  {
-    id: "cave",
-    name: "אזור המערה",
-    description: "מערה חשוכה שבה מסתתרים פוקימונים נדירים.",
-    imageUrl: "/zones/cave.png",
-
-    encounters: [
-      { pokemonId: "zubat", minimumLevel: 3, maximumLevel: 6, encounterWeight: 22 },
-      { pokemonId: "geodude", minimumLevel: 3, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "onix", minimumLevel: 5, maximumLevel: 8, encounterWeight: 8 },
-      { pokemonId: "clefairy", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "clefable", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "golbat", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "diglett", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "dugtrio", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "machop", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "machoke", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "machamp", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "graveler", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "golem", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "magnemite", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "magneton", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "grimer", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "muk", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "voltorb", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "electrode", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "hitmonlee", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "hitmonchan", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "rhyhorn", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "rhydon", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "aerodactyl", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "kabuto", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "kabutops", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-    ],
-  },
-  {
-    id: "lava",
-    name: "אזור הלבה",
-    description: "אזור געשי מסוכן שבו חיים פוקימונים חזקים.",
-    imageUrl: "/zones/lava.png",
-
-    encounters: [
-      { pokemonId: "charmander", minimumLevel: 5, maximumLevel: 7, encounterWeight: 5 },
-      { pokemonId: "growlithe", minimumLevel: 4, maximumLevel: 7, encounterWeight: 12 },
-      { pokemonId: "ponyta", minimumLevel: 4, maximumLevel: 7, encounterWeight: 10 },
-      { pokemonId: "charmeleon", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "charizard", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "vulpix", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "ninetales", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "arcanine", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "rapidash", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "magmar", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "flareon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "moltres", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
-    ],
-  },
-  {
-    id: "beach",
-    name: "אזור החוף",
-    description: "חוף שקט שבו מסתתרים פוקימונים ידידותיים.",
-    imageUrl: "/zones/beach.png",
-
-    encounters: [
-      { pokemonId: "krabby", minimumLevel: 2, maximumLevel: 5, encounterWeight: 20 },
-      { pokemonId: "shellder", minimumLevel: 3, maximumLevel: 6, encounterWeight: 18 },
-      { pokemonId: "seel", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "dewgong", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "cloyster", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "kingler", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "omanyte", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "omastar", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "parasect", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "paras", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-    ],
-  },
-  {
-    id: "haunted-house",
-    name: "בית הרוחות",
-    description: "בית נטוש שבו מסתתרים פוקימוני רוח.",
-    imageUrl: "/zones/haunted-house.png",
-
-    encounters: [
-      { pokemonId: "gastly", minimumLevel: 4, maximumLevel: 7, encounterWeight: 14 },
-      { pokemonId: "haunter", minimumLevel: 6, maximumLevel: 9, encounterWeight: 5 },
-      { pokemonId: "cubone", minimumLevel: 4, maximumLevel: 7, encounterWeight: 12 },
-      { pokemonId: "gengar", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "drowzee", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "hypno", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "marowak", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "koffing", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "weezing", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "mr-mime", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "porygon", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "abra", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "mew", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
-      { pokemonId: "mewtwo", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
-      { pokemonId: "kadabra", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "alakazam", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "jynx", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-    ],
-  },
-];
+// Every region currently backed by real zone data — used only for
+// "does this zoneId exist in ANY region" shape validation (see
+// features/battle-session/services/battle-session.service.ts's own
+// isValidZoneId), never for resolving an actual encounter pool.
+export function getAllRegionsWithZoneData(): RegionId[] {
+  return Object.keys(ZONE_DATA_BY_REGION) as RegionId[];
+}
