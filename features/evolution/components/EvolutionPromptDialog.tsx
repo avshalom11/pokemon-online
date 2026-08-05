@@ -40,7 +40,7 @@ export function EvolutionPromptDialog({ pending, isSubmitting, onAccept, onRejec
 
         <div className="mt-4 flex items-center justify-center gap-4">
           <SpriteImage
-            src={getFrontSpritePath(pending.currentSpecies.dexNumber)}
+            src={getFrontSpritePath(pending.currentSpecies)}
             alt={pending.currentSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
@@ -49,7 +49,7 @@ export function EvolutionPromptDialog({ pending, isSubmitting, onAccept, onRejec
             ←
           </span>
           <SpriteImage
-            src={getFrontSpritePath(pending.evolvedSpecies.dexNumber)}
+            src={getFrontSpritePath(pending.evolvedSpecies)}
             alt={pending.evolvedSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

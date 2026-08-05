@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { getZoneData } from "@/data/zones/zone-data";
 import { BattleContent } from "@/features/battle/components/BattleContent";
 import { getBattleViewData } from "@/features/battle/services/battle-view.service";
 import { getInventoryView } from "@/features/inventory/services/inventory-view.service";
-import { getRegionDefinition } from "@/features/regions/data/region-registry";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { toRegionId } from "@/shared/types/region";
@@ -40,17 +40,26 @@ export default async function BattlePage({ searchParams }: { searchParams: Promi
   // for the region gate below) costs no extra DB round trip beyond what
   // this page already needed further down for the Bag's inventory view.
   const profile = await getPlayerProfile(session.user.id);
-  const region = getRegionDefinition(toRegionId(profile.regionId));
+  const regionId = toRegionId(profile.regionId);
 
-  // A wild encounter only exists for a region with real, clickable zones —
-  // the Region Registry's mapConfig, not just hasMap (Johto has a map image
-  // now but no zones yet, so hasMap alone would wrongly let it through).
-  // Only "kanto" has a mapConfig today. This refuses a direct /battle?zone=
-  // deep link while a zoneless region is active, on top of Map itself never
-  // rendering zones/InteractiveWorldMap for one — Kanto's own
-  // zones/encounters must never be reachable while a different region is
-  // selected.
-  if (!region.mapConfig) {
+  // A wild encounter only exists for a region with real, populated zone
+  // encounter tables (data/zones/zone-data.ts's getZoneData) — NOT merely a
+  // Region Registry mapConfig. Those two used to always coincide (only
+  // Kanto, later Johto, ever had a mapConfig, and both got real zone data
+  // the same phase they got one), but Hoenn breaks that assumption on
+  // purpose: it has a real, interactive mapConfig (data/maps/
+  // hoenn-map-config.ts) so the Map page can show real, clickable polygons
+  // (see MapContent), with NO zone/encounter data yet (no
+  // data/zones/hoenn-zone-data.ts — that's a separate future phase).
+  // Gating on mapConfig presence alone would let a direct /battle?zone=
+  // deep link — or simply clicking a Hoenn zone on the Map page, which
+  // still navigates here exactly like any other region — reach
+  // getBattleViewData for a region with nothing to roll an encounter from.
+  // Gating on real zone data instead keeps Kanto and Johto behaving exactly
+  // as before (both already have real zone data) while correctly bouncing
+  // Hoenn back to /map until it gets its own zone data — never by reusing
+  // Kanto's or Johto's own zone/encounter tables to fake one.
+  if (getZoneData(regionId).length === 0) {
     redirect("/map");
   }
 

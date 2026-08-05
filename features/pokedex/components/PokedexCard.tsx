@@ -48,7 +48,7 @@ export function PokedexCard({ entry, onSelect }: PokedexCardProps) {
       <span dir="ltr" className="text-[10px] font-medium text-slate-500">{`#${formatDexNumber(species.dexNumber)}`}</span>
 
       <SpriteImage
-        src={getFrontSpritePath(species.dexNumber)}
+        src={getFrontSpritePath(species)}
         alt={isUnseen ? "פוקימון שטרם התגלה" : species.name}
         className={`h-12 w-12 object-contain transition-transform sm:h-14 sm:w-14 ${
           isUnseen ? "opacity-80 brightness-0" : "group-hover:scale-110"

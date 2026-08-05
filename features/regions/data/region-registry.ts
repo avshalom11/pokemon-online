@@ -1,4 +1,6 @@
+import { HOENN_MAP_CONFIG } from "@/data/maps/hoenn-map-config";
 import { JOHTO_MAP_CONFIG } from "@/data/maps/johto-map-config";
+import { SINNOH_MAP_CONFIG } from "@/data/maps/sinnoh-map-config";
 import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
 import type { RegionId } from "@/shared/types/region";
 import type { RegionDefinition } from "../types/region-registry.types";
@@ -47,8 +49,53 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // reusing Kanto's own table.
     mapConfig: JOHTO_MAP_CONFIG,
   },
-  hoenn: { id: "hoenn", englishName: "Hoenn", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
-  sinnoh: { id: "sinnoh", englishName: "Sinnoh", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
+  hoenn: {
+    id: "hoenn",
+    englishName: "Hoenn",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Hoenn now has real, clickable zones (data/maps/hoenn-map-config.ts,
+    // manually placed via /dev/hoenn-map-editor against the real
+    // /images/hoenn-map.png) — same as Kanto/Johto, mapConfig.imageSrc is
+    // the one source for the map image; mapImageSrc is left unset since
+    // mapConfig already covers it (MapContent renders from mapConfig
+    // whenever it's present).
+    //
+    // As of Hoenn Encounter Tables Phase 4, Hoenn also has its own real
+    // zone encounter tables (data/zones/hoenn-zone-data.ts) — the same six
+    // zone ids as Kanto/Johto, but its own Hoenn-only Pokémon pool;
+    // resolved by region via data/zones/zone-data.ts's getZoneData/getZone,
+    // never by reusing Kanto's or Johto's own table. This makes Hoenn
+    // battle-capable automatically: app/(game)/battle/page.tsx's region
+    // gate checks getZoneData(regionId).length > 0 (not mapConfig presence
+    // specifically, which is why Hoenn's map could already render
+    // interactively before this phase while still correctly blocking
+    // battles) — no change to that gate, or to this registry beyond
+    // mapConfig already being set, was needed for Hoenn to pass it.
+    mapConfig: HOENN_MAP_CONFIG,
+  },
+  sinnoh: {
+    id: "sinnoh",
+    englishName: "Sinnoh",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Sinnoh now has real, clickable zones (data/maps/sinnoh-map-config.ts,
+    // manually placed via /dev/sinnoh-map-editor against the real
+    // /images/sinnoh-map.png) — same as Kanto/Johto/Hoenn, mapConfig.
+    // imageSrc is the one source for the map image; mapImageSrc is left
+    // unset since mapConfig already covers it (MapContent renders from
+    // mapConfig whenever it's present).
+    //
+    // Sinnoh has NO zone encounter data yet (data/zones/sinnoh-zone-data.ts
+    // does not exist) — app/(game)/battle/page.tsx's region gate checks
+    // getZoneData(regionId).length === 0 (not mapConfig presence), so
+    // Sinnoh's map can render interactively here while battles stay
+    // correctly blocked, exactly the same "map before encounters" window
+    // Hoenn went through between its own map-config and encounter-table
+    // phases. No change to that gate, or to this registry beyond mapConfig
+    // being set, is needed for that to hold.
+    mapConfig: SINNOH_MAP_CONFIG,
+  },
   unova: { id: "unova", englishName: "Unova", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   kalos: { id: "kalos", englishName: "Kalos", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   alola: { id: "alola", englishName: "Alola", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },

@@ -32,7 +32,7 @@ export function ReleaseConfirmDialog({ pokemon, pending, onCancel, onConfirm }: 
         className="w-full max-w-sm rounded-2xl border border-rose-500/30 bg-slate-900 p-6 text-center shadow-2xl"
       >
         <SpriteImage
-          src={getFrontSpritePath(pokemon.species.dexNumber)}
+          src={getFrontSpritePath(pokemon.species)}
           alt={displayName}
           className="mx-auto h-24 w-24 object-contain"
           fallbackClassName="mx-auto flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

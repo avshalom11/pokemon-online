@@ -18,7 +18,7 @@ export function StarterCard({ species, isSelected, onSelect }: StarterCardProps)
       }`}
     >
       <SpriteImage
-        src={getFrontSpritePath(species.dexNumber)}
+        src={getFrontSpritePath(species)}
         alt={species.name}
         className="h-28 w-28 object-contain"
         fallbackClassName="flex h-28 w-28 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

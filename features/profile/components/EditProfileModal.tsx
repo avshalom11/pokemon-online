@@ -161,7 +161,7 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
                     className="flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-slate-950/40 p-1.5 text-center"
                   >
                     <SpriteImage
-                      src={getFrontSpritePath(member.dexNumber)}
+                      src={getFrontSpritePath(member)}
                       alt={member.displayName}
                       className="h-10 w-10 object-contain"
                       fallbackClassName="flex h-10 w-10 items-center justify-center rounded border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

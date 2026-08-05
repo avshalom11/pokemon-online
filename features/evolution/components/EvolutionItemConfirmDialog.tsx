@@ -41,7 +41,7 @@ export function EvolutionItemConfirmDialog({
 
         <div className="mt-4 flex items-center justify-center gap-4">
           <SpriteImage
-            src={getFrontSpritePath(candidate.currentSpecies.dexNumber)}
+            src={getFrontSpritePath(candidate.currentSpecies)}
             alt={candidate.currentSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
@@ -50,7 +50,7 @@ export function EvolutionItemConfirmDialog({
             ←
           </span>
           <SpriteImage
-            src={getFrontSpritePath(candidate.evolvedSpecies.dexNumber)}
+            src={getFrontSpritePath(candidate.evolvedSpecies)}
             alt={candidate.evolvedSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

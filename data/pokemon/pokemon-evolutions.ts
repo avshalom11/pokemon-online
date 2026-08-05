@@ -169,6 +169,241 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // deriveSpeciesWildLevelRange).
   golbat: { evolvesToSpeciesId: "crobat", requiredLevel: 36 },
   chansey: { evolvesToSpeciesId: "blissey", requiredLevel: 16 },
+
+  // Generation III (Hoenn, Phase 2) — same "unconditional level-up only"
+  // scope as the Generation I/II blocks above, including the same
+  // simplification rules already established for Kanto/Johto:
+  //   - A species whose real-game evolution is Stone-based keeps that
+  //     method (see the Hoenn block in EVOLUTION_ITEM_EVOLUTIONS below:
+  //     lombre -> ludicolo via water-stone, nuzleaf -> shiftry via
+  //     leaf-stone) — never flattened to level, exactly like Gloom/
+  //     Weepinbell/Exeggcute already weren't.
+  //   - A species whose real-game evolution requires Moon Stone (Skitty ->
+  //     Delcatty) keeps that method — see the Hoenn Completeness Review
+  //     block in EVOLUTION_ITEM_EVOLUTIONS below, never this table. Moon
+  //     Stone is now a real, generalized EvolutionItemId (the Hoenn
+  //     Completeness Review also backfilled the four pre-existing Kanto
+  //     Moon Stone evolutions — Nidorina/Nidorino/Clefairy/Jigglypuff — that
+  //     had been left out entirely up to that point).
+  //   - Wurmple's real-game personality-value split (Silcoon vs Cascoon) is
+  //     an explicit level-7 player CHOICE instead — see BRANCH_EVOLUTIONS
+  //     below, never this table, and never a hidden/random value.
+  //   - Feebas's real-game Beauty-condition evolution is simplified to a
+  //     flat level-30 evolution per this phase's own explicit spec — no
+  //     Beauty/Contests/Pokéblocks/Prism Scale mechanic exists in this
+  //     project.
+  //   - Clamperl's real-game evolution requires trading while holding an
+  //     item; this project has no trading system, so both branches evolve
+  //     directly from their item instead (deep-sea-tooth -> huntail,
+  //     deep-sea-scale -> gorebyss) — see the Hoenn block in
+  //     EVOLUTION_ITEM_EVOLUTIONS below, never this table.
+  //   - Nincada is deliberately absent here — the real games' SIMULTANEOUS
+  //     bonus Shedinja (obtained for free alongside Ninjask, requiring an
+  //     empty party slot + a spare Poké Ball) is NOT implemented, and never
+  //     will be invented as a "one evolution produces two Pokémon" mechanic.
+  //     Instead, Nincada is a normal level-20 BRANCH — the player explicitly
+  //     chooses Ninjask or Shedinja, exactly one target, replacing Nincada
+  //     in place, the same shape Eevee/Wurmple already use. See
+  //     BRANCH_EVOLUTIONS below, never this table.
+  treecko: { evolvesToSpeciesId: "grovyle", requiredLevel: 16 },
+  grovyle: { evolvesToSpeciesId: "sceptile", requiredLevel: 36 },
+  torchic: { evolvesToSpeciesId: "combusken", requiredLevel: 16 },
+  combusken: { evolvesToSpeciesId: "blaziken", requiredLevel: 36 },
+  mudkip: { evolvesToSpeciesId: "marshtomp", requiredLevel: 16 },
+  marshtomp: { evolvesToSpeciesId: "swampert", requiredLevel: 36 },
+  poochyena: { evolvesToSpeciesId: "mightyena", requiredLevel: 18 },
+  zigzagoon: { evolvesToSpeciesId: "linoone", requiredLevel: 20 },
+  // Wurmple itself is deliberately absent here — see BRANCH_EVOLUTIONS.
+  silcoon: { evolvesToSpeciesId: "beautifly", requiredLevel: 10 },
+  cascoon: { evolvesToSpeciesId: "dustox", requiredLevel: 10 },
+  lotad: { evolvesToSpeciesId: "lombre", requiredLevel: 14 },
+  // lombre -> ludicolo is Water-Stone, not level — see EVOLUTION_ITEM_EVOLUTIONS.
+  seedot: { evolvesToSpeciesId: "nuzleaf", requiredLevel: 14 },
+  // nuzleaf -> shiftry is Leaf-Stone, not level — see EVOLUTION_ITEM_EVOLUTIONS.
+  taillow: { evolvesToSpeciesId: "swellow", requiredLevel: 22 },
+  wingull: { evolvesToSpeciesId: "pelipper", requiredLevel: 25 },
+  ralts: { evolvesToSpeciesId: "kirlia", requiredLevel: 20 },
+  kirlia: { evolvesToSpeciesId: "gardevoir", requiredLevel: 30 },
+  surskit: { evolvesToSpeciesId: "masquerain", requiredLevel: 22 },
+  shroomish: { evolvesToSpeciesId: "breloom", requiredLevel: 23 },
+  slakoth: { evolvesToSpeciesId: "vigoroth", requiredLevel: 18 },
+  vigoroth: { evolvesToSpeciesId: "slaking", requiredLevel: 36 },
+  // Nincada itself is deliberately absent here — see BRANCH_EVOLUTIONS.
+  whismur: { evolvesToSpeciesId: "loudred", requiredLevel: 20 },
+  loudred: { evolvesToSpeciesId: "exploud", requiredLevel: 40 },
+  makuhita: { evolvesToSpeciesId: "hariyama", requiredLevel: 24 },
+  // Azurill's real-game evolution is Friendship-based — same simplification
+  // rule as pichu/cleffa/igglybuff/togepi above (a plain level evolution,
+  // never the incense breeding mechanic that produces Azurill in the first
+  // place, which this project doesn't implement either).
+  azurill: { evolvesToSpeciesId: "marill", requiredLevel: 16 },
+  // skitty (-> delcatty) is Moon-Stone, not level — see the Hoenn
+  // Completeness Review block in EVOLUTION_ITEM_EVOLUTIONS below.
+  aron: { evolvesToSpeciesId: "lairon", requiredLevel: 32 },
+  lairon: { evolvesToSpeciesId: "aggron", requiredLevel: 42 },
+  meditite: { evolvesToSpeciesId: "medicham", requiredLevel: 37 },
+  electrike: { evolvesToSpeciesId: "manectric", requiredLevel: 26 },
+  gulpin: { evolvesToSpeciesId: "swalot", requiredLevel: 26 },
+  carvanha: { evolvesToSpeciesId: "sharpedo", requiredLevel: 30 },
+  wailmer: { evolvesToSpeciesId: "wailord", requiredLevel: 40 },
+  numel: { evolvesToSpeciesId: "camerupt", requiredLevel: 33 },
+  spoink: { evolvesToSpeciesId: "grumpig", requiredLevel: 32 },
+  trapinch: { evolvesToSpeciesId: "vibrava", requiredLevel: 35 },
+  vibrava: { evolvesToSpeciesId: "flygon", requiredLevel: 45 },
+  cacnea: { evolvesToSpeciesId: "cacturne", requiredLevel: 32 },
+  swablu: { evolvesToSpeciesId: "altaria", requiredLevel: 35 },
+  barboach: { evolvesToSpeciesId: "whiscash", requiredLevel: 30 },
+  corphish: { evolvesToSpeciesId: "crawdaunt", requiredLevel: 30 },
+  baltoy: { evolvesToSpeciesId: "claydol", requiredLevel: 36 },
+  lileep: { evolvesToSpeciesId: "cradily", requiredLevel: 40 },
+  anorith: { evolvesToSpeciesId: "armaldo", requiredLevel: 40 },
+  // Feebas's real-game Beauty-condition evolution is simplified to a flat
+  // level 30 per this phase's own explicit spec — see this block's own top
+  // note.
+  feebas: { evolvesToSpeciesId: "milotic", requiredLevel: 30 },
+  shuppet: { evolvesToSpeciesId: "banette", requiredLevel: 37 },
+  duskull: { evolvesToSpeciesId: "dusclops", requiredLevel: 37 },
+  // Wynaut (Hoenn) evolving into Wobbuffet (already Johto's own #202) —
+  // same "baby added in a later generation, adult unchanged" precedent as
+  // smoochum/elekid/magby -> jynx/electabuzz/magmar above.
+  wynaut: { evolvesToSpeciesId: "wobbuffet", requiredLevel: 15 },
+  snorunt: { evolvesToSpeciesId: "glalie", requiredLevel: 42 },
+  spheal: { evolvesToSpeciesId: "sealeo", requiredLevel: 32 },
+  sealeo: { evolvesToSpeciesId: "walrein", requiredLevel: 44 },
+  // clamperl (-> huntail/gorebyss) is deliberately absent — real-game
+  // Trade-with-item evolution, replaced by two direct evolution-item
+  // branches instead. See EVOLUTION_ITEM_EVOLUTIONS below.
+  bagon: { evolvesToSpeciesId: "shelgon", requiredLevel: 30 },
+  shelgon: { evolvesToSpeciesId: "salamence", requiredLevel: 50 },
+  beldum: { evolvesToSpeciesId: "metang", requiredLevel: 20 },
+  metang: { evolvesToSpeciesId: "metagross", requiredLevel: 45 },
+  // Regirock/Regice/Registeel/Latias/Latios/Kyogre/Groudon/Rayquaza/
+  // Jirachi/Deoxys (all four forms)/Castform are all deliberately absent —
+  // none of them evolve.
+
+  // Generation IV (Sinnoh, Phase 2) — same "unconditional level-up only"
+  // scope as every generation above, plus this phase's own explicit
+  // simplification rules for the official mechanics this project doesn't
+  // implement:
+  //   - Friendship (Budew/Buneary/Bonsly/Mime Jr./Munchlax/Riolu/Chingling,
+  //     plus Riolu and Chingling's real-game Time-of-day/night condition,
+  //     plus Bonsly/Mime Jr.'s real-game Move-Known condition) is flattened
+  //     to a plain level-16 evolution — same default level every prior
+  //     Friendship simplification in this file already uses (pichu/cleffa/
+  //     igglybuff/togepi/chansey/azurill), deviated from only when a chain
+  //     collision forces otherwise (golbat/crobat is still the only such
+  //     case, unaffected by this block).
+  //   - Combee -> Vespiquen's real-game Gender restriction (only female
+  //     Combee evolve) is dropped — since there is only one possible
+  //     target, this is a plain level-21 evolution, never a fake one-target
+  //     "branch". Burmy's own Gender split (Wormadam vs Mothim, two REAL
+  //     targets) is a genuine choice instead — see BRANCH_EVOLUTIONS below,
+  //     never this table.
+  //   - Mantyke -> Mantine's real-game "must level up with a Remoraid in
+  //     the party" condition (not Friendship, but equally unimplementable)
+  //     is flattened to the same default level-16 evolution.
+  //   - Move-Known conditions (Aipom -> Ambipom/Double Hit, Tangela ->
+  //     Tangrowth/Ancient Power, Lickitung -> Lickilicky/Rollout, Yanma ->
+  //     Yanmega/Ancient Power) keep their real canonical level and simply
+  //     drop the move-known requirement — these DO have a genuine
+  //     game-canon level unlike pure-Friendship cases, so that real number
+  //     is kept rather than defaulting to 16.
+  //   - Location evolutions (Magneton -> Magnezone and Nosepass ->
+  //     Probopass, both "level up at a special magnetic field" in the
+  //     source games, no canonical level) become plain level evolutions at
+  //     a level comfortably above their own pre-evolution's floor.
+  //   - Eevee's own Leafeon/Glaceon (real-game Location evolution near a
+  //     Moss Rock/Icy Rock) and Kirlia/Snorunt's Gender-restricted second
+  //     targets (Gallade/Froslass) are NOT here — all four are direct
+  //     evolution-item evolutions (Leaf Stone/Ice Stone/Dawn Stone) — see
+  //     EVOLUTION_ITEM_EVOLUTIONS below, never this table or
+  //     BRANCH_EVOLUTIONS.
+  //   - Piloswine's real Move-Known (Ancient Power) target level isn't
+  //     precisely canonical in the source games either; a comfortably
+  //     higher level than Piloswine's own level-33 pre-evolution is used
+  //     instead, keeping the same "final stage sits well above its middle
+  //     stage" shape every other three-stage-adjacent chain in this table
+  //     already has.
+  //   - Real Trade/Trade-with-held-item evolutions (Rhydon/Electabuzz/
+  //     Magmar/Porygon2/Dusclops, plus Roselia/Togetic/Happiny's Shiny/
+  //     Oval Stone branches and Sneasel/Gligar/Misdreavus/Murkrow's
+  //     Razor Claw/Razor Fang/Dusk Stone branches) are deliberately absent
+  //     here — see EVOLUTION_ITEM_EVOLUTIONS below, never this table.
+  turtwig: { evolvesToSpeciesId: "grotle", requiredLevel: 18 },
+  grotle: { evolvesToSpeciesId: "torterra", requiredLevel: 32 },
+  chimchar: { evolvesToSpeciesId: "monferno", requiredLevel: 14 },
+  monferno: { evolvesToSpeciesId: "infernape", requiredLevel: 36 },
+  piplup: { evolvesToSpeciesId: "prinplup", requiredLevel: 16 },
+  prinplup: { evolvesToSpeciesId: "empoleon", requiredLevel: 36 },
+  starly: { evolvesToSpeciesId: "staravia", requiredLevel: 14 },
+  staravia: { evolvesToSpeciesId: "staraptor", requiredLevel: 34 },
+  bidoof: { evolvesToSpeciesId: "bibarel", requiredLevel: 15 },
+  kricketot: { evolvesToSpeciesId: "kricketune", requiredLevel: 10 },
+  shinx: { evolvesToSpeciesId: "luxio", requiredLevel: 15 },
+  luxio: { evolvesToSpeciesId: "luxray", requiredLevel: 30 },
+  // Budew -> Roselia (Hoenn, #315) is a real cross-generation link: Roselia
+  // itself was a Hoenn final-stage species until this phase added both its
+  // own new pre-evolution here AND its own new post-evolution (Roselia ->
+  // Roserade, Shiny Stone) in EVOLUTION_ITEM_EVOLUTIONS below.
+  budew: { evolvesToSpeciesId: "roselia", requiredLevel: 16 },
+  cranidos: { evolvesToSpeciesId: "rampardos", requiredLevel: 30 },
+  shieldon: { evolvesToSpeciesId: "bastiodon", requiredLevel: 30 },
+  combee: { evolvesToSpeciesId: "vespiquen", requiredLevel: 21 },
+  buizel: { evolvesToSpeciesId: "floatzel", requiredLevel: 26 },
+  cherubi: { evolvesToSpeciesId: "cherrim", requiredLevel: 25 },
+  shellos: { evolvesToSpeciesId: "gastrodon", requiredLevel: 30 },
+  drifloon: { evolvesToSpeciesId: "drifblim", requiredLevel: 28 },
+  buneary: { evolvesToSpeciesId: "lopunny", requiredLevel: 16 },
+  glameow: { evolvesToSpeciesId: "purugly", requiredLevel: 38 },
+  stunky: { evolvesToSpeciesId: "skuntank", requiredLevel: 34 },
+  bronzor: { evolvesToSpeciesId: "bronzong", requiredLevel: 33 },
+  // Bonsly -> Sudowoodo (Johto, #185): Sudowoodo itself is unchanged,
+  // final-stage — only its new pre-evolution is added here, same
+  // "baby added in a later generation" precedent as smoochum/elekid/magby/
+  // wynaut above.
+  bonsly: { evolvesToSpeciesId: "sudowoodo", requiredLevel: 16 },
+  // Mime Jr. -> Mr. Mime (Kanto, #122): same precedent as Bonsly above.
+  "mime-jr": { evolvesToSpeciesId: "mr-mime", requiredLevel: 16 },
+  gible: { evolvesToSpeciesId: "gabite", requiredLevel: 24 },
+  gabite: { evolvesToSpeciesId: "garchomp", requiredLevel: 48 },
+  // Munchlax -> Snorlax (Kanto, #143): same precedent as Bonsly above.
+  munchlax: { evolvesToSpeciesId: "snorlax", requiredLevel: 16 },
+  riolu: { evolvesToSpeciesId: "lucario", requiredLevel: 16 },
+  hippopotas: { evolvesToSpeciesId: "hippowdon", requiredLevel: 34 },
+  skorupi: { evolvesToSpeciesId: "drapion", requiredLevel: 40 },
+  croagunk: { evolvesToSpeciesId: "toxicroak", requiredLevel: 37 },
+  finneon: { evolvesToSpeciesId: "lumineon", requiredLevel: 31 },
+  // Mantyke -> Mantine (Johto, #226): same precedent as Bonsly above.
+  mantyke: { evolvesToSpeciesId: "mantine", requiredLevel: 16 },
+  snover: { evolvesToSpeciesId: "abomasnow", requiredLevel: 40 },
+  // Aipom (Johto, #190) -> Ambipom: former Move-Known (Double Hit)
+  // evolution, now a plain level evolution at its real canonical level.
+  aipom: { evolvesToSpeciesId: "ambipom", requiredLevel: 32 },
+  // Magneton (Kanto, #082) -> Magnezone: former Location (special magnetic
+  // field) evolution, now a plain level evolution comfortably above
+  // Magnemite -> Magneton's own level-30 floor.
+  magneton: { evolvesToSpeciesId: "magnezone", requiredLevel: 40 },
+  // Lickitung (Kanto, #108) -> Lickilicky: former Move-Known (Rollout)
+  // evolution, now a plain level evolution at its real canonical level.
+  lickitung: { evolvesToSpeciesId: "lickilicky", requiredLevel: 33 },
+  // Tangela (Kanto, #114) -> Tangrowth: former Move-Known (Ancient Power)
+  // evolution, now a plain level evolution at its real canonical level.
+  tangela: { evolvesToSpeciesId: "tangrowth", requiredLevel: 36 },
+  // Yanma (Johto, #193) -> Yanmega: former Move-Known (Ancient Power)
+  // evolution, now a plain level evolution at its real canonical level.
+  yanma: { evolvesToSpeciesId: "yanmega", requiredLevel: 33 },
+  // Piloswine (Johto, #221) -> Mamoswine: former Move-Known (Ancient
+  // Power) evolution, now a plain level evolution comfortably above
+  // Swinub -> Piloswine's own level-33 floor.
+  piloswine: { evolvesToSpeciesId: "mamoswine", requiredLevel: 45 },
+  // Nosepass (Hoenn, #299) -> Probopass: former Location (special magnetic
+  // field) evolution, now a plain level evolution — same rule as Magneton
+  // -> Magnezone above.
+  nosepass: { evolvesToSpeciesId: "probopass", requiredLevel: 42 },
+  // Chingling -> Chimecho (Hoenn, #358): former Friendship+night evolution,
+  // now the same default level-16 evolution as every other Friendship
+  // simplification in this block.
+  chingling: { evolvesToSpeciesId: "chimecho", requiredLevel: 16 },
 };
 
 // The one place a species' level-evolution target/threshold is ever looked
@@ -226,7 +461,59 @@ export type EvolutionItemId =
   | "kings-rock"
   | "metal-coat"
   | "dragon-scale"
-  | "upgrade";
+  | "upgrade"
+  // Generation III (Hoenn, Phase 2) — Clamperl's two branches. Real-game
+  // evolution requires trading while holding one of these; this project has
+  // no trading system, so both evolve directly from the item instead (same
+  // "former Trade-with-held-item, now direct item use" precedent as
+  // kings-rock/metal-coat/dragon-scale/upgrade above). Registry-only, same
+  // as sun-stone/kings-rock/metal-coat/dragon-scale/upgrade were when first
+  // added — see EVOLUTION_ITEM_IDS's own doc comment for the full
+  // obtainability list; neither is in the Shop catalog.
+  | "deep-sea-tooth"
+  | "deep-sea-scale"
+  // Hoenn Completeness Review — Moon Stone, generalized into this same
+  // architecture rather than a one-off special case. Backfills Skitty ->
+  // Delcatty (Hoenn) AND four pre-existing Kanto species whose canonical
+  // Moon-Stone evolution had been left out of this table entirely up to
+  // now: Nidorina -> Nidoqueen, Nidorino -> Nidoking, Clefairy -> Clefable,
+  // Jigglypuff -> Wigglytuff (see EVOLUTION_ITEM_EVOLUTIONS below).
+  // Registry-only, same not-yet-purchasable status as every other
+  // non-elemental-stone item above — never added to the Shop here.
+  | "moon-stone"
+  // Generation IV (Sinnoh, Phase 2) — eleven new evolution items, every one
+  // of them a real Trade-with-held-item evolution turned into a direct
+  // item use (Sneasel/Rhydon/Electabuzz/Magmar/Porygon2/Dusclops — same
+  // "former Trade-with-held-item, now direct item use" precedent as
+  // kings-rock/metal-coat/dragon-scale/upgrade), or a real
+  // Gender-restricted second branch turned into an independent
+  // evolution-item option alongside the species' existing level evolution
+  // (Kirlia -> Gallade, Snorunt -> Froslass — same "one species, multiple
+  // evolution methods" precedent Slowpoke already established for level +
+  // evolution-item together), or a real evolution-item evolution that
+  // simply didn't exist in this catalog's prior generations
+  // (Roselia/Togetic's Shiny Stone, Happiny's Oval Stone,
+  // Misdreavus/Murkrow's Dusk Stone). Registry-only, same not-yet-
+  // purchasable status as every other item above — none of these are added
+  // to the Shop in this phase; see EVOLUTION_ITEM_EVOLUTIONS below for
+  // exactly which species use which.
+  | "dawn-stone"
+  | "dusk-stone"
+  | "shiny-stone"
+  | "protector"
+  | "dubious-disc"
+  | "reaper-cloth"
+  | "razor-claw"
+  | "razor-fang"
+  | "electirizer"
+  | "magmarizer"
+  | "oval-stone"
+  // Generation IV (Sinnoh, Phase 2 design correction) — Eevee's Ice Stone
+  // branch into Glaceon. Leaf Stone (Eevee's Leafeon branch) already
+  // existed; Ice Stone is the one genuinely new item this correction adds.
+  // Registry-only, same not-yet-purchasable status as every other item
+  // above — never added to the Shop.
+  | "ice-stone";
 
 export interface EvolutionItemEvolution {
   method: "evolution-item";
@@ -262,6 +549,17 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
     { method: "evolution-item", evolvesToSpeciesId: "flareon", itemId: "fire-stone" },
     { method: "evolution-item", evolvesToSpeciesId: "vaporeon", itemId: "water-stone" },
     { method: "evolution-item", evolvesToSpeciesId: "jolteon", itemId: "thunder-stone" },
+    // Generation IV (Sinnoh, Phase 2 design correction) — Leafeon/Glaceon's
+    // real-game evolution method is Location (leveling up near a Moss
+    // Rock/Icy Rock), which this project doesn't implement. Originally
+    // added as two more Branch targets alongside Espeon/Umbreon, then
+    // corrected to match this table's own existing "former
+    // Location/Trade/Friendship evolution, now direct item use" precedent
+    // instead — Leaf Stone already exists (reused directly, same item
+    // Gloom/Weepinbell/Nuzleaf/Lombre already use), Ice Stone is new (see
+    // EvolutionItemId's own doc comment).
+    { method: "evolution-item", evolvesToSpeciesId: "leafeon", itemId: "leaf-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "glaceon", itemId: "ice-stone" },
     // Eevee's remaining two Generation II forms (Espeon/Umbreon) are a
     // player-chosen level-16 BRANCH, not an item — see BRANCH_EVOLUTIONS
     // below, never this table.
@@ -277,6 +575,93 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   scyther: [{ method: "evolution-item", evolvesToSpeciesId: "scizor", itemId: "metal-coat" }],
   seadra: [{ method: "evolution-item", evolvesToSpeciesId: "kingdra", itemId: "dragon-scale" }],
   porygon: [{ method: "evolution-item", evolvesToSpeciesId: "porygon2", itemId: "upgrade" }],
+
+  // Generation III (Hoenn, Phase 2) — lombre/nuzleaf keep their real-game
+  // Stone methods (never flattened to level, see LEVEL_EVOLUTIONS's own
+  // Hoenn block note). Clamperl is the former Trade-with-held-item case
+  // (see deep-sea-tooth/deep-sea-scale's own doc comment above) — two
+  // independent branches off the same species, same multi-branch precedent
+  // as Eevee/Gloom/Poliwhirl above.
+  lombre: [{ method: "evolution-item", evolvesToSpeciesId: "ludicolo", itemId: "water-stone" }],
+  nuzleaf: [{ method: "evolution-item", evolvesToSpeciesId: "shiftry", itemId: "leaf-stone" }],
+  clamperl: [
+    { method: "evolution-item", evolvesToSpeciesId: "huntail", itemId: "deep-sea-tooth" },
+    { method: "evolution-item", evolvesToSpeciesId: "gorebyss", itemId: "deep-sea-scale" },
+  ],
+
+  // Hoenn Completeness Review — Moon Stone. skitty is the new Hoenn entry
+  // this review adds; nidorina/nidorino/clefairy/jigglypuff are pre-existing
+  // Kanto species whose canonical Moon-Stone evolution was never added to
+  // this table at all until now (confirmed missing by inspection — they had
+  // no entry in EITHER LEVEL_EVOLUTIONS or EVOLUTION_ITEM_EVOLUTIONS, so
+  // they were silently treated as already-final-stage). All five are
+  // simple single-branch species, same shape as vulpix/growlithe above.
+  nidorina: [{ method: "evolution-item", evolvesToSpeciesId: "nidoqueen", itemId: "moon-stone" }],
+  nidorino: [{ method: "evolution-item", evolvesToSpeciesId: "nidoking", itemId: "moon-stone" }],
+  clefairy: [{ method: "evolution-item", evolvesToSpeciesId: "clefable", itemId: "moon-stone" }],
+  jigglypuff: [{ method: "evolution-item", evolvesToSpeciesId: "wigglytuff", itemId: "moon-stone" }],
+  skitty: [{ method: "evolution-item", evolvesToSpeciesId: "delcatty", itemId: "moon-stone" }],
+
+  // Generation IV (Sinnoh, Phase 2) — Roselia (Hoenn, #315) -> Roserade:
+  // real-game Shiny Stone evolution, unrelated to Roselia's own new
+  // pre-evolution (Budew, LEVEL_EVOLUTIONS above).
+  roselia: [{ method: "evolution-item", evolvesToSpeciesId: "roserade", itemId: "shiny-stone" }],
+  // Happiny -> Chansey: former Friendship+Time(day) evolution — simplified
+  // to a direct Oval Stone use instead of the default level-16 (Oval Stone
+  // is Happiny's own canonical held-item association in the source games),
+  // matching this phase's explicit item-reuse philosophy. Chansey's own
+  // pre-existing level-16 evolution into Blissey is untouched.
+  happiny: [{ method: "evolution-item", evolvesToSpeciesId: "chansey", itemId: "oval-stone" }],
+  // Sneasel (Johto, #215) -> Weavile: former Trade-while-holding-Razor-Claw
+  // (at night) evolution — now a direct Razor Claw use, no trade, no
+  // time-of-day, same "former Trade-with-held-item, now direct item use"
+  // precedent as onix/scyther/seadra/porygon above.
+  sneasel: [{ method: "evolution-item", evolvesToSpeciesId: "weavile", itemId: "razor-claw" }],
+  // Rhydon (Kanto, #112) -> Rhyperior: former Trade-while-holding-Protector
+  // evolution — same precedent as Sneasel above.
+  rhydon: [{ method: "evolution-item", evolvesToSpeciesId: "rhyperior", itemId: "protector" }],
+  // Electabuzz (Kanto, #125) -> Electivire: former
+  // Trade-while-holding-Electirizer evolution — same precedent as Sneasel
+  // above.
+  electabuzz: [{ method: "evolution-item", evolvesToSpeciesId: "electivire", itemId: "electirizer" }],
+  // Magmar (Kanto, #126) -> Magmortar: former Trade-while-holding-
+  // Magmarizer evolution — same precedent as Sneasel above.
+  magmar: [{ method: "evolution-item", evolvesToSpeciesId: "magmortar", itemId: "magmarizer" }],
+  // Togetic (Johto, #176) -> Togekiss: real-game Shiny Stone evolution.
+  // Togetic's own pre-existing evolution FROM Togepi is untouched.
+  togetic: [{ method: "evolution-item", evolvesToSpeciesId: "togekiss", itemId: "shiny-stone" }],
+  // Gligar (Hoenn, #207) -> Gliscor: former Trade-while-holding-Razor-Fang
+  // (at night) evolution — same precedent as Sneasel above.
+  gligar: [{ method: "evolution-item", evolvesToSpeciesId: "gliscor", itemId: "razor-fang" }],
+  // Porygon2 (Johto, #233) -> Porygon-Z: former
+  // Trade-while-holding-Dubious-Disc evolution — same precedent as Sneasel
+  // above. Porygon2's own pre-existing evolution FROM Porygon (Upgrade) is
+  // untouched.
+  porygon2: [{ method: "evolution-item", evolvesToSpeciesId: "porygon-z", itemId: "dubious-disc" }],
+  // Kirlia (Hoenn, #281) -> Gallade: real-game Gender-restricted second
+  // target (Dawn Stone, male only) — Gender evolution is forbidden, so
+  // this becomes an independent evolution-item branch that exists
+  // alongside Kirlia's own pre-existing level-30 evolution into Gardevoir,
+  // same "one species, level AND evolution-item together" precedent
+  // Slowpoke already established (slowpoke -> slowbro @37 level, AND
+  // slowpoke -> slowking via kings-rock). The player, not a hidden gender
+  // value, decides which one their Kirlia becomes.
+  kirlia: [{ method: "evolution-item", evolvesToSpeciesId: "gallade", itemId: "dawn-stone" }],
+  // Dusclops (Hoenn, #356) -> Dusknoir: former
+  // Trade-while-holding-Reaper-Cloth evolution — same precedent as Sneasel
+  // above. Dusclops's own pre-existing evolution FROM Duskull is untouched.
+  dusclops: [{ method: "evolution-item", evolvesToSpeciesId: "dusknoir", itemId: "reaper-cloth" }],
+  // Snorunt (Hoenn, #361) -> Froslass: real-game Gender-restricted second
+  // target (Dawn Stone, female only) — same "level AND evolution-item
+  // together" simplification as Kirlia -> Gallade above. Snorunt's own
+  // pre-existing level-42 evolution into Glalie is untouched.
+  snorunt: [{ method: "evolution-item", evolvesToSpeciesId: "froslass", itemId: "dawn-stone" }],
+  // Misdreavus (Johto, #200) -> Mismagius: real-game Dusk Stone evolution.
+  misdreavus: [{ method: "evolution-item", evolvesToSpeciesId: "mismagius", itemId: "dusk-stone" }],
+  // Murkrow (Johto, #198) -> Honchkrow: real-game Dusk Stone evolution —
+  // same item as Misdreavus above, two independent species each with their
+  // own single Dusk Stone branch.
+  murkrow: [{ method: "evolution-item", evolvesToSpeciesId: "honchkrow", itemId: "dusk-stone" }],
 };
 
 // Every evolution-item branch a species has, regardless of which item —
@@ -336,6 +721,31 @@ const EVOLUTION_ITEM_IDS: readonly EvolutionItemId[] = [
   "metal-coat",
   "dragon-scale",
   "upgrade",
+  // Generation III (Hoenn, Phase 2) — deep-sea-tooth/deep-sea-scale are
+  // NOT in the Shop catalog (same "registry-only, not yet purchasable"
+  // status sun-stone/kings-rock/metal-coat/dragon-scale/upgrade already
+  // have) — never added there in this phase.
+  "deep-sea-tooth",
+  "deep-sea-scale",
+  // Hoenn Completeness Review — moon-stone. Also NOT in the Shop catalog.
+  "moon-stone",
+  // Generation IV (Sinnoh, Phase 2) — eleven new items, none added to the
+  // Shop catalog in this phase (see EvolutionItemId's own doc comment
+  // above for what each one is used for).
+  "dawn-stone",
+  "dusk-stone",
+  "shiny-stone",
+  "protector",
+  "dubious-disc",
+  "reaper-cloth",
+  "razor-claw",
+  "razor-fang",
+  "electirizer",
+  "magmarizer",
+  "oval-stone",
+  // Generation IV (Sinnoh, Phase 2 design correction) — ice-stone. Also NOT
+  // in the Shop catalog.
+  "ice-stone",
 ];
 
 // Narrows an arbitrary Shop/Inventory itemId to the EvolutionItemId union —
@@ -365,6 +775,33 @@ export interface BranchEvolution {
 
 const BRANCH_EVOLUTIONS: Record<string, BranchEvolution> = {
   eevee: { requiredLevel: 16, targets: ["espeon", "umbreon"] },
+  // Burmy's real-game evolution is Gender-restricted (male -> Mothim,
+  // female -> Wormadam), always at level 20. Gender evolution is
+  // forbidden, so — same as Wurmple/Nincada above — it becomes an explicit
+  // player CHOICE between the two real targets instead of a hidden value.
+  burmy: { requiredLevel: 20, targets: ["wormadam", "mothim"] },
+  // Generation III (Hoenn, Phase 2) — Wurmple's real-game evolution is
+  // decided by a hidden personality value the player never sees; this
+  // project has no such hidden-value mechanic (and the phase spec
+  // explicitly forbids introducing one), so it's an explicit level-7
+  // player CHOICE instead — same deterministic, player-driven pattern
+  // Eevee already established, reusing the exact same
+  // create-choice/then-confirm flow (chooseEvolutionBranch,
+  // EvolutionBranchChoiceDialog) with zero new mechanics.
+  wurmple: { requiredLevel: 7, targets: ["silcoon", "cascoon"] },
+  // Hoenn Evolution Cleanup — Nincada's real-game evolution normally
+  // produces Ninjask AND a bonus Shedinja simultaneously (requires an empty
+  // party slot + a spare Poké Ball at the moment of evolution). This
+  // project's evolution architecture has no "one evolution produces two
+  // Pokémon" mechanic for any method and never will — instead, Nincada is a
+  // normal level-20 BRANCH: the player explicitly chooses exactly one of
+  // Ninjask or Shedinja, which replaces Nincada in place, the same
+  // single-target-replacement shape every other branch (and every other
+  // evolution method) already uses. No free party slot, no Poké Ball, no
+  // duplication, no special-case logic — Shedinja is simply another branch
+  // target, resolved through the exact same create-choice/then-confirm flow
+  // Eevee/Wurmple already use.
+  nincada: { requiredLevel: 20, targets: ["ninjask", "shedinja"] },
 };
 
 // The one place a species' Branch Evolution is ever looked up — mirrors

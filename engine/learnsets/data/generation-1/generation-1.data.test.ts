@@ -80,11 +80,13 @@ test("every level-up entry has a positive integer level (never 0)", () => {
   }
 });
 
-test("the real registry loads all Generation 1 and Generation 2 learnsets", () => {
-  // 151 Generation 1 + 100 Generation 2 (Phase 3) = 251. Update this number
-  // deliberately whenever a new generation's learnset data is registered —
-  // see engine/learnsets/data/index.ts.
-  assert.equal(getAllLearnsets().length, 251);
+test("the real registry loads all Generation 1, Generation 2, Generation 3, and Generation 4 learnsets", () => {
+  // 151 Generation 1 + 100 Generation 2 + 138 Generation 3 + 113
+  // Generation 4 (Sinnoh Moves & Learnsets Phase 3 — 107 Sinnoh base
+  // species + 6 alternate forms) = 502. Update this number deliberately
+  // whenever a new generation's learnset data is registered — see
+  // engine/learnsets/data/index.ts.
+  assert.equal(getAllLearnsets().length, 502);
 });
 
 test("queries continue to work correctly against the populated registry", () => {

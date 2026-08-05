@@ -26,6 +26,7 @@ export async function getProfileEditViewModel(userId: string, username: string):
   const realParty = await getPlayerParty(profile.id);
   const partyPreview: PublicPartyMemberView[] = realParty.map((pokemon) => ({
     dexNumber: pokemon.species.dexNumber,
+    spriteId: pokemon.species.spriteId,
     displayName: pokemon.nickname ?? pokemon.species.name,
     level: pokemon.level,
   }));

@@ -42,7 +42,7 @@ export function PokemonCard({ pokemon, onClick }: PokemonCardProps) {
       ) : null}
 
       <SpriteImage
-        src={getFrontSpritePath(pokemon.species.dexNumber)}
+        src={getFrontSpritePath(pokemon.species)}
         alt={displayName}
         className="h-12 w-12 object-contain transition-transform group-hover:scale-110 sm:h-14 sm:w-14"
         fallbackClassName="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500 sm:h-14 sm:w-14"

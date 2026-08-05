@@ -35,11 +35,15 @@ export interface RegionDefinition {
   mapImageSrc?: string;
 
   // The full interactive zone config (clickable polygons keyed by ZoneId) —
-  // presence of this, not hasMap, is what gates battle-capability: only a
-  // region with real zones can ever start a field battle (see
-  // app/(game)/battle/page.tsx's region gate). Only "kanto" has one today.
-  // Adding Johto's own zones later means giving johto this field too — at
-  // that point its Map page rendering and battle access both switch on
-  // automatically, with no change needed to MapContent or the battle gate.
+  // presence of this is what gates whether MapContent renders a real,
+  // clickable InteractiveWorldMap instead of a plain image or
+  // RegionMapPlaceholder. It does NOT by itself gate battle-capability
+  // (that used to be true when only Kanto/Johto ever had one — see
+  // app/(game)/battle/page.tsx's region gate, which checks real zone/
+  // encounter data via data/zones/zone-data.ts's getZoneData instead):
+  // Hoenn is the first region with a real mapConfig but no zone/encounter
+  // data yet, so its map is interactive while it still correctly can't
+  // start a battle. Kanto and Johto both have one, and both already have
+  // real zone data, so nothing about their own behavior changed.
   mapConfig?: WorldMapConfig;
 }

@@ -40,7 +40,7 @@ export const PROFILE_IMAGE_OPTIONS: ProfileImageOption[] = PROFILE_IMAGE_SPECIES
   // breaking the picker instead of crashing it.
   if (!species) return [];
 
-  return [{ id: species.id, label: species.name, imageUrl: getFrontSpritePath(species.dexNumber) }];
+  return [{ id: species.id, label: species.name, imageUrl: getFrontSpritePath(species) }];
 });
 
 // The one place a ProfileImageBlock.imageId is ever validated against the

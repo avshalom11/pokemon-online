@@ -93,7 +93,7 @@ export function EvolutionItemPanel({ item, ownedPokemon }: EvolutionItemPanelPro
                 className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-slate-900/60 p-2 text-center transition-all hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-slate-900/80"
               >
                 <SpriteImage
-                  src={getFrontSpritePath(candidate.currentSpecies.dexNumber)}
+                  src={getFrontSpritePath(candidate.currentSpecies)}
                   alt={displayName}
                   className="h-12 w-12 object-contain"
                   fallbackClassName="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

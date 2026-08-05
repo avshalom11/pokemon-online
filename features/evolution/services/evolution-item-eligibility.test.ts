@@ -70,11 +70,16 @@ test("Eevee is returned once per matching stone, resolving to the correct branch
   const water = getEvolutionItemCandidates("water-stone", owned);
   const thunder = getEvolutionItemCandidates("thunder-stone", owned);
   const leaf = getEvolutionItemCandidates("leaf-stone", owned);
+  const ice = getEvolutionItemCandidates("ice-stone", owned);
 
   assert.equal(fire[0]?.evolvedSpecies.id, "flareon");
   assert.equal(water[0]?.evolvedSpecies.id, "vaporeon");
   assert.equal(thunder[0]?.evolvedSpecies.id, "jolteon");
-  assert.deepEqual(leaf, [], "Eevee has no Leaf Stone branch");
+  // Generation IV (Sinnoh, Phase 2 design correction) — Leafeon/Glaceon are
+  // direct evolution-item evolutions (Leaf Stone/Ice Stone), not Branch
+  // targets like Espeon/Umbreon.
+  assert.equal(leaf[0]?.evolvedSpecies.id, "leafeon");
+  assert.equal(ice[0]?.evolvedSpecies.id, "glaceon");
 });
 
 test("former Trade-item evolutions are eligible directly from the item, with no trade of any kind", () => {

@@ -1,5 +1,7 @@
+import { HOENN_ZONE_DATA } from "./hoenn-zone-data";
 import { JOHTO_ZONE_DATA } from "./johto-zone-data";
 import { KANTO_ZONE_DATA } from "./kanto-zone-data";
+import { SINNOH_ZONE_DATA } from "./sinnoh-zone-data";
 import type { RegionId } from "@/shared/types/region";
 import type { Zone, ZoneId } from "@/shared/types/zone";
 
@@ -13,14 +15,17 @@ import type { Zone, ZoneId } from "@/shared/types/zone";
 // zoneId (e.g. "grassland") intentionally resolves to a completely
 // different Pokémon pool depending on which region is passed in here.
 //
-// Regions with no zone data yet (every RegionId besides "kanto"/"johto" —
-// see features/regions/data/region-registry.ts's own `hasMap`/`mapConfig`
-// flags) resolve to an empty array rather than throwing, the same
-// "unknown/not-yet-built -> safe empty result" precedent every other
-// region-aware lookup in this codebase already follows.
+// Regions with no zone data yet (every RegionId besides "kanto"/"johto"/
+// "hoenn"/"sinnoh" — see features/regions/data/region-registry.ts's own
+// `hasMap`/`mapConfig` flags) resolve to an empty array rather than
+// throwing, the same "unknown/not-yet-built -> safe empty result"
+// precedent every other region-aware lookup in this codebase already
+// follows.
 const ZONE_DATA_BY_REGION: Partial<Record<RegionId, Zone[]>> = {
   kanto: KANTO_ZONE_DATA,
   johto: JOHTO_ZONE_DATA,
+  hoenn: HOENN_ZONE_DATA,
+  sinnoh: SINNOH_ZONE_DATA,
 };
 
 export function getZoneData(regionId: RegionId): Zone[] {

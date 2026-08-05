@@ -74,7 +74,7 @@ export function PartySlot({ pokemon, isActive, variant = "compact", onSelect, di
       ) : null}
 
       <SpriteImage
-        src={getFrontSpritePath(pokemon.species.dexNumber)}
+        src={getFrontSpritePath(pokemon.species)}
         alt={displayName}
         className="h-16 w-16 object-contain sm:h-20 sm:w-20"
         fallbackClassName="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500 sm:h-20 sm:w-20"

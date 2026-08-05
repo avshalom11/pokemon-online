@@ -3,13 +3,19 @@ import type { ProfileContentBlock } from "./profile-content.types";
 import type { RegionId } from "@/shared/types/region";
 
 // A single displayed party member on the PUBLIC profile — deliberately NOT
-// OwnedPokemon: only the three fields the spec explicitly allows are ever
-// selected onto this shape (dex number for the sprite, display name,
-// level). No id (internal PlayerPokemon id), no XP, no IVs/stats, no
-// moves, no status — those are never even read for this purpose, let alone
-// exposed. See public-profile-view.service.ts's own doc comment.
+// OwnedPokemon: only the fields the spec explicitly allows are ever
+// selected onto this shape (dex number + optional sprite form override for
+// the sprite, display name, level). No id (internal PlayerPokemon id), no
+// XP, no IVs/stats, no moves, no status — those are never even read for
+// this purpose, let alone exposed. See public-profile-view.service.ts's own
+// doc comment.
 export interface PublicPartyMemberView {
   dexNumber: number;
+  // Mirrors PokemonSpecies.spriteId (shared/types/pokemon.ts) — carried
+  // through so an owned Pokémon that's an alternate FORM (e.g. Deoxys
+  // Attack Form) still renders its own real sprite here instead of its
+  // base form's, without exposing anything else about the owned instance.
+  spriteId?: string;
   displayName: string;
   level: number;
 }

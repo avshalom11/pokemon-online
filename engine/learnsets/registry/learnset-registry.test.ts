@@ -24,10 +24,12 @@ test("a lookup by pokemonId returns that species' learnset", () => {
 });
 
 test("the real registry loads the full learnset database (every generation) without throwing", () => {
-  // 151 Generation 1 learnsets + 100 Generation 2 learnsets (Phase 3) = 251.
+  // 151 Generation 1 learnsets + 100 Generation 2 learnsets + 138
+  // Generation 3 learnsets + 113 Generation 4 learnsets (Sinnoh Moves &
+  // Learnsets Phase 3 — 107 Sinnoh base species + 6 alternate forms) = 502.
   // Update this number deliberately whenever a new generation's learnset
   // data is registered — see engine/learnsets/data/index.ts.
-  assert.equal(getAllLearnsets().length, 251);
+  assert.equal(getAllLearnsets().length, 502);
 });
 
 test("getLearnsetByPokemonId finds a real Generation 1 Pokémon's learnset by its permanent id", () => {

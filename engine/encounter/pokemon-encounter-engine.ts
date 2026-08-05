@@ -6,7 +6,7 @@ import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effec
 import { getEligibleWildLevelRange } from "@/engine/evolution-stage-scaling/species-eligibility";
 import { getWildLevelRangeForPlayerLevel, type WildLevelRange } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 import { rollLevelInRange } from "@/engine/player-level-scaling/wild-level-generator";
-import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
+import { getFrontSpritePath, type SpriteSource } from "@/features/pokemon/media/pokemon-media-paths";
 import type { RegionId } from "@/shared/types/region";
 import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 import type { ZoneEncounter, ZoneId } from "@/shared/types/zone";
@@ -62,14 +62,15 @@ const ZONE_ENCOUNTERS_BY_REGION_AND_RARITY: Map<RegionId, Map<ZoneId, Encounters
   ])
 );
 
-// pokemonId -> dexNumber, same "build once, O(1) lookups after" precedent
-// engine/encounter-rarity/get-effective-encounter-rarity.ts's own
-// SPECIES_RARITY_BY_ID uses. Species ids are globally unique across every
-// generation/region (see data/pokemon/pokemon-data.ts), so this one flat
-// map already covers Kanto and Johto together — no region-scoping needed
-// here.
-const DEX_NUMBER_BY_SPECIES_ID: Map<string, number> = new Map(
-  POKEMON_DATA.map((species) => [species.id, species.dexNumber])
+// pokemonId -> sprite source (dexNumber + optional form spriteId — see
+// PokemonSpecies.spriteId's own doc comment), same "build once, O(1)
+// lookups after" precedent engine/encounter-rarity/
+// get-effective-encounter-rarity.ts's own SPECIES_RARITY_BY_ID uses. Species
+// ids are globally unique across every generation/region (see
+// data/pokemon/pokemon-data.ts), so this one flat map already covers every
+// region together — no region-scoping needed here.
+const SPRITE_SOURCE_BY_SPECIES_ID: Map<string, SpriteSource> = new Map(
+  POKEMON_DATA.map((species) => [species.id, { dexNumber: species.dexNumber, spriteId: species.spriteId }])
 );
 
 // regionId -> zoneId -> every distinct front-sprite URL that region+zone
@@ -83,13 +84,14 @@ const FRONT_SPRITE_URLS_BY_REGION_AND_ZONE: Map<RegionId, Map<ZoneId, string[]>>
     regionId,
     new Map(
       getZoneData(regionId).map((zone) => {
-        const dexNumbers = new Set(
+        const spriteUrls = new Set(
           zone.encounters
-            .map((encounter) => DEX_NUMBER_BY_SPECIES_ID.get(encounter.pokemonId))
-            .filter((dexNumber): dexNumber is number => dexNumber !== undefined)
+            .map((encounter) => SPRITE_SOURCE_BY_SPECIES_ID.get(encounter.pokemonId))
+            .filter((source): source is SpriteSource => source !== undefined)
+            .map(getFrontSpritePath)
         );
 
-        return [zone.id, Array.from(dexNumbers, getFrontSpritePath)];
+        return [zone.id, Array.from(spriteUrls)];
       })
     ),
   ])

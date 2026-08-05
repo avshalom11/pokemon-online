@@ -1,8 +1,8 @@
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
-import { getAllEvolutionItemEvolutionEntries, type EvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
+import { getAllEvolutionItemEvolutionEntries } from "@/data/pokemon/pokemon-evolutions";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 
-// Phase 3 — Stone-evolved wild Pokémon use Very-Rare encounter odds without
+// Phase 3 — Item-evolved wild Pokémon use Very-Rare encounter odds without
 // Very-Rare UI styling. This module is ENCOUNTER-ONLY: it computes which
 // rarity TIER a species' wild encounter probability should be bucketed
 // into, entirely separate from PokemonSpecies.rarity (which stays the
@@ -13,34 +13,23 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // React, no UI strings, no randomness — a pure lookup, exactly like
 // engine/evolution-stage-scaling's own species-wild-level-range.ts.
 //
-// Deliberately scoped to the original five elemental/mood Stones only
-// (fire/water/thunder/leaf/sun-stone) — NOT the former Trade-item
-// evolutions (King's Rock/Metal Coat/Dragon Scale/Upgrade) that the
-// Evolution Simplification phase merged into the same
-// EVOLUTION_ITEM_EVOLUTIONS table as these Stones. That phase's own explicit
-// "do not change rarity, encounter weights" rule means Politoed/Slowking/
-// Steelix/Scizor/Kingdra/Porygon2 must keep resolving to their own real
-// catalog rarity here exactly as before, unaffected by simply sharing a
-// table with the Stones now.
-const STONE_ITEM_IDS: ReadonlySet<EvolutionItemId> = new Set([
-  "fire-stone",
-  "water-stone",
-  "thunder-stone",
-  "leaf-stone",
-  "sun-stone",
-]);
+// Covers EVERY direct evolution-item branch in EVOLUTION_ITEM_EVOLUTIONS —
+// the five elemental/mood Stones (fire/water/thunder/leaf/sun-stone) AND
+// the former Trade-item evolutions (King's Rock/Metal Coat/Dragon
+// Scale/Upgrade), now that the Evolution Simplification phase made all of
+// them direct item uses with no trade involved. No item-id filtering here:
+// membership in this set is "is this species the target of ANY entry in the
+// canonical table," so a newly added evolution item is covered
+// automatically without touching this file again.
 
 // Built once at module load: every species id that is the TARGET of at
-// least one of the five Stones above (data/pokemon/pokemon-evolutions.ts's
-// own EVOLUTION_ITEM_EVOLUTIONS table, read via
-// getAllEvolutionItemEvolutionEntries and filtered to STONE_ITEM_IDS) —
-// never a second/duplicated species list. A Set, not a Map: only
-// membership matters here, never which stone or which pre-evolution led to
-// it.
-const STONE_EVOLVED_SPECIES_IDS: ReadonlySet<string> = new Set(
-  getAllEvolutionItemEvolutionEntries()
-    .filter((entry) => STONE_ITEM_IDS.has(entry.evolution.itemId))
-    .map((entry) => entry.evolution.evolvesToSpeciesId)
+// least one entry in data/pokemon/pokemon-evolutions.ts's own
+// EVOLUTION_ITEM_EVOLUTIONS table (read via getAllEvolutionItemEvolutionEntries,
+// the single canonical source of truth — never a second/duplicated species
+// list here). A Set, not a Map: only membership matters, never which item
+// or which pre-evolution led to it.
+const ITEM_EVOLVED_SPECIES_IDS: ReadonlySet<string> = new Set(
+  getAllEvolutionItemEvolutionEntries().map((entry) => entry.evolution.evolvesToSpeciesId)
 );
 
 // pokemonId -> real catalog rarity, built once at module load — the same
@@ -58,11 +47,13 @@ const SPECIES_RARITY_BY_ID: Map<string, PokemonRarity> = new Map(
 // pokemon-encounter-engine.ts's groupByRarity already relies on, so an
 // invalid/missing id is never silently assigned an invented rarity.
 //
-// - A species that is the target of a stone evolution (Ninetales,
-//   Arcanine, Raichu, Vaporeon, Jolteon, Flareon, Poliwrath, Cloyster,
-//   Starmie, Vileplume, Victreebel, Exeggutor today — derived, never
-//   hardcoded here) always resolves to "very-rare" for THIS purpose,
-//   regardless of its own real PokemonSpecies.rarity.
+// - A species that is the target of ANY direct evolution-item evolution
+//   (Ninetales, Arcanine, Raichu, Vaporeon, Jolteon, Flareon, Poliwrath,
+//   Cloyster, Starmie, Vileplume, Bellossom, Victreebel, Exeggutor,
+//   Sunflora, Politoed, Slowking, Steelix, Scizor, Kingdra, Porygon2 today
+//   — derived from EVOLUTION_ITEM_EVOLUTIONS, never hardcoded here) always
+//   resolves to "very-rare" for THIS purpose, regardless of its own real
+//   PokemonSpecies.rarity.
 // - Every other species resolves to its own real catalog rarity, unchanged.
 export function getEffectiveEncounterRarity(speciesId: string): PokemonRarity | undefined {
   const catalogRarity = SPECIES_RARITY_BY_ID.get(speciesId);
@@ -71,5 +62,5 @@ export function getEffectiveEncounterRarity(speciesId: string): PokemonRarity | 
     return undefined;
   }
 
-  return STONE_EVOLVED_SPECIES_IDS.has(speciesId) ? "very-rare" : catalogRarity;
+  return ITEM_EVOLVED_SPECIES_IDS.has(speciesId) ? "very-rare" : catalogRarity;
 }

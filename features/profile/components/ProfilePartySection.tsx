@@ -29,7 +29,7 @@ export function ProfilePartySection({ party }: ProfilePartySectionProps) {
               className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-slate-950/40 p-2 text-center"
             >
               <SpriteImage
-                src={getFrontSpritePath(member.dexNumber)}
+                src={getFrontSpritePath(member)}
                 alt={member.displayName}
                 className="h-12 w-12 object-contain sm:h-14 sm:w-14"
                 fallbackClassName="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500 sm:h-14 sm:w-14"

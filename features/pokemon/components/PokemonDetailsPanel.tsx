@@ -164,7 +164,7 @@ export function PokemonDetailsPanel({
 
           <div className="flex flex-col items-center gap-3 text-center">
             <SpriteImage
-              src={getFrontSpritePath(pokemon.species.dexNumber)}
+              src={getFrontSpritePath(pokemon.species)}
               alt={displayName}
               className="h-40 w-40 object-contain drop-shadow-[0_0_20px_rgba(99,102,241,0.35)]"
               fallbackClassName="flex h-40 w-40 items-center justify-center rounded-xl border border-dashed border-white/20 bg-slate-800/60 text-slate-500"

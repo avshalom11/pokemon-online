@@ -22,7 +22,7 @@ export const PROFILE_AVATAR_OPTIONS: ProfileAvatarOption[] = AVATAR_SPECIES_IDS.
   // the avatar picker instead of crashing it.
   if (!species) return [];
 
-  return [{ dexNumber: species.dexNumber, label: species.name, imageUrl: getFrontSpritePath(species.dexNumber) }];
+  return [{ dexNumber: species.dexNumber, label: species.name, imageUrl: getFrontSpritePath(species) }];
 });
 
 // Every dex number a player is allowed to persist as their avatar — the one

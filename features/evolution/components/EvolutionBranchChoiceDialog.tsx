@@ -39,7 +39,7 @@ export function EvolutionBranchChoiceDialog({ pending, isSubmitting, onChoose, o
 
         <div className="mt-4 flex items-center justify-center">
           <SpriteImage
-            src={getFrontSpritePath(pending.currentSpecies.dexNumber)}
+            src={getFrontSpritePath(pending.currentSpecies)}
             alt={pending.currentSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
@@ -58,7 +58,7 @@ export function EvolutionBranchChoiceDialog({ pending, isSubmitting, onChoose, o
               className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-slate-900/60 p-3 transition-all hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-slate-900/80 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <SpriteImage
-                src={getFrontSpritePath(target.dexNumber)}
+                src={getFrontSpritePath(target)}
                 alt={target.name}
                 className="h-16 w-16 object-contain"
                 fallbackClassName="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
