@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 
+import { EvolutionItemBranchChoiceDialog } from "@/features/evolution/components/EvolutionItemBranchChoiceDialog";
 import { EvolutionItemConfirmDialog } from "@/features/evolution/components/EvolutionItemConfirmDialog";
 import { acceptEvolutionItemAction } from "@/features/evolution/actions/evolution.actions";
 import { noEligibleEvolutionItemPokemonMessage } from "@/features/evolution/messages/evolution-messages";
@@ -10,6 +11,7 @@ import { SpriteImage } from "@/components/media/SpriteImage";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { ShopItem } from "@/features/shop/types/shop.types";
+import type { PokemonSpecies } from "@/shared/types/pokemon";
 
 interface EvolutionItemPanelProps {
   item: ShopItem;
@@ -17,18 +19,25 @@ interface EvolutionItemPanelProps {
 }
 
 // Appears under InventorySellPanel whenever an Evolution Item (a Stone, or
-// a former Trade-item like King's Rock/Metal Coat/Dragon Scale/Upgrade — see
-// data/pokemon/pokemon-evolutions.ts's EVOLUTION_ITEM_EVOLUTIONS) is
-// selected in the Inventory (see InventoryContent) — never for any other
-// category. Filters the player's full owned-Pokémon list (party AND
-// storage — see getAllOwnedPokemon) down to exactly the species this one
-// item can evolve (getEvolutionItemCandidates), then opens the same-styled
-// confirmation dialog level evolution uses (EvolutionItemConfirmDialog)
-// once a specific Pokémon is chosen. Selling this same item is entirely
-// unaffected — that stays InventorySellPanel/InventorySellConfirmDialog's
-// own flow, untouched. No trade of any kind is ever involved in this flow.
+// an Evolution Item like King's Rock/Metal Coat/Dragon Scale/Upgrade/
+// Protector/Reaper Cloth — see data/pokemon/pokemon-evolutions.ts's
+// EVOLUTION_ITEM_EVOLUTIONS) is selected in the Inventory (see
+// InventoryContent) — never for any other category. Filters the player's
+// full owned-Pokémon list (party AND storage — see getAllOwnedPokemon) down
+// to exactly the species this one item can evolve
+// (getEvolutionItemCandidates), then either opens the confirmation dialog
+// directly (a single target) or, for a branch item (Clamperl + Water
+// Stone, evolvedSpeciesOptions.length > 1), first opens
+// EvolutionItemBranchChoiceDialog so the player explicitly picks Huntail or
+// Gorebyss before confirming — same two-step shape
+// BRANCH_EVOLUTIONS/EvolutionBranchChoiceDialog already use for level
+// evolutions, reused here for the item path. Selling this same item is
+// entirely unaffected — that stays InventorySellPanel/
+// InventorySellConfirmDialog's own flow, untouched. No trade of any kind is
+// ever involved in this flow.
 export function EvolutionItemPanel({ item, ownedPokemon }: EvolutionItemPanelProps) {
   const [selectedCandidate, setSelectedCandidate] = useState<EvolutionItemCandidate | null>(null);
+  const [chosenTarget, setChosenTarget] = useState<PokemonSpecies | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, startTransition] = useTransition();
@@ -37,8 +46,17 @@ export function EvolutionItemPanel({ item, ownedPokemon }: EvolutionItemPanelPro
 
   function handleSelectCandidate(candidate: EvolutionItemCandidate) {
     setSelectedCandidate(candidate);
+    // A single-target species goes straight to the confirm dialog; a branch
+    // (evolvedSpeciesOptions.length > 1) waits for an explicit choice first —
+    // never auto-picks the first option.
+    setChosenTarget(candidate.evolvedSpeciesOptions.length === 1 ? candidate.evolvedSpeciesOptions[0] : null);
     setErrorMessage(null);
     setSuccessMessage(null);
+  }
+
+  function handleChooseTarget(target: PokemonSpecies) {
+    setChosenTarget(target);
+    setErrorMessage(null);
   }
 
   function handleCancel() {
@@ -47,17 +65,19 @@ export function EvolutionItemPanel({ item, ownedPokemon }: EvolutionItemPanelPro
     // were; the player may pick the same (or another) Pokémon again later
     // while still owning this item.
     setSelectedCandidate(null);
+    setChosenTarget(null);
     setErrorMessage(null);
   }
 
   function handleConfirm() {
-    if (!selectedCandidate) return;
+    if (!selectedCandidate || !chosenTarget) return;
 
     startTransition(async () => {
-      const result = await acceptEvolutionItemAction(selectedCandidate.playerPokemonId, item.id);
+      const result = await acceptEvolutionItemAction(selectedCandidate.playerPokemonId, item.id, chosenTarget.id);
 
       if (result.status === "success") {
         setSelectedCandidate(null);
+        setChosenTarget(null);
         setSuccessMessage(`${result.oldSpeciesName} התפתח ל־${result.newSpeciesName}!`);
         return;
       }
@@ -114,9 +134,22 @@ export function EvolutionItemPanel({ item, ownedPokemon }: EvolutionItemPanelPro
         </p>
       ) : null}
 
-      {selectedCandidate ? (
+      {selectedCandidate && !chosenTarget ? (
+        <EvolutionItemBranchChoiceDialog
+          currentSpecies={selectedCandidate.currentSpecies}
+          nickname={selectedCandidate.nickname}
+          targets={selectedCandidate.evolvedSpeciesOptions}
+          isSubmitting={isSubmitting}
+          onChoose={handleChooseTarget}
+          onCancel={handleCancel}
+        />
+      ) : null}
+
+      {selectedCandidate && chosenTarget ? (
         <EvolutionItemConfirmDialog
-          candidate={selectedCandidate}
+          currentSpecies={selectedCandidate.currentSpecies}
+          nickname={selectedCandidate.nickname}
+          evolvedSpecies={chosenTarget}
           itemName={item.name}
           isSubmitting={isSubmitting}
           errorMessage={errorMessage}

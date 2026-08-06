@@ -115,13 +115,21 @@ export const SHOP_ITEMS: ShopItem[] = [
     medicineEffectKind: "revive",
     healPercent: 1,
   },
+  // Shop UI Redesign phase — every evolution product's description below is
+  // a short thematic sentence (never a Pokémon list, never derived from
+  // Pokémon names) that replaces the previous permanent inline "Evolves:"
+  // list under the product card; the actual Pokémon that evolve using each
+  // item are still shown, but only on demand, via the small "?" info
+  // button on the card (EvolutionItemInfoDialog), always live-derived from
+  // data/pokemon/pokemon-evolutions.ts — never hardcoded here or anywhere
+  // in features/shop.
   {
     id: "fire-stone",
     categoryId: "stones",
     name: "אבן אש",
     price: 70,
     currency: "gold",
-    description: "אבן אבולוציה הטעונה באנרגיית אש.",
+    description: "אבן אש לוהטת שמפתחת פוקימונים בעלי זיקה לאש.",
     imageUrl: getShopItemImagePath("stones", "fire-stone"),
   },
   {
@@ -130,7 +138,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "אבן מים",
     price: 70,
     currency: "gold",
-    description: "אבן אבולוציה הטעונה באנרגיית מים.",
+    description: "אבן מים מיוחדת שמפתחת פוקימונים בעלי זיקה למים.",
     imageUrl: getShopItemImagePath("stones", "water-stone"),
   },
   {
@@ -139,7 +147,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "אבן רעם",
     price: 70,
     currency: "gold",
-    description: "אבן אבולוציה הטעונה באנרגיה חשמלית.",
+    description: "אבן ברק נדירה שמפתחת פוקימונים בעלי זיקה לחשמל.",
     imageUrl: getShopItemImagePath("stones", "thunder-stone"),
   },
   {
@@ -148,7 +156,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "אבן עלים",
     price: 70,
     currency: "gold",
-    description: "אבן אבולוציה הטעונה באנרגיית טבע.",
+    description: "אבן טבע ירוקה שמפתחת פוקימונים בעלי זיקה לצומח.",
     imageUrl: getShopItemImagePath("stones", "leaf-stone"),
   },
   {
@@ -157,7 +165,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "אבן שמש",
     price: 70,
     currency: "gold",
-    description: "משמשת להתפתחות של פוקימונים מסוימים.",
+    description: "אבן שמש זוהרת שמעוררת התפתחות הקשורה לאור ולצמיחה.",
     imageUrl: getShopItemImagePath("stones", "sun-stone"),
   },
   {
@@ -166,7 +174,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "אבן המלך",
     price: 70,
     currency: "gold",
-    description: "פריט התפתחות מיוחד לפוקימונים מסוימים.",
+    description: "חפץ מלכותי עתיק שמאפשר לפוקימונים מסוימים להתפתח.",
     imageUrl: getShopItemImagePath("stones", "kings-rock"),
   },
   {
@@ -175,7 +183,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "ציפוי מתכת",
     price: 70,
     currency: "gold",
-    description: "פריט התפתחות מיוחד לפוקימונים מסוימים.",
+    description: "ציפוי מתכתי מיוחד שמאפשר לפוקימונים מסוימים להגיע לצורה מתקדמת.",
     imageUrl: getShopItemImagePath("stones", "metal-coat"),
   },
   {
@@ -184,7 +192,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "קשקש דרקון",
     price: 70,
     currency: "gold",
-    description: "פריט התפתחות מיוחד לפוקימונים מסוימים.",
+    description: "קשקש דרקון עתיק שמאפשר לפוקימונים מסוימים להתפתח לצורה חזקה יותר.",
     imageUrl: getShopItemImagePath("stones", "dragon-scale"),
   },
   {
@@ -193,7 +201,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "שדרוג",
     price: 70,
     currency: "gold",
-    description: "פריט התפתחות מיוחד לפוקימונים מסוימים.",
+    description: "רכיב טכנולוגי מתקדם שמשדרג פוקימונים דיגיטליים.",
     imageUrl: getShopItemImagePath("stones", "upgrade"),
   },
   {
@@ -202,25 +210,61 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: "אבן ירח",
     price: 70,
     currency: "gold",
-    description: "אבן אבולוציה הטעונה באנרגיית ירח.",
+    description: "אבן ירח מסתורית שמפתחת פוקימונים בעלי זיקה לאנרגיית הירח.",
     imageUrl: getShopItemImagePath("stones", "moon-stone"),
   },
   {
-    id: "deep-sea-tooth",
+    id: "ice-stone",
     categoryId: "stones",
-    name: "שן ים עמוק",
+    name: "אבן קרח",
     price: 70,
     currency: "gold",
-    description: "פריט התפתחות מיוחד שמפתח את Clamperl ל-Huntail.",
-    imageUrl: getShopItemImagePath("stones", "deep-sea-tooth"),
+    description: "אבן קרח צוננת שמפתחת פוקימונים בעלי זיקה לקור.",
+    imageUrl: getShopItemImagePath("stones", "ice-stone"),
   },
   {
-    id: "deep-sea-scale",
+    id: "dawn-stone",
     categoryId: "stones",
-    name: "קשקש ים עמוק",
+    name: "אבן שחר",
     price: 70,
     currency: "gold",
-    description: "פריט התפתחות מיוחד שמפתח את Clamperl ל-Gorebyss.",
-    imageUrl: getShopItemImagePath("stones", "deep-sea-scale"),
+    description: "אבן שחר נוצצת שחושפת פוטנציאל התפתחות נסתר.",
+    imageUrl: getShopItemImagePath("stones", "dawn-stone"),
+  },
+  {
+    id: "dusk-stone",
+    categoryId: "stones",
+    name: "אבן דמדומים",
+    price: 70,
+    currency: "gold",
+    description: "אבן דמדומים אפלה שמעוררת התפתחות הקשורה לצללים.",
+    imageUrl: getShopItemImagePath("stones", "dusk-stone"),
+  },
+  {
+    id: "shiny-stone",
+    categoryId: "stones",
+    name: "אבן נוצצת",
+    price: 70,
+    currency: "gold",
+    description: "אבן נוצצת ומבריקה שמעוררת התפתחות מרהיבה.",
+    imageUrl: getShopItemImagePath("stones", "shiny-stone"),
+  },
+  {
+    id: "protector",
+    categoryId: "stones",
+    name: "מגן",
+    price: 70,
+    currency: "gold",
+    description: "מגן כבד ועמיד שמאפשר התפתחות מיוחדת.",
+    imageUrl: getShopItemImagePath("stones", "protector"),
+  },
+  {
+    id: "reaper-cloth",
+    categoryId: "stones",
+    name: "בד הקוצר",
+    price: 70,
+    currency: "gold",
+    description: "אריג מסתורי בעל אנרגיה אפלה שמאפשר התפתחות מיוחדת.",
+    imageUrl: getShopItemImagePath("stones", "reaper-cloth"),
   },
 ];

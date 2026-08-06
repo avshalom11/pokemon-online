@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getEvolutionItemEvolutionByItem, isEvolutionItemId, type EvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
+import { getEvolutionItemEvolutionsByItem, isEvolutionItemId, type EvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
 import { applyEvolutionToPlayerPokemon, calculateEvolutionHpOutcome } from "@/features/evolution/services/apply-evolution.service";
 import { getInventoryItemQuantity, removeInventoryItem } from "@/features/inventory/services/inventory.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
@@ -62,7 +62,8 @@ class ConcurrentEvolutionItemError extends Error {}
 export async function acceptEvolutionItem(
   playerId: string,
   playerPokemonId: string,
-  itemId: string
+  itemId: string,
+  targetSpeciesId?: string
 ): Promise<AcceptEvolutionItemResult> {
   if (!isEvolutionItemId(itemId)) {
     return { status: "invalid-item" };
@@ -76,8 +77,17 @@ export async function acceptEvolutionItem(
   // Re-derived from the canonical Evolution-Item table, never trusted from
   // the client's itemId alone — same "validate the target matches the
   // canonical Species Registry evolution data" rule accept-evolution.
-  // service.ts already follows for the level path.
-  const canonicalEvolution = getEvolutionItemEvolutionByItem(pokemon.speciesId, itemId);
+  // service.ts already follows for the level path. Usually exactly one
+  // match; Clamperl + Water Stone is genuinely two (Huntail/Gorebyss), so
+  // the client must additionally say which one it wants
+  // (EvolutionItemBranchChoiceDialog) — an omitted/mismatched
+  // targetSpeciesId on a branch item is rejected the same as any other
+  // invalid pairing, never defaulted to "the first one".
+  const candidateEvolutions = getEvolutionItemEvolutionsByItem(pokemon.speciesId, itemId);
+  const canonicalEvolution =
+    candidateEvolutions.length === 1 && !targetSpeciesId
+      ? candidateEvolutions[0]
+      : candidateEvolutions.find((evolution) => evolution.evolvesToSpeciesId === targetSpeciesId);
   if (!canonicalEvolution) {
     return { status: "invalid-target" };
   }

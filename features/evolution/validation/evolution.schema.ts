@@ -12,10 +12,13 @@ export const evolutionDecisionSchema = z.object({
 // itemId is actually one of the canonical Evolution-Item ids, and whether
 // the target species/item pairing is valid, are accept-evolution-item.
 // service.ts's job (data/pokemon/pokemon-evolutions.ts's isEvolutionItemId
-// and getEvolutionItemEvolutionByItem).
+// and getEvolutionItemEvolutionsByItem). targetSpeciesId is optional
+// structurally — only required in practice for a branch item (Clamperl +
+// Water Stone), which the service itself enforces, never this schema.
 export const evolutionItemDecisionSchema = z.object({
   playerPokemonId: z.string().min(1),
   itemId: z.string().min(1),
+  targetSpeciesId: z.string().min(1).optional(),
 });
 
 // Structural validation for choosing a Branch Evolution target (Eevee's

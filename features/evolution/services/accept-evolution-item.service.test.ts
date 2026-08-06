@@ -123,6 +123,54 @@ test("a Pokémon permanently blocked from LEVEL evolution can still evolve with 
   assert.equal(getPlayerPokemonRow("mon-1")?.evolutionPermanentlyBlocked, true, "the level-evolution flag itself is never touched");
 });
 
+test("Clamperl + Water Stone evolves into whichever branch target is explicitly chosen (Huntail or Gorebyss)", async () => {
+  seedPlayerPokemon({ id: "mon-huntail", playerId: "owner-1", speciesId: "clamperl", level: 20 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "water-stone", quantity: 2 });
+
+  const huntailResult = await acceptEvolutionItem("owner-1", "mon-huntail", "water-stone", "huntail");
+  assert.equal(huntailResult.status, "success");
+  assert.equal(getPlayerPokemonRow("mon-huntail")?.speciesId, "huntail");
+
+  seedPlayerPokemon({ id: "mon-gorebyss", playerId: "owner-1", speciesId: "clamperl", level: 20 });
+  const gorebyssResult = await acceptEvolutionItem("owner-1", "mon-gorebyss", "water-stone", "gorebyss");
+  assert.equal(gorebyssResult.status, "success");
+  assert.equal(getPlayerPokemonRow("mon-gorebyss")?.speciesId, "gorebyss");
+});
+
+test("Clamperl + Water Stone with no chosen target (or an unrelated one) is rejected — never defaults to Huntail", async () => {
+  seedPlayerPokemon({ id: "mon-1", playerId: "owner-1", speciesId: "clamperl", level: 20 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "water-stone", quantity: 2 });
+
+  const noTarget = await acceptEvolutionItem("owner-1", "mon-1", "water-stone");
+  assert.equal(noTarget.status, "invalid-target");
+  assert.equal(getPlayerPokemonRow("mon-1")?.speciesId, "clamperl");
+  assert.equal(getInventoryItemRow("owner-1", "water-stone")?.quantity, 2, "no item consumed on an ambiguous/invalid attempt");
+
+  const wrongTarget = await acceptEvolutionItem("owner-1", "mon-1", "water-stone", "vaporeon");
+  assert.equal(wrongTarget.status, "invalid-target");
+  assert.equal(getPlayerPokemonRow("mon-1")?.speciesId, "clamperl");
+});
+
+test("Evolution Item Cleanup remapped species evolve from their new item: Electabuzz (Thunder Stone), Magmar (Fire Stone), Porygon2 (Upgrade)", async () => {
+  seedPlayerPokemon({ id: "mon-electabuzz", playerId: "owner-1", speciesId: "electabuzz", level: 30 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "thunder-stone", quantity: 1 });
+  const electabuzzResult = await acceptEvolutionItem("owner-1", "mon-electabuzz", "thunder-stone");
+  assert.equal(electabuzzResult.status, "success");
+  assert.equal(getPlayerPokemonRow("mon-electabuzz")?.speciesId, "electivire");
+
+  seedPlayerPokemon({ id: "mon-magmar", playerId: "owner-1", speciesId: "magmar", level: 30 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "fire-stone", quantity: 1 });
+  const magmarResult = await acceptEvolutionItem("owner-1", "mon-magmar", "fire-stone");
+  assert.equal(magmarResult.status, "success");
+  assert.equal(getPlayerPokemonRow("mon-magmar")?.speciesId, "magmortar");
+
+  seedPlayerPokemon({ id: "mon-porygon2", playerId: "owner-1", speciesId: "porygon2", level: 30 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "upgrade", quantity: 1 });
+  const porygon2Result = await acceptEvolutionItem("owner-1", "mon-porygon2", "upgrade");
+  assert.equal(porygon2Result.status, "success");
+  assert.equal(getPlayerPokemonRow("mon-porygon2")?.speciesId, "porygon-z");
+});
+
 test("an unauthorized player cannot evolve another player's Pokémon", async () => {
   seedPlayerPokemon({ id: "mon-1", playerId: "owner-1", speciesId: "vulpix", level: 20 });
   seedInventoryItem({ playerId: "intruder-1", itemId: "fire-stone", quantity: 5 });

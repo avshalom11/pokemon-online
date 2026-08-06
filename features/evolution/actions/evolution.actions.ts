@@ -68,16 +68,17 @@ export async function rejectEvolutionAction(playerPokemonId: string): Promise<Re
 // Trade-item evolutions alike — no trade of any kind is ever involved.
 export async function acceptEvolutionItemAction(
   playerPokemonId: string,
-  itemId: string
+  itemId: string,
+  targetSpeciesId?: string
 ): Promise<AcceptEvolutionItemActionResult> {
   const session = await getCurrentSession();
   if (!session) return { status: "error" };
 
-  const parsed = evolutionItemDecisionSchema.safeParse({ playerPokemonId, itemId });
+  const parsed = evolutionItemDecisionSchema.safeParse({ playerPokemonId, itemId, targetSpeciesId });
   if (!parsed.success) return { status: "error" };
 
   const profile = await getPlayerProfile(session.user.id);
-  const result = await acceptEvolutionItem(profile.id, parsed.data.playerPokemonId, parsed.data.itemId);
+  const result = await acceptEvolutionItem(profile.id, parsed.data.playerPokemonId, parsed.data.itemId, parsed.data.targetSpeciesId);
 
   if (result.status === "success") {
     // Item quantity + species/HP changed — same revalidation set

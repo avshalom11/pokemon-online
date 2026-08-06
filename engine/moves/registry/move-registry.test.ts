@@ -20,10 +20,11 @@ test("buildMoveRegistry on an empty list produces an empty map", () => {
 
 test("the real registry loads the full move database (every generation) without throwing", () => {
   // 165 Generation 1 moves + 36 Generation 2 moves + 102 Generation 3 moves
-  // + 113 Generation 4 moves (Sinnoh Moves & Learnsets Phase 3) = 416.
-  // Update this number deliberately whenever a new generation's move data
-  // is registered — see engine/moves/data/index.ts.
-  assert.equal(getAllMoves().length, 416);
+  // + 113 Generation 4 moves (Sinnoh Moves & Learnsets Phase 3) + 87
+  // Generation 5 moves (Unova Moves & Learnsets Phase 3) = 503. Update this
+  // number deliberately whenever a new generation's move data is
+  // registered — see engine/moves/data/index.ts.
+  assert.equal(getAllMoves().length, 503);
 });
 
 test("getMoveById finds a real Generation 1 move by its permanent id", () => {

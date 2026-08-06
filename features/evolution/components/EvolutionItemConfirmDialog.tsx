@@ -1,10 +1,12 @@
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { evolutionItemPromptMessage, evolutionPromptTitle } from "@/features/evolution/messages/evolution-messages";
-import type { EvolutionItemCandidate } from "@/features/evolution/services/evolution-item-eligibility";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
+import type { PokemonSpecies } from "@/shared/types/pokemon";
 
 interface EvolutionItemConfirmDialogProps {
-  candidate: EvolutionItemCandidate;
+  currentSpecies: PokemonSpecies;
+  nickname: string | null;
+  evolvedSpecies: PokemonSpecies;
   itemName: string;
   isSubmitting: boolean;
   errorMessage: string | null;
@@ -18,16 +20,22 @@ interface EvolutionItemConfirmDialogProps {
 // player must explicitly choose" applies here too. Deliberately has no
 // reject-warning counterpart (evolutionRejectWarning) — cancelling an
 // evolution-item evolution is never permanent (see this feature's own
-// spec), so there is nothing equivalent to warn about.
+// spec), so there is nothing equivalent to warn about. Takes the resolved
+// current/evolved species directly (rather than an EvolutionItemCandidate)
+// so a branch item (Clamperl + Water Stone) can pass in whichever target
+// the player already chose via EvolutionItemBranchChoiceDialog — this
+// dialog's own job is only the final confirm, never the choice itself.
 export function EvolutionItemConfirmDialog({
-  candidate,
+  currentSpecies,
+  nickname,
+  evolvedSpecies,
   itemName,
   isSubmitting,
   errorMessage,
   onConfirm,
   onCancel,
 }: EvolutionItemConfirmDialogProps) {
-  const currentName = candidate.nickname ?? candidate.currentSpecies.name;
+  const currentName = nickname ?? currentSpecies.name;
 
   return (
     <div
@@ -41,8 +49,8 @@ export function EvolutionItemConfirmDialog({
 
         <div className="mt-4 flex items-center justify-center gap-4">
           <SpriteImage
-            src={getFrontSpritePath(candidate.currentSpecies)}
-            alt={candidate.currentSpecies.name}
+            src={getFrontSpritePath(currentSpecies)}
+            alt={currentSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
           />
@@ -50,15 +58,15 @@ export function EvolutionItemConfirmDialog({
             ←
           </span>
           <SpriteImage
-            src={getFrontSpritePath(candidate.evolvedSpecies)}
-            alt={candidate.evolvedSpecies.name}
+            src={getFrontSpritePath(evolvedSpecies)}
+            alt={evolvedSpecies.name}
             className="h-20 w-20 object-contain"
             fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
           />
         </div>
 
         <p className="mt-4 text-sm text-slate-300">
-          {evolutionItemPromptMessage(currentName, candidate.evolvedSpecies.name, itemName)}
+          {evolutionItemPromptMessage(currentName, evolvedSpecies.name, itemName)}
         </p>
 
         {errorMessage ? <p className="mt-3 text-xs font-semibold text-rose-400">{errorMessage}</p> : null}

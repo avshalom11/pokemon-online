@@ -170,3 +170,95 @@ test("getFormLabel resolves real Giratina form labels", () => {
   assert.equal(getFormLabel(getSpeciesById("giratina")!), "Giratina", "the base form has no formLabel set — falls back to its name");
   assert.equal(getFormLabel(getSpeciesById("giratina-origin")!), "Origin Form");
 });
+
+// Tornadus/Thundurus/Landorus (Generation 5/Unova) each get exactly one
+// Therian alternate form — the smallest possible non-trivial group, same
+// shape as Giratina above, exercised three times against three different
+// real base species.
+for (const baseId of ["tornadus", "thundurus", "landorus"]) {
+  const formId = `${baseId}-therian`;
+
+  test(`${baseId} (base/Incarnate Forme) has forms; its Therian Forme is recognized as an alternate form`, () => {
+    const base = getSpeciesById(baseId)!;
+    assert.equal(hasForms(base), true);
+    assert.equal(isAlternateForm(base), false);
+
+    const therian = getSpeciesById(formId)!;
+    assert.equal(isAlternateForm(therian), true);
+    assert.equal(hasForms(therian), false, "an alternate form itself never reports hasForms — only the base does");
+  });
+
+  test(`getFormEntries returns both ${baseId} forms, base first, starting from either the base or the sibling`, () => {
+    const expectedIds = [baseId, formId];
+
+    const fromBase = getFormEntries(getSpeciesById(baseId)!);
+    assert.deepEqual(fromBase.map((species) => species.id), expectedIds);
+
+    const fromSibling = getFormEntries(getSpeciesById(formId)!);
+    assert.deepEqual(fromSibling.map((species) => species.id), expectedIds);
+  });
+
+  test(`getFormLabel resolves the real ${baseId} Therian Forme label, falling back to the base species name for the base form`, () => {
+    const base = getSpeciesById(baseId)!;
+    assert.equal(getFormLabel(base), base.name, "the base form has no formLabel set — falls back to its name");
+    assert.equal(getFormLabel(getSpeciesById(formId)!), "Therian Forme");
+  });
+}
+
+// Kyurem (Generation 5/Unova) gets two alternate forms (Black/White) — the
+// same three-total-entries shape Deoxys's attack/defense/speed trio uses,
+// just with two siblings instead of three.
+test("Kyurem (base) has forms; Kyurem Black and White are each recognized as an alternate form", () => {
+  const kyurem = getSpeciesById("kyurem")!;
+  assert.equal(hasForms(kyurem), true);
+  assert.equal(isAlternateForm(kyurem), false);
+
+  for (const id of ["kyurem-black", "kyurem-white"]) {
+    const form = getSpeciesById(id)!;
+    assert.equal(isAlternateForm(form), true);
+    assert.equal(hasForms(form), false, "an alternate form itself never reports hasForms — only the base does");
+  }
+});
+
+test("getFormEntries returns all three Kyurem forms, base first, starting from either the base or any sibling", () => {
+  const expectedIds = ["kyurem", "kyurem-black", "kyurem-white"];
+
+  const fromBase = getFormEntries(getSpeciesById("kyurem")!);
+  assert.deepEqual(fromBase.map((species) => species.id).sort(), [...expectedIds].sort());
+
+  const fromSibling = getFormEntries(getSpeciesById("kyurem-white")!);
+  assert.deepEqual(fromSibling.map((species) => species.id).sort(), [...expectedIds].sort());
+});
+
+test("getFormLabel resolves real Kyurem form labels", () => {
+  assert.equal(getFormLabel(getSpeciesById("kyurem")!), "Kyurem", "the base form has no formLabel set — falls back to its name");
+  assert.equal(getFormLabel(getSpeciesById("kyurem-black")!), "Black Kyurem");
+  assert.equal(getFormLabel(getSpeciesById("kyurem-white")!), "White Kyurem");
+});
+
+// Meloetta (Generation 5/Unova) gets exactly one alternate form (Pirouette)
+// — same shape as Giratina/Therian forms above.
+test("Meloetta (base/Aria Forme) has forms; its Pirouette Forme is recognized as an alternate form", () => {
+  const meloetta = getSpeciesById("meloetta")!;
+  assert.equal(hasForms(meloetta), true);
+  assert.equal(isAlternateForm(meloetta), false);
+
+  const pirouette = getSpeciesById("meloetta-pirouette")!;
+  assert.equal(isAlternateForm(pirouette), true);
+  assert.equal(hasForms(pirouette), false, "an alternate form itself never reports hasForms — only the base does");
+});
+
+test("getFormEntries returns both Meloetta forms, base first, starting from either the base or the sibling", () => {
+  const expectedIds = ["meloetta", "meloetta-pirouette"];
+
+  const fromBase = getFormEntries(getSpeciesById("meloetta")!);
+  assert.deepEqual(fromBase.map((species) => species.id), expectedIds);
+
+  const fromSibling = getFormEntries(getSpeciesById("meloetta-pirouette")!);
+  assert.deepEqual(fromSibling.map((species) => species.id), expectedIds);
+});
+
+test("getFormLabel resolves real Meloetta form labels", () => {
+  assert.equal(getFormLabel(getSpeciesById("meloetta")!), "Meloetta", "the base form has no formLabel set — falls back to its name");
+  assert.equal(getFormLabel(getSpeciesById("meloetta-pirouette")!), "Pirouette Forme");
+});

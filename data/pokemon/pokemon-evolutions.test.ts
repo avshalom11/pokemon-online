@@ -10,6 +10,7 @@ import {
   getLevelEvolution,
   getAllLevelEvolutionEntries,
   getEvolutionItemEvolutionByItem,
+  getEvolutionItemEvolutionsByItem,
   getEvolutionItemEvolutions,
   getAllEvolutionItemEvolutionEntries,
   isEvolutionItemId,
@@ -59,20 +60,28 @@ test("evolution-item species are never also present in the Level Evolution table
   }
 });
 
-test("isEvolutionItemId recognizes all twelve canonical evolution-item ids, including Moon Stone", () => {
-  assert.equal(isEvolutionItemId("fire-stone"), true);
-  assert.equal(isEvolutionItemId("water-stone"), true);
-  assert.equal(isEvolutionItemId("thunder-stone"), true);
-  assert.equal(isEvolutionItemId("leaf-stone"), true);
-  assert.equal(isEvolutionItemId("sun-stone"), true);
-  assert.equal(isEvolutionItemId("kings-rock"), true);
-  assert.equal(isEvolutionItemId("metal-coat"), true);
-  assert.equal(isEvolutionItemId("dragon-scale"), true);
-  assert.equal(isEvolutionItemId("upgrade"), true);
-  assert.equal(isEvolutionItemId("deep-sea-tooth"), true);
-  assert.equal(isEvolutionItemId("deep-sea-scale"), true);
-  assert.equal(isEvolutionItemId("moon-stone"), true);
+test("isEvolutionItemId recognizes exactly the sixteen canonical evolution-item ids (Evolution Item Cleanup phase's final catalog)", () => {
+  const canonicalIds = [
+    "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
+    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+  ];
+  for (const itemId of canonicalIds) {
+    assert.equal(isEvolutionItemId(itemId), true, `${itemId} must be a recognized EvolutionItemId`);
+  }
+  assert.equal(canonicalIds.length, 16, "exactly 16 evolution products: 10 stones + 6 items");
   assert.equal(isEvolutionItemId("poke-ball"), false);
+
+  // Retired items (Evolution Item Cleanup phase) must never be recognized
+  // again — each species that used to need one of these now shares a
+  // kept/general item instead (see this file's own remapping tests below).
+  const retiredIds = [
+    "deep-sea-tooth", "deep-sea-scale", "dubious-disc", "razor-claw",
+    "razor-fang", "electirizer", "magmarizer", "oval-stone",
+  ];
+  for (const itemId of retiredIds) {
+    assert.equal(isEvolutionItemId(itemId), false, `${itemId} must no longer be a recognized EvolutionItemId`);
+  }
 });
 
 test("Gloom has two independent Sun/Leaf Stone branches; Sunkern is Sun-Stone-only and never a level evolution", () => {
@@ -255,13 +264,22 @@ test("Lombre -> Ludicolo (Water Stone) and Nuzleaf -> Shiftry (Leaf Stone) keep 
   assert.equal(getLevelEvolution("nuzleaf"), undefined);
 });
 
-test("Clamperl evolves via two independent Deep Sea items, never a trade", () => {
+test("Clamperl evolves via a Water Stone BRANCH (Huntail or Gorebyss), never a trade and never a hidden value", () => {
   const branches = getEvolutionItemEvolutions("clamperl");
-  const byItem = Object.fromEntries(branches.map((branch) => [branch.itemId, branch.evolvesToSpeciesId]));
-
   assert.equal(branches.length, 2);
-  assert.equal(byItem["deep-sea-tooth"], "huntail");
-  assert.equal(byItem["deep-sea-scale"], "gorebyss");
+  assert.ok(branches.every((branch) => branch.itemId === "water-stone"), "both branches share the same item");
+
+  const targets = branches.map((branch) => branch.evolvesToSpeciesId).sort();
+  assert.deepEqual(targets, ["gorebyss", "huntail"]);
+
+  // getEvolutionItemEvolutionByItem's plain .find() only ever surfaces the
+  // first entry (Huntail) — real branch consumers must use the plural
+  // getEvolutionItemEvolutionsByItem instead, which returns both.
+  assert.equal(getEvolutionItemEvolutionByItem("clamperl", "water-stone")?.evolvesToSpeciesId, "huntail");
+  const waterStoneBranches = getEvolutionItemEvolutionsByItem("clamperl", "water-stone");
+  assert.equal(waterStoneBranches.length, 2);
+  assert.deepEqual(waterStoneBranches.map((b) => b.evolvesToSpeciesId).sort(), ["gorebyss", "huntail"]);
+
   assert.equal(getLevelEvolution("clamperl"), undefined, "Clamperl must never also have a level evolution entry");
 });
 
@@ -499,26 +517,39 @@ test("former Location (special magnetic field) Sinnoh evolutions are now plain l
   assert.deepEqual(getLevelEvolution("nosepass"), { evolvesToSpeciesId: "probopass", requiredLevel: 42 });
 });
 
-test("isEvolutionItemId recognizes all eleven new Sinnoh evolution items", () => {
-  for (const itemId of ["dawn-stone", "dusk-stone", "shiny-stone", "protector", "dubious-disc", "reaper-cloth", "razor-claw", "razor-fang", "electirizer", "magmarizer", "oval-stone"]) {
+test("isEvolutionItemId recognizes the six new Sinnoh evolution items kept after Evolution Item Cleanup", () => {
+  for (const itemId of ["dawn-stone", "dusk-stone", "shiny-stone", "protector", "reaper-cloth"]) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must be a recognized EvolutionItemId`);
   }
 });
 
-test("former Trade-with-held-item Sinnoh evolutions now evolve directly from their item, no trade involved", () => {
-  assert.equal(getEvolutionItemEvolutionByItem("sneasel", "razor-claw")?.evolvesToSpeciesId, "weavile");
+// Evolution Item Cleanup phase — every former Trade-with-held-item Sinnoh
+// evolution that used to need its OWN unique item (Razor Claw, Electirizer,
+// Magmarizer, Razor Fang, Dubious Disc, Oval Stone) is remapped onto one of
+// the 16 kept/general items instead. Rhydon/Dusclops (Protector/Reaper
+// Cloth) were never remapped — those two items were kept as-is.
+test("former Trade-with-held-item Sinnoh evolutions now evolve directly from a kept/remapped item, no trade involved", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("sneasel", "ice-stone")?.evolvesToSpeciesId, "weavile");
   assert.equal(getEvolutionItemEvolutionByItem("rhydon", "protector")?.evolvesToSpeciesId, "rhyperior");
-  assert.equal(getEvolutionItemEvolutionByItem("electabuzz", "electirizer")?.evolvesToSpeciesId, "electivire");
-  assert.equal(getEvolutionItemEvolutionByItem("magmar", "magmarizer")?.evolvesToSpeciesId, "magmortar");
-  assert.equal(getEvolutionItemEvolutionByItem("gligar", "razor-fang")?.evolvesToSpeciesId, "gliscor");
-  assert.equal(getEvolutionItemEvolutionByItem("porygon2", "dubious-disc")?.evolvesToSpeciesId, "porygon-z");
+  assert.equal(getEvolutionItemEvolutionByItem("electabuzz", "thunder-stone")?.evolvesToSpeciesId, "electivire");
+  assert.equal(getEvolutionItemEvolutionByItem("magmar", "fire-stone")?.evolvesToSpeciesId, "magmortar");
+  assert.equal(getEvolutionItemEvolutionByItem("gligar", "dusk-stone")?.evolvesToSpeciesId, "gliscor");
+  assert.equal(getEvolutionItemEvolutionByItem("porygon2", "upgrade")?.evolvesToSpeciesId, "porygon-z");
   assert.equal(getEvolutionItemEvolutionByItem("dusclops", "reaper-cloth")?.evolvesToSpeciesId, "dusknoir");
+
+  // The eight retired item ids must never resolve any evolution anymore.
+  assert.equal(getEvolutionItemEvolutionByItem("sneasel", "razor-claw"), undefined);
+  assert.equal(getEvolutionItemEvolutionByItem("electabuzz", "electirizer"), undefined);
+  assert.equal(getEvolutionItemEvolutionByItem("magmar", "magmarizer"), undefined);
+  assert.equal(getEvolutionItemEvolutionByItem("gligar", "razor-fang"), undefined);
+  assert.equal(getEvolutionItemEvolutionByItem("porygon2", "dubious-disc"), undefined);
 });
 
-test("Roselia -> Roserade (Shiny Stone) and Happiny -> Chansey (Oval Stone) are direct evolution-item evolutions", () => {
+test("Roselia -> Roserade (Shiny Stone) and Happiny -> Chansey (remapped to Moon Stone) are direct evolution-item evolutions", () => {
   assert.equal(getEvolutionItemEvolutionByItem("roselia", "shiny-stone")?.evolvesToSpeciesId, "roserade");
   assert.equal(getEvolutionItemEvolutionByItem("togetic", "shiny-stone")?.evolvesToSpeciesId, "togekiss");
-  assert.equal(getEvolutionItemEvolutionByItem("happiny", "oval-stone")?.evolvesToSpeciesId, "chansey");
+  assert.equal(getEvolutionItemEvolutionByItem("happiny", "moon-stone")?.evolvesToSpeciesId, "chansey");
+  assert.equal(getEvolutionItemEvolutionByItem("happiny", "oval-stone"), undefined, "Oval Stone is retired");
 });
 
 test("Misdreavus -> Mismagius and Murkrow -> Honchkrow each evolve via Dusk Stone, two independent single-branch species", () => {
@@ -580,4 +611,263 @@ test("deriveSpeciesWildLevelRange leaves a Sinnoh Branch-only species (Burmy) an
   assert.deepEqual(deriveSpeciesWildLevelRange("mothim"), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
   assert.deepEqual(deriveSpeciesWildLevelRange("roserade"), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
   assert.deepEqual(deriveSpeciesWildLevelRange("weavile"), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
+});
+
+// ============================================================================
+// Generation V (Unova, Phase 2)
+// ============================================================================
+
+test("every Unova starter line is complete: level 17 then level 36 for all three lines", () => {
+  const lines: [string, string, string][] = [
+    ["snivy", "servine", "serperior"],
+    ["tepig", "pignite", "emboar"],
+    ["oshawott", "dewott", "samurott"],
+  ];
+
+  for (const [base, middle, final] of lines) {
+    assert.deepEqual(getLevelEvolution(base), { evolvesToSpeciesId: middle, requiredLevel: 17 }, `${base} -> ${middle}`);
+    assert.deepEqual(getLevelEvolution(middle), { evolvesToSpeciesId: final, requiredLevel: 36 }, `${middle} -> ${final}`);
+    assert.equal(getLevelEvolution(final), undefined, `${final} is a final evolution and must have no further level evolution`);
+  }
+});
+
+test("every plain Unova level evolution resolves to its real canonical target and level", () => {
+  const plainLevelEvolutions: [string, string, number][] = [
+    ["patrat", "watchog", 20],
+    ["lillipup", "herdier", 16],
+    ["herdier", "stoutland", 32],
+    ["purrloin", "liepard", 20],
+    ["pidove", "tranquill", 21],
+    ["tranquill", "unfezant", 32],
+    ["blitzle", "zebstrika", 27],
+    ["roggenrola", "boldore", 25],
+    ["drilbur", "excadrill", 31],
+    ["timburr", "gurdurr", 25],
+    ["tympole", "palpitoad", 25],
+    ["palpitoad", "seismitoad", 36],
+    ["sewaddle", "swadloon", 20],
+    ["venipede", "whirlipede", 22],
+    ["whirlipede", "scolipede", 30],
+    ["sandile", "krokorok", 29],
+    ["krokorok", "krookodile", 40],
+    ["darumaka", "darmanitan", 35],
+    ["dwebble", "crustle", 34],
+    ["scraggy", "scrafty", 39],
+    ["yamask", "cofagrigus", 34],
+    ["tirtouga", "carracosta", 37],
+    ["archen", "archeops", 37],
+    ["trubbish", "garbodor", 36],
+    ["zorua", "zoroark", 30],
+    ["gothita", "gothorita", 32],
+    ["gothorita", "gothitelle", 41],
+    ["solosis", "duosion", 32],
+    ["duosion", "reuniclus", 41],
+    ["ducklett", "swanna", 35],
+    ["vanillite", "vanillish", 35],
+    ["vanillish", "vanilluxe", 47],
+    ["deerling", "sawsbuck", 34],
+    ["foongus", "amoonguss", 39],
+    ["frillish", "jellicent", 40],
+    ["joltik", "galvantula", 36],
+    ["ferroseed", "ferrothorn", 40],
+    ["klink", "klang", 38],
+    ["klang", "klinklang", 49],
+    ["tynamo", "eelektrik", 39],
+    ["elgyem", "beheeyem", 42],
+    ["litwick", "lampent", 41],
+    ["axew", "fraxure", 38],
+    ["fraxure", "haxorus", 48],
+    ["cubchoo", "beartic", 37],
+    ["mienfoo", "mienshao", 50],
+    ["golett", "golurk", 43],
+    ["pawniard", "bisharp", 52],
+    ["rufflet", "braviary", 54],
+    ["vullaby", "mandibuzz", 54],
+    ["larvesta", "volcarona", 59],
+  ];
+
+  for (const [speciesId, targetId, level] of plainLevelEvolutions) {
+    assert.deepEqual(
+      getLevelEvolution(speciesId),
+      { evolvesToSpeciesId: targetId, requiredLevel: level },
+      `${speciesId} -> ${targetId} @ ${level}`
+    );
+  }
+});
+
+test("Deino/Zweilous/Hydreigon is Unova's pseudo-legendary line: a complete three-stage level chain", () => {
+  assert.deepEqual(getLevelEvolution("deino"), { evolvesToSpeciesId: "zweilous", requiredLevel: 50 });
+  assert.deepEqual(getLevelEvolution("zweilous"), { evolvesToSpeciesId: "hydreigon", requiredLevel: 64 });
+  assert.equal(getLevelEvolution("hydreigon"), undefined);
+});
+
+test("former Friendship Unova evolutions (Woobat, Swadloon) are now plain level evolutions — Woobat defaults to level 16 (no collision), Swadloon uses level 30 (above its own level-20 floor)", () => {
+  assert.deepEqual(getLevelEvolution("woobat"), { evolvesToSpeciesId: "swoobat", requiredLevel: 16 });
+  assert.deepEqual(getLevelEvolution("swadloon"), { evolvesToSpeciesId: "leavanny", requiredLevel: 30 });
+});
+
+test("former Trade Unova evolutions (Gurdurr, Boldore, Karrablast, Shelmet) are now plain level evolutions at exactly the levels this phase assigns, never a branch or an evolution item", () => {
+  const formerTradeEvolutions: [string, string, number][] = [
+    ["gurdurr", "conkeldurr", 40],
+    ["boldore", "gigalith", 40],
+    ["karrablast", "escavalier", 35],
+    ["shelmet", "accelgor", 35],
+  ];
+
+  for (const [speciesId, targetId, level] of formerTradeEvolutions) {
+    assert.deepEqual(getLevelEvolution(speciesId), { evolvesToSpeciesId: targetId, requiredLevel: level }, `${speciesId} -> ${targetId} @ ${level}`);
+    assert.deepEqual(getEvolutionItemEvolutions(speciesId), [], `${speciesId} must not also have an evolution-item evolution`);
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must not be a branch evolution`);
+  }
+});
+
+test("every Unova evolution-item evolution resolves to its real canonical target and item, using only existing catalog items", () => {
+  const itemEvolutions: [string, string, string][] = [
+    ["pansage", "simisage", "leaf-stone"],
+    ["pansear", "simisear", "fire-stone"],
+    ["panpour", "simipour", "water-stone"],
+    ["munna", "musharna", "moon-stone"],
+    ["cottonee", "whimsicott", "sun-stone"],
+    ["petilil", "lilligant", "sun-stone"],
+    ["eelektrik", "eelektross", "thunder-stone"],
+    ["minccino", "cinccino", "shiny-stone"],
+    ["lampent", "chandelure", "dusk-stone"],
+  ];
+
+  for (const [speciesId, targetId, itemId] of itemEvolutions) {
+    assert.equal(getEvolutionItemEvolutionByItem(speciesId, itemId)?.evolvesToSpeciesId, targetId, `${speciesId} -> ${targetId} via ${itemId}`);
+    assert.equal(getLevelEvolution(speciesId), undefined, `${speciesId} must never also have a level evolution entry`);
+  }
+});
+
+test("Eelektrik and Lampent each keep their own pre-existing level evolution (from Tynamo/Litwick) alongside their independent evolution-item evolution", () => {
+  assert.deepEqual(getLevelEvolution("tynamo"), { evolvesToSpeciesId: "eelektrik", requiredLevel: 39 });
+  assert.equal(getEvolutionItemEvolutionByItem("eelektrik", "thunder-stone")?.evolvesToSpeciesId, "eelektross");
+
+  assert.deepEqual(getLevelEvolution("litwick"), { evolvesToSpeciesId: "lampent", requiredLevel: 41 });
+  assert.equal(getEvolutionItemEvolutionByItem("lampent", "dusk-stone")?.evolvesToSpeciesId, "chandelure");
+});
+
+test("the evolution-item catalog is unchanged by Unova: still exactly the same 16 EvolutionItemId values, no new evolution product introduced", () => {
+  const canonicalIds = [
+    "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
+    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+  ];
+  assert.equal(canonicalIds.length, 16);
+  for (const itemId of canonicalIds) {
+    assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
+  }
+  // No new item id (e.g. a Unova-only stone) was ever introduced.
+  for (const fakeUnovaItem of ["trade-stone", "unova-stone", "reveal-glass", "prison-bottle"]) {
+    assert.equal(isEvolutionItemId(fakeUnovaItem), false, `${fakeUnovaItem} must never be a recognized EvolutionItemId`);
+  }
+});
+
+test("no Unova species uses branch evolution — every real trade/gender/personality-value mechanic was replaced with level or item, never a player-choice branch", () => {
+  const unovaSpeciesTouchedByEvolution = [
+    "snivy", "servine", "tepig", "pignite", "oshawott", "dewott", "patrat", "lillipup", "herdier",
+    "purrloin", "pansage", "pansear", "panpour", "munna", "pidove", "tranquill", "blitzle", "roggenrola",
+    "boldore", "woobat", "drilbur", "timburr", "gurdurr", "tympole", "palpitoad", "sewaddle", "swadloon",
+    "venipede", "whirlipede", "cottonee", "petilil", "sandile", "krokorok", "darumaka", "dwebble", "scraggy",
+    "yamask", "tirtouga", "archen", "trubbish", "zorua", "minccino", "gothita", "gothorita", "solosis",
+    "duosion", "ducklett", "vanillite", "vanillish", "deerling", "karrablast", "foongus", "frillish", "joltik",
+    "ferroseed", "klink", "klang", "tynamo", "eelektrik", "elgyem", "litwick", "lampent", "axew", "fraxure",
+    "cubchoo", "shelmet", "mienfoo", "golett", "pawniard", "rufflet", "vullaby", "deino", "zweilous", "larvesta",
+  ];
+  for (const speciesId of unovaSpeciesTouchedByEvolution) {
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must never be a branch evolution — Unova Phase 2 uses only level and evolution-item`);
+  }
+});
+
+test("every genuinely standalone (non-evolving, non-legendary) Unova species has no evolution of any kind", () => {
+  const standaloneIds = [
+    "audino", "throh", "sawk", "basculin", "maractus", "sigilyph",
+    "emolga", "alomomola", "cryogonal", "stunfisk", "druddigon", "bouffalant", "heatmor", "durant",
+  ];
+  for (const id of standaloneIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every Unova legendary/mythical species (Victini, Swords of Justice, Forces of Nature incl. Therian forms, Reshiram/Zekrom, Kyurem incl. Black/White, Keldeo, Meloetta incl. Pirouette, Genesect) has no evolution of any kind", () => {
+  const legendaryIds = [
+    "victini", "cobalion", "terrakion", "virizion",
+    "tornadus", "tornadus-therian", "thundurus", "thundurus-therian",
+    "reshiram", "zekrom",
+    "landorus", "landorus-therian",
+    "kyurem", "kyurem-black", "kyurem-white",
+    "keldeo", "meloetta", "meloetta-pirouette", "genesect",
+  ];
+  for (const id of legendaryIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("alternate forms never get their own evolution, on either side of the arrow — a form is never a source, and no evolution ever targets a form", () => {
+  const formIds = ["tornadus-therian", "thundurus-therian", "landorus-therian", "kyurem-black", "kyurem-white", "meloetta-pirouette"];
+
+  for (const formId of formIds) {
+    assert.equal(getLevelEvolution(formId), undefined, `${formId} must never be a level-evolution source`);
+    assert.deepEqual(getEvolutionItemEvolutions(formId), [], `${formId} must never be an evolution-item source`);
+    assert.equal(getBranchEvolution(formId), undefined, `${formId} must never be a branch-evolution source`);
+  }
+
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.ok(!formIds.includes(evolution.evolvesToSpeciesId), `${evolution.evolvesToSpeciesId} is an alternate form and must never be a level-evolution target`);
+  }
+  for (const { evolution } of getAllEvolutionItemEvolutionEntries()) {
+    assert.ok(!formIds.includes(evolution.evolvesToSpeciesId), `${evolution.evolvesToSpeciesId} is an alternate form and must never be an evolution-item target`);
+  }
+});
+
+test("total evolution counts include exactly 65 new Unova level evolutions and 9 new Unova evolution-item evolutions", () => {
+  const unovaDexRange = new Set(POKEMON_DATA.filter((species) => species.dexNumber >= 494 && species.dexNumber <= 649).map((species) => species.id));
+
+  const unovaLevelEntries = getAllLevelEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
+  const unovaItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
+
+  assert.equal(unovaLevelEntries.length, 65);
+  assert.equal(unovaItemEntries.length, 9);
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the four former-Trade Unova chains with no gaps, no overlaps, and no empty ranges: Conkeldurr, Gigalith, Escavalier, Accelgor", () => {
+  assert.deepEqual(deriveSpeciesWildLevelRange("timburr"), { minimumLevel: 1, maximumLevel: 24 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("gurdurr"), { minimumLevel: 25, maximumLevel: 39 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("conkeldurr"), { minimumLevel: 40, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("roggenrola"), { minimumLevel: 1, maximumLevel: 24 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("boldore"), { minimumLevel: 25, maximumLevel: 39 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("gigalith"), { minimumLevel: 40, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("karrablast"), { minimumLevel: 1, maximumLevel: 34 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("escavalier"), { minimumLevel: 35, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("shelmet"), { minimumLevel: 1, maximumLevel: 34 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("accelgor"), { minimumLevel: 35, maximumLevel: Number.POSITIVE_INFINITY });
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the two former-Friendship Unova chains with no collision: Woobat/Swoobat and Sewaddle/Swadloon/Leavanny", () => {
+  assert.deepEqual(deriveSpeciesWildLevelRange("woobat"), { minimumLevel: 1, maximumLevel: 15 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("swoobat"), { minimumLevel: 16, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("sewaddle"), { minimumLevel: 1, maximumLevel: 19 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("swadloon"), { minimumLevel: 20, maximumLevel: 29 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("leavanny"), { minimumLevel: 30, maximumLevel: Number.POSITIVE_INFINITY });
+});
+
+test("deriveSpeciesWildLevelRange leaves every Unova evolution-item target (Musharna, Simisear, Eelektross, Chandelure) fully unrestricted, same as Ludicolo/Vileplume already are", () => {
+  for (const id of ["musharna", "simisage", "simisear", "simipour", "whimsicott", "lilligant", "eelektross", "cinccino", "chandelure"]) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(id), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY }, `${id} must be fully unrestricted (evolution-item targets are invisible to the level-only reverse index)`);
+  }
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the Unova pseudo-legendary chain (Deino/Zweilous/Hydreigon) with no collision", () => {
+  assert.deepEqual(deriveSpeciesWildLevelRange("deino"), { minimumLevel: 1, maximumLevel: 49 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("zweilous"), { minimumLevel: 50, maximumLevel: 63 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("hydreigon"), { minimumLevel: 64, maximumLevel: Number.POSITIVE_INFINITY });
 });

@@ -1,4 +1,4 @@
-import { getEvolutionItemEvolutionByItem } from "@/data/pokemon/pokemon-evolutions";
+import { getEvolutionItemEvolutionsByItem } from "@/data/pokemon/pokemon-evolutions";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import type { PokemonSpecies } from "@/shared/types/pokemon";
@@ -18,30 +18,37 @@ import type { PokemonSpecies } from "@/shared/types/pokemon";
 // the Level Evolution table, so an item-eligible Pokémon can never have a
 // pending level/branch decision to begin with — see that file's own doc
 // comment.
+// evolvedSpeciesOptions is almost always exactly one element — Clamperl +
+// Water Stone is the one case with two (Huntail/Gorebyss), so the panel
+// must ask the player to pick before confirming (same "explicit player
+// choice" rule BRANCH_EVOLUTIONS already established for level evolutions;
+// see EvolutionItemPanel/EvolutionItemBranchChoiceDialog).
 export interface EvolutionItemCandidate {
   playerPokemonId: string;
   nickname: string | null;
   level: number;
   currentSpecies: PokemonSpecies;
-  evolvedSpecies: PokemonSpecies;
+  evolvedSpeciesOptions: PokemonSpecies[];
 }
 
 export function getEvolutionItemCandidates(itemId: string, ownedPokemon: OwnedPokemon[]): EvolutionItemCandidate[] {
   const candidates: EvolutionItemCandidate[] = [];
 
   for (const pokemon of ownedPokemon) {
-    const evolution = getEvolutionItemEvolutionByItem(pokemon.species.id, itemId);
-    if (!evolution) continue;
+    const evolutions = getEvolutionItemEvolutionsByItem(pokemon.species.id, itemId);
+    if (evolutions.length === 0) continue;
 
-    const evolvedSpecies = getSpeciesById(evolution.evolvesToSpeciesId);
-    if (!evolvedSpecies) continue;
+    const evolvedSpeciesOptions = evolutions
+      .map((evolution) => getSpeciesById(evolution.evolvesToSpeciesId))
+      .filter((species): species is PokemonSpecies => species !== undefined);
+    if (evolvedSpeciesOptions.length === 0) continue;
 
     candidates.push({
       playerPokemonId: pokemon.id,
       nickname: pokemon.nickname ?? null,
       level: pokemon.level,
       currentSpecies: pokemon.species,
-      evolvedSpecies,
+      evolvedSpeciesOptions,
     });
   }
 

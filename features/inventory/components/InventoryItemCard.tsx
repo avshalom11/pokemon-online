@@ -1,5 +1,6 @@
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
+import { getEvolutionItemDisplayLabels } from "@/features/evolution/services/evolution-item-catalog";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 
 interface InventoryItemCardProps {
@@ -15,8 +16,12 @@ interface InventoryItemCardProps {
 // confirm dialog) lives in InventorySellPanel/InventorySellConfirmDialog,
 // triggered once an item is selected here — same division of
 // responsibility ShopItemCard already establishes for buying.
+// Evolution-item ("stones" category) cards additionally show which
+// Pokémon this exact item evolves — same live-derived rule ShopItemCard
+// uses (getEvolutionItemDisplayLabels), never hardcoded per item.
 export function InventoryItemCard({ view, isSelected, onSelect }: InventoryItemCardProps) {
   const { item, quantity, sellUnitPrice } = view;
+  const evolvesLabels = item.categoryId === "stones" ? getEvolutionItemDisplayLabels(item.id) : [];
 
   return (
     <button
@@ -57,6 +62,12 @@ export function InventoryItemCard({ view, isSelected, onSelect }: InventoryItemC
       </span>
 
       <span className="text-[11px] leading-snug text-slate-400">{item.description}</span>
+
+      {evolvesLabels.length > 0 ? (
+        <div className="mt-1 w-full text-right text-[10px] leading-snug text-indigo-300/80">
+          <span className="font-semibold text-indigo-200">מתפתחים:</span> {evolvesLabels.join(", ")}
+        </div>
+      ) : null}
     </button>
   );
 }

@@ -51,9 +51,13 @@ const SPECIES_RARITY_BY_ID: Map<string, PokemonRarity> = new Map(
 //   (Ninetales, Arcanine, Raichu, Vaporeon, Jolteon, Flareon, Poliwrath,
 //   Cloyster, Starmie, Vileplume, Bellossom, Victreebel, Exeggutor,
 //   Sunflora, Politoed, Slowking, Steelix, Scizor, Kingdra, Porygon2 today
-//   — derived from EVOLUTION_ITEM_EVOLUTIONS, never hardcoded here) always
-//   resolves to "very-rare" for THIS purpose, regardless of its own real
-//   PokemonSpecies.rarity.
+//   — derived from EVOLUTION_ITEM_EVOLUTIONS, never hardcoded here) resolves
+//   to "very-rare" for THIS purpose, regardless of its own real
+//   PokemonSpecies.rarity — UNLESS that real rarity is already "legendary",
+//   in which case it stays "legendary": a legendary is never downgraded to
+//   very-rare just because some future evolution item happens to target it
+//   (no current species hits this branch, but the rule must hold either
+//   way — see the Evolution Item Encounter Rarity audit).
 // - Every other species resolves to its own real catalog rarity, unchanged.
 export function getEffectiveEncounterRarity(speciesId: string): PokemonRarity | undefined {
   const catalogRarity = SPECIES_RARITY_BY_ID.get(speciesId);
@@ -62,5 +66,5 @@ export function getEffectiveEncounterRarity(speciesId: string): PokemonRarity | 
     return undefined;
   }
 
-  return ITEM_EVOLVED_SPECIES_IDS.has(speciesId) ? "very-rare" : catalogRarity;
+  return ITEM_EVOLVED_SPECIES_IDS.has(speciesId) && catalogRarity !== "legendary" ? "very-rare" : catalogRarity;
 }

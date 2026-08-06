@@ -1,6 +1,7 @@
 import { HOENN_MAP_CONFIG } from "@/data/maps/hoenn-map-config";
 import { JOHTO_MAP_CONFIG } from "@/data/maps/johto-map-config";
 import { SINNOH_MAP_CONFIG } from "@/data/maps/sinnoh-map-config";
+import { UNOVA_MAP_CONFIG } from "@/data/maps/unova-map-config";
 import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
 import type { RegionId } from "@/shared/types/region";
 import type { RegionDefinition } from "../types/region-registry.types";
@@ -96,7 +97,28 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // being set, is needed for that to hold.
     mapConfig: SINNOH_MAP_CONFIG,
   },
-  unova: { id: "unova", englishName: "Unova", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
+  unova: {
+    id: "unova",
+    englishName: "Unova",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Unova now has real, clickable zones (data/maps/unova-map-config.ts,
+    // manually placed via /dev/unova-map-editor against the real
+    // /images/unova-map.png) — same as Kanto/Johto/Hoenn/Sinnoh, mapConfig.
+    // imageSrc is the one source for the map image; mapImageSrc is left
+    // unset since mapConfig already covers it (MapContent renders from
+    // mapConfig whenever it's present).
+    //
+    // Unova has NO zone encounter data yet (data/zones/unova-zone-data.ts
+    // does not exist) — app/(game)/battle/page.tsx's region gate checks
+    // getZoneData(regionId).length === 0 (not mapConfig presence), so
+    // Unova's map can render interactively here while battles stay
+    // correctly blocked, exactly the same "map before encounters" window
+    // Hoenn and Sinnoh already went through between their own map-config
+    // and encounter-table phases. No change to that gate, or to this
+    // registry beyond mapConfig being set, is needed for that to hold.
+    mapConfig: UNOVA_MAP_CONFIG,
+  },
   kalos: { id: "kalos", englishName: "Kalos", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   alola: { id: "alola", englishName: "Alola", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   galar: { id: "galar", englishName: "Galar", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
