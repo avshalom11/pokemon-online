@@ -19,12 +19,17 @@ import type { PokemonLearnset } from "../../types/learnset.types.ts";
 // above the species' own evolution threshold from data/pokemon/
 // pokemon-evolutions.ts (Unova Phase 2) — never colliding with it.
 //
-// Forms (Tornadus/Thundurus/Landorus Therian, Kyurem Black/White, Meloetta
-// Pirouette) are each their own learnset entry, keyed by their exact Forms-
-// catalog id (data/pokemon/generation-5-pokemon-data.ts), sharing a core
-// curve with their base form but swapping several higher-level moves for a
-// genuinely distinct set — same "never byte-for-byte identical between
-// forms" rule Rotom/Giratina already established.
+// Forms (Tornadus/Thundurus/Landorus Therian, Kyurem Black/White, Keldeo
+// Resolute, Meloetta Pirouette) are each their own learnset entry, keyed by
+// their exact Forms-catalog id (data/pokemon/generation-5-pokemon-data.ts),
+// sharing a core curve with their base form but swapping several
+// higher-level moves for a genuinely distinct set — same "never
+// byte-for-byte identical between forms" rule Rotom/Giratina already
+// established. Keldeo Resolute (added in the Unova Update phase) still
+// culminates in Secret Sword at level 65, same as base Keldeo — its
+// signature move stays the form's own capstone either way, matching the
+// Meloetta/Meloetta-Pirouette precedent of sharing a final move while every
+// earlier level differs.
 export const GENERATION_5_LEARNSETS: PokemonLearnset[] = [
   {
     pokemonId: "victini",
@@ -1763,6 +1768,19 @@ export const GENERATION_5_LEARNSETS: PokemonLearnset[] = [
       { moveId: "aqua-jet", method: { kind: "level-up", level: 30 } },
       { moveId: "hydro-pump", method: { kind: "level-up", level: 45 } },
       { moveId: "close-combat", method: { kind: "level-up", level: 55 } },
+      { moveId: "secret-sword", method: { kind: "level-up", level: 65 } },
+    ],
+  },
+  {
+    pokemonId: "keldeo-resolute",
+    generation: 5,
+    entries: [
+      { moveId: "quick-attack", method: { kind: "level-up", level: 1 } },
+      { moveId: "double-kick", method: { kind: "level-up", level: 1 } },
+      { moveId: "aqua-jet", method: { kind: "level-up", level: 15 } },
+      { moveId: "brick-break", method: { kind: "level-up", level: 30 } },
+      { moveId: "close-combat", method: { kind: "level-up", level: 45 } },
+      { moveId: "hydro-pump", method: { kind: "level-up", level: 55 } },
       { moveId: "secret-sword", method: { kind: "level-up", level: 65 } },
     ],
   },

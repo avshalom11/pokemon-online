@@ -24,25 +24,38 @@ import type { PokemonSpecies } from "@/shared/types/pokemon";
 // Oshawott/Dewott/Samurott) are "very-rare" at every stage, Unova's own
 // pseudo-legendary line (Deino/Zweilous/Hydreigon) is "very-rare" at every
 // stage, and every legendary/mythical (Victini, the Swords of Justice,
-// the Forces of Nature, Reshiram/Zekrom/Kyurem, Keldeo, Meloetta,
-// Genesect) is "legendary". No evolution-item-target rarity bump is
-// applied here (unlike the Sinnoh Rarity Audit's Porygon-Z/Magmortar/
-// Electivire/Rhyperior/Magnezone pass) since evolutions/evolution-items
-// are not part of this species-catalog-only phase.
+// the Forces of Nature, Reshiram/Zekrom/Kyurem, Keldeo incl. Resolute
+// Form, Meloetta, Genesect) is "legendary". No evolution-item-target
+// rarity bump is applied here (unlike the Sinnoh Rarity Audit's
+// Porygon-Z/Magmortar/Electivire/Rhyperior/Magnezone pass) since
+// evolutions/evolution-items are not part of this species-catalog-only
+// phase.
 //
-// Forms (features/pokemon/forms/pokemon-forms.ts): only six alternate
-// forms this phase, per this phase's own explicit scope — Basculin's
-// Red/Blue-Striped forms, Deerling/Sawsbuck's four seasonal forms each,
-// Darmanitan's Zen Mode, and Genesect's four Drives are all deliberately
-// single-entry, matching this catalog's own "no form entries without a
-// genuinely distinct, in-scope form" rule (compare Castform/Shaymin/
-// Arceus/Shellos-Gastrodon from the Hoenn/Sinnoh catalogs). The six
-// implemented forms — Tornadus Therian, Thundurus Therian, Landorus
-// Therian, Kyurem Black, Kyurem White, Meloetta Pirouette — each share
-// their base's own dexNumber (641, 642, 645, 646, 648) and use spriteId to
+// Unova Update rarity pass (approved design change, alongside adding
+// Keldeo Resolute): Zorua and Larvesta moved from real "common" to real
+// "very-rare"; Zoroark and Volcarona moved from real "rare" to real
+// "very-rare" — a direct rarity reassignment for all four (not an
+// evolution-item override; none of them are evolution-item targets), same
+// "the field is the single source of truth" precedent the Sinnoh Rarity
+// Audit already established. Their Unova encounter-table weights were
+// updated to match (data/zones/unova-zone-data.ts).
+//
+// Forms (features/pokemon/forms/pokemon-forms.ts): seven alternate forms
+// total — Basculin's Red/Blue-Striped forms, Deerling/Sawsbuck's four
+// seasonal forms each, Darmanitan's Zen Mode, and Genesect's four Drives
+// are all deliberately single-entry, matching this catalog's own "no form
+// entries without a genuinely distinct, in-scope form" rule (compare
+// Castform/Shaymin/Arceus/Shellos-Gastrodon from the Hoenn/Sinnoh
+// catalogs). The seven implemented forms — Tornadus Therian, Thundurus
+// Therian, Landorus Therian, Kyurem Black, Kyurem White, Keldeo Resolute
+// (added in the Unova Update phase), Meloetta Pirouette — each share their
+// base's own dexNumber (641, 642, 645, 646, 647, 648) and use spriteId to
 // point at their own distinct sprite sheet, the same "separate internal
 // species id per form" precedent Deoxys/Rotom/Giratina already
-// established.
+// established. Keldeo Resolute's real-game form-change (triggered by
+// learning Secret Sword) is not modeled as a runtime mechanic here — like
+// every other alternate form in this catalog, it is simply an
+// independently encounterable static species row.
 export const GENERATION_5_POKEMON_DATA: PokemonSpecies[] = [
   {
     id: "victini",
@@ -810,7 +823,7 @@ export const GENERATION_5_POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שועל תרמית, מסוגל להשתנות בצורתו לפוקימונים אחרים.",
     dexNumber: 570,
     types: ["dark"],
-    rarity: "common",
+    rarity: "very-rare",
     baseStats: { health: 40, attack: 65, defense: 40, specialAttack: 80, specialDefense: 40, speed: 65 },
     imageUrl: "/pokemon/zorua.png",
   },
@@ -820,7 +833,7 @@ export const GENERATION_5_POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון שועל ערמומי, יוצר אשליות מציאותיות כדי להגן על הלהקה שלו.",
     dexNumber: 571,
     types: ["dark"],
-    rarity: "rare",
+    rarity: "very-rare",
     baseStats: { health: 60, attack: 105, defense: 60, specialAttack: 120, specialDefense: 60, speed: 105 },
     imageUrl: "/pokemon/zoroark.png",
   },
@@ -1470,7 +1483,7 @@ export const GENERATION_5_POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עש אש, נולד עטוף בשלהבות מגן שמלוות אותו מלידה.",
     dexNumber: 636,
     types: ["bug", "fire"],
-    rarity: "common",
+    rarity: "very-rare",
     baseStats: { health: 55, attack: 85, defense: 55, specialAttack: 50, specialDefense: 55, speed: 60 },
     imageUrl: "/pokemon/larvesta.png",
   },
@@ -1480,7 +1493,7 @@ export const GENERATION_5_POKEMON_DATA: PokemonSpecies[] = [
     description: "פוקימון עש שמש, נחשב פעם לגלגול נשמתה של השמש עצמה.",
     dexNumber: 637,
     types: ["bug", "fire"],
-    rarity: "rare",
+    rarity: "very-rare",
     baseStats: { health: 85, attack: 60, defense: 65, specialAttack: 135, specialDefense: 105, speed: 100 },
     imageUrl: "/pokemon/volcarona.png",
   },
@@ -1648,6 +1661,19 @@ export const GENERATION_5_POKEMON_DATA: PokemonSpecies[] = [
     rarity: "legendary",
     baseStats: { health: 91, attack: 72, defense: 90, specialAttack: 129, specialDefense: 90, speed: 108 },
     imageUrl: "/pokemon/keldeo.png",
+  },
+  {
+    id: "keldeo-resolute",
+    name: "Keldeo",
+    description: "כשקלדאו מגיע לצורתו הנחושה, מבטו קורן נחישות והוא מוכן להילחם בכל מחיר.",
+    dexNumber: 647,
+    types: ["water", "fighting"],
+    rarity: "legendary",
+    formOf: "keldeo",
+    formLabel: "Resolute Form",
+    spriteId: "0647R",
+    baseStats: { health: 91, attack: 72, defense: 90, specialAttack: 129, specialDefense: 90, speed: 108 },
+    imageUrl: "/pokemon/keldeo-resolute.png",
   },
   {
     id: "meloetta",

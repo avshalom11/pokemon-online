@@ -12,14 +12,14 @@ import { POKEMON_DATA } from "../../../../data/pokemon/pokemon-data.ts";
 // checks are about coverage (every Unova species, no duplicates, no unknown
 // references, strictly ascending levels), not historical accuracy.
 //
-// 156 official Unova base species (#494-#649) + 6 alternate forms
+// 156 official Unova base species (#494-#649) + 7 alternate forms
 // (tornadus-therian, thundurus-therian, landorus-therian, kyurem-black,
-// kyurem-white, meloetta-pirouette) = 162. This is the one number this
-// file's own database is built around; if it drifts, something is missing,
-// duplicated, or miscounted.
-const EXPECTED_GENERATION_5_LEARNSET_COUNT = 162;
+// kyurem-white, keldeo-resolute, meloetta-pirouette) = 163. This is the one
+// number this file's own database is built around; if it drifts, something
+// is missing, duplicated, or miscounted.
+const EXPECTED_GENERATION_5_LEARNSET_COUNT = 163;
 
-test("exactly 162 Generation 5 Pokémon learnsets are loaded (156 Unova base species + 6 alternate forms)", () => {
+test("exactly 163 Generation 5 Pokémon learnsets are loaded (156 Unova base species + 7 alternate forms)", () => {
   assert.equal(GENERATION_5_LEARNSETS.length, EXPECTED_GENERATION_5_LEARNSET_COUNT);
 });
 
@@ -96,8 +96,8 @@ test("all 156 base species have exactly one learnset each", () => {
   }
 });
 
-test("all 6 alternate forms (Tornadus/Thundurus/Landorus Therian, Kyurem Black/White, Meloetta Pirouette) each have exactly one learnset", () => {
-  const formIds = ["tornadus-therian", "thundurus-therian", "landorus-therian", "kyurem-black", "kyurem-white", "meloetta-pirouette"];
+test("all 7 alternate forms (Tornadus/Thundurus/Landorus Therian, Kyurem Black/White, Keldeo Resolute, Meloetta Pirouette) each have exactly one learnset", () => {
+  const formIds = ["tornadus-therian", "thundurus-therian", "landorus-therian", "kyurem-black", "kyurem-white", "keldeo-resolute", "meloetta-pirouette"];
   for (const id of formIds) {
     const matches = GENERATION_5_LEARNSETS.filter((learnset) => learnset.pokemonId === id);
     assert.equal(matches.length, 1, `${id} must have exactly one learnset`);
@@ -141,6 +141,15 @@ test("Kyurem has exactly three learnsets across its form group (base + Black + W
   assert.equal(new Set(entrySets).size, 3, "each Kyurem form should have a distinct learnset, not three copies of the same one");
 });
 
+test("Keldeo has exactly two learnsets across its form group (Ordinary + Resolute)", () => {
+  const keldeoIds = ["keldeo", "keldeo-resolute"];
+  const found = keldeoIds.filter((id) => GENERATION_5_LEARNSETS.some((learnset) => learnset.pokemonId === id));
+  assert.deepEqual(found, keldeoIds);
+
+  const entrySets = keldeoIds.map((id) => JSON.stringify(GENERATION_5_LEARNSETS.find((learnset) => learnset.pokemonId === id)!.entries));
+  assert.equal(new Set(entrySets).size, 2, "each Keldeo form should have a distinct learnset, not two copies of the same one");
+});
+
 test("Meloetta has exactly two learnsets across its form group (Aria + Pirouette)", () => {
   const meloettaIds = ["meloetta", "meloetta-pirouette"];
   const found = meloettaIds.filter((id) => GENERATION_5_LEARNSETS.some((learnset) => learnset.pokemonId === id));
@@ -151,7 +160,7 @@ test("Meloetta has exactly two learnsets across its form group (Aria + Pirouette
 });
 
 test("no unexpected alternate-form learnsets exist (no Basculin stripe forms, Darmanitan Zen, Deerling/Sawsbuck seasonal forms, Genesect Drives)", () => {
-  const expectedFormIds = ["tornadus-therian", "thundurus-therian", "landorus-therian", "kyurem-black", "kyurem-white", "meloetta-pirouette"];
+  const expectedFormIds = ["tornadus-therian", "thundurus-therian", "landorus-therian", "kyurem-black", "kyurem-white", "keldeo-resolute", "meloetta-pirouette"];
   const formLikeIds = GENERATION_5_LEARNSETS.map((learnset) => learnset.pokemonId).filter(
     (id) => id.includes("-") && !expectedFormIds.includes(id)
   );

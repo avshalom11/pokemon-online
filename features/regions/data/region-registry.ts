@@ -1,5 +1,6 @@
 import { HOENN_MAP_CONFIG } from "@/data/maps/hoenn-map-config";
 import { JOHTO_MAP_CONFIG } from "@/data/maps/johto-map-config";
+import { KALOS_MAP_CONFIG } from "@/data/maps/kalos-map-config";
 import { SINNOH_MAP_CONFIG } from "@/data/maps/sinnoh-map-config";
 import { UNOVA_MAP_CONFIG } from "@/data/maps/unova-map-config";
 import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
@@ -109,17 +110,36 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // unset since mapConfig already covers it (MapContent renders from
     // mapConfig whenever it's present).
     //
-    // Unova has NO zone encounter data yet (data/zones/unova-zone-data.ts
-    // does not exist) — app/(game)/battle/page.tsx's region gate checks
-    // getZoneData(regionId).length === 0 (not mapConfig presence), so
-    // Unova's map can render interactively here while battles stay
-    // correctly blocked, exactly the same "map before encounters" window
-    // Hoenn and Sinnoh already went through between their own map-config
-    // and encounter-table phases. No change to that gate, or to this
-    // registry beyond mapConfig being set, is needed for that to hold.
+    // Unova now also has real zone encounter data (data/zones/
+    // unova-zone-data.ts, wired through data/zones/zone-data.ts) — the same
+    // "map before encounters" window Hoenn and Sinnoh already went through
+    // has closed for Unova too; app/(game)/battle/page.tsx's region gate
+    // (getZoneData(regionId).length === 0) now passes and Unova is
+    // battle-capable.
     mapConfig: UNOVA_MAP_CONFIG,
   },
-  kalos: { id: "kalos", englishName: "Kalos", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
+  kalos: {
+    id: "kalos",
+    englishName: "Kalos",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Kalos now has real, clickable zones (data/maps/kalos-map-config.ts,
+    // manually placed via /dev/kalos-map-editor against the real
+    // /images/kalos-map.png) — same as Kanto/Johto/Hoenn/Sinnoh/Unova,
+    // mapConfig.imageSrc is the one source for the map image; mapImageSrc
+    // is left unset since mapConfig already covers it (MapContent renders
+    // from mapConfig whenever it's present). Kalos is a five-zone region
+    // (no Beach) — kalos-map-config.ts's own regions array reflects that;
+    // the global ZoneId type is unaffected.
+    //
+    // Kalos now also has real zone encounter data (data/zones/
+    // kalos-zone-data.ts, wired through data/zones/zone-data.ts) — the same
+    // "map before encounters" window Hoenn, Sinnoh, and Unova already went
+    // through has closed for Kalos too; app/(game)/battle/page.tsx's region
+    // gate (getZoneData(regionId).length === 0) now passes and Kalos is
+    // battle-capable.
+    mapConfig: KALOS_MAP_CONFIG,
+  },
   alola: { id: "alola", englishName: "Alola", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   galar: { id: "galar", englishName: "Galar", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   paldea: { id: "paldea", englishName: "Paldea", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },

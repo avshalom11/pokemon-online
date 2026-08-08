@@ -472,16 +472,17 @@ test("Eevee's Branch is exactly Espeon/Umbreon; Leafeon/Glaceon are evolution-it
   assert.deepEqual(branch.targets, ["espeon", "umbreon"]);
 });
 
-test("Eevee has exactly five evolution-item branches (fire/water/thunder/leaf/ice stones); Leafeon is reachable only via Leaf Stone, Glaceon only via Ice Stone", () => {
+test("Eevee has exactly six evolution-item branches (fire/water/thunder/leaf/ice/shiny stones); Leafeon is reachable only via Leaf Stone, Glaceon only via Ice Stone, Sylveon only via Shiny Stone", () => {
   const branches = getEvolutionItemEvolutions("eevee");
   const byItem = Object.fromEntries(branches.map((branch) => [branch.itemId, branch.evolvesToSpeciesId]));
 
-  assert.equal(branches.length, 5);
+  assert.equal(branches.length, 6);
   assert.equal(byItem["fire-stone"], "flareon");
   assert.equal(byItem["water-stone"], "vaporeon");
   assert.equal(byItem["thunder-stone"], "jolteon");
   assert.equal(byItem["leaf-stone"], "leafeon");
   assert.equal(byItem["ice-stone"], "glaceon");
+  assert.equal(byItem["shiny-stone"], "sylveon");
 
   assert.equal(getEvolutionItemEvolutionByItem("eevee", "water-stone")?.evolvesToSpeciesId, "vaporeon", "Leaf Stone's addition must not disturb Eevee's pre-existing branches");
   assert.equal(
@@ -494,6 +495,17 @@ test("Eevee has exactly five evolution-item branches (fire/water/thunder/leaf/ic
     1,
     "Glaceon must be reachable through exactly one evolution-item branch (Ice Stone)"
   );
+  assert.equal(
+    branches.filter((branch) => branch.evolvesToSpeciesId === "sylveon").length,
+    1,
+    "Sylveon must be reachable through exactly one evolution-item branch (Shiny Stone), not the Espeon/Umbreon level Branch"
+  );
+});
+
+test("Sylveon is never added to Eevee's Espeon/Umbreon level-16 Branch (Kalos Phase 2) — the Branch's targets stay exactly two", () => {
+  const branch = getBranchEvolution("eevee")!;
+  assert.deepEqual(branch.targets, ["espeon", "umbreon"]);
+  assert.ok(!branch.targets.includes("sylveon"), "Sylveon must be an evolution-item target, never a Branch target");
 });
 
 test("Eevee is never a key in LEVEL_EVOLUTIONS — no duplicate/competing Eevee evolution definitions exist outside Branch + evolution-item", () => {
@@ -870,4 +882,270 @@ test("deriveSpeciesWildLevelRange correctly derives the Unova pseudo-legendary c
   assert.deepEqual(deriveSpeciesWildLevelRange("deino"), { minimumLevel: 1, maximumLevel: 49 });
   assert.deepEqual(deriveSpeciesWildLevelRange("zweilous"), { minimumLevel: 50, maximumLevel: 63 });
   assert.deepEqual(deriveSpeciesWildLevelRange("hydreigon"), { minimumLevel: 64, maximumLevel: Number.POSITIVE_INFINITY });
+});
+
+// ============================================================================
+// Generation VI (Kalos, Phase 2)
+// ============================================================================
+
+test("every Kalos starter line is complete: level 16 then level 36 for all three lines", () => {
+  const lines: [string, string, string][] = [
+    ["chespin", "quilladin", "chesnaught"],
+    ["fennekin", "braixen", "delphox"],
+    ["froakie", "frogadier", "greninja"],
+  ];
+
+  for (const [base, middle, final] of lines) {
+    assert.deepEqual(getLevelEvolution(base), { evolvesToSpeciesId: middle, requiredLevel: 16 }, `${base} -> ${middle}`);
+    assert.deepEqual(getLevelEvolution(middle), { evolvesToSpeciesId: final, requiredLevel: 36 }, `${middle} -> ${final}`);
+    assert.equal(getLevelEvolution(final), undefined, `${final} is a final evolution and must have no further level evolution`);
+  }
+});
+
+test("every plain Kalos level evolution resolves to its real canonical target and level", () => {
+  const plainLevelEvolutions: [string, string, number][] = [
+    ["bunnelby", "diggersby", 20],
+    ["fletchling", "fletchinder", 17],
+    ["fletchinder", "talonflame", 35],
+    ["scatterbug", "spewpa", 9],
+    ["spewpa", "vivillon", 12],
+    ["litleo", "pyroar", 35],
+    ["flabebe", "floette", 19],
+    ["skiddo", "gogoat", 32],
+    ["espurr", "meowstic", 25],
+    ["honedge", "doublade", 35],
+    ["binacle", "barbaracle", 39],
+    ["skrelp", "dragalge", 48],
+    ["clauncher", "clawitzer", 37],
+    ["bergmite", "avalugg", 37],
+    ["noibat", "noivern", 48],
+  ];
+
+  for (const [speciesId, targetId, level] of plainLevelEvolutions) {
+    assert.deepEqual(
+      getLevelEvolution(speciesId),
+      { evolvesToSpeciesId: targetId, requiredLevel: level },
+      `${speciesId} -> ${targetId} @ ${level}`
+    );
+  }
+});
+
+test("Goomy/Sliggoo/Goodra is Kalos's own pseudo-legendary line: a complete three-stage level chain", () => {
+  assert.deepEqual(getLevelEvolution("goomy"), { evolvesToSpeciesId: "sliggoo", requiredLevel: 40 });
+  assert.deepEqual(getLevelEvolution("sliggoo"), { evolvesToSpeciesId: "goodra", requiredLevel: 50 });
+  assert.equal(getLevelEvolution("goodra"), undefined);
+});
+
+test("approved Kalos mechanic simplifications: Pancham, Inkay, Sliggoo, Phantump, and Pumpkaboo keep their real canonical level and drop only the unsupported condition", () => {
+  // Pancham -> Pangoro: former party-composition (another Dark-type
+  // required) evolution.
+  assert.deepEqual(getLevelEvolution("pancham"), { evolvesToSpeciesId: "pangoro", requiredLevel: 32 });
+  // Inkay -> Malamar: former device-orientation (upside-down) evolution.
+  assert.deepEqual(getLevelEvolution("inkay"), { evolvesToSpeciesId: "malamar", requiredLevel: 30 });
+  // Sliggoo -> Goodra: former weather (rain) evolution.
+  assert.deepEqual(getLevelEvolution("sliggoo"), { evolvesToSpeciesId: "goodra", requiredLevel: 50 });
+  // Phantump -> Trevenant: former Trade evolution.
+  assert.deepEqual(getLevelEvolution("phantump"), { evolvesToSpeciesId: "trevenant", requiredLevel: 35 });
+  // Pumpkaboo -> Gourgeist: former Trade evolution.
+  assert.deepEqual(getLevelEvolution("pumpkaboo"), { evolvesToSpeciesId: "gourgeist", requiredLevel: 35 });
+
+  // None of the five ever became an evolution-item or branch evolution.
+  for (const speciesId of ["pancham", "inkay", "sliggoo", "phantump", "pumpkaboo"]) {
+    assert.deepEqual(getEvolutionItemEvolutions(speciesId), [], `${speciesId} must not also have an evolution-item evolution`);
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must not be a branch evolution`);
+  }
+});
+
+test("every Kalos evolution-item evolution resolves to its real canonical target and item, using only existing catalog items", () => {
+  const itemEvolutions: [string, string, string][] = [
+    ["floette", "florges", "shiny-stone"],
+    ["doublade", "aegislash", "dusk-stone"],
+    ["spritzee", "aromatisse", "shiny-stone"],
+    ["swirlix", "slurpuff", "shiny-stone"],
+    // Helioptile -> Heliolisk uses Thunder Stone in this project (design
+    // correction from the real-game Sun Stone method).
+    ["helioptile", "heliolisk", "thunder-stone"],
+  ];
+
+  for (const [speciesId, targetId, itemId] of itemEvolutions) {
+    assert.equal(getEvolutionItemEvolutionByItem(speciesId, itemId)?.evolvesToSpeciesId, targetId, `${speciesId} -> ${targetId} via ${itemId}`);
+    assert.equal(getLevelEvolution(speciesId), undefined, `${speciesId} must never also have a level evolution entry`);
+  }
+});
+
+test("Helioptile -> Heliolisk uses Thunder Stone, not Sun Stone (Kalos evolution correction)", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("helioptile", "thunder-stone")?.evolvesToSpeciesId, "heliolisk");
+  assert.equal(getEvolutionItemEvolutionByItem("helioptile", "sun-stone"), undefined, "Helioptile must no longer have a Sun Stone evolution");
+
+  const branches = getEvolutionItemEvolutions("helioptile");
+  assert.equal(branches.length, 1, "Helioptile must have exactly one evolution-item branch");
+  assert.equal(branches[0]?.itemId, "thunder-stone");
+});
+
+test("Eevee -> Sylveon via Shiny Stone (Kalos Phase 2)", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("eevee", "shiny-stone")?.evolvesToSpeciesId, "sylveon");
+});
+
+test("Floette and Doublade each keep their own pre-existing level evolution (from Flabébé/Honedge) alongside their independent evolution-item evolution", () => {
+  assert.deepEqual(getLevelEvolution("flabebe"), { evolvesToSpeciesId: "floette", requiredLevel: 19 });
+  assert.equal(getEvolutionItemEvolutionByItem("floette", "shiny-stone")?.evolvesToSpeciesId, "florges");
+
+  assert.deepEqual(getLevelEvolution("honedge"), { evolvesToSpeciesId: "doublade", requiredLevel: 35 });
+  assert.equal(getEvolutionItemEvolutionByItem("doublade", "dusk-stone")?.evolvesToSpeciesId, "aegislash");
+});
+
+test("the evolution-item catalog is unchanged by Kalos: still exactly the same 16 EvolutionItemId values, no new evolution product introduced", () => {
+  const canonicalIds = [
+    "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
+    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+  ];
+  assert.equal(canonicalIds.length, 16);
+  for (const itemId of canonicalIds) {
+    assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
+  }
+  // No new item id (e.g. a Kalos-only stone) was ever introduced, and no
+  // retired item was ever reintroduced.
+  for (const fakeOrRetiredItem of [
+    "mega-stone", "prison-bottle", "sachet", "whipped-dream",
+    "deep-sea-tooth", "deep-sea-scale", "dubious-disc", "razor-claw", "razor-fang", "electirizer", "magmarizer", "oval-stone",
+  ]) {
+    assert.equal(isEvolutionItemId(fakeOrRetiredItem), false, `${fakeOrRetiredItem} must never be a recognized EvolutionItemId`);
+  }
+});
+
+test("no Kalos species uses branch evolution — every real trade/party/orientation/weather/affection mechanic was replaced with level or item, never a player-choice branch", () => {
+  const kalosSpeciesTouchedByEvolution = [
+    "chespin", "quilladin", "fennekin", "braixen", "froakie", "frogadier",
+    "bunnelby", "fletchling", "fletchinder", "scatterbug", "spewpa", "litleo",
+    "flabebe", "floette", "skiddo", "pancham", "espurr", "honedge", "doublade",
+    "spritzee", "swirlix", "inkay", "binacle", "skrelp", "clauncher", "helioptile",
+    "tyrunt", "amaura", "goomy", "sliggoo", "phantump", "pumpkaboo", "bergmite", "noibat",
+  ];
+  for (const speciesId of kalosSpeciesTouchedByEvolution) {
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must never be a branch evolution — Kalos Phase 2 uses only level and evolution-item`);
+  }
+});
+
+test("every genuinely standalone (non-evolving, non-legendary) Kalos species has no evolution of any kind", () => {
+  const standaloneIds = ["furfrou", "hawlucha", "dedenne", "carbink", "klefki"];
+  for (const id of standaloneIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every Kalos legendary/mythical species (Xerneas, Yveltal, Zygarde, Diancie, Hoopa incl. Unbound Form, Volcanion) has no evolution of any kind", () => {
+  const legendaryIds = ["xerneas", "yveltal", "zygarde", "diancie", "hoopa", "hoopa-unbound", "volcanion"];
+  for (const id of legendaryIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("Hoopa Unbound is a Form, not an evolution — no hoopa -> hoopa-unbound entry exists in any evolution table", () => {
+  assert.equal(getLevelEvolution("hoopa"), undefined);
+  assert.deepEqual(getEvolutionItemEvolutions("hoopa"), []);
+  assert.equal(getBranchEvolution("hoopa"), undefined);
+
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "hoopa-unbound", "hoopa-unbound must never be a level-evolution target");
+  }
+  for (const { evolution } of getAllEvolutionItemEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "hoopa-unbound", "hoopa-unbound must never be an evolution-item target");
+  }
+});
+
+test("no Mega Evolution appears anywhere in the evolution registry", () => {
+  const megaLikeLevelTargets = getAllLevelEvolutionEntries().filter((entry) => entry.evolution.evolvesToSpeciesId.startsWith("mega-"));
+  const megaLikeItemTargets = getAllEvolutionItemEvolutionEntries().filter((entry) => entry.evolution.evolvesToSpeciesId.startsWith("mega-"));
+  assert.deepEqual(megaLikeLevelTargets, []);
+  assert.deepEqual(megaLikeItemTargets, []);
+
+  for (const fakeMegaItem of ["mega-stone", "mega-stone-x", "mega-stone-y", "key-stone"]) {
+    assert.equal(isEvolutionItemId(fakeMegaItem), false, `${fakeMegaItem} must never be a recognized EvolutionItemId`);
+  }
+});
+
+test("total evolution counts include exactly 29 new Kalos level evolutions and 5 new Kalos-native evolution-item evolutions", () => {
+  const kalosDexRange = new Set(POKEMON_DATA.filter((species) => species.dexNumber >= 650 && species.dexNumber <= 721).map((species) => species.id));
+
+  const kalosLevelEntries = getAllLevelEvolutionEntries().filter((entry) => kalosDexRange.has(entry.speciesId));
+  const kalosItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => kalosDexRange.has(entry.speciesId));
+
+  assert.equal(kalosLevelEntries.length, 29);
+  assert.equal(kalosItemEntries.length, 5, "Kalos-native evolution-item species only — Eevee -> Sylveon is a Kanto-keyed entry and is verified separately");
+});
+
+test("no duplicate evolution definitions and no conflicting level/item/branch outcome for any Kalos evolution target", () => {
+  const kalosLevelTargets = new Map<string, string[]>();
+  for (const { speciesId, evolution } of getAllLevelEvolutionEntries()) {
+    const list = kalosLevelTargets.get(evolution.evolvesToSpeciesId) ?? [];
+    list.push(speciesId);
+    kalosLevelTargets.set(evolution.evolvesToSpeciesId, list);
+  }
+
+  // Every Kalos evolution TARGET (the evolved species) must be reachable
+  // from exactly one pre-evolution — no two different species both claim
+  // to evolve into the same Kalos target.
+  const kalosTargets = [
+    "quilladin", "chesnaught", "braixen", "delphox", "frogadier", "greninja",
+    "diggersby", "fletchinder", "talonflame", "spewpa", "vivillon", "pyroar",
+    "floette", "gogoat", "pangoro", "meowstic", "doublade", "malamar",
+    "barbaracle", "dragalge", "clawitzer", "tyrantrum", "aurorus", "sliggoo",
+    "goodra", "trevenant", "gourgeist", "avalugg", "noivern",
+  ];
+  for (const target of kalosTargets) {
+    const sources = kalosLevelTargets.get(target) ?? [];
+    assert.equal(sources.length, 1, `${target} must be reachable from exactly one level-evolution source, found: ${sources.join(", ")}`);
+  }
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the three Kalos starter chains", () => {
+  const lines: [string, string, string][] = [
+    ["chespin", "quilladin", "chesnaught"],
+    ["fennekin", "braixen", "delphox"],
+    ["froakie", "frogadier", "greninja"],
+  ];
+  for (const [base, middle, final] of lines) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(base), { minimumLevel: 1, maximumLevel: 15 });
+    assert.deepEqual(deriveSpeciesWildLevelRange(middle), { minimumLevel: 16, maximumLevel: 35 });
+    assert.deepEqual(deriveSpeciesWildLevelRange(final), { minimumLevel: 36, maximumLevel: Number.POSITIVE_INFINITY });
+  }
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the Kalos pseudo-legendary chain (Goomy/Sliggoo/Goodra) with no collision", () => {
+  assert.deepEqual(deriveSpeciesWildLevelRange("goomy"), { minimumLevel: 1, maximumLevel: 39 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("sliggoo"), { minimumLevel: 40, maximumLevel: 49 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("goodra"), { minimumLevel: 50, maximumLevel: Number.POSITIVE_INFINITY });
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the five approved-simplification Kalos chains with no gaps, no overlaps, and no empty ranges: Pancham, Inkay, Phantump, Pumpkaboo", () => {
+  assert.deepEqual(deriveSpeciesWildLevelRange("pancham"), { minimumLevel: 1, maximumLevel: 31 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("pangoro"), { minimumLevel: 32, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("inkay"), { minimumLevel: 1, maximumLevel: 29 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("malamar"), { minimumLevel: 30, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("phantump"), { minimumLevel: 1, maximumLevel: 34 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("trevenant"), { minimumLevel: 35, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("pumpkaboo"), { minimumLevel: 1, maximumLevel: 34 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("gourgeist"), { minimumLevel: 35, maximumLevel: Number.POSITIVE_INFINITY });
+});
+
+test("deriveSpeciesWildLevelRange leaves every Kalos evolution-item target (Florges, Aegislash, Aromatisse, Slurpuff, Heliolisk, Sylveon) fully unrestricted, same as Ludicolo/Vileplume already are", () => {
+  for (const id of ["florges", "aegislash", "aromatisse", "slurpuff", "heliolisk", "sylveon"]) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(id), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY }, `${id} must be fully unrestricted (evolution-item targets are invisible to the level-only reverse index)`);
+  }
+});
+
+test("deriveSpeciesWildLevelRange across the entire catalog never produces minimumLevel > maximumLevel", () => {
+  const invalid = POKEMON_DATA.filter((species) => {
+    const range = deriveSpeciesWildLevelRange(species.id);
+    return range.minimumLevel > range.maximumLevel;
+  });
+  assert.deepEqual(invalid.map((species) => species.id), []);
 });

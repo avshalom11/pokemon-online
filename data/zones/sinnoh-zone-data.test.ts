@@ -5,6 +5,7 @@ import { HOENN_ZONE_DATA } from "./hoenn-zone-data.ts";
 import { JOHTO_ZONE_DATA } from "./johto-zone-data.ts";
 import { KANTO_ZONE_DATA } from "./kanto-zone-data.ts";
 import { SINNOH_ZONE_DATA } from "./sinnoh-zone-data.ts";
+import { UNOVA_ZONE_DATA } from "./unova-zone-data.ts";
 import { getZone, getZoneData } from "./zone-data.ts";
 import { POKEMON_DATA } from "../pokemon/pokemon-data.ts";
 
@@ -43,12 +44,19 @@ test("every official Sinnoh base species (#387-#493) appears exactly once", () =
   assert.deepEqual(missing, [], "no Sinnoh base species may be missing from the encounter tables");
 });
 
-test("Victini (#494) is absent from Sinnoh's encounter tables", () => {
-  const ids = allSinnohEncounters().map((encounter) => encounter.pokemonId);
-  assert.ok(!ids.includes("victini"));
-
+test("Victini (#494) exists in the global catalog (Unova, Generation 5) but does not appear in Sinnoh's encounter tables", () => {
+  // Victini legitimately exists in POKEMON_DATA now that Unova has been
+  // added — the old "Victini must not exist in the catalog at all"
+  // assumption predates Unova and no longer holds. The real Sinnoh
+  // invariant was always region isolation: Victini belongs to Unova, so it
+  // must never appear in Sinnoh's own encounter tables, regardless of
+  // whether it exists elsewhere in the catalog.
   const victiniSpecies = POKEMON_DATA.find((species) => species.dexNumber === 494);
-  assert.equal(victiniSpecies, undefined, "test assumption: Victini must not exist in the species catalog either");
+  assert.ok(victiniSpecies, "Victini must exist in the canonical global catalog as part of Unova");
+  assert.equal(victiniSpecies!.id, "victini");
+
+  const ids = allSinnohEncounters().map((encounter) => encounter.pokemonId);
+  assert.ok(!ids.includes("victini"), "Victini must never appear in Sinnoh's own encounter tables");
 });
 
 test("all five Rotom alternate forms each appear exactly once", () => {
@@ -69,11 +77,12 @@ test("base Rotom and base Giratina also appear exactly once each", () => {
   assert.equal(ids.filter((id) => id === "giratina").length, 1);
 });
 
-test("no Kanto, Johto, or Hoenn species appears in the Sinnoh pools", () => {
+test("no Kanto, Johto, Hoenn, or Unova species appears in the Sinnoh pools", () => {
   const otherRegionIds = new Set([
     ...KANTO_ZONE_DATA.flatMap((zone) => zone.encounters.map((e) => e.pokemonId)),
     ...JOHTO_ZONE_DATA.flatMap((zone) => zone.encounters.map((e) => e.pokemonId)),
     ...HOENN_ZONE_DATA.flatMap((zone) => zone.encounters.map((e) => e.pokemonId)),
+    ...UNOVA_ZONE_DATA.flatMap((zone) => zone.encounters.map((e) => e.pokemonId)),
   ]);
   const overlap = allSinnohEncounters()
     .map((encounter) => encounter.pokemonId)

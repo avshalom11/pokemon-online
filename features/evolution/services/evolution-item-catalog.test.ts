@@ -56,9 +56,10 @@ test("Water Stone's mappings include both Clamperl branches as two separate, una
   assert.ok(clamperlRows.some((row) => row.sourceName === "Clamperl" && row.targetName === "Gorebyss"));
 });
 
-test("Thunder Stone's mappings include Electabuzz -> Electivire", () => {
+test("Thunder Stone's mappings include Electabuzz -> Electivire and the Kalos evolution correction Helioptile -> Heliolisk", () => {
   const mappings = getEvolutionItemMappings("thunder-stone");
   assert.ok(mappings.some((row) => row.sourceName === "Electabuzz" && row.targetName === "Electivire"));
+  assert.ok(mappings.some((row) => row.sourceName === "Helioptile" && row.targetName === "Heliolisk"));
 });
 
 test("Fire Stone's mappings include Magmar -> Magmortar", () => {
@@ -85,6 +86,42 @@ test("mappings are sorted by the source species' own dexNumber, for a stable Pok
 
 test("an item nothing evolves with returns an empty mapping list", () => {
   assert.deepEqual(getEvolutionItemMappings("poke-ball"), []);
+});
+
+test("Shiny Stone's mappings auto-pick up all three Kalos Phase 2 additions (Eevee -> Sylveon, Spritzee -> Aromatisse, Swirlix -> Slurpuff) alongside pre-existing species, with no hardcoded Kalos-specific code", () => {
+  const labels = getEvolutionItemDisplayLabels("shiny-stone");
+
+  for (const name of ["Roselia", "Togetic", "Minccino", "Eevee", "Spritzee", "Swirlix"]) {
+    assert.ok(labels.includes(name), `${name} must be listed under Shiny Stone`);
+  }
+
+  const mappings = getEvolutionItemMappings("shiny-stone");
+  assert.ok(mappings.some((row) => row.sourceName === "Eevee" && row.targetName === "Sylveon"));
+  assert.ok(mappings.some((row) => row.sourceName === "Spritzee" && row.targetName === "Aromatisse"));
+  assert.ok(mappings.some((row) => row.sourceName === "Swirlix" && row.targetName === "Slurpuff"));
+});
+
+test("Dusk Stone's mappings auto-pick up the Kalos Phase 2 addition (Doublade -> Aegislash) alongside pre-existing species", () => {
+  const labels = getEvolutionItemDisplayLabels("dusk-stone");
+
+  for (const name of ["Misdreavus", "Murkrow", "Gligar", "Lampent", "Doublade"]) {
+    assert.ok(labels.includes(name), `${name} must be listed under Dusk Stone`);
+  }
+
+  const mappings = getEvolutionItemMappings("dusk-stone");
+  assert.ok(mappings.some((row) => row.sourceName === "Doublade" && row.targetName === "Aegislash"));
+});
+
+test("Sun Stone's mappings are unaffected by Kalos — still only the pre-existing species; Helioptile was corrected onto Thunder Stone, never Sun Stone", () => {
+  const labels = getEvolutionItemDisplayLabels("sun-stone");
+
+  for (const name of ["Sunkern", "Gloom", "Cottonee", "Petilil"]) {
+    assert.ok(labels.includes(name), `${name} must be listed under Sun Stone`);
+  }
+  assert.ok(!labels.includes("Helioptile"), "Helioptile must no longer be listed under Sun Stone after the evolution correction");
+
+  const mappings = getEvolutionItemMappings("sun-stone");
+  assert.ok(!mappings.some((row) => row.sourceName === "Helioptile"), "Sun Stone must have no Helioptile mapping");
 });
 
 test("every one of the Shop's 16 evolution products has at least one mapping row", () => {

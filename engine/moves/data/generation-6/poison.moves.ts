@@ -1,0 +1,38 @@
+import type { Move } from "../../types/move.types.ts";
+
+export const GENERATION_6_POISON_MOVES: Move[] = [
+  {
+    id: "belch",
+    name: "Belch",
+    generation: 6,
+    introducedGeneration: 6,
+    description: "The user lets out a damaging belch at the target. In the original games the user must have eaten a held Berry to use this move — held-item consumption is not modeled in this project, so the requirement is dropped.",
+    type: "poison",
+    category: "special",
+    power: 120,
+    accuracy: 90,
+    maxPp: 10,
+    priority: 0,
+    target: "opponent",
+    effect: { kind: "damage" },
+    flags: ["protectable", "mirrorMove"],
+    implementationStatus: "data-only",
+  },
+  {
+    id: "venom-drench",
+    name: "Venom Drench",
+    generation: 6,
+    introducedGeneration: 6,
+    description: "Opposing Pokémon are drenched in an odd poisonous liquid, lowering Attack, Special Attack, and Speed. Only affects already-poisoned targets in the original games — that status-gated condition is dropped here.",
+    type: "poison",
+    category: "status",
+    power: null,
+    accuracy: 100,
+    maxPp: 20,
+    priority: 0,
+    target: "all-opponents",
+    effect: { kind: "stat-change", changes: [{ stat: "attack", stages: -1 }, { stat: "specialAttack", stages: -1 }, { stat: "speed", stages: -1 }] },
+    flags: ["protectable", "mirrorMove"],
+    implementationStatus: "data-only",
+  },
+];

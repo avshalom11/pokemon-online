@@ -6,29 +6,31 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 
 // Generation 1 (Kanto, #0001-#0151) + Generation 2 (Johto, #0152-#0251) +
 // Generation 3 (Hoenn, #0252-#0386) + Generation 4 (Sinnoh, #0387-#0493) +
-// Generation 5 (Unova, #0494-#0649) — 649 official National Dex entries
-// (one base/headline species row per dex number). Victini (#494) IS part
-// of Unova and IS present (Unova Phase 1's own explicit scope). See
-// engine/learnsets/data/generation-1/generation-1.completeness.test.ts for
-// the same invariant applied to the (still Generation-1-only) learnset
-// database.
+// Generation 5 (Unova, #0494-#0649) + Generation 6 (Kalos, #0650-#0721) —
+// 721 official National Dex entries (one base/headline species row per dex
+// number). Victini (#494) IS part of Unova and IS present (Unova Phase 1's
+// own explicit scope). See engine/learnsets/data/generation-1/
+// generation-1.completeness.test.ts for the same invariant applied to the
+// (still Generation-1-only) learnset database.
 //
 // PLUS alternate FORM rows that intentionally share their base's dex
 // number rather than getting their own (see features/pokemon/forms/
 // pokemon-forms.ts's own doc comment): 3 Deoxys forms (dex #386), 5 Rotom
 // forms (dex #479: Heat/Wash/Frost/Fan/Mow), 1 Giratina form (dex #487:
-// Origin), and — new this phase — 1 Tornadus form (dex #641: Therian),
-// 1 Thundurus form (dex #642: Therian), 1 Landorus form (dex #645:
-// Therian), 2 Kyurem forms (dex #646: Black/White), and 1 Meloetta form
-// (dex #648: Pirouette). That makes two different, both-correct counts:
-//   - EXPECTED_BASE_DEX_COUNT (649): distinct dex numbers / Pokédex rows —
+// Origin), 1 Tornadus form (dex #641: Therian), 1 Thundurus form (dex
+// #642: Therian), 1 Landorus form (dex #645: Therian), 2 Kyurem forms
+// (dex #646: Black/White), 1 Keldeo form (dex #647: Resolute — added in
+// the Unova Update phase), 1 Meloetta form (dex #648: Pirouette), and 1
+// Hoopa form (dex #720: Unbound — added in the Kalos Phase 1 species
+// catalog). That makes two different, both-correct counts:
+//   - EXPECTED_BASE_DEX_COUNT (721): distinct dex numbers / Pokédex rows —
 //     what "dex numbers cover 1..N with no gaps" and the Pokédex service's
 //     own row count are checked against.
-//   - EXPECTED_TOTAL_SPECIES_COUNT (664): every PokemonSpecies row in
-//     POKEMON_DATA, including all 15 alternate forms — what "every id is
+//   - EXPECTED_TOTAL_SPECIES_COUNT (738): every PokemonSpecies row in
+//     POKEMON_DATA, including all 17 alternate forms — what "every id is
 //     present exactly once" is checked against.
-const EXPECTED_BASE_DEX_COUNT = 649;
-const EXPECTED_TOTAL_SPECIES_COUNT = 664;
+const EXPECTED_BASE_DEX_COUNT = 721;
+const EXPECTED_TOTAL_SPECIES_COUNT = 738;
 
 const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legendary"];
 
@@ -36,30 +38,39 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // extended 2026-08-04 for Generation 2, extended 2026-08-05 for Generation
 // 3/Hoenn, extended 2026-08-05 for Generation 4/Sinnoh, revised again for
 // the Sinnoh Rarity Audit approved-design-change pass, extended again for
-// Generation 5/Unova): every species keyed by dexNumber -> its intended
-// rarity tier, so a test failure points at exactly which Pokémon regressed
-// rather than just a wrong total. Includes the 3 Deoxys forms (all
-// "legendary"), the 1 Giratina-Origin form ("legendary", matching base
-// Giratina), base Rotom and all 5 Rotom alternate forms ("legendary", per
-// the Rarity Audit change), Porygon-Z/Magmortar/Electivire/Rhyperior/
-// Magnezone ("very-rare", also per the Rarity Audit change), and — new
-// this phase — every Unova legendary/mythical (Victini, Cobalion/
-// Terrakion/Virizion, Tornadus/Thundurus/Landorus incl. their Therian
-// forms, Reshiram/Zekrom, Kyurem incl. Black/White, Keldeo, Meloetta incl.
-// Pirouette, Genesect — 19 rows total, all "legendary"), Unova's starter
-// trio and pseudo-legendary line (Snivy/Servine/Serperior, Tepig/Pignite/
-// Emboar, Oshawott/Dewott/Samurott, Deino/Zweilous/Hydreigon — 12 rows
-// total, all "very-rare", no evolution-item rarity bump applied since
-// evolutions aren't in this phase's scope). See generation-5-pokemon-
-// data.ts's own per-species rarity fields for the single source of truth.
+// Generation 5/Unova, revised again for the Unova Update rarity pass,
+// extended again for Generation 6/Kalos Phase 1): every species keyed by
+// dexNumber -> its intended rarity tier, so a test failure points at
+// exactly which Pokémon regressed rather than just a wrong total. Includes
+// the 3 Deoxys forms (all "legendary"), the 1 Giratina-Origin form
+// ("legendary", matching base Giratina), base Rotom and all 5 Rotom
+// alternate forms ("legendary", per the Rarity Audit change),
+// Porygon-Z/Magmortar/Electivire/Rhyperior/Magnezone ("very-rare", also
+// per the Rarity Audit change), every Unova legendary/mythical (Victini,
+// Cobalion/Terrakion/Virizion, Tornadus/Thundurus/Landorus incl. their
+// Therian forms, Reshiram/Zekrom, Kyurem incl. Black/White, Keldeo incl.
+// Resolute Form, Meloetta incl. Pirouette, Genesect — 20 rows total, all
+// "legendary"), Unova's starter trio, pseudo-legendary line, and the
+// Unova Update's four reclassified species (Snivy/Servine/Serperior,
+// Tepig/Pignite/Emboar, Oshawott/Dewott/Samurott, Deino/Zweilous/
+// Hydreigon, Zorua, Zoroark, Larvesta, Volcarona — 16 rows total, all
+// "very-rare"; the Unova Update four are a direct rarity reassignment, not
+// an evolution-item override, same as the Sinnoh Rarity Audit precedent),
+// every Kalos legendary/mythical (Xerneas, Yveltal, Zygarde, Diancie,
+// Hoopa incl. Unbound Form, Volcanion — 7 rows total, all "legendary"),
+// and Kalos's starter trio and pseudo-legendary line (Chespin/Quilladin/
+// Chesnaught, Fennekin/Braixen/Delphox, Froakie/Frogadier/Greninja,
+// Goomy/Sliggoo/Goodra — 12 rows total, all "very-rare"). See
+// generation-5-pokemon-data.ts's and generation-6-pokemon-data.ts's own
+// per-species rarity fields for the single source of truth.
 const EXPECTED_RARITY_COUNTS: Record<PokemonRarity, number> = {
-  common: 271,
-  rare: 255,
-  "very-rare": 74,
-  legendary: 64,
+  common: 295,
+  rare: 281,
+  "very-rare": 90,
+  legendary: 72,
 };
 
-test("exactly 664 Pokémon species rows are loaded (649 base Dex entries + 15 alternate forms)", () => {
+test("exactly 738 Pokémon species rows are loaded (721 base Dex entries + 17 alternate forms)", () => {
   assert.equal(POKEMON_DATA.length, EXPECTED_TOTAL_SPECIES_COUNT);
 });
 
@@ -136,7 +147,7 @@ test("no alternate form points at another alternate form (every formOf target is
   }
 });
 
-test("dex numbers, deduped by base form, cover exactly 1 through 649 with no gaps", () => {
+test("dex numbers, deduped by base form, cover exactly 1 through 721 with no gaps", () => {
   const dexNumbers = POKEMON_DATA.filter((species) => species.formOf === undefined)
     .map((species) => species.dexNumber)
     .sort((a, b) => a - b);
@@ -144,9 +155,9 @@ test("dex numbers, deduped by base form, cover exactly 1 through 649 with no gap
   assert.deepEqual(dexNumbers, expected);
 });
 
-test("no species uses dexNumber 650 or higher (Unova stops at Genesect, #649)", () => {
+test("no species uses dexNumber 722 or higher (Kalos Phase 1 stops at Volcanion, #721)", () => {
   const maxDexNumber = Math.max(...POKEMON_DATA.map((species) => species.dexNumber));
-  assert.equal(maxDexNumber, 649);
+  assert.equal(maxDexNumber, 721);
 });
 
 test("Victini (#494) IS present in the catalog and is rarity legendary (Unova Phase 1's own explicit scope)", () => {
@@ -157,13 +168,24 @@ test("Victini (#494) IS present in the catalog and is rarity legendary (Unova Ph
   assert.equal(victini!.formOf, undefined, "Victini is a single-form species, not an alternate form");
 });
 
-test("no species uses the temporary Deoxys-form sprite filenames (669/670/671) as a dexNumber", () => {
+test("Deoxys and its alternate forms never use the old temporary sprite filenames (669/670/671) as a dexNumber", () => {
+  // 669/670/671 were only ever a TEMPORARY Deoxys-form sprite-filename bug,
+  // long before Kalos existed — that assumption predates Generation 6 and
+  // no longer holds project-wide: #669 (Flabébé), #670 (Floette), and #671
+  // (Florges) are now legitimate real Kalos dex numbers (Kalos Phase 1).
+  // The real invariant was always scoped to Deoxys specifically: its own
+  // dexNumber and every one of its alternate forms' dexNumbers must be 386,
+  // never one of the three temporary sprite-filename values.
   const forbidden = [669, 670, 671];
-  for (const species of POKEMON_DATA) {
+  const deoxysGroup = POKEMON_DATA.filter((species) => species.id === "deoxys" || species.formOf === "deoxys");
+
+  assert.ok(deoxysGroup.length > 0, "test assumption: the Deoxys form group must exist");
+  for (const species of deoxysGroup) {
     assert.ok(
       !forbidden.includes(species.dexNumber),
       `${species.id} must never use ${species.dexNumber} as dexNumber — that was only ever a temporary sprite filename`
     );
+    assert.equal(species.dexNumber, 386, `${species.id} must use dexNumber 386`);
   }
 });
 
@@ -186,6 +208,24 @@ test("exactly 156 official Unova base species exist for #494-649", () => {
     (species) => species.formOf === undefined && species.dexNumber >= 494 && species.dexNumber <= 649
   );
   assert.equal(unovaBase.length, 156);
+});
+
+test("exactly 72 official Kalos base species exist for #650-721", () => {
+  const kalosBase = POKEMON_DATA.filter(
+    (species) => species.formOf === undefined && species.dexNumber >= 650 && species.dexNumber <= 721
+  );
+  assert.equal(kalosBase.length, 72);
+});
+
+test("Chespin is #650 and Volcanion is #721 (the Kalos base dex range's own endpoints)", () => {
+  const chespin = POKEMON_DATA.find((species) => species.id === "chespin");
+  assert.ok(chespin, "Chespin must exist in the catalog");
+  assert.equal(chespin!.dexNumber, 650);
+
+  const volcanion = POKEMON_DATA.find((species) => species.id === "volcanion");
+  assert.ok(volcanion, "Volcanion must exist in the catalog");
+  assert.equal(volcanion!.dexNumber, 721);
+  assert.equal(volcanion!.rarity, "legendary");
 });
 
 test("Deoxys has exactly four internal form entries, all sharing dexNumber 386", () => {
@@ -363,8 +403,95 @@ test("Meloetta form sprite ids resolve to the real on-disk sprite filenames (064
   assert.equal(byId.get("meloetta-pirouette")!.spriteId, "0648P");
 });
 
-test("Keldeo, Genesect, Reshiram, Zekrom, and the three Swords of Justice are single-entry (no alternate forms implemented for them)", () => {
-  for (const id of ["keldeo", "genesect", "reshiram", "zekrom", "cobalion", "terrakion", "virizion", "victini"]) {
+test("Genesect, Reshiram, Zekrom, and the three Swords of Justice are single-entry (no alternate forms implemented for them)", () => {
+  for (const id of ["genesect", "reshiram", "zekrom", "cobalion", "terrakion", "virizion", "victini"]) {
+    const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
+    assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
+  }
+});
+
+test("Keldeo has exactly two internal form entries (Ordinary + Resolute), both sharing dexNumber 647", () => {
+  const keldeoGroup = POKEMON_DATA.filter((species) => species.id === "keldeo" || species.formOf === "keldeo");
+
+  assert.deepEqual(
+    keldeoGroup.map((species) => species.id).sort(),
+    ["keldeo", "keldeo-resolute"]
+  );
+  for (const species of keldeoGroup) {
+    assert.equal(species.dexNumber, 647, `${species.id} must share dexNumber 647`);
+    assert.equal(species.rarity, "legendary", `${species.id} must be rarity "legendary"`);
+  }
+});
+
+test("Keldeo Resolute Form has the required fields (dexNumber 647, formOf keldeo, formLabel Resolute Form, rarity legendary)", () => {
+  const resolute = POKEMON_DATA.find((species) => species.id === "keldeo-resolute");
+  assert.ok(resolute, "keldeo-resolute must exist in the catalog");
+  assert.equal(resolute!.dexNumber, 647);
+  assert.equal(resolute!.formOf, "keldeo");
+  assert.equal(resolute!.formLabel, "Resolute Form");
+  assert.equal(resolute!.rarity, "legendary");
+});
+
+test("Keldeo form sprite ids resolve to the real on-disk sprite filenames (0647/0647R)", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  assert.equal(byId.get("keldeo")!.spriteId, undefined, "keldeo (Ordinary Form) has no override — resolves via dexNumber to 0647");
+  assert.equal(byId.get("keldeo-resolute")!.spriteId, "0647R");
+});
+
+test("Hoopa has exactly two internal form entries (Confined + Unbound), both sharing dexNumber 720", () => {
+  const hoopaGroup = POKEMON_DATA.filter((species) => species.id === "hoopa" || species.formOf === "hoopa");
+
+  assert.deepEqual(
+    hoopaGroup.map((species) => species.id).sort(),
+    ["hoopa", "hoopa-unbound"]
+  );
+  for (const species of hoopaGroup) {
+    assert.equal(species.dexNumber, 720, `${species.id} must share dexNumber 720`);
+    assert.equal(species.rarity, "legendary", `${species.id} must be rarity "legendary"`);
+  }
+});
+
+test("Hoopa Unbound Form has the required fields (dexNumber 720, formOf hoopa, formLabel Unbound Form, rarity legendary)", () => {
+  const unbound = POKEMON_DATA.find((species) => species.id === "hoopa-unbound");
+  assert.ok(unbound, "hoopa-unbound must exist in the catalog");
+  assert.equal(unbound!.dexNumber, 720);
+  assert.equal(unbound!.formOf, "hoopa");
+  assert.equal(unbound!.formLabel, "Unbound Form");
+  assert.equal(unbound!.rarity, "legendary");
+});
+
+test("Hoopa Confined is Psychic/Ghost and Hoopa Unbound is Psychic/Dark (distinct typing per form)", () => {
+  const confined = POKEMON_DATA.find((species) => species.id === "hoopa")!;
+  const unbound = POKEMON_DATA.find((species) => species.id === "hoopa-unbound")!;
+
+  assert.deepEqual(confined.types, ["psychic", "ghost"]);
+  assert.deepEqual(unbound.types, ["psychic", "dark"]);
+});
+
+test("Hoopa Unbound uses distinct base stats from Hoopa Confined (never a blind copy)", () => {
+  const confined = POKEMON_DATA.find((species) => species.id === "hoopa")!;
+  const unbound = POKEMON_DATA.find((species) => species.id === "hoopa-unbound")!;
+
+  assert.notDeepEqual(unbound.baseStats, confined.baseStats);
+});
+
+test("Hoopa form sprite ids resolve to the real on-disk sprite filenames (0720/0720U)", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  assert.equal(byId.get("hoopa")!.spriteId, undefined, "hoopa (Confined Form) has no override — resolves via dexNumber to 0720");
+  assert.equal(byId.get("hoopa-unbound")!.spriteId, "0720U");
+});
+
+test("Xerneas, Yveltal, Zygarde, Diancie, and Volcanion are single-entry (no alternate forms implemented for them in this phase)", () => {
+  for (const id of ["xerneas", "yveltal", "zygarde", "diancie", "volcanion"]) {
+    const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
+    assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
+  }
+});
+
+test("no unapproved Kalos form groups exist (Aegislash, Pumpkaboo, Gourgeist, Vivillon, Flabébé/Floette/Florges, and Xerneas Active Mode are all deliberately single-entry)", () => {
+  for (const id of ["aegislash", "pumpkaboo", "gourgeist", "vivillon", "flabebe", "floette", "florges"]) {
     const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
     assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
   }
@@ -377,19 +504,19 @@ test("Basculin, Deerling, Sawsbuck, Darmanitan, and Genesect have no alternate-f
   }
 });
 
-test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, and Meloetta", () => {
+test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, and Hoopa", () => {
   const formGroupBases = new Set(
     POKEMON_DATA.filter((species) => species.formOf !== undefined).map((species) => species.formOf)
   );
   assert.deepEqual(
     [...formGroupBases].sort(),
-    ["deoxys", "giratina", "kyurem", "landorus", "meloetta", "rotom", "thundurus", "tornadus"]
+    ["deoxys", "giratina", "hoopa", "keldeo", "kyurem", "landorus", "meloetta", "rotom", "thundurus", "tornadus"]
   );
 });
 
-test("exactly 15 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Meloetta)", () => {
+test("exactly 17 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa)", () => {
   const formRows = POKEMON_DATA.filter((species) => species.formOf !== undefined);
-  assert.equal(formRows.length, 15);
+  assert.equal(formRows.length, 17);
 });
 
 test("no Hoenn starter-line species (Treecko/Torchic/Mudkip lines) is marked isStarter", () => {
@@ -437,6 +564,21 @@ test("no Unova starter-line species (Snivy/Tepig/Oshawott lines) is marked isSta
   }
 });
 
+test("no Kalos starter-line species (Chespin/Fennekin/Froakie lines) is marked isStarter", () => {
+  const kalosStarterLineIds = [
+    "chespin", "quilladin", "chesnaught",
+    "fennekin", "braixen", "delphox",
+    "froakie", "frogadier", "greninja",
+  ];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of kalosStarterLineIds) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.notEqual(species!.isStarter, true, `${id} must not be an onboarding starter`);
+  }
+});
+
 test("onboarding starters remain exactly Bulbasaur/Charmander/Squirtle", () => {
   const starterIds = POKEMON_DATA.filter((species) => species.isStarter)
     .map((species) => species.id)
@@ -457,6 +599,42 @@ test("Unova's starter trio and pseudo-legendary line are all very-rare at every 
     const species = byId.get(id);
     assert.ok(species, `expected ${id} to exist in the catalog`);
     assert.equal(species!.rarity, "very-rare", `${id} must be rarity "very-rare"`);
+  }
+});
+
+test("Unova Update rarity pass: Zorua, Zoroark, Larvesta, and Volcarona are now real very-rare (a direct rarity reassignment, not an evolution-item override)", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of ["zorua", "zoroark", "larvesta", "volcarona"]) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "very-rare", `${id} must be rarity "very-rare"`);
+  }
+});
+
+test("Kalos's starter trio and pseudo-legendary line are all very-rare at every evolution stage", () => {
+  const veryRareLineIds = [
+    "chespin", "quilladin", "chesnaught",
+    "fennekin", "braixen", "delphox",
+    "froakie", "frogadier", "greninja",
+    "goomy", "sliggoo", "goodra",
+  ];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of veryRareLineIds) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "very-rare", `${id} must be rarity "very-rare"`);
+  }
+});
+
+test("Kalos's legendary/mythical species (Xerneas, Yveltal, Zygarde, Diancie, Hoopa incl. Unbound, Volcanion) are all real legendary", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of ["xerneas", "yveltal", "zygarde", "diancie", "hoopa", "hoopa-unbound", "volcanion"]) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "legendary", `${id} must be rarity "legendary"`);
   }
 });
 

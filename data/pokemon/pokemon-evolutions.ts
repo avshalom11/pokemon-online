@@ -534,6 +534,95 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   deino: { evolvesToSpeciesId: "zweilous", requiredLevel: 50 },
   zweilous: { evolvesToSpeciesId: "hydreigon", requiredLevel: 64 },
   larvesta: { evolvesToSpeciesId: "volcarona", requiredLevel: 59 },
+
+  // Generation VI (Kalos, Phase 2) — same "unconditional level-up only"
+  // scope as every generation above, plus this phase's own explicit
+  // simplification rules for the official Kalos mechanics this project
+  // doesn't implement:
+  //   - Party composition (Pancham -> Pangoro requires another Dark-type
+  //     Pokémon in the party) is dropped; Pancham's own real canonical
+  //     level (32) is kept as a plain level evolution, no party check.
+  //   - Device orientation (Inkay -> Malamar requires leveling up while the
+  //     console is held upside down) is dropped; Inkay's own real
+  //     canonical level (30) is kept as a plain level evolution.
+  //   - Weather (Sliggoo -> Goodra requires leveling up in rain) is
+  //     dropped; Sliggoo's own real canonical level (50) is kept as a
+  //     plain level evolution — same "keep the real number, drop the
+  //     unsupported condition" rule Feebas/Tyrunt/Amaura already follow.
+  //   - Trade (Phantump -> Trevenant, Pumpkaboo -> Gourgeist) becomes a
+  //     normal level evolution — same "former Trade, now level" precedent
+  //     Kadabra/Machoke/Graveler/Haunter (Generation I) and
+  //     Gurdurr/Boldore/Karrablast/Shelmet (Generation V) already
+  //     established. Neither Phantump nor Pumpkaboo has a pre-evolution of
+  //     its own, so level 35 is a safe, collision-free standalone
+  //     threshold for both, same shape as Karrablast/Shelmet -> 35 above.
+  //   - Time-of-day (Tyrunt -> Tyrantrum requires night, Amaura -> Aurorus
+  //     requires day) is dropped; both keep their real canonical level (39).
+  //   - Real Stone evolutions (Floette -> Florges, Doublade -> Aegislash,
+  //     Helioptile -> Heliolisk) and the Trade-with-held-item evolutions
+  //     simplified per this phase's own explicit spec (Eevee -> Sylveon,
+  //     Spritzee -> Aromatisse, Swirlix -> Slurpuff, all Shiny Stone) keep
+  //     their real-game item methods — see EVOLUTION_ITEM_EVOLUTIONS below,
+  //     never this table, same "Stone-based evolution stays Stone-based"
+  //     rule every prior generation already established.
+  //   - Goomy/Sliggoo/Goodra is Kalos's own pseudo-legendary line (same
+  //     "very-rare at every stage" rarity precedent as Dratini/Larvitar/
+  //     Bagon/Beldum/Gible/Deino) — a plain three-stage level chain.
+  //   - Legendary/mythical species (Xerneas, Yveltal, Zygarde, Diancie,
+  //     Hoopa incl. Unbound Form, Volcanion) and every genuinely standalone
+  //     non-evolving species (Furfrou, Hawlucha, Dedenne, Carbink, Klefki)
+  //     are all deliberately absent here — none of them evolve. Hoopa
+  //     Unbound is a Form (features/pokemon/forms), never an evolution
+  //     target — no "hoopa -> hoopa-unbound" entry exists in any table in
+  //     this file.
+  chespin: { evolvesToSpeciesId: "quilladin", requiredLevel: 16 },
+  quilladin: { evolvesToSpeciesId: "chesnaught", requiredLevel: 36 },
+  fennekin: { evolvesToSpeciesId: "braixen", requiredLevel: 16 },
+  braixen: { evolvesToSpeciesId: "delphox", requiredLevel: 36 },
+  froakie: { evolvesToSpeciesId: "frogadier", requiredLevel: 16 },
+  frogadier: { evolvesToSpeciesId: "greninja", requiredLevel: 36 },
+  bunnelby: { evolvesToSpeciesId: "diggersby", requiredLevel: 20 },
+  fletchling: { evolvesToSpeciesId: "fletchinder", requiredLevel: 17 },
+  fletchinder: { evolvesToSpeciesId: "talonflame", requiredLevel: 35 },
+  scatterbug: { evolvesToSpeciesId: "spewpa", requiredLevel: 9 },
+  spewpa: { evolvesToSpeciesId: "vivillon", requiredLevel: 12 },
+  litleo: { evolvesToSpeciesId: "pyroar", requiredLevel: 35 },
+  flabebe: { evolvesToSpeciesId: "floette", requiredLevel: 19 },
+  // floette -> florges is Shiny Stone, not level — see EVOLUTION_ITEM_EVOLUTIONS.
+  skiddo: { evolvesToSpeciesId: "gogoat", requiredLevel: 32 },
+  // Pancham -> Pangoro: former party-composition (another Dark-type
+  // required) evolution, now a plain level evolution — see this block's
+  // own top note.
+  pancham: { evolvesToSpeciesId: "pangoro", requiredLevel: 32 },
+  espurr: { evolvesToSpeciesId: "meowstic", requiredLevel: 25 },
+  honedge: { evolvesToSpeciesId: "doublade", requiredLevel: 35 },
+  // doublade -> aegislash is Dusk Stone, not level — see EVOLUTION_ITEM_EVOLUTIONS.
+  // Inkay -> Malamar: former device-orientation (upside-down) evolution,
+  // now a plain level evolution — see this block's own top note.
+  inkay: { evolvesToSpeciesId: "malamar", requiredLevel: 30 },
+  binacle: { evolvesToSpeciesId: "barbaracle", requiredLevel: 39 },
+  skrelp: { evolvesToSpeciesId: "dragalge", requiredLevel: 48 },
+  clauncher: { evolvesToSpeciesId: "clawitzer", requiredLevel: 37 },
+  // Tyrunt -> Tyrantrum: former time-of-day (night) evolution, now a plain
+  // level evolution at its real canonical level — see this block's own top
+  // note.
+  tyrunt: { evolvesToSpeciesId: "tyrantrum", requiredLevel: 39 },
+  // Amaura -> Aurorus: former time-of-day (day) evolution, now a plain
+  // level evolution at its real canonical level — see this block's own top
+  // note.
+  amaura: { evolvesToSpeciesId: "aurorus", requiredLevel: 39 },
+  goomy: { evolvesToSpeciesId: "sliggoo", requiredLevel: 40 },
+  // Sliggoo -> Goodra: former weather (rain) evolution, now a plain level
+  // evolution at its real canonical level — see this block's own top note.
+  sliggoo: { evolvesToSpeciesId: "goodra", requiredLevel: 50 },
+  // Phantump -> Trevenant: former Trade evolution, now level 35 — see this
+  // block's own top note.
+  phantump: { evolvesToSpeciesId: "trevenant", requiredLevel: 35 },
+  // Pumpkaboo -> Gourgeist: former Trade evolution, now level 35 — see this
+  // block's own top note.
+  pumpkaboo: { evolvesToSpeciesId: "gourgeist", requiredLevel: 35 },
+  bergmite: { evolvesToSpeciesId: "avalugg", requiredLevel: 37 },
+  noibat: { evolvesToSpeciesId: "noivern", requiredLevel: 48 },
 };
 
 // The one place a species' level-evolution target/threshold is ever looked
@@ -657,6 +746,18 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
     // EvolutionItemId's own doc comment).
     { method: "evolution-item", evolvesToSpeciesId: "leafeon", itemId: "leaf-stone" },
     { method: "evolution-item", evolvesToSpeciesId: "glaceon", itemId: "ice-stone" },
+    // Generation VI (Kalos, Phase 2) — Sylveon's real-game evolution method
+    // is affection (Pokémon-Amie/friendship past a threshold) while knowing
+    // a Fairy-type move, neither of which this project implements. Same
+    // "former unsupported mechanic, now direct item use" precedent as
+    // Leafeon/Glaceon just above — Shiny Stone is reused (already used by
+    // Roselia -> Roserade and Togetic -> Togekiss) rather than introducing
+    // a new product, and Sylveon is deliberately NOT added to the
+    // Espeon/Umbreon level-16 BRANCH below (an item evolution and a level
+    // branch are two independent, coexisting methods for the same species,
+    // same "one species, multiple methods" shape Slowpoke/Kirlia/Snorunt
+    // already establish).
+    { method: "evolution-item", evolvesToSpeciesId: "sylveon", itemId: "shiny-stone" },
     // Eevee's remaining two Generation II forms (Espeon/Umbreon) are a
     // player-chosen level-16 BRANCH, not an item — see BRANCH_EVOLUTIONS
     // below, never this table.
@@ -792,6 +893,39 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // above) is untouched, same "mutually exclusive per species" rule as
   // Eelektrik above.
   lampent: [{ method: "evolution-item", evolvesToSpeciesId: "chandelure", itemId: "dusk-stone" }],
+
+  // Generation VI (Kalos, Phase 2) — every one of these is either a
+  // real-game Stone evolution kept as-is, or a former Trade-with-held-item
+  // evolution simplified onto Shiny Stone per this phase's own explicit
+  // spec (see LEVEL_EVOLUTIONS's own Kalos block note above for the full
+  // rationale) — every itemId used here is one of the 16 EvolutionItemId
+  // values already in this catalog; no new evolution item is introduced
+  // for Kalos.
+  // Floette (Kalos, #670) -> Florges: real-game Shiny Stone evolution —
+  // Floette's own pre-existing level evolution FROM Flabébé (LEVEL_EVOLUTIONS
+  // above) is untouched, same "mutually exclusive per species" rule as
+  // Eelektrik/Lampent above.
+  floette: [{ method: "evolution-item", evolvesToSpeciesId: "florges", itemId: "shiny-stone" }],
+  // Doublade (Kalos, #680) -> Aegislash: real-game Dusk Stone evolution —
+  // Doublade's own pre-existing level evolution FROM Honedge (LEVEL_EVOLUTIONS
+  // above) is untouched.
+  doublade: [{ method: "evolution-item", evolvesToSpeciesId: "aegislash", itemId: "dusk-stone" }],
+  // Spritzee (Kalos, #682) -> Aromatisse: former Trade-while-holding-Sachet
+  // evolution — simplified onto Shiny Stone (Sachet was never one of the
+  // 16 kept Evolution Items, same "remap onto a shared existing product"
+  // rule Electirizer/Magmarizer/Razor Claw/Razor Fang/Dubious Disc/Deep Sea
+  // Tooth/Deep Sea Scale/Oval Stone already followed in the Evolution Item
+  // Cleanup phase).
+  spritzee: [{ method: "evolution-item", evolvesToSpeciesId: "aromatisse", itemId: "shiny-stone" }],
+  // Swirlix (Kalos, #684) -> Slurpuff: former
+  // Trade-while-holding-Whipped-Dream evolution — same remap rule as
+  // Spritzee above, also onto Shiny Stone.
+  swirlix: [{ method: "evolution-item", evolvesToSpeciesId: "slurpuff", itemId: "shiny-stone" }],
+  // Helioptile (Kalos, #694) -> Heliolisk: uses Thunder Stone in this
+  // project (design correction — not the real-game Sun Stone method),
+  // reusing an existing catalog item, same as every other evolution-item
+  // mapping in this file.
+  helioptile: [{ method: "evolution-item", evolvesToSpeciesId: "heliolisk", itemId: "thunder-stone" }],
 };
 
 // Every evolution-item branch a species has, regardless of which item —

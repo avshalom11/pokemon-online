@@ -236,6 +236,62 @@ test("getFormLabel resolves real Kyurem form labels", () => {
   assert.equal(getFormLabel(getSpeciesById("kyurem-white")!), "White Kyurem");
 });
 
+// Keldeo (Generation 5/Unova) gets exactly one alternate form (Resolute) —
+// added in the Unova Update phase, same shape as Giratina/Therian forms
+// above.
+test("Keldeo (base/Ordinary Form) has forms; its Resolute Form is recognized as an alternate form", () => {
+  const keldeo = getSpeciesById("keldeo")!;
+  assert.equal(hasForms(keldeo), true);
+  assert.equal(isAlternateForm(keldeo), false);
+
+  const resolute = getSpeciesById("keldeo-resolute")!;
+  assert.equal(isAlternateForm(resolute), true);
+  assert.equal(hasForms(resolute), false, "an alternate form itself never reports hasForms — only the base does");
+});
+
+test("getFormEntries returns both Keldeo forms, base first, starting from either the base or the sibling", () => {
+  const expectedIds = ["keldeo", "keldeo-resolute"];
+
+  const fromBase = getFormEntries(getSpeciesById("keldeo")!);
+  assert.deepEqual(fromBase.map((species) => species.id), expectedIds);
+
+  const fromSibling = getFormEntries(getSpeciesById("keldeo-resolute")!);
+  assert.deepEqual(fromSibling.map((species) => species.id), expectedIds);
+});
+
+test("getFormLabel resolves real Keldeo form labels", () => {
+  assert.equal(getFormLabel(getSpeciesById("keldeo")!), "Keldeo", "the base form has no formLabel set — falls back to its name");
+  assert.equal(getFormLabel(getSpeciesById("keldeo-resolute")!), "Resolute Form");
+});
+
+// Hoopa (Generation 6/Kalos) gets exactly one alternate form (Unbound) —
+// added in the Kalos Phase 1 species catalog, same shape as Giratina/
+// Therian/Keldeo forms above.
+test("Hoopa (base/Confined Form) has forms; its Unbound Form is recognized as an alternate form", () => {
+  const hoopa = getSpeciesById("hoopa")!;
+  assert.equal(hasForms(hoopa), true);
+  assert.equal(isAlternateForm(hoopa), false);
+
+  const unbound = getSpeciesById("hoopa-unbound")!;
+  assert.equal(isAlternateForm(unbound), true);
+  assert.equal(hasForms(unbound), false, "an alternate form itself never reports hasForms — only the base does");
+});
+
+test("getFormEntries returns both Hoopa forms, base first, starting from either the base or the sibling", () => {
+  const expectedIds = ["hoopa", "hoopa-unbound"];
+
+  const fromBase = getFormEntries(getSpeciesById("hoopa")!);
+  assert.deepEqual(fromBase.map((species) => species.id), expectedIds);
+
+  const fromSibling = getFormEntries(getSpeciesById("hoopa-unbound")!);
+  assert.deepEqual(fromSibling.map((species) => species.id), expectedIds);
+});
+
+test("getFormLabel resolves real Hoopa form labels", () => {
+  assert.equal(getFormLabel(getSpeciesById("hoopa")!), "Hoopa", "the base form has no formLabel set — falls back to its name");
+  assert.equal(getFormLabel(getSpeciesById("hoopa-unbound")!), "Unbound Form");
+});
+
 // Meloetta (Generation 5/Unova) gets exactly one alternate form (Pirouette)
 // — same shape as Giratina/Therian forms above.
 test("Meloetta (base/Aria Forme) has forms; its Pirouette Forme is recognized as an alternate form", () => {

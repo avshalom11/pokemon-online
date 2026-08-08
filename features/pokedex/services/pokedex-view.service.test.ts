@@ -109,3 +109,20 @@ test("Rotom groups under exactly one Pokédex row (#479) with all six forms list
     ["rotom", "rotom-fan", "rotom-frost", "rotom-heat", "rotom-mow", "rotom-wash"]
   );
 });
+
+test("Hoopa (Kalos, Generation 6) groups under exactly one Pokédex row (#720) with both forms listed; Volcanion remains its own separate #721 row", async () => {
+  const view = await getPokedexView("owner-1");
+  const hoopaRows = view.filter((entry) => entry.species.dexNumber === 720);
+
+  assert.equal(hoopaRows.length, 1, "Hoopa must appear as exactly one Pokédex row");
+  assert.equal(hoopaRows[0]!.species.id, "hoopa");
+  assert.deepEqual(
+    hoopaRows[0]!.forms.map((form) => form.species.id).sort(),
+    ["hoopa", "hoopa-unbound"]
+  );
+
+  const volcanionRows = view.filter((entry) => entry.species.dexNumber === 721);
+  assert.equal(volcanionRows.length, 1, "Volcanion must appear as its own separate Pokédex row");
+  assert.equal(volcanionRows[0]!.species.id, "volcanion");
+  assert.deepEqual(volcanionRows[0]!.forms.map((form) => form.species.id), ["volcanion"]);
+});

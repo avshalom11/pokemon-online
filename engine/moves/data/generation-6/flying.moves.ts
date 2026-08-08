@@ -1,0 +1,38 @@
+import type { Move } from "../../types/move.types.ts";
+
+export const GENERATION_6_FLYING_MOVES: Move[] = [
+  {
+    id: "oblivion-wing",
+    name: "Oblivion Wing",
+    generation: 6,
+    introducedGeneration: 6,
+    description: "The user absorbs its target's HP. The user's HP is restored by over half of the damage dealt to the target.",
+    type: "flying",
+    category: "special",
+    power: 80,
+    accuracy: 100,
+    maxPp: 10,
+    priority: 0,
+    target: "opponent",
+    effect: { kind: "drain", drainPercent: 75 },
+    flags: ["protectable", "mirrorMove"],
+    implementationStatus: "data-only",
+  },
+  {
+    id: "dragon-ascent",
+    name: "Dragon Ascent",
+    generation: 6,
+    introducedGeneration: 6,
+    description: "After soaring upward, the user attacks its target by dropping out of the sky at high speeds. This also lowers the user's own Defense and Special Defense.",
+    type: "flying",
+    category: "physical",
+    power: 120,
+    accuracy: 100,
+    maxPp: 5,
+    priority: 0,
+    target: "opponent",
+    effect: { kind: "damage-with-stat-change-chance", changes: [{ stat: "defense", stages: -1 }, { stat: "specialDefense", stages: -1 }], chancePercent: 100 },
+    flags: ["makesContact", "protectable", "mirrorMove"],
+    implementationStatus: "data-only",
+  },
+];

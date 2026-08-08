@@ -1,0 +1,38 @@
+import type { Move } from "../../types/move.types.ts";
+
+export const GENERATION_6_GHOST_MOVES: Move[] = [
+  {
+    id: "phantom-force",
+    name: "Phantom Force",
+    generation: 6,
+    introducedGeneration: 6,
+    description: "The user vanishes somewhere, then strikes the target on the second turn, bypassing Protect and Detect — reuses the existing charge-shaped (two-turn, invulnerable) simplification Shadow Force already established.",
+    type: "ghost",
+    category: "physical",
+    power: 90,
+    accuracy: 100,
+    maxPp: 10,
+    priority: 0,
+    target: "opponent",
+    effect: { kind: "charge", invulnerable: true },
+    flags: ["makesContact", "mirrorMove"],
+    implementationStatus: "data-only",
+  },
+  {
+    id: "trick-or-treat",
+    name: "Trick-or-Treat",
+    generation: 6,
+    introducedGeneration: 6,
+    description: "The user takes the target trick-or-treating, adding Ghost type to the target's own type(s) — a type-addition mechanic this project doesn't model; registered as a no-op, same simplification as Forest's Curse.",
+    type: "ghost",
+    category: "status",
+    power: null,
+    accuracy: 100,
+    maxPp: 20,
+    priority: 0,
+    target: "opponent",
+    effect: { kind: "no-effect" },
+    flags: ["protectable", "mirrorMove"],
+    implementationStatus: "data-only",
+  },
+];
