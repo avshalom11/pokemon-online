@@ -32,10 +32,12 @@ test("the real registry loads the full learnset database (every generation) with
   // Tornadus/Thundurus/Landorus Therian, Kyurem Black/White, Keldeo
   // Resolute, Meloetta Pirouette) + 73 Generation 6 learnsets (Kalos Moves &
   // Learnsets Phase 3 — 72 Kalos base species + 1 alternate form: Hoopa
-  // Unbound) = 738. Update this number deliberately whenever a new
+  // Unbound) + 108 Generation 7 learnsets (Alola Moves & Learnsets Phase 3
+  // — 88 Alola base species + 18 Alolan Forms + 2 Lycanroc alternate
+  // forms) = 846. Update this number deliberately whenever a new
   // generation's learnset data is registered — see
   // engine/learnsets/data/index.ts.
-  assert.equal(getAllLearnsets().length, 738);
+  assert.equal(getAllLearnsets().length, 846);
 });
 
 test("getLearnsetByPokemonId finds a real Generation 1 Pokémon's learnset by its permanent id", () => {

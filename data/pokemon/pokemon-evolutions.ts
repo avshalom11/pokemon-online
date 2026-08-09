@@ -94,7 +94,13 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   drowzee: { evolvesToSpeciesId: "hypno", requiredLevel: 26 },
   krabby: { evolvesToSpeciesId: "kingler", requiredLevel: 28 },
   voltorb: { evolvesToSpeciesId: "electrode", requiredLevel: 30 },
-  cubone: { evolvesToSpeciesId: "marowak", requiredLevel: 28 },
+  // Cubone -> Marowak used to be a plain single-target level-28 evolution
+  // here. Generation VII (Alola, Phase 2) migrated it to BRANCH_EVOLUTIONS
+  // below instead (Cubone now explicitly branches into Marowak OR Alolan
+  // Marowak, both at the same preserved level 28) — see this file's own
+  // Alola Phase 2 comment block further down for the full rationale. Kept
+  // OUT of this table so the two tables never disagree about Cubone's
+  // evolution method.
   koffing: { evolvesToSpeciesId: "weezing", requiredLevel: 35 },
   rhyhorn: { evolvesToSpeciesId: "rhydon", requiredLevel: 42 },
   horsea: { evolvesToSpeciesId: "seadra", requiredLevel: 32 },
@@ -623,6 +629,107 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   pumpkaboo: { evolvesToSpeciesId: "gourgeist", requiredLevel: 35 },
   bergmite: { evolvesToSpeciesId: "avalugg", requiredLevel: 37 },
   noibat: { evolvesToSpeciesId: "noivern", requiredLevel: 48 },
+
+  // Generation VII (Alola, Phase 2) — same "unconditional level-up only"
+  // scope as every generation above, plus this phase's own explicit
+  // simplification rules for the official Alola mechanics this project
+  // doesn't implement:
+  //   - Location (Charjabug -> Vikavolt, "level up at Vast Poni Canyon") is
+  //     dropped in favor of a direct Thunder Stone use instead — see
+  //     EVOLUTION_ITEM_EVOLUTIONS below, never this table (Vikavolt is
+  //     Electric-type and Thunder Stone already exists in the catalog, so
+  //     no new evolution item is introduced).
+  //   - Location (Crabrawler -> Crabominable, "level up at Mount Lanakila")
+  //     is dropped; a plain level-35 evolution is used instead (this
+  //     phase's own explicit spec).
+  //   - Gender (Salandit -> Salazzle, female only) is dropped; any owned
+  //     Salandit may evolve, at the real canonical level 33.
+  //   - Move-Known (Steenee -> Tsareena/Stomp, Poipole -> Naganadel/Dragon
+  //     Pulse) is dropped; both keep this phase's own assigned level (29
+  //     and 40 respectively) without checking known moves.
+  //   - Friendship (Type: Null -> Silvally) is dropped; a plain level-40
+  //     evolution is used instead (this phase's own explicit spec).
+  //   - Pokémon GO Candy (Meltan -> Melmetal, 400 Meltan Candy in the real
+  //     mechanic) is dropped entirely — no candy/currency/item requirement
+  //     of any kind; a plain level-40 evolution is used instead (this
+  //     phase's own explicit spec).
+  //   - Rockruff (-> Lycanroc) and Cubone (-> Marowak) are NOT here —
+  //     Rockruff's real-game day/night/Own-Tempo three-way split and
+  //     Cubone's new Alolan-Form second target are both explicit
+  //     player-chosen BRANCH_EVOLUTIONS instead — see below, never this
+  //     table. Cosmoem's real-game version-exclusive Solgaleo/Lunala split
+  //     is the same shape — also BRANCH_EVOLUTIONS, never this table.
+  //   - Alolan Forms (regional variants of Kanto species, generation-7-
+  //     pokemon-data.ts) get their own level evolutions here wherever the
+  //     real games use level: rattata-alola/diglett-alola/geodude-alola/
+  //     graveler-alola/grimer-alola all mirror their Kantonian line's own
+  //     level (dropping only the unsupported night/location condition
+  //     where one existed), and meowth-alola mirrors ordinary Meowth's own
+  //     level 28 (dropping the real-game Friendship condition, same
+  //     Friendship-simplification rule as every prior generation). Alolan
+  //     Sandshrew/Vulpix (-> Ice Stone) are NOT here — see
+  //     EVOLUTION_ITEM_EVOLUTIONS below.
+  rowlet: { evolvesToSpeciesId: "dartrix", requiredLevel: 17 },
+  dartrix: { evolvesToSpeciesId: "decidueye", requiredLevel: 34 },
+  litten: { evolvesToSpeciesId: "torracat", requiredLevel: 17 },
+  torracat: { evolvesToSpeciesId: "incineroar", requiredLevel: 34 },
+  popplio: { evolvesToSpeciesId: "brionne", requiredLevel: 17 },
+  brionne: { evolvesToSpeciesId: "primarina", requiredLevel: 34 },
+  pikipek: { evolvesToSpeciesId: "trumbeak", requiredLevel: 14 },
+  trumbeak: { evolvesToSpeciesId: "toucannon", requiredLevel: 28 },
+  yungoos: { evolvesToSpeciesId: "gumshoos", requiredLevel: 20 },
+  grubbin: { evolvesToSpeciesId: "charjabug", requiredLevel: 20 },
+  // Crabrawler -> Crabominable: former Location (Mount Lanakila) evolution,
+  // now a plain level evolution — see this block's own top note.
+  crabrawler: { evolvesToSpeciesId: "crabominable", requiredLevel: 35 },
+  cutiefly: { evolvesToSpeciesId: "ribombee", requiredLevel: 25 },
+  mareanie: { evolvesToSpeciesId: "toxapex", requiredLevel: 38 },
+  mudbray: { evolvesToSpeciesId: "mudsdale", requiredLevel: 30 },
+  dewpider: { evolvesToSpeciesId: "araquanid", requiredLevel: 22 },
+  fomantis: { evolvesToSpeciesId: "lurantis", requiredLevel: 34 },
+  morelull: { evolvesToSpeciesId: "shiinotic", requiredLevel: 24 },
+  // Salandit -> Salazzle: former Gender-restricted (female only) evolution,
+  // now a plain level evolution at its real canonical level — see this
+  // block's own top note.
+  salandit: { evolvesToSpeciesId: "salazzle", requiredLevel: 33 },
+  stufful: { evolvesToSpeciesId: "bewear", requiredLevel: 27 },
+  bounsweet: { evolvesToSpeciesId: "steenee", requiredLevel: 18 },
+  // Steenee -> Tsareena: former Move-Known (Stomp) evolution, now a plain
+  // level evolution at this phase's own assigned level — see this block's
+  // own top note.
+  steenee: { evolvesToSpeciesId: "tsareena", requiredLevel: 29 },
+  wimpod: { evolvesToSpeciesId: "golisopod", requiredLevel: 30 },
+  sandygast: { evolvesToSpeciesId: "palossand", requiredLevel: 34 },
+  // Type: Null -> Silvally: former Friendship evolution, now a plain
+  // level-40 evolution — see this block's own top note.
+  "type-null": { evolvesToSpeciesId: "silvally", requiredLevel: 40 },
+  "jangmo-o": { evolvesToSpeciesId: "hakamo-o", requiredLevel: 35 },
+  "hakamo-o": { evolvesToSpeciesId: "kommo-o", requiredLevel: 45 },
+  cosmog: { evolvesToSpeciesId: "cosmoem", requiredLevel: 43 },
+  // Poipole -> Naganadel: former Move-Known (Dragon Pulse) evolution, now a
+  // plain level evolution at this phase's own assigned level — see this
+  // block's own top note.
+  poipole: { evolvesToSpeciesId: "naganadel", requiredLevel: 40 },
+  // Meltan -> Melmetal: former Pokémon GO Candy evolution, now a plain
+  // level evolution with no candy/currency/item requirement of any kind —
+  // see this block's own top note.
+  meltan: { evolvesToSpeciesId: "melmetal", requiredLevel: 40 },
+
+  // Alolan Forms — regional variants of Kanto species (bases in
+  // generation-1-pokemon-data.ts). See this block's own top note.
+  "rattata-alola": { evolvesToSpeciesId: "raticate-alola", requiredLevel: 20 },
+  "diglett-alola": { evolvesToSpeciesId: "dugtrio-alola", requiredLevel: 26 },
+  // Alolan Meowth -> Alolan Persian: former Friendship evolution, now a
+  // plain level evolution mirroring ordinary Meowth's own level 28 — see
+  // this block's own top note.
+  "meowth-alola": { evolvesToSpeciesId: "persian-alola", requiredLevel: 28 },
+  "geodude-alola": { evolvesToSpeciesId: "graveler-alola", requiredLevel: 25 },
+  // Alolan Graveler -> Alolan Golem: same former-Trade simplification this
+  // table already applies to the Kantonian line (graveler -> golem @36,
+  // above in the Generation I block) — reused verbatim rather than
+  // inventing a different Trade replacement just for Alola.
+  "graveler-alola": { evolvesToSpeciesId: "golem-alola", requiredLevel: 36 },
+  "grimer-alola": { evolvesToSpeciesId: "muk-alola", requiredLevel: 38 },
 };
 
 // The one place a species' level-evolution target/threshold is ever looked
@@ -720,7 +827,17 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   ],
   shellder: [{ method: "evolution-item", evolvesToSpeciesId: "cloyster", itemId: "water-stone" }],
   staryu: [{ method: "evolution-item", evolvesToSpeciesId: "starmie", itemId: "water-stone" }],
-  pikachu: [{ method: "evolution-item", evolvesToSpeciesId: "raichu", itemId: "thunder-stone" }],
+  pikachu: [
+    { method: "evolution-item", evolvesToSpeciesId: "raichu", itemId: "thunder-stone" },
+    // Generation VII (Alola, Phase 2) — Alolan Raichu is reachable through
+    // the exact same Thunder Stone, a second entry sharing pikachu's
+    // existing thunder-stone itemId — same "two entries, same itemId, is a
+    // genuine player-choice BRANCH" shape Clamperl's Water Stone already
+    // established (see clamperl below). The player explicitly picks
+    // Raichu or Alolan Raichu; nothing about the player's current region is
+    // ever consulted.
+    { method: "evolution-item", evolvesToSpeciesId: "raichu-alola", itemId: "thunder-stone" },
+  ],
   gloom: [
     { method: "evolution-item", evolvesToSpeciesId: "vileplume", itemId: "leaf-stone" },
     // Generation II (Phase 2) — Gloom's second, independent stone branch:
@@ -730,7 +847,14 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
     { method: "evolution-item", evolvesToSpeciesId: "bellossom", itemId: "sun-stone" },
   ],
   weepinbell: [{ method: "evolution-item", evolvesToSpeciesId: "victreebel", itemId: "leaf-stone" }],
-  exeggcute: [{ method: "evolution-item", evolvesToSpeciesId: "exeggutor", itemId: "leaf-stone" }],
+  exeggcute: [
+    { method: "evolution-item", evolvesToSpeciesId: "exeggutor", itemId: "leaf-stone" },
+    // Generation VII (Alola, Phase 2) — Alolan Exeggutor is reachable
+    // through the exact same Leaf Stone, same Clamperl-shaped
+    // two-entries-same-itemId branch as Pikachu -> Raichu/Alolan Raichu
+    // above.
+    { method: "evolution-item", evolvesToSpeciesId: "exeggutor-alola", itemId: "leaf-stone" },
+  ],
   eevee: [
     { method: "evolution-item", evolvesToSpeciesId: "flareon", itemId: "fire-stone" },
     { method: "evolution-item", evolvesToSpeciesId: "vaporeon", itemId: "water-stone" },
@@ -926,6 +1050,20 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // reusing an existing catalog item, same as every other evolution-item
   // mapping in this file.
   helioptile: [{ method: "evolution-item", evolvesToSpeciesId: "heliolisk", itemId: "thunder-stone" }],
+
+  // Generation VII (Alola, Phase 2) — Charjabug (Location, "level up at
+  // Vast Poni Canyon" in the real game) now evolves directly from Thunder
+  // Stone instead, reusing the existing item rather than introducing a new
+  // one (Vikavolt is Electric-type, so Thunder Stone is a natural fit) —
+  // Charjabug's own pre-existing level evolution FROM Grubbin
+  // (LEVEL_EVOLUTIONS above) is untouched, same "mutually exclusive per
+  // species" rule Eelektrik/Lampent/Floette/Doublade already follow.
+  charjabug: [{ method: "evolution-item", evolvesToSpeciesId: "vikavolt", itemId: "thunder-stone" }],
+  // Alolan Sandshrew/Vulpix — real-game Ice Stone evolutions, reusing the
+  // same item their Sinnoh-introduced Eevee/Sneasel precedent already put
+  // in this catalog; no new evolution item introduced.
+  "sandshrew-alola": [{ method: "evolution-item", evolvesToSpeciesId: "sandslash-alola", itemId: "ice-stone" }],
+  "vulpix-alola": [{ method: "evolution-item", evolvesToSpeciesId: "ninetales-alola", itemId: "ice-stone" }],
 };
 
 // Every evolution-item branch a species has, regardless of which item —
@@ -1058,6 +1196,41 @@ const BRANCH_EVOLUTIONS: Record<string, BranchEvolution> = {
   // target, resolved through the exact same create-choice/then-confirm flow
   // Eevee/Wurmple already use.
   nincada: { requiredLevel: 20, targets: ["ninjask", "shedinja"] },
+
+  // Generation VII (Alola, Phase 2) — Rockruff's real-game evolution is
+  // decided by a hidden time-of-day/version-exclusive/Own-Tempo-ability
+  // value the player never explicitly picks; none of that is implemented
+  // (and never will be — same "no hidden/random/time-based value" rule
+  // Wurmple/Nincada above already established), so it's an explicit
+  // level-25 player CHOICE between all three real targets instead — the
+  // base/Midday Form entry (lycanroc), Midnight Form (lycanroc-midnight),
+  // and Dusk Form (lycanroc-dusk), all three ALREADY independent species
+  // ids in the catalog (Alola Phase 1's own Forms work, generation-7-
+  // pokemon-data.ts) since a Form is just a different appearance of the
+  // same National Dex entry (#745) — reusing that existing id here is not
+  // a new mechanic, just BRANCH_EVOLUTIONS' first 3-target example (every
+  // prior branch above has exactly 2).
+  rockruff: { requiredLevel: 25, targets: ["lycanroc", "lycanroc-midnight", "lycanroc-dusk"] },
+  // Cosmoem's real-game evolution into Solgaleo or Lunala is decided by
+  // which game version the cartridge is (Sun -> Solgaleo, Moon -> Lunala),
+  // a mechanic this single-build project has no equivalent of — same "no
+  // version-exclusive/day-night/random value" rule as Rockruff above, so
+  // it's an explicit level-53 player CHOICE between both real targets
+  // instead. Cosmog -> Cosmoem itself stays a normal level-43 evolution
+  // (LEVEL_EVOLUTIONS above) — only the second stage is a branch.
+  cosmoem: { requiredLevel: 53, targets: ["solgaleo", "lunala"] },
+  // Cubone's real-game evolution into Marowak is a plain level-28
+  // evolution with no branch at all in the source games; Alola Phase 2
+  // adds Alolan Marowak as a second, equally valid target reachable at the
+  // SAME level, migrated here from LEVEL_EVOLUTIONS (which used to hold
+  // cubone -> marowak @28 as a single-target entry — see that table's own
+  // note at the old cubone key) rather than duplicating a second,
+  // conflicting Cubone evolution definition. The level-28 threshold itself
+  // is unchanged; only the table (and therefore the resolution shape —
+  // single target vs. explicit choice) changed. No night/region/randomness
+  // condition of any kind decides between the two — the player always
+  // explicitly picks.
+  cubone: { requiredLevel: 28, targets: ["marowak", "marowak-alola"] },
 };
 
 // The one place a species' Branch Evolution is ever looked up — mirrors

@@ -1,3 +1,4 @@
+import { ALOLA_MAP_CONFIG } from "@/data/maps/alola-map-config";
 import { HOENN_MAP_CONFIG } from "@/data/maps/hoenn-map-config";
 import { JOHTO_MAP_CONFIG } from "@/data/maps/johto-map-config";
 import { KALOS_MAP_CONFIG } from "@/data/maps/kalos-map-config";
@@ -140,7 +141,28 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // battle-capable.
     mapConfig: KALOS_MAP_CONFIG,
   },
-  alola: { id: "alola", englishName: "Alola", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
+  alola: {
+    id: "alola",
+    englishName: "Alola",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Alola now has real, clickable zones (data/maps/alola-map-config.ts,
+    // manually placed via /dev/alola-map-editor against the real
+    // /images/alola-map.png) — same as Kalos, mapConfig.imageSrc is the
+    // one source for the map image; mapImageSrc is left unset since
+    // mapConfig already covers it (MapContent renders from mapConfig
+    // whenever it's present). Alola is a five-zone region (no Beach) —
+    // alola-map-config.ts's own regions array reflects that; the global
+    // ZoneId type is unaffected.
+    //
+    // Alola now also has real zone encounter data (data/zones/
+    // alola-zone-data.ts, wired through data/zones/zone-data.ts) — the same
+    // "map before encounters" window Hoenn, Sinnoh, Unova, and Kalos already
+    // went through has closed for Alola too; app/(game)/battle/page.tsx's
+    // region gate (getZoneData(regionId).length === 0) now passes and Alola
+    // is battle-capable.
+    mapConfig: ALOLA_MAP_CONFIG,
+  },
   galar: { id: "galar", englishName: "Galar", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
   paldea: { id: "paldea", englishName: "Paldea", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
 };

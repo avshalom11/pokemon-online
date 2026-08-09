@@ -6,12 +6,13 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 
 // Generation 1 (Kanto, #0001-#0151) + Generation 2 (Johto, #0152-#0251) +
 // Generation 3 (Hoenn, #0252-#0386) + Generation 4 (Sinnoh, #0387-#0493) +
-// Generation 5 (Unova, #0494-#0649) + Generation 6 (Kalos, #0650-#0721) —
-// 721 official National Dex entries (one base/headline species row per dex
-// number). Victini (#494) IS part of Unova and IS present (Unova Phase 1's
-// own explicit scope). See engine/learnsets/data/generation-1/
-// generation-1.completeness.test.ts for the same invariant applied to the
-// (still Generation-1-only) learnset database.
+// Generation 5 (Unova, #0494-#0649) + Generation 6 (Kalos, #0650-#0721) +
+// Generation 7 (Alola, #0722-#0809) — 809 official National Dex entries
+// (one base/headline species row per dex number). Victini (#494) IS part
+// of Unova and IS present (Unova Phase 1's own explicit scope). See
+// engine/learnsets/data/generation-1/generation-1.completeness.test.ts for
+// the same invariant applied to the (still Generation-1-only) learnset
+// database.
 //
 // PLUS alternate FORM rows that intentionally share their base's dex
 // number rather than getting their own (see features/pokemon/forms/
@@ -20,17 +21,22 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 // Origin), 1 Tornadus form (dex #641: Therian), 1 Thundurus form (dex
 // #642: Therian), 1 Landorus form (dex #645: Therian), 2 Kyurem forms
 // (dex #646: Black/White), 1 Keldeo form (dex #647: Resolute — added in
-// the Unova Update phase), 1 Meloetta form (dex #648: Pirouette), and 1
+// the Unova Update phase), 1 Meloetta form (dex #648: Pirouette), 1
 // Hoopa form (dex #720: Unbound — added in the Kalos Phase 1 species
-// catalog). That makes two different, both-correct counts:
-//   - EXPECTED_BASE_DEX_COUNT (721): distinct dex numbers / Pokédex rows —
+// catalog), 2 Lycanroc forms (dex #745: Midnight/Dusk — added in the
+// Alola Phase 1 species catalog), and 18 Alolan Forms (regional variants
+// of 18 Kanto species, sharing THEIR bases' dex numbers — #19/#20/#26/
+// #27/#28/#37/#38/#50/#51/#52/#53/#74/#75/#76/#88/#89/#103/#105 — also
+// added in the Alola Phase 1 species catalog). That makes two different,
+// both-correct counts:
+//   - EXPECTED_BASE_DEX_COUNT (809): distinct dex numbers / Pokédex rows —
 //     what "dex numbers cover 1..N with no gaps" and the Pokédex service's
 //     own row count are checked against.
-//   - EXPECTED_TOTAL_SPECIES_COUNT (738): every PokemonSpecies row in
-//     POKEMON_DATA, including all 17 alternate forms — what "every id is
+//   - EXPECTED_TOTAL_SPECIES_COUNT (846): every PokemonSpecies row in
+//     POKEMON_DATA, including all 37 alternate forms — what "every id is
 //     present exactly once" is checked against.
-const EXPECTED_BASE_DEX_COUNT = 721;
-const EXPECTED_TOTAL_SPECIES_COUNT = 738;
+const EXPECTED_BASE_DEX_COUNT = 809;
+const EXPECTED_TOTAL_SPECIES_COUNT = 846;
 
 const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legendary"];
 
@@ -39,12 +45,15 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // 3/Hoenn, extended 2026-08-05 for Generation 4/Sinnoh, revised again for
 // the Sinnoh Rarity Audit approved-design-change pass, extended again for
 // Generation 5/Unova, revised again for the Unova Update rarity pass,
-// extended again for Generation 6/Kalos Phase 1): every species keyed by
-// dexNumber -> its intended rarity tier, so a test failure points at
-// exactly which Pokémon regressed rather than just a wrong total. Includes
-// the 3 Deoxys forms (all "legendary"), the 1 Giratina-Origin form
-// ("legendary", matching base Giratina), base Rotom and all 5 Rotom
-// alternate forms ("legendary", per the Rarity Audit change),
+// extended again for Generation 6/Kalos Phase 1, extended again for
+// Generation 7/Alola Phase 1 — see generation-7-pokemon-data.ts's own
+// header comment for the full rarity philosophy, including the explicit
+// Type: Null/Silvally judgment call): every species keyed by dexNumber ->
+// its intended rarity tier, so a test failure points at exactly which
+// Pokémon regressed rather than just a wrong total. Includes the 3 Deoxys
+// forms (all "legendary"), the 1 Giratina-Origin form ("legendary",
+// matching base Giratina), base Rotom and all 5 Rotom alternate forms
+// ("legendary", per the Rarity Audit change),
 // Porygon-Z/Magmortar/Electivire/Rhyperior/Magnezone ("very-rare", also
 // per the Rarity Audit change), every Unova legendary/mythical (Victini,
 // Cobalion/Terrakion/Virizion, Tornadus/Thundurus/Landorus incl. their
@@ -58,19 +67,33 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // an evolution-item override, same as the Sinnoh Rarity Audit precedent),
 // every Kalos legendary/mythical (Xerneas, Yveltal, Zygarde, Diancie,
 // Hoopa incl. Unbound Form, Volcanion — 7 rows total, all "legendary"),
-// and Kalos's starter trio and pseudo-legendary line (Chespin/Quilladin/
+// Kalos's starter trio and pseudo-legendary line (Chespin/Quilladin/
 // Chesnaught, Fennekin/Braixen/Delphox, Froakie/Frogadier/Greninja,
-// Goomy/Sliggoo/Goodra — 12 rows total, all "very-rare"). See
-// generation-5-pokemon-data.ts's and generation-6-pokemon-data.ts's own
-// per-species rarity fields for the single source of truth.
+// Goomy/Sliggoo/Goodra — 12 rows total, all "very-rare"), Alola's starter
+// trio and pseudo-legendary line (Rowlet/Dartrix/Decidueye, Litten/
+// Torracat/Incineroar, Popplio/Brionne/Primarina, Jangmo-o/Hakamo-o/
+// Kommo-o — 12 rows total, all "very-rare"), every Alola legendary/
+// mythical/Ultra Beast (the 4 Tapu, Cosmog/Cosmoem/Solgaleo/Lunala, the 11
+// Ultra Beasts incl. Poipole/Naganadel, Necrozma, Magearna, Marshadow,
+// Zeraora, Meltan/Melmetal — 25 rows total, all "legendary" — this
+// project's four-tier model has no separate mythical/ultra-beast tier),
+// and the 18 Alolan Forms plus 2 Lycanroc alternate forms (each inheriting
+// its own base species' exact rarity tier, per this project's established
+// "a form always shares its base's rarity" rule) — EXCEPT the four Alolan
+// Forms the approved Alola Rarity Audit explicitly retuned away from their
+// Kanto base's rarity (raticate-alola, golem-alola, muk-alola,
+// marowak-alola; see generation-7-pokemon-data.ts's own "ALOLA RARITY
+// AUDIT" comment and ALOLAN_FORM_EXPECTATIONS below for the exact
+// approved values). See generation-5/6/7-pokemon-data.ts's own per-species
+// rarity fields for the single source of truth.
 const EXPECTED_RARITY_COUNTS: Record<PokemonRarity, number> = {
-  common: 295,
-  rare: 281,
-  "very-rare": 90,
-  legendary: 72,
+  common: 330,
+  rare: 314,
+  "very-rare": 105,
+  legendary: 97,
 };
 
-test("exactly 738 Pokémon species rows are loaded (721 base Dex entries + 17 alternate forms)", () => {
+test("exactly 846 Pokémon species rows are loaded (809 base Dex entries + 37 alternate forms)", () => {
   assert.equal(POKEMON_DATA.length, EXPECTED_TOTAL_SPECIES_COUNT);
 });
 
@@ -147,7 +170,7 @@ test("no alternate form points at another alternate form (every formOf target is
   }
 });
 
-test("dex numbers, deduped by base form, cover exactly 1 through 721 with no gaps", () => {
+test("dex numbers, deduped by base form, cover exactly 1 through 809 with no gaps", () => {
   const dexNumbers = POKEMON_DATA.filter((species) => species.formOf === undefined)
     .map((species) => species.dexNumber)
     .sort((a, b) => a - b);
@@ -155,9 +178,9 @@ test("dex numbers, deduped by base form, cover exactly 1 through 721 with no gap
   assert.deepEqual(dexNumbers, expected);
 });
 
-test("no species uses dexNumber 722 or higher (Kalos Phase 1 stops at Volcanion, #721)", () => {
+test("no species uses dexNumber 810 or higher (Alola Phase 1 stops at Melmetal, #809)", () => {
   const maxDexNumber = Math.max(...POKEMON_DATA.map((species) => species.dexNumber));
-  assert.equal(maxDexNumber, 721);
+  assert.equal(maxDexNumber, 809);
 });
 
 test("Victini (#494) IS present in the catalog and is rarity legendary (Unova Phase 1's own explicit scope)", () => {
@@ -504,19 +527,24 @@ test("Basculin, Deerling, Sawsbuck, Darmanitan, and Genesect have no alternate-f
   }
 });
 
-test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, and Hoopa", () => {
+test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, and the 18 Alolan Form base species", () => {
   const formGroupBases = new Set(
     POKEMON_DATA.filter((species) => species.formOf !== undefined).map((species) => species.formOf)
   );
   assert.deepEqual(
     [...formGroupBases].sort(),
-    ["deoxys", "giratina", "hoopa", "keldeo", "kyurem", "landorus", "meloetta", "rotom", "thundurus", "tornadus"]
+    [
+      "deoxys", "diglett", "dugtrio", "exeggutor", "geodude", "giratina", "golem", "graveler", "grimer", "hoopa",
+      "keldeo", "kyurem", "landorus", "lycanroc", "marowak", "meloetta", "meowth", "muk", "ninetales", "persian",
+      "raichu", "raticate", "rattata", "rotom",
+      "sandshrew", "sandslash", "thundurus", "tornadus", "vulpix",
+    ].sort()
   );
 });
 
-test("exactly 17 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa)", () => {
+test("exactly 37 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms)", () => {
   const formRows = POKEMON_DATA.filter((species) => species.formOf !== undefined);
-  assert.equal(formRows.length, 17);
+  assert.equal(formRows.length, 37);
 });
 
 test("no Hoenn starter-line species (Treecko/Torchic/Mudkip lines) is marked isStarter", () => {
@@ -637,6 +665,174 @@ test("Kalos's legendary/mythical species (Xerneas, Yveltal, Zygarde, Diancie, Ho
     assert.equal(species!.rarity, "legendary", `${id} must be rarity "legendary"`);
   }
 });
+
+test("exactly 88 official Alola base species exist for #722-809", () => {
+  const alolaBase = POKEMON_DATA.filter(
+    (species) => species.formOf === undefined && species.dexNumber >= 722 && species.dexNumber <= 809
+  );
+  assert.equal(alolaBase.length, 88);
+});
+
+test("Rowlet is #722 and Melmetal is #809 (the Alola base dex range's own endpoints)", () => {
+  const rowlet = POKEMON_DATA.find((species) => species.id === "rowlet");
+  assert.ok(rowlet, "Rowlet must exist in the catalog");
+  assert.equal(rowlet!.dexNumber, 722);
+
+  const melmetal = POKEMON_DATA.find((species) => species.id === "melmetal");
+  assert.ok(melmetal, "Melmetal must exist in the catalog");
+  assert.equal(melmetal!.dexNumber, 809);
+  assert.equal(melmetal!.rarity, "legendary");
+});
+
+test("Alola's starter trio and pseudo-legendary line are all very-rare at every evolution stage", () => {
+  const veryRareLineIds = [
+    "rowlet", "dartrix", "decidueye",
+    "litten", "torracat", "incineroar",
+    "popplio", "brionne", "primarina",
+    "jangmo-o", "hakamo-o", "kommo-o",
+  ];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of veryRareLineIds) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "very-rare", `${id} must be rarity "very-rare"`);
+  }
+});
+
+test("Alola's legendary/mythical/Ultra Beast species are all real legendary (this project's four-tier model has no separate mythical/ultra-beast tier)", () => {
+  const legendaryIds = [
+    "tapu-koko", "tapu-lele", "tapu-bulu", "tapu-fini",
+    "cosmog", "cosmoem", "solgaleo", "lunala",
+    "nihilego", "buzzwole", "pheromosa", "xurkitree", "celesteela", "kartana", "guzzlord",
+    "necrozma", "magearna", "marshadow",
+    "poipole", "naganadel", "stakataka", "blacephalon",
+    "zeraora", "meltan", "melmetal",
+  ];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of legendaryIds) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "legendary", `${id} must be rarity "legendary"`);
+  }
+});
+
+test("Type: Null and Silvally are deliberately NOT legendary (explicit judgment call: neither is officially flagged Legendary/Mythical/Ultra Beast in the source games, so they use the ordinary two-stage common/rare rule instead)", () => {
+  const typeNull = POKEMON_DATA.find((species) => species.id === "type-null");
+  assert.ok(typeNull, "type-null must exist in the catalog");
+  assert.equal(typeNull!.dexNumber, 772);
+  assert.equal(typeNull!.rarity, "common");
+  assert.equal(typeNull!.formOf, undefined);
+
+  const silvally = POKEMON_DATA.find((species) => species.id === "silvally");
+  assert.ok(silvally, "silvally must exist in the catalog");
+  assert.equal(silvally!.dexNumber, 773);
+  assert.equal(silvally!.rarity, "rare");
+  assert.equal(silvally!.formOf, undefined);
+});
+
+test("Lycanroc has exactly three internal form entries (Midday/base + Midnight + Dusk), all sharing dexNumber 745", () => {
+  const lycanrocGroup = POKEMON_DATA.filter((species) => species.id === "lycanroc" || species.formOf === "lycanroc");
+
+  assert.deepEqual(
+    lycanrocGroup.map((species) => species.id).sort(),
+    ["lycanroc", "lycanroc-dusk", "lycanroc-midnight"]
+  );
+  for (const species of lycanrocGroup) {
+    assert.equal(species.dexNumber, 745, `${species.id} must share dexNumber 745`);
+    assert.equal(species.rarity, "rare", `${species.id} must be rarity "rare" (matches base Lycanroc)`);
+    assert.deepEqual(species.types, ["rock"], `${species.id} must keep the Rock type`);
+  }
+});
+
+test("Lycanroc form sprite ids resolve to the real on-disk sprite filenames (0745/0745M/0745D)", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  assert.equal(byId.get("lycanroc")!.spriteId, undefined, "lycanroc (Midday Form) has no override — resolves via dexNumber to 0745");
+  assert.equal(byId.get("lycanroc-midnight")!.spriteId, "0745M");
+  assert.equal(byId.get("lycanroc-dusk")!.spriteId, "0745D");
+});
+
+test("Lycanroc's three forms use genuinely distinct base stats (never a blind copy across forms)", () => {
+  const midday = POKEMON_DATA.find((species) => species.id === "lycanroc")!;
+  const midnight = POKEMON_DATA.find((species) => species.id === "lycanroc-midnight")!;
+  const dusk = POKEMON_DATA.find((species) => species.id === "lycanroc-dusk")!;
+
+  assert.notDeepEqual(midnight.baseStats, midday.baseStats);
+  assert.notDeepEqual(dusk.baseStats, midday.baseStats);
+  assert.notDeepEqual(dusk.baseStats, midnight.baseStats);
+});
+
+// The 18 Alolan Forms — regional variants of 18 Kanto species (bases live
+// in generation-1-pokemon-data.ts). See generation-7-pokemon-data.ts's own
+// header comment for the full rationale. `expectedRarity`, when set,
+// overrides the default "inherits its base's exact rarity" check — used
+// only for the four forms the approved Alola Rarity Audit explicitly
+// retuned away from their Kanto base's rarity (raticate-alola, golem-alola,
+// muk-alola, marowak-alola); every other form still must equal its base's
+// rarity exactly.
+const ALOLAN_FORM_EXPECTATIONS: Array<{
+  formId: string;
+  baseId: string;
+  kantoDexNumber: number;
+  spriteId: string;
+  expectedRarity?: PokemonRarity;
+}> = [
+  { formId: "rattata-alola", baseId: "rattata", kantoDexNumber: 19, spriteId: "0019A" },
+  { formId: "raticate-alola", baseId: "raticate", kantoDexNumber: 20, spriteId: "0020A", expectedRarity: "rare" },
+  { formId: "raichu-alola", baseId: "raichu", kantoDexNumber: 26, spriteId: "0026A" },
+  { formId: "sandshrew-alola", baseId: "sandshrew", kantoDexNumber: 27, spriteId: "0027A" },
+  { formId: "sandslash-alola", baseId: "sandslash", kantoDexNumber: 28, spriteId: "0028A" },
+  { formId: "vulpix-alola", baseId: "vulpix", kantoDexNumber: 37, spriteId: "0037A" },
+  { formId: "ninetales-alola", baseId: "ninetales", kantoDexNumber: 38, spriteId: "0038A" },
+  { formId: "diglett-alola", baseId: "diglett", kantoDexNumber: 50, spriteId: "0050A" },
+  { formId: "dugtrio-alola", baseId: "dugtrio", kantoDexNumber: 51, spriteId: "0051A" },
+  { formId: "meowth-alola", baseId: "meowth", kantoDexNumber: 52, spriteId: "0052A" },
+  { formId: "persian-alola", baseId: "persian", kantoDexNumber: 53, spriteId: "0053A" },
+  { formId: "geodude-alola", baseId: "geodude", kantoDexNumber: 74, spriteId: "0074A" },
+  { formId: "graveler-alola", baseId: "graveler", kantoDexNumber: 75, spriteId: "0075A" },
+  { formId: "golem-alola", baseId: "golem", kantoDexNumber: 76, spriteId: "0076A", expectedRarity: "very-rare" },
+  { formId: "grimer-alola", baseId: "grimer", kantoDexNumber: 88, spriteId: "0088A" },
+  { formId: "muk-alola", baseId: "muk", kantoDexNumber: 89, spriteId: "0089A", expectedRarity: "rare" },
+  { formId: "exeggutor-alola", baseId: "exeggutor", kantoDexNumber: 103, spriteId: "0103A" },
+  { formId: "marowak-alola", baseId: "marowak", kantoDexNumber: 105, spriteId: "0105A", expectedRarity: "very-rare" },
+];
+
+test("exactly 18 Alolan Forms exist in the catalog", () => {
+  const alolanFormIds = POKEMON_DATA.filter((species) => species.formLabel === "Alolan Form").map((species) => species.id);
+  assert.equal(alolanFormIds.length, 18);
+  assert.deepEqual(
+    alolanFormIds.sort(),
+    ALOLAN_FORM_EXPECTATIONS.map((expectation) => expectation.formId).sort()
+  );
+});
+
+for (const { formId, baseId, kantoDexNumber, spriteId, expectedRarity } of ALOLAN_FORM_EXPECTATIONS) {
+  const rarityExpectation = expectedRarity
+    ? `is real rarity "${expectedRarity}" per the approved Alola Rarity Audit (an explicit exception to base-rarity inheritance)`
+    : "inherits its base's exact rarity";
+
+  test(`${formId}: formOf "${baseId}", shares its Kanto base's dexNumber #${kantoDexNumber}, uses the verified sprite id "${spriteId}", and ${rarityExpectation}`, () => {
+    const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+    const base = byId.get(baseId);
+    const form = byId.get(formId);
+
+    assert.ok(base, `expected base species "${baseId}" to exist in the catalog`);
+    assert.ok(form, `expected Alolan Form "${formId}" to exist in the catalog`);
+
+    assert.equal(form!.formOf, baseId);
+    assert.equal(form!.dexNumber, kantoDexNumber);
+    assert.equal(base!.dexNumber, kantoDexNumber);
+    assert.equal(form!.spriteId, spriteId);
+
+    if (expectedRarity) {
+      assert.equal(form!.rarity, expectedRarity, `${formId} must be real rarity "${expectedRarity}" per the approved Alola Rarity Audit`);
+    } else {
+      assert.equal(form!.rarity, base!.rarity, `${formId} must inherit its base's exact rarity ("${base!.rarity}")`);
+    }
+  });
+}
 
 test("every species has one valid rarity value", () => {
   for (const species of POKEMON_DATA) {

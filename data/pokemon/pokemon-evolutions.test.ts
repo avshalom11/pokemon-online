@@ -1142,6 +1142,377 @@ test("deriveSpeciesWildLevelRange leaves every Kalos evolution-item target (Flor
   }
 });
 
+// ============================================================================
+// Generation VII (Alola, Phase 2)
+// ============================================================================
+
+test("every Alola starter line is complete: level 17 then level 34 for all three lines", () => {
+  const lines: [string, string, string][] = [
+    ["rowlet", "dartrix", "decidueye"],
+    ["litten", "torracat", "incineroar"],
+    ["popplio", "brionne", "primarina"],
+  ];
+
+  for (const [base, middle, final] of lines) {
+    assert.deepEqual(getLevelEvolution(base), { evolvesToSpeciesId: middle, requiredLevel: 17 }, `${base} -> ${middle}`);
+    assert.deepEqual(getLevelEvolution(middle), { evolvesToSpeciesId: final, requiredLevel: 34 }, `${middle} -> ${final}`);
+    assert.equal(getLevelEvolution(final), undefined, `${final} is a final evolution and must have no further level evolution`);
+  }
+});
+
+test("every plain Alola level evolution resolves to its real canonical target and level", () => {
+  const plainLevelEvolutions: [string, string, number][] = [
+    ["pikipek", "trumbeak", 14],
+    ["trumbeak", "toucannon", 28],
+    ["yungoos", "gumshoos", 20],
+    ["grubbin", "charjabug", 20],
+    ["cutiefly", "ribombee", 25],
+    ["mareanie", "toxapex", 38],
+    ["mudbray", "mudsdale", 30],
+    ["dewpider", "araquanid", 22],
+    ["fomantis", "lurantis", 34],
+    ["morelull", "shiinotic", 24],
+    ["stufful", "bewear", 27],
+    ["bounsweet", "steenee", 18],
+    ["wimpod", "golisopod", 30],
+    ["sandygast", "palossand", 34],
+    ["jangmo-o", "hakamo-o", 35],
+    ["hakamo-o", "kommo-o", 45],
+    ["cosmog", "cosmoem", 43],
+  ];
+
+  for (const [speciesId, targetId, level] of plainLevelEvolutions) {
+    assert.deepEqual(
+      getLevelEvolution(speciesId),
+      { evolvesToSpeciesId: targetId, requiredLevel: level },
+      `${speciesId} -> ${targetId} @ ${level}`
+    );
+  }
+  assert.equal(getLevelEvolution("kommo-o"), undefined, "Kommo-o is Alola's pseudo-legendary line's final stage and must have no further evolution");
+});
+
+test("Jangmo-o/Hakamo-o/Kommo-o is Alola's own pseudo-legendary line: a complete three-stage level chain", () => {
+  assert.deepEqual(getLevelEvolution("jangmo-o"), { evolvesToSpeciesId: "hakamo-o", requiredLevel: 35 });
+  assert.deepEqual(getLevelEvolution("hakamo-o"), { evolvesToSpeciesId: "kommo-o", requiredLevel: 45 });
+  assert.equal(getLevelEvolution("kommo-o"), undefined);
+});
+
+test("approved Alola mechanic simplifications: Crabrawler/Salandit/Steenee/Type: Null/Poipole/Meltan keep this phase's own assigned level and drop only the unsupported condition", () => {
+  // Crabrawler -> Crabominable: former Location (Mount Lanakila) evolution.
+  assert.deepEqual(getLevelEvolution("crabrawler"), { evolvesToSpeciesId: "crabominable", requiredLevel: 35 });
+  // Salandit -> Salazzle: former Gender-restricted (female only) evolution.
+  assert.deepEqual(getLevelEvolution("salandit"), { evolvesToSpeciesId: "salazzle", requiredLevel: 33 });
+  // Steenee -> Tsareena: former Move-Known (Stomp) evolution.
+  assert.deepEqual(getLevelEvolution("steenee"), { evolvesToSpeciesId: "tsareena", requiredLevel: 29 });
+  // Type: Null -> Silvally: former Friendship evolution.
+  assert.deepEqual(getLevelEvolution("type-null"), { evolvesToSpeciesId: "silvally", requiredLevel: 40 });
+  // Poipole -> Naganadel: former Move-Known (Dragon Pulse) evolution.
+  assert.deepEqual(getLevelEvolution("poipole"), { evolvesToSpeciesId: "naganadel", requiredLevel: 40 });
+  // Meltan -> Melmetal: former Pokémon GO Candy evolution — no candy/currency/item requirement of any kind.
+  assert.deepEqual(getLevelEvolution("meltan"), { evolvesToSpeciesId: "melmetal", requiredLevel: 40 });
+
+  // None of the six ever became an evolution-item or branch evolution.
+  for (const speciesId of ["crabrawler", "salandit", "steenee", "type-null", "poipole", "meltan"]) {
+    assert.deepEqual(getEvolutionItemEvolutions(speciesId), [], `${speciesId} must not also have an evolution-item evolution`);
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must not be a branch evolution`);
+  }
+});
+
+test("Rockruff is an explicit level-25 Branch choice between all three Lycanroc forms, never day/night/Own-Tempo/randomness", () => {
+  const branch = getBranchEvolution("rockruff");
+  assert.equal(branch?.requiredLevel, 25);
+  assert.deepEqual(branch?.targets, ["lycanroc", "lycanroc-midnight", "lycanroc-dusk"]);
+  assert.equal(getLevelEvolution("rockruff"), undefined, "Rockruff must never also have a level evolution entry");
+  assert.deepEqual(getEvolutionItemEvolutions("rockruff"), [], "Rockruff must never also have an evolution-item evolution");
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "rockruff", level: 24, attackStat: 0, defenseStat: 0 }), null);
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "rockruff", level: 25, attackStat: 0, defenseStat: 0 }), {
+    kind: "branch",
+    targets: ["lycanroc", "lycanroc-midnight", "lycanroc-dusk"],
+  });
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "rockruff", level: 25, attackStat: 0, defenseStat: 0 }, "lycanroc"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "rockruff", level: 25, attackStat: 0, defenseStat: 0 }, "lycanroc-midnight"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "rockruff", level: 25, attackStat: 0, defenseStat: 0 }, "lycanroc-dusk"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "rockruff", level: 25, attackStat: 0, defenseStat: 0 }, "raichu"), false);
+});
+
+test("Cosmoem is an explicit level-53 Branch choice between Solgaleo and Lunala, never game-version/day-night/randomness; Cosmog -> Cosmoem itself stays a plain level-43 evolution", () => {
+  assert.deepEqual(getLevelEvolution("cosmog"), { evolvesToSpeciesId: "cosmoem", requiredLevel: 43 });
+
+  const branch = getBranchEvolution("cosmoem");
+  assert.equal(branch?.requiredLevel, 53);
+  assert.deepEqual(branch?.targets, ["solgaleo", "lunala"]);
+  assert.equal(getLevelEvolution("cosmoem"), undefined, "Cosmoem must never also have a level evolution entry");
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "cosmoem", level: 52, attackStat: 0, defenseStat: 0 }), null);
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "cosmoem", level: 53, attackStat: 0, defenseStat: 0 }), {
+    kind: "branch",
+    targets: ["solgaleo", "lunala"],
+  });
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "cosmoem", level: 53, attackStat: 0, defenseStat: 0 }, "solgaleo"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "cosmoem", level: 53, attackStat: 0, defenseStat: 0 }, "lunala"), true);
+
+  assert.equal(getLevelEvolution("solgaleo"), undefined);
+  assert.equal(getLevelEvolution("lunala"), undefined);
+});
+
+test("Cubone was migrated from a single-target level-28 evolution to an explicit level-28 Branch (Marowak or Alolan Marowak), preserving the same threshold, no night/region/randomness condition", () => {
+  assert.equal(getLevelEvolution("cubone"), undefined, "Cubone must no longer be a LEVEL_EVOLUTIONS key — migrated to Branch");
+
+  const branch = getBranchEvolution("cubone");
+  assert.equal(branch?.requiredLevel, 28, "the original Cubone -> Marowak level-28 threshold must be preserved");
+  assert.deepEqual(branch?.targets, ["marowak", "marowak-alola"]);
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "cubone", level: 27, attackStat: 0, defenseStat: 0 }), null);
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "cubone", level: 28, attackStat: 0, defenseStat: 0 }), {
+    kind: "branch",
+    targets: ["marowak", "marowak-alola"],
+  });
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "cubone", level: 28, attackStat: 0, defenseStat: 0 }, "marowak"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "cubone", level: 28, attackStat: 0, defenseStat: 0 }, "marowak-alola"), true);
+});
+
+test("Charjabug -> Vikavolt evolves via Thunder Stone (former Location evolution), never a level evolution", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("charjabug", "thunder-stone")?.evolvesToSpeciesId, "vikavolt");
+  assert.deepEqual(getLevelEvolution("grubbin"), { evolvesToSpeciesId: "charjabug", requiredLevel: 20 }, "Grubbin's own pre-existing level evolution into Charjabug is untouched");
+});
+
+test("Alolan Sandshrew -> Alolan Sandslash and Alolan Vulpix -> Alolan Ninetales each evolve via Ice Stone", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("sandshrew-alola", "ice-stone")?.evolvesToSpeciesId, "sandslash-alola");
+  assert.equal(getEvolutionItemEvolutionByItem("vulpix-alola", "ice-stone")?.evolvesToSpeciesId, "ninetales-alola");
+});
+
+test("Alolan Forms use the exact live catalog ids and the correct level thresholds — no Alolan source ever evolves into the Kantonian target", () => {
+  const alolanLevelEvolutions: [string, string, number][] = [
+    ["rattata-alola", "raticate-alola", 20],
+    ["diglett-alola", "dugtrio-alola", 26],
+    ["meowth-alola", "persian-alola", 28],
+    ["geodude-alola", "graveler-alola", 25],
+    ["graveler-alola", "golem-alola", 36],
+    ["grimer-alola", "muk-alola", 38],
+  ];
+
+  for (const [speciesId, targetId, level] of alolanLevelEvolutions) {
+    assert.deepEqual(
+      getLevelEvolution(speciesId),
+      { evolvesToSpeciesId: targetId, requiredLevel: level },
+      `${speciesId} -> ${targetId} @ ${level}`
+    );
+  }
+});
+
+test("Alolan Graveler -> Alolan Golem uses the exact same former-Trade simplification (level 36) as the Kantonian Graveler -> Golem line, not a different Trade replacement", () => {
+  assert.equal(getLevelEvolution("graveler")?.requiredLevel, 36, "Kantonian Graveler -> Golem's own threshold");
+  assert.equal(getLevelEvolution("graveler-alola")?.requiredLevel, 36, "Alolan Graveler -> Alolan Golem must use the same threshold");
+});
+
+test("Pikachu + Thunder Stone offers exactly Raichu and Alolan Raichu, both reachable, with no region-specific condition", () => {
+  const branches = getEvolutionItemEvolutions("pikachu");
+  const thunderStoneBranches = branches.filter((b) => b.itemId === "thunder-stone");
+  assert.equal(thunderStoneBranches.length, 2);
+  assert.deepEqual(thunderStoneBranches.map((b) => b.evolvesToSpeciesId).sort(), ["raichu", "raichu-alola"]);
+
+  // getEvolutionItemEvolutionByItem's plain .find() only ever surfaces the
+  // first entry (Raichu) — the Inventory eligibility flow must use the
+  // plural getEvolutionItemEvolutionsByItem instead, same Clamperl-shaped
+  // rule as Pikachu's own comment in the data file explains.
+  assert.equal(getEvolutionItemEvolutionByItem("pikachu", "thunder-stone")?.evolvesToSpeciesId, "raichu");
+  const viaPlural = getEvolutionItemEvolutionsByItem("pikachu", "thunder-stone");
+  assert.equal(viaPlural.length, 2);
+  assert.deepEqual(viaPlural.map((b) => b.evolvesToSpeciesId).sort(), ["raichu", "raichu-alola"]);
+});
+
+test("Exeggcute + Leaf Stone offers exactly Exeggutor and Alolan Exeggutor, both reachable, with no region-specific condition", () => {
+  const branches = getEvolutionItemEvolutionsByItem("exeggcute", "leaf-stone");
+  assert.equal(branches.length, 2);
+  assert.deepEqual(branches.map((b) => b.evolvesToSpeciesId).sort(), ["exeggutor", "exeggutor-alola"]);
+});
+
+test("normal Raichu/Exeggutor/Marowak remain reachable exactly as before, alongside their new Alolan alternatives", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("pikachu", "thunder-stone")?.evolvesToSpeciesId, "raichu");
+  assert.ok(
+    getEvolutionItemEvolutionsByItem("pikachu", "thunder-stone").some((b) => b.evolvesToSpeciesId === "raichu-alola"),
+    "Alolan Raichu must also be reachable"
+  );
+
+  assert.ok(
+    getEvolutionItemEvolutionsByItem("exeggcute", "leaf-stone").some((b) => b.evolvesToSpeciesId === "exeggutor"),
+    "ordinary Exeggutor must remain reachable"
+  );
+  assert.ok(
+    getEvolutionItemEvolutionsByItem("exeggcute", "leaf-stone").some((b) => b.evolvesToSpeciesId === "exeggutor-alola"),
+    "Alolan Exeggutor must also be reachable"
+  );
+
+  const cuboneBranch = getBranchEvolution("cubone")!;
+  assert.ok(cuboneBranch.targets.includes("marowak"), "ordinary Marowak must remain reachable");
+  assert.ok(cuboneBranch.targets.includes("marowak-alola"), "Alolan Marowak must also be reachable");
+});
+
+test("no new evolution item was introduced for Alola: still exactly the same 16 EvolutionItemId values", () => {
+  const canonicalIds = [
+    "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
+    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+  ];
+  assert.equal(canonicalIds.length, 16);
+  for (const itemId of canonicalIds) {
+    assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
+  }
+  for (const fakeAlolaItem of ["z-crystal", "meltan-box", "alola-stone", "ultra-ball", "beast-ball"]) {
+    assert.equal(isEvolutionItemId(fakeAlolaItem), false, `${fakeAlolaItem} must never be a recognized EvolutionItemId`);
+  }
+});
+
+test("no unapproved Gen VII form gets an evolution mapping: Oricorio, Wishiwashi, Minior, Silvally (its own memory-disc typing), Mimikyu, Necrozma, Magearna, and Totem forms have no form-specific evolution entries", () => {
+  for (const id of ["oricorio", "wishiwashi", "minior", "mimikyu", "necrozma", "magearna"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+  // Silvally itself (Type: Null's evolved form) has no further evolution —
+  // its 18 memory-disc types are a held-item battle mechanic, never a
+  // species-level Form or evolution target.
+  assert.equal(getLevelEvolution("silvally"), undefined);
+});
+
+test("every genuinely standalone (non-evolving, non-legendary) Alola species has no evolution of any kind", () => {
+  const standaloneIds = [
+    "oricorio", "wishiwashi", "comfey", "oranguru", "passimian", "pyukumuku",
+    "minior", "komala", "turtonator", "togedemaru", "mimikyu", "bruxish", "drampa", "dhelmise",
+  ];
+  for (const id of standaloneIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every Alola legendary/mythical/Ultra Beast species has no evolution of any kind (Tapu, standalone Ultra Beasts, Necrozma, Magearna, Marshadow, Zeraora)", () => {
+  const legendaryIds = [
+    "tapu-koko", "tapu-lele", "tapu-bulu", "tapu-fini",
+    "nihilego", "buzzwole", "pheromosa", "xurkitree", "celesteela", "kartana", "guzzlord",
+    "necrozma", "magearna", "marshadow", "stakataka", "blacephalon", "zeraora",
+  ];
+  for (const id of legendaryIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+
+  // Final-stage/single-target legendary evolution outcomes have no further evolution either.
+  for (const id of ["solgaleo", "lunala", "naganadel", "melmetal"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no further evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("no duplicate/conflicting Gen VII evolution outcome: every Gen VII level-evolution target is reachable from exactly one source", () => {
+  const levelTargets = new Map<string, string[]>();
+  for (const { speciesId, evolution } of getAllLevelEvolutionEntries()) {
+    const list = levelTargets.get(evolution.evolvesToSpeciesId) ?? [];
+    list.push(speciesId);
+    levelTargets.set(evolution.evolvesToSpeciesId, list);
+  }
+
+  const gen7Targets = [
+    "dartrix", "decidueye", "torracat", "incineroar", "brionne", "primarina",
+    "trumbeak", "toucannon", "gumshoos", "charjabug", "crabominable", "ribombee",
+    "toxapex", "mudsdale", "araquanid", "lurantis", "shiinotic", "salazzle",
+    "bewear", "steenee", "tsareena", "golisopod", "palossand", "silvally",
+    "hakamo-o", "kommo-o", "cosmoem", "naganadel", "melmetal",
+    "raticate-alola", "dugtrio-alola", "persian-alola", "graveler-alola", "golem-alola", "muk-alola",
+  ];
+  for (const target of gen7Targets) {
+    const sources = levelTargets.get(target) ?? [];
+    assert.equal(sources.length, 1, `${target} must be reachable from exactly one level-evolution source, found: ${sources.join(", ")}`);
+  }
+});
+
+// This phase (uniquely among prior generations) touches evolution
+// definitions keyed by PRE-EXISTING Kanto species (Pikachu, Exeggcute,
+// Cubone) in addition to new Gen VII species — so a pure dex-range filter
+// (694-809, the pattern every prior generation's own "total evolution
+// counts" test uses) would undercount. Counted explicitly instead: 29 new
+// LEVEL_EVOLUTIONS entries keyed by a base Gen VII species (#722-809) + 6
+// new LEVEL_EVOLUTIONS entries keyed by an Alolan Form (sharing a Kanto
+// dexNumber) = 35 total new LEVEL_EVOLUTIONS entries, minus the 1
+// migrated-out Cubone entry (now a Branch) = 34 net new LEVEL_EVOLUTIONS
+// rows. Item evolutions: 3 brand-new species keys (charjabug,
+// sandshrew-alola, vulpix-alola) + 2 new branches added to pre-existing
+// species (pikachu, exeggcute) = 5 new EVOLUTION_ITEM_EVOLUTIONS rows.
+// Branch evolutions: 2 brand-new (rockruff, cosmoem) + 1 migrated
+// (cubone) = 3 new/changed BRANCH_EVOLUTIONS entries.
+test("total evolution counts include exactly 34 net new Gen VII/Alolan-Form level evolutions, 5 new Gen VII evolution-item evolutions, and 3 new/changed Gen VII branch evolutions", () => {
+  const gen7BaseLevelIds = [
+    "rowlet", "dartrix", "litten", "torracat", "popplio", "brionne", "pikipek", "trumbeak", "yungoos",
+    "grubbin", "crabrawler", "cutiefly", "mareanie", "mudbray", "dewpider", "fomantis", "morelull",
+    "salandit", "stufful", "bounsweet", "steenee", "wimpod", "sandygast", "type-null", "jangmo-o",
+    "hakamo-o", "cosmog", "poipole", "meltan",
+  ];
+  const alolanFormLevelIds = ["rattata-alola", "diglett-alola", "meowth-alola", "geodude-alola", "graveler-alola", "grimer-alola"];
+
+  assert.equal(gen7BaseLevelIds.length, 29);
+  assert.equal(alolanFormLevelIds.length, 6);
+  for (const id of [...gen7BaseLevelIds, ...alolanFormLevelIds]) {
+    assert.ok(getLevelEvolution(id), `${id} must have a level evolution entry`);
+  }
+  assert.equal(getLevelEvolution("cubone"), undefined, "the pre-existing cubone level entry was migrated out, for a net +34");
+
+  assert.equal(getEvolutionItemEvolutions("charjabug").length, 1);
+  assert.equal(getEvolutionItemEvolutions("sandshrew-alola").length, 1);
+  assert.equal(getEvolutionItemEvolutions("vulpix-alola").length, 1);
+  assert.equal(getEvolutionItemEvolutions("pikachu").length, 2, "pikachu gained one new thunder-stone branch (raichu-alola), for 2 total");
+  assert.equal(getEvolutionItemEvolutions("exeggcute").length, 2, "exeggcute gained one new leaf-stone branch (exeggutor-alola), for 2 total");
+
+  assert.ok(getBranchEvolution("rockruff"));
+  assert.ok(getBranchEvolution("cosmoem"));
+  assert.ok(getBranchEvolution("cubone"));
+});
+
+test("deriveSpeciesWildLevelRange correctly derives the Alola starter chains and the pseudo-legendary chain, with no collision", () => {
+  const lines: [string, string, string][] = [
+    ["rowlet", "dartrix", "decidueye"],
+    ["litten", "torracat", "incineroar"],
+    ["popplio", "brionne", "primarina"],
+  ];
+  for (const [base, middle, final] of lines) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(base), { minimumLevel: 1, maximumLevel: 16 });
+    assert.deepEqual(deriveSpeciesWildLevelRange(middle), { minimumLevel: 17, maximumLevel: 33 });
+    assert.deepEqual(deriveSpeciesWildLevelRange(final), { minimumLevel: 34, maximumLevel: Number.POSITIVE_INFINITY });
+  }
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("jangmo-o"), { minimumLevel: 1, maximumLevel: 34 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("hakamo-o"), { minimumLevel: 35, maximumLevel: 44 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("kommo-o"), { minimumLevel: 45, maximumLevel: Number.POSITIVE_INFINITY });
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("cosmog"), { minimumLevel: 1, maximumLevel: 42 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("cosmoem"), { minimumLevel: 43, maximumLevel: Number.POSITIVE_INFINITY }, "Cosmoem's own maximumLevel is uncapped: its Branch evolution (unlike a LEVEL_EVOLUTIONS entry) is invisible to the level-only reverse index, same as every other Branch source");
+});
+
+test("deriveSpeciesWildLevelRange leaves Rockruff's three Lycanroc targets, Cosmoem's two targets, and Cubone's own range exactly as unrestricted/unchanged as every other Branch already establishes", () => {
+  for (const id of ["lycanroc", "lycanroc-midnight", "lycanroc-dusk", "solgaleo", "lunala"]) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(id), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY }, `${id} is a Branch target — invisible to the level-only reverse index, same as Espeon/Umbreon already are`);
+  }
+
+  // Cubone's own range changes as an expected, consistent SIDE EFFECT of
+  // the Branch migration: it used to be capped (maximumLevel 27, from its
+  // old LEVEL_EVOLUTIONS entry) and is now uncapped, exactly like every
+  // other Branch-only source (Eevee/Wurmple/Nincada/Burmy) already is —
+  // never a regression.
+  assert.deepEqual(deriveSpeciesWildLevelRange("cubone"), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
+  for (const id of ["marowak", "marowak-alola"]) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(id), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
+  }
+});
+
+test("deriveSpeciesWildLevelRange leaves every Gen VII evolution-item target (Vikavolt, Alolan Sandslash/Ninetales, Raichu, Alolan Raichu, Exeggutor, Alolan Exeggutor) fully unrestricted, same as Ludicolo/Vileplume already are", () => {
+  for (const id of ["vikavolt", "sandslash-alola", "ninetales-alola", "raichu", "raichu-alola", "exeggutor", "exeggutor-alola"]) {
+    assert.deepEqual(deriveSpeciesWildLevelRange(id), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY }, `${id} must be fully unrestricted (evolution-item targets are invisible to the level-only reverse index)`);
+  }
+});
+
 test("deriveSpeciesWildLevelRange across the entire catalog never produces minimumLevel > maximumLevel", () => {
   const invalid = POKEMON_DATA.filter((species) => {
     const range = deriveSpeciesWildLevelRange(species.id);

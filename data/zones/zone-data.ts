@@ -1,3 +1,4 @@
+import { ALOLA_ZONE_DATA } from "./alola-zone-data";
 import { HOENN_ZONE_DATA } from "./hoenn-zone-data";
 import { JOHTO_ZONE_DATA } from "./johto-zone-data";
 import { KALOS_ZONE_DATA } from "./kalos-zone-data";
@@ -18,7 +19,7 @@ import type { Zone, ZoneId } from "@/shared/types/zone";
 // different Pokémon pool depending on which region is passed in here.
 //
 // Regions with no zone data yet (every RegionId besides "kanto"/"johto"/
-// "hoenn"/"sinnoh"/"unova"/"kalos" — see features/regions/data/
+// "hoenn"/"sinnoh"/"unova"/"kalos"/"alola" — see features/regions/data/
 // region-registry.ts's own `hasMap`/`mapConfig` flags) resolve to an empty
 // array rather than throwing, the same "unknown/not-yet-built -> safe
 // empty result" precedent every other region-aware lookup in this codebase
@@ -30,6 +31,7 @@ const ZONE_DATA_BY_REGION: Partial<Record<RegionId, Zone[]>> = {
   sinnoh: SINNOH_ZONE_DATA,
   unova: UNOVA_ZONE_DATA,
   kalos: KALOS_ZONE_DATA,
+  alola: ALOLA_ZONE_DATA,
 };
 
 export function getZoneData(regionId: RegionId): Zone[] {
