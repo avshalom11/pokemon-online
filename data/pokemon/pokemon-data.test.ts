@@ -7,12 +7,12 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 // Generation 1 (Kanto, #0001-#0151) + Generation 2 (Johto, #0152-#0251) +
 // Generation 3 (Hoenn, #0252-#0386) + Generation 4 (Sinnoh, #0387-#0493) +
 // Generation 5 (Unova, #0494-#0649) + Generation 6 (Kalos, #0650-#0721) +
-// Generation 7 (Alola, #0722-#0809) — 809 official National Dex entries
-// (one base/headline species row per dex number). Victini (#494) IS part
-// of Unova and IS present (Unova Phase 1's own explicit scope). See
-// engine/learnsets/data/generation-1/generation-1.completeness.test.ts for
-// the same invariant applied to the (still Generation-1-only) learnset
-// database.
+// Generation 7 (Alola, #0722-#0809) + Generation 8 (Galar, #0810-#0898) —
+// 898 official National Dex entries (one base/headline species row per dex
+// number). Victini (#494) IS part of Unova and IS present (Unova Phase 1's
+// own explicit scope). See engine/learnsets/data/generation-1/
+// generation-1.completeness.test.ts for the same invariant applied to the
+// (still Generation-1-only) learnset database.
 //
 // PLUS alternate FORM rows that intentionally share their base's dex
 // number rather than getting their own (see features/pokemon/forms/
@@ -24,19 +24,22 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 // the Unova Update phase), 1 Meloetta form (dex #648: Pirouette), 1
 // Hoopa form (dex #720: Unbound — added in the Kalos Phase 1 species
 // catalog), 2 Lycanroc forms (dex #745: Midnight/Dusk — added in the
-// Alola Phase 1 species catalog), and 18 Alolan Forms (regional variants
+// Alola Phase 1 species catalog), 18 Alolan Forms (regional variants
 // of 18 Kanto species, sharing THEIR bases' dex numbers — #19/#20/#26/
 // #27/#28/#37/#38/#50/#51/#52/#53/#74/#75/#76/#88/#89/#103/#105 — also
-// added in the Alola Phase 1 species catalog). That makes two different,
-// both-correct counts:
-//   - EXPECTED_BASE_DEX_COUNT (809): distinct dex numbers / Pokédex rows —
+// added in the Alola Phase 1 species catalog), and 19 Galarian Forms
+// (regional variants of 19 Kanto/Johto/Hoenn/Unova species, sharing THEIR
+// bases' dex numbers — #52/#77/#78/#79/#80/#83/#110/#122/#144/#145/#146/
+// #199/#222/#263/#264/#554/#555/#562/#618 — added in the Galar Phase 1
+// species catalog). That makes two different, both-correct counts:
+//   - EXPECTED_BASE_DEX_COUNT (898): distinct dex numbers / Pokédex rows —
 //     what "dex numbers cover 1..N with no gaps" and the Pokédex service's
 //     own row count are checked against.
-//   - EXPECTED_TOTAL_SPECIES_COUNT (846): every PokemonSpecies row in
-//     POKEMON_DATA, including all 37 alternate forms — what "every id is
+//   - EXPECTED_TOTAL_SPECIES_COUNT (954): every PokemonSpecies row in
+//     POKEMON_DATA, including all 56 alternate forms — what "every id is
 //     present exactly once" is checked against.
-const EXPECTED_BASE_DEX_COUNT = 809;
-const EXPECTED_TOTAL_SPECIES_COUNT = 846;
+const EXPECTED_BASE_DEX_COUNT = 898;
+const EXPECTED_TOTAL_SPECIES_COUNT = 954;
 
 const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legendary"];
 
@@ -46,14 +49,17 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // the Sinnoh Rarity Audit approved-design-change pass, extended again for
 // Generation 5/Unova, revised again for the Unova Update rarity pass,
 // extended again for Generation 6/Kalos Phase 1, extended again for
-// Generation 7/Alola Phase 1 — see generation-7-pokemon-data.ts's own
-// header comment for the full rarity philosophy, including the explicit
-// Type: Null/Silvally judgment call): every species keyed by dexNumber ->
-// its intended rarity tier, so a test failure points at exactly which
-// Pokémon regressed rather than just a wrong total. Includes the 3 Deoxys
-// forms (all "legendary"), the 1 Giratina-Origin form ("legendary",
-// matching base Giratina), base Rotom and all 5 Rotom alternate forms
-// ("legendary", per the Rarity Audit change),
+// Generation 7/Alola Phase 1, extended again for Generation 8/Galar Phase
+// 1 — see generation-7-pokemon-data.ts's own header comment for the full
+// rarity philosophy, including the explicit Type: Null/Silvally judgment
+// call, and generation-8-pokemon-data.ts's own header comment for the
+// Galar-specific philosophy (no rarity audit performed yet — deferred to
+// the future GALAR PHASE 7 — Rarity Audit): every species keyed by
+// dexNumber -> its intended rarity tier, so a test failure points at
+// exactly which Pokémon regressed rather than just a wrong total. Includes
+// the 3 Deoxys forms (all "legendary"), the 1 Giratina-Origin form
+// ("legendary", matching base Giratina), base Rotom and all 5 Rotom
+// alternate forms ("legendary", per the Rarity Audit change),
 // Porygon-Z/Magmortar/Electivire/Rhyperior/Magnezone ("very-rare", also
 // per the Rarity Audit change), every Unova legendary/mythical (Victini,
 // Cobalion/Terrakion/Virizion, Tornadus/Thundurus/Landorus incl. their
@@ -77,20 +83,32 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // Ultra Beasts incl. Poipole/Naganadel, Necrozma, Magearna, Marshadow,
 // Zeraora, Meltan/Melmetal — 25 rows total, all "legendary" — this
 // project's four-tier model has no separate mythical/ultra-beast tier),
-// and the 18 Alolan Forms plus 2 Lycanroc alternate forms (each inheriting
+// the 18 Alolan Forms plus 2 Lycanroc alternate forms (each inheriting
 // its own base species' exact rarity tier, per this project's established
 // "a form always shares its base's rarity" rule) — EXCEPT the four Alolan
 // Forms the approved Alola Rarity Audit explicitly retuned away from their
 // Kanto base's rarity (raticate-alola, golem-alola, muk-alola,
 // marowak-alola; see generation-7-pokemon-data.ts's own "ALOLA RARITY
 // AUDIT" comment and ALOLAN_FORM_EXPECTATIONS below for the exact
-// approved values). See generation-5/6/7-pokemon-data.ts's own per-species
-// rarity fields for the single source of truth.
+// approved values), Galar's starter trio and pseudo-legendary line
+// (Grookey/Thwackey/Rillaboom, Scorbunny/Raboot/Cinderace, Sobble/
+// Drizzile/Inteleon, Dreepy/Drakloak/Dragapult — 12 rows total, all
+// "very-rare"), every Galar legendary/mythical (Zacian, Zamazenta,
+// Eternatus, Kubfu, Urshifu, Zarude, Regieleki, Regidrago, Glastrier,
+// Spectrier, Calyrex — 11 rows total, all "legendary" — Zarude is a
+// Mythical in the source games, mapped to "legendary" the same way
+// Meltan/Melmetal/Magearna/Marshadow/Zeraora were in Alola), and the 19
+// Galarian Forms (each inheriting its own base species' exact rarity tier
+// verbatim, including the 3 Legendary-bird forms — Articuno/Zapdos/
+// Moltres-Galar all stay "legendary" — no rarity audit was performed this
+// phase; see GALARIAN_FORM_EXPECTATIONS below). See generation-5/6/7/8-
+// pokemon-data.ts's own per-species rarity fields for the single source of
+// truth.
 const EXPECTED_RARITY_COUNTS: Record<PokemonRarity, number> = {
-  common: 330,
-  rare: 314,
-  "very-rare": 105,
-  legendary: 97,
+  common: 365,
+  rare: 361,
+  "very-rare": 117,
+  legendary: 111,
 };
 
 test("exactly 846 Pokémon species rows are loaded (809 base Dex entries + 37 alternate forms)", () => {
@@ -170,7 +188,7 @@ test("no alternate form points at another alternate form (every formOf target is
   }
 });
 
-test("dex numbers, deduped by base form, cover exactly 1 through 809 with no gaps", () => {
+test("dex numbers, deduped by base form, cover exactly 1 through 898 with no gaps", () => {
   const dexNumbers = POKEMON_DATA.filter((species) => species.formOf === undefined)
     .map((species) => species.dexNumber)
     .sort((a, b) => a - b);
@@ -178,9 +196,9 @@ test("dex numbers, deduped by base form, cover exactly 1 through 809 with no gap
   assert.deepEqual(dexNumbers, expected);
 });
 
-test("no species uses dexNumber 810 or higher (Alola Phase 1 stops at Melmetal, #809)", () => {
+test("no species uses dexNumber 899 or higher (Galar Phase 1 stops at Calyrex, #898)", () => {
   const maxDexNumber = Math.max(...POKEMON_DATA.map((species) => species.dexNumber));
-  assert.equal(maxDexNumber, 809);
+  assert.equal(maxDexNumber, 898);
 });
 
 test("Victini (#494) IS present in the catalog and is rarity legendary (Unova Phase 1's own explicit scope)", () => {
@@ -520,31 +538,53 @@ test("no unapproved Kalos form groups exist (Aegislash, Pumpkaboo, Gourgeist, Vi
   }
 });
 
-test("Basculin, Deerling, Sawsbuck, Darmanitan, and Genesect have no alternate-form entries (their real forms are explicitly out of this phase's scope)", () => {
-  for (const id of ["basculin", "deerling", "sawsbuck", "darmanitan"]) {
+test("Basculin, Deerling, and Sawsbuck have no alternate-form entries (their real forms are explicitly out of this phase's scope)", () => {
+  for (const id of ["basculin", "deerling", "sawsbuck"]) {
     const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
     assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
   }
 });
 
-test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, and the 18 Alolan Form base species", () => {
+// Darmanitan's real Zen Mode / Galarian Zen Mode battle-state forms remain
+// explicitly out of scope (see generation-8-pokemon-data.ts's own header
+// comment) — but Darmanitan now legitimately has exactly ONE alternate
+// form as of Galar Phase 1: the Galarian Standard Mode regional form
+// (darmanitan-galar). This test replaces Darmanitan's old membership in
+// the Kalos-era "no alternate-form entries" list above, which is now
+// stale rather than a real invariant.
+test("Darmanitan has exactly two internal form entries (Kanto/base + Galarian), both sharing dexNumber 555", () => {
+  const darmanitanGroup = POKEMON_DATA.filter((species) => species.id === "darmanitan" || species.formOf === "darmanitan");
+
+  assert.deepEqual(
+    darmanitanGroup.map((species) => species.id).sort(),
+    ["darmanitan", "darmanitan-galar"]
+  );
+  for (const species of darmanitanGroup) {
+    assert.equal(species.dexNumber, 555, `${species.id} must share dexNumber 555`);
+  }
+});
+
+test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, the 18 Alolan Form base species, and the 19 Galarian Form base species", () => {
   const formGroupBases = new Set(
     POKEMON_DATA.filter((species) => species.formOf !== undefined).map((species) => species.formOf)
   );
   assert.deepEqual(
     [...formGroupBases].sort(),
     [
-      "deoxys", "diglett", "dugtrio", "exeggutor", "geodude", "giratina", "golem", "graveler", "grimer", "hoopa",
-      "keldeo", "kyurem", "landorus", "lycanroc", "marowak", "meloetta", "meowth", "muk", "ninetales", "persian",
-      "raichu", "raticate", "rattata", "rotom",
-      "sandshrew", "sandslash", "thundurus", "tornadus", "vulpix",
+      "articuno", "corsola", "darmanitan", "darumaka", "deoxys", "diglett", "dugtrio", "exeggutor",
+      "farfetchd", "geodude", "giratina", "golem", "graveler", "grimer", "hoopa",
+      "keldeo", "kyurem", "landorus", "linoone", "lycanroc", "marowak", "meloetta", "meowth",
+      "moltres", "mr-mime", "muk", "ninetales", "persian", "ponyta",
+      "raichu", "rapidash", "raticate", "rattata", "rotom",
+      "sandshrew", "sandslash", "slowbro", "slowking", "slowpoke", "stunfisk",
+      "thundurus", "tornadus", "vulpix", "weezing", "yamask", "zapdos", "zigzagoon",
     ].sort()
   );
 });
 
-test("exactly 37 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms)", () => {
+test("exactly 56 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms + 19 Galarian Forms)", () => {
   const formRows = POKEMON_DATA.filter((species) => species.formOf !== undefined);
-  assert.equal(formRows.length, 37);
+  assert.equal(formRows.length, 56);
 });
 
 test("no Hoenn starter-line species (Treecko/Torchic/Mudkip lines) is marked isStarter", () => {
@@ -831,6 +871,128 @@ for (const { formId, baseId, kantoDexNumber, spriteId, expectedRarity } of ALOLA
     } else {
       assert.equal(form!.rarity, base!.rarity, `${formId} must inherit its base's exact rarity ("${base!.rarity}")`);
     }
+  });
+}
+
+test("exactly 89 official Galar base species exist for #810-898", () => {
+  const galarBase = POKEMON_DATA.filter(
+    (species) => species.formOf === undefined && species.dexNumber >= 810 && species.dexNumber <= 898
+  );
+  assert.equal(galarBase.length, 89);
+});
+
+test("Grookey is #810 and Calyrex is #898 (the Galar base dex range's own endpoints)", () => {
+  const grookey = POKEMON_DATA.find((species) => species.id === "grookey");
+  assert.ok(grookey, "Grookey must exist in the catalog");
+  assert.equal(grookey!.dexNumber, 810);
+
+  const calyrex = POKEMON_DATA.find((species) => species.id === "calyrex");
+  assert.ok(calyrex, "Calyrex must exist in the catalog");
+  assert.equal(calyrex!.dexNumber, 898);
+  assert.equal(calyrex!.rarity, "legendary");
+});
+
+test("Galar's starter trio and pseudo-legendary line are all very-rare at every evolution stage", () => {
+  const veryRareLineIds = [
+    "grookey", "thwackey", "rillaboom",
+    "scorbunny", "raboot", "cinderace",
+    "sobble", "drizzile", "inteleon",
+    "dreepy", "drakloak", "dragapult",
+  ];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of veryRareLineIds) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "very-rare", `${id} must be rarity "very-rare"`);
+  }
+});
+
+test("Galar's legendary/mythical species are all real legendary (this project's four-tier model has no separate mythical tier)", () => {
+  const legendaryIds = [
+    "zacian", "zamazenta", "eternatus", "kubfu", "urshifu", "zarude",
+    "regieleki", "regidrago", "glastrier", "spectrier", "calyrex",
+  ];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of legendaryIds) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.rarity, "legendary", `${id} must be rarity "legendary"`);
+  }
+});
+
+test("Obstagoon, Perrserker, Cursola, Sirfetch'd, Mr. Rime, and Runerigus are ordinary Generation 8 base species (evolutions of Galarian Forms), not additional form rows", () => {
+  const ids = ["obstagoon", "perrserker", "cursola", "sirfetchd", "mr-rime", "runerigus"];
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const id of ids) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to exist in the catalog`);
+    assert.equal(species!.formOf, undefined, `${id} must be a base species, not a form`);
+    assert.ok(species!.dexNumber >= 810 && species!.dexNumber <= 898, `${id} must be in the Galar dex range`);
+  }
+});
+
+// The 19 Galarian Forms — regional variants of 19 Kanto/Johto/Hoenn/Unova
+// species (bases live in generation-1/2/3/5-pokemon-data.ts). See
+// generation-8-pokemon-data.ts's own header comment for the full
+// rationale. Every Galarian Form inherits its base's exact rarity tier —
+// this phase performed no rarity audit (unlike Alola's own Alola Rarity
+// Audit), so unlike ALOLAN_FORM_EXPECTATIONS there is no `expectedRarity`
+// override field here.
+const GALARIAN_FORM_EXPECTATIONS: Array<{
+  formId: string;
+  baseId: string;
+  baseDexNumber: number;
+  spriteId: string;
+}> = [
+  { formId: "meowth-galar", baseId: "meowth", baseDexNumber: 52, spriteId: "0052G" },
+  { formId: "ponyta-galar", baseId: "ponyta", baseDexNumber: 77, spriteId: "0077G" },
+  { formId: "rapidash-galar", baseId: "rapidash", baseDexNumber: 78, spriteId: "0078G" },
+  { formId: "slowpoke-galar", baseId: "slowpoke", baseDexNumber: 79, spriteId: "0079G" },
+  { formId: "slowbro-galar", baseId: "slowbro", baseDexNumber: 80, spriteId: "0080G" },
+  { formId: "farfetchd-galar", baseId: "farfetchd", baseDexNumber: 83, spriteId: "0083G" },
+  { formId: "weezing-galar", baseId: "weezing", baseDexNumber: 110, spriteId: "0110G" },
+  { formId: "mr-mime-galar", baseId: "mr-mime", baseDexNumber: 122, spriteId: "0122G" },
+  { formId: "articuno-galar", baseId: "articuno", baseDexNumber: 144, spriteId: "0144G" },
+  { formId: "zapdos-galar", baseId: "zapdos", baseDexNumber: 145, spriteId: "0145G" },
+  { formId: "moltres-galar", baseId: "moltres", baseDexNumber: 146, spriteId: "0146G" },
+  { formId: "slowking-galar", baseId: "slowking", baseDexNumber: 199, spriteId: "0199G" },
+  { formId: "corsola-galar", baseId: "corsola", baseDexNumber: 222, spriteId: "0222G" },
+  { formId: "zigzagoon-galar", baseId: "zigzagoon", baseDexNumber: 263, spriteId: "0263G" },
+  { formId: "linoone-galar", baseId: "linoone", baseDexNumber: 264, spriteId: "0264G" },
+  { formId: "darumaka-galar", baseId: "darumaka", baseDexNumber: 554, spriteId: "0554G" },
+  { formId: "darmanitan-galar", baseId: "darmanitan", baseDexNumber: 555, spriteId: "0555G" },
+  { formId: "yamask-galar", baseId: "yamask", baseDexNumber: 562, spriteId: "0562G" },
+  { formId: "stunfisk-galar", baseId: "stunfisk", baseDexNumber: 618, spriteId: "0618G" },
+];
+
+test("exactly 19 Galarian Forms exist in the catalog", () => {
+  const galarianFormIds = POKEMON_DATA.filter((species) => species.formLabel === "Galarian Form").map(
+    (species) => species.id
+  );
+  assert.equal(galarianFormIds.length, 19);
+  assert.deepEqual(
+    galarianFormIds.sort(),
+    GALARIAN_FORM_EXPECTATIONS.map((expectation) => expectation.formId).sort()
+  );
+});
+
+for (const { formId, baseId, baseDexNumber, spriteId } of GALARIAN_FORM_EXPECTATIONS) {
+  test(`${formId}: formOf "${baseId}", shares its base's dexNumber #${baseDexNumber}, uses the verified sprite id "${spriteId}", and inherits its base's exact rarity`, () => {
+    const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+    const base = byId.get(baseId);
+    const form = byId.get(formId);
+
+    assert.ok(base, `expected base species "${baseId}" to exist in the catalog`);
+    assert.ok(form, `expected Galarian Form "${formId}" to exist in the catalog`);
+
+    assert.equal(form!.formOf, baseId);
+    assert.equal(form!.dexNumber, baseDexNumber);
+    assert.equal(base!.dexNumber, baseDexNumber);
+    assert.equal(form!.spriteId, spriteId);
+    assert.equal(form!.rarity, base!.rarity, `${formId} must inherit its base's exact rarity ("${base!.rarity}")`);
   });
 }
 

@@ -112,9 +112,14 @@ test("all 88 base species have exactly one learnset each", () => {
 // lycanroc). Derived from the live species catalog's own formOf field
 // (never a naive "id contains a hyphen" check — several genuine BASE Gen 7
 // species ids also contain hyphens, e.g. type-null, jangmo-o, hakamo-o,
-// kommo-o, and the four Tapu, none of which are alternate forms).
+// kommo-o, and the four Tapu, none of which are alternate forms). Alolan
+// Forms are identified by formLabel === "Alolan Form" specifically —
+// NOT by "shares a Kanto dexNumber 1-151" — since Galar Phase 1 added its
+// own 19 Galarian Forms that also share Kanto/Johto dex numbers in that
+// same 1-151 range (e.g. meowth-galar, ponyta-galar, articuno-galar); the
+// dexNumber-range heuristic alone can no longer distinguish the two.
 const APPROVED_ALOLA_FORM_IDS = POKEMON_DATA.filter(
-  (species) => species.formOf !== undefined && (species.dexNumber === 745 || (species.dexNumber >= 1 && species.dexNumber <= 151))
+  (species) => species.formOf !== undefined && (species.dexNumber === 745 || species.formLabel === "Alolan Form")
 ).map((species) => species.id);
 
 test("test assumption: exactly 20 approved alternate-form species exist in the live catalog (18 Alolan Forms + 2 Lycanroc)", () => {
@@ -122,9 +127,7 @@ test("test assumption: exactly 20 approved alternate-form species exist in the l
 });
 
 test("every one of the 18 Alolan Forms has exactly one learnset, and it is not empty", () => {
-  const alolanFormIds = POKEMON_DATA.filter(
-    (species) => species.formOf !== undefined && species.dexNumber >= 1 && species.dexNumber <= 151
-  ).map((species) => species.id);
+  const alolanFormIds = POKEMON_DATA.filter((species) => species.formLabel === "Alolan Form").map((species) => species.id);
   assert.equal(alolanFormIds.length, 18);
 
   for (const id of alolanFormIds) {

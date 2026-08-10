@@ -1,4 +1,5 @@
 import { ALOLA_MAP_CONFIG } from "@/data/maps/alola-map-config";
+import { GALAR_MAP_CONFIG } from "@/data/maps/galar-map-config";
 import { HOENN_MAP_CONFIG } from "@/data/maps/hoenn-map-config";
 import { JOHTO_MAP_CONFIG } from "@/data/maps/johto-map-config";
 import { KALOS_MAP_CONFIG } from "@/data/maps/kalos-map-config";
@@ -163,7 +164,28 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // is battle-capable.
     mapConfig: ALOLA_MAP_CONFIG,
   },
-  galar: { id: "galar", englishName: "Galar", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
+  galar: {
+    id: "galar",
+    englishName: "Galar",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Galar now has real, clickable zones (data/maps/galar-map-config.ts,
+    // manually placed via /dev/galar-map-editor against the real
+    // /images/galar-map.png) — same as Kalos/Alola, mapConfig.imageSrc is
+    // the one source for the map image; mapImageSrc is left unset since
+    // mapConfig already covers it (MapContent renders from mapConfig
+    // whenever it's present). Galar is a five-zone region (no Beach) —
+    // galar-map-config.ts's own regions array reflects that; the global
+    // ZoneId type is unaffected.
+    //
+    // Galar now also has real zone encounter data (data/zones/
+    // galar-zone-data.ts, wired through data/zones/zone-data.ts) — the same
+    // "map before encounters" window Hoenn and Sinnoh already went through
+    // has closed for Galar too; app/(game)/battle/page.tsx's region gate
+    // (getZoneData(regionId).length === 0) now passes and Galar is
+    // battle-capable.
+    mapConfig: GALAR_MAP_CONFIG,
+  },
   paldea: { id: "paldea", englishName: "Paldea", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
 };
 

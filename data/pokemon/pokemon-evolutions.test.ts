@@ -838,7 +838,21 @@ test("alternate forms never get their own evolution, on either side of the arrow
 });
 
 test("total evolution counts include exactly 65 new Unova level evolutions and 9 new Unova evolution-item evolutions", () => {
-  const unovaDexRange = new Set(POKEMON_DATA.filter((species) => species.dexNumber >= 494 && species.dexNumber <= 649).map((species) => species.id));
+  // formOf === undefined excludes alternate forms sharing a dex number in
+  // this range — this used to only matter for Unova's own Therian/Black/
+  // White/Pirouette forms (none of which ever had an evolution entry, see
+  // the "alternate forms never get their own evolution" test above), but
+  // Galar Phase 2 added evolution entries for two Galarian Forms whose
+  // BASE species happens to share a Unova dex number (yamask-galar, dex
+  // #562; darumaka-galar, dex #554) — a plain dexNumber-range filter alone
+  // can no longer distinguish "genuinely Unova" from "a Galarian reskin of
+  // a Unova species", so formOf === undefined is required to keep this
+  // count scoped to real Unova base species only.
+  const unovaDexRange = new Set(
+    POKEMON_DATA.filter((species) => species.formOf === undefined && species.dexNumber >= 494 && species.dexNumber <= 649).map(
+      (species) => species.id
+    )
+  );
 
   const unovaLevelEntries = getAllLevelEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
   const unovaItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
@@ -1511,6 +1525,315 @@ test("deriveSpeciesWildLevelRange leaves every Gen VII evolution-item target (Vi
   for (const id of ["vikavolt", "sandslash-alola", "ninetales-alola", "raichu", "raichu-alola", "exeggutor", "exeggutor-alola"]) {
     assert.deepEqual(deriveSpeciesWildLevelRange(id), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY }, `${id} must be fully unrestricted (evolution-item targets are invisible to the level-only reverse index)`);
   }
+});
+
+test("every Galar starter line is complete: level 16 then level 35 for all three lines", () => {
+  const lines: [string, string, string][] = [
+    ["grookey", "thwackey", "rillaboom"],
+    ["scorbunny", "raboot", "cinderace"],
+    ["sobble", "drizzile", "inteleon"],
+  ];
+
+  for (const [base, middle, final] of lines) {
+    assert.deepEqual(getLevelEvolution(base), { evolvesToSpeciesId: middle, requiredLevel: 16 }, `${base} -> ${middle}`);
+    assert.deepEqual(getLevelEvolution(middle), { evolvesToSpeciesId: final, requiredLevel: 35 }, `${middle} -> ${final}`);
+    assert.equal(getLevelEvolution(final), undefined, `${final} is a final evolution and must have no further level evolution`);
+  }
+});
+
+test("Dreepy/Drakloak/Dragapult is Galar's own pseudo-legendary line: a complete three-stage level chain", () => {
+  assert.deepEqual(getLevelEvolution("dreepy"), { evolvesToSpeciesId: "drakloak", requiredLevel: 50 });
+  assert.deepEqual(getLevelEvolution("drakloak"), { evolvesToSpeciesId: "dragapult", requiredLevel: 60 });
+  assert.equal(getLevelEvolution("dragapult"), undefined);
+});
+
+test("every plain Galar level evolution resolves to its real canonical target and level", () => {
+  const plainLevelEvolutions: [string, string, number][] = [
+    ["skwovet", "greedent", 24],
+    ["rookidee", "corvisquire", 18],
+    ["corvisquire", "corviknight", 38],
+    ["blipbug", "dottler", 10],
+    ["dottler", "orbeetle", 30],
+    ["nickit", "thievul", 18],
+    ["gossifleur", "eldegoss", 20],
+    ["wooloo", "dubwool", 24],
+    ["chewtle", "drednaw", 22],
+    ["yamper", "boltund", 25],
+    ["rolycoly", "carkol", 18],
+    ["carkol", "coalossal", 34],
+    ["silicobra", "sandaconda", 36],
+    ["arrokuda", "barraskewda", 26],
+    ["toxel", "toxtricity", 30],
+    ["sizzlipede", "centiskorch", 28],
+    ["hatenna", "hattrem", 32],
+    ["hattrem", "hatterene", 42],
+    ["impidimp", "morgrem", 32],
+    ["morgrem", "grimmsnarl", 42],
+    ["cufant", "copperajah", 34],
+  ];
+
+  for (const [speciesId, targetId, level] of plainLevelEvolutions) {
+    assert.deepEqual(
+      getLevelEvolution(speciesId),
+      { evolvesToSpeciesId: targetId, requiredLevel: level },
+      `${speciesId} -> ${targetId} @ ${level}`
+    );
+  }
+});
+
+test("approved Galar mechanic simplifications: Clobbopus/Sinistea/Snom/Kubfu keep this phase's own assigned level and drop only the unsupported condition", () => {
+  // Clobbopus -> Grapploct: former Move-Known (Taunt) evolution.
+  assert.deepEqual(getLevelEvolution("clobbopus"), { evolvesToSpeciesId: "grapploct", requiredLevel: 35 });
+  // Sinistea -> Polteageist: former Cracked Pot/Chipped Pot (Antique/Phony form) evolution.
+  assert.deepEqual(getLevelEvolution("sinistea"), { evolvesToSpeciesId: "polteageist", requiredLevel: 32 });
+  // Snom -> Frosmoth: former Friendship+Time(night) evolution.
+  assert.deepEqual(getLevelEvolution("snom"), { evolvesToSpeciesId: "frosmoth", requiredLevel: 16 });
+  // Kubfu -> Urshifu: former tower-progression/style-item evolution — this
+  // project's single Urshifu representation is the only possible target.
+  assert.deepEqual(getLevelEvolution("kubfu"), { evolvesToSpeciesId: "urshifu", requiredLevel: 40 });
+
+  for (const speciesId of ["clobbopus", "sinistea", "snom", "kubfu"]) {
+    assert.deepEqual(getEvolutionItemEvolutions(speciesId), [], `${speciesId} must not also have an evolution-item evolution`);
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must not be a branch evolution`);
+  }
+});
+
+test("Applin is an explicit level-25 Branch choice between Flapple and Appletun, never a hidden/unmapped item value", () => {
+  const branch = getBranchEvolution("applin");
+  assert.equal(branch?.requiredLevel, 25);
+  assert.deepEqual(branch?.targets, ["flapple", "appletun"]);
+  assert.equal(getLevelEvolution("applin"), undefined, "Applin must never also have a level evolution entry");
+  assert.deepEqual(getEvolutionItemEvolutions("applin"), [], "Applin must never also have an evolution-item evolution");
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "applin", level: 24, attackStat: 0, defenseStat: 0 }), null);
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }), {
+    kind: "branch",
+    targets: ["flapple", "appletun"],
+  });
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "flapple"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "appletun"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "rillaboom"), false);
+});
+
+test("Milcery -> Alcremie evolves via Shiny Stone, the same Fairy-dessert-species precedent Spritzee/Swirlix already established", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("milcery", "shiny-stone")?.evolvesToSpeciesId, "alcremie");
+  assert.equal(getLevelEvolution("milcery"), undefined, "Milcery must never also have a level evolution entry");
+  assert.equal(getBranchEvolution("milcery"), undefined, "Milcery must never also have a branch evolution");
+});
+
+test("Galarian Meowth -> Perrserker and Galarian Ponyta -> Galarian Rapidash use their real canonical levels, identical to their Kantonian counterparts' own thresholds", () => {
+  assert.deepEqual(getLevelEvolution("meowth-galar"), { evolvesToSpeciesId: "perrserker", requiredLevel: 28 });
+  assert.equal(getLevelEvolution("meowth")?.requiredLevel, 28, "ordinary Meowth's own threshold is unchanged");
+  assert.deepEqual(getLevelEvolution("ponyta-galar"), { evolvesToSpeciesId: "rapidash-galar", requiredLevel: 40 });
+  assert.equal(getLevelEvolution("ponyta")?.requiredLevel, 40, "ordinary Ponyta's own threshold is unchanged");
+});
+
+test("Galarian Slowpoke branches exactly like ordinary Slowpoke: level -> Galarian Slowbro (37), King's Rock -> Galarian Slowking, mirroring the real species' own existing shape", () => {
+  assert.deepEqual(getLevelEvolution("slowpoke-galar"), { evolvesToSpeciesId: "slowbro-galar", requiredLevel: 37 });
+  assert.equal(getLevelEvolution("slowpoke")?.requiredLevel, 37, "ordinary Slowpoke's own level threshold into Slowbro is unchanged");
+  assert.equal(getEvolutionItemEvolutionByItem("slowpoke-galar", "kings-rock")?.evolvesToSpeciesId, "slowking-galar");
+  assert.equal(getEvolutionItemEvolutionByItem("slowpoke", "kings-rock")?.evolvesToSpeciesId, "slowking", "ordinary Slowpoke's own King's Rock branch into Slowking is unchanged");
+});
+
+test("Galarian Farfetch'd -> Sirfetch'd, Galarian Mr. Mime -> Mr. Rime, and Galarian Corsola -> Cursola use their assigned/real canonical levels", () => {
+  // Galarian Farfetch'd -> Sirfetch'd: former three-critical-hits battle-achievement evolution.
+  assert.deepEqual(getLevelEvolution("farfetchd-galar"), { evolvesToSpeciesId: "sirfetchd", requiredLevel: 30 });
+  // Galarian Mr. Mime -> Mr. Rime: real canonical level 42.
+  assert.deepEqual(getLevelEvolution("mr-mime-galar"), { evolvesToSpeciesId: "mr-rime", requiredLevel: 42 });
+  // Galarian Corsola -> Cursola: real canonical level 38.
+  assert.deepEqual(getLevelEvolution("corsola-galar"), { evolvesToSpeciesId: "cursola", requiredLevel: 38 });
+});
+
+test("Galarian Zigzagoon -> Galarian Linoone -> Obstagoon is a complete level chain (former night-time condition on the second step dropped, real canonical levels kept)", () => {
+  assert.deepEqual(getLevelEvolution("zigzagoon-galar"), { evolvesToSpeciesId: "linoone-galar", requiredLevel: 20 });
+  assert.equal(getLevelEvolution("zigzagoon")?.requiredLevel, 20, "ordinary Zigzagoon's own threshold into Linoone is unchanged");
+  assert.deepEqual(getLevelEvolution("linoone-galar"), { evolvesToSpeciesId: "obstagoon", requiredLevel: 35 });
+  assert.equal(getLevelEvolution("linoone"), undefined, "ordinary Linoone must never gain the Galar-only Obstagoon evolution");
+  assert.equal(getLevelEvolution("obstagoon"), undefined, "Obstagoon is a final evolution");
+});
+
+test("Galarian Darumaka -> Galarian Darmanitan evolves via Ice Stone, reusing the existing catalog item — ordinary Darumaka's own level-35 Darmanitan evolution is unchanged", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("darumaka-galar", "ice-stone")?.evolvesToSpeciesId, "darmanitan-galar");
+  assert.equal(getLevelEvolution("darumaka-galar"), undefined, "Galarian Darumaka must never also have a level evolution entry");
+  assert.deepEqual(getLevelEvolution("darumaka"), { evolvesToSpeciesId: "darmanitan", requiredLevel: 35 }, "ordinary Darumaka's own threshold is unchanged");
+});
+
+test("Galarian Yamask -> Runerigus is a plain level-34 evolution (former take-damage/location condition dropped) — ordinary (Unova) Yamask's own Cofagrigus evolution is unchanged, and neither ordinary species gains the other's Galar-only target", () => {
+  assert.deepEqual(getLevelEvolution("yamask-galar"), { evolvesToSpeciesId: "runerigus", requiredLevel: 34 });
+  assert.deepEqual(getLevelEvolution("yamask"), { evolvesToSpeciesId: "cofagrigus", requiredLevel: 34 }, "ordinary Yamask's own threshold into Cofagrigus is unchanged");
+  assert.equal(getLevelEvolution("runerigus"), undefined, "Runerigus is a final evolution");
+});
+
+test("ordinary (non-Galarian) forms never accidentally gain a Galar-only evolution: Meowth/Farfetch'd/Corsola/Yamask never evolve into Perrserker/Sirfetch'd/Cursola/Runerigus", () => {
+  assert.notEqual(getLevelEvolution("meowth")?.evolvesToSpeciesId, "perrserker");
+  assert.equal(getLevelEvolution("farfetchd"), undefined, "ordinary Farfetch'd must remain a standalone species with no evolution");
+  assert.equal(getLevelEvolution("corsola"), undefined, "ordinary Corsola must remain a standalone species with no evolution");
+  assert.notEqual(getLevelEvolution("yamask")?.evolvesToSpeciesId, "runerigus");
+});
+
+test("Galarian Forms use the exact live catalog ids — no Galarian source ever evolves into the Kantonian/Johto/Hoenn/Unova target, and vice versa", () => {
+  const galarianFormLevelEvolutions: [string, string][] = [
+    ["meowth-galar", "perrserker"],
+    ["ponyta-galar", "rapidash-galar"],
+    ["slowpoke-galar", "slowbro-galar"],
+    ["farfetchd-galar", "sirfetchd"],
+    ["mr-mime-galar", "mr-rime"],
+    ["corsola-galar", "cursola"],
+    ["zigzagoon-galar", "linoone-galar"],
+    ["linoone-galar", "obstagoon"],
+    ["yamask-galar", "runerigus"],
+  ];
+  for (const [speciesId, targetId] of galarianFormLevelEvolutions) {
+    assert.equal(getLevelEvolution(speciesId)?.evolvesToSpeciesId, targetId, `${speciesId} -> ${targetId}`);
+  }
+});
+
+test("Weezing, Galarian Weezing, Stunfisk, Galarian Stunfisk, and the three Galarian Legendary birds have no evolution of any kind", () => {
+  for (const id of ["weezing", "weezing-galar", "stunfisk", "stunfisk-galar", "articuno-galar", "zapdos-galar", "moltres-galar"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every genuinely standalone (non-evolving, non-legendary, non-fossil) Galar species has no evolution of any kind", () => {
+  const standaloneIds = ["cramorant", "falinks", "stonjourner", "eiscue", "indeedee", "morpeko", "pincurchin", "duraludon"];
+  for (const id of standaloneIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("the four fossil combinations (Dracozolt/Arctozolt/Dracovish/Arctovish) never evolve into or from one another, or anything else", () => {
+  const fossilIds = ["dracozolt", "arctozolt", "dracovish", "arctovish"];
+  for (const id of fossilIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.ok(!fossilIds.includes(evolution.evolvesToSpeciesId), `${evolution.evolvesToSpeciesId} is a fossil combination and must never be a level-evolution target`);
+  }
+});
+
+test("every Galar legendary/mythical species has no evolution of any kind (Zacian, Zamazenta, Eternatus, Zarude, Regieleki, Regidrago, Glastrier, Spectrier, Calyrex)", () => {
+  const legendaryIds = ["zacian", "zamazenta", "eternatus", "zarude", "regieleki", "regidrago", "glastrier", "spectrier", "calyrex"];
+  for (const id of legendaryIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+  // Kubfu -> Urshifu is the one Galar "legendary" evolution that DOES exist
+  // (LEVEL_EVOLUTIONS above) — Urshifu itself has no further evolution.
+  assert.equal(getLevelEvolution("urshifu"), undefined, "Urshifu is a final evolution");
+});
+
+test("no Calyrex fusion/rider form (Ice Rider/Shadow Rider) or Gigantamax form appears anywhere in the evolution registry", () => {
+  for (const fakeId of ["calyrex-ice", "calyrex-shadow", "calyrex-ice-rider", "calyrex-shadow-rider", "glastrier-fusion", "spectrier-fusion"]) {
+    assert.equal(getLevelEvolution(fakeId), undefined);
+    assert.deepEqual(getEvolutionItemEvolutions(fakeId), []);
+    assert.equal(getBranchEvolution(fakeId), undefined);
+  }
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.ok(!evolution.evolvesToSpeciesId.includes("calyrex-"), `${evolution.evolvesToSpeciesId} must never be a Calyrex fusion form`);
+  }
+});
+
+test("no new evolution item was introduced for Galar: still exactly the same 16 EvolutionItemId values", () => {
+  const canonicalIds = [
+    "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
+    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+  ];
+  assert.equal(canonicalIds.length, 16);
+  for (const itemId of canonicalIds) {
+    assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
+  }
+  for (const fakeGalarItem of ["tart-apple", "sweet-apple", "galarica-cuff", "galarica-wreath", "cracked-pot", "chipped-pot", "scroll-of-darkness", "scroll-of-waters"]) {
+    assert.equal(isEvolutionItemId(fakeGalarItem), false, `${fakeGalarItem} must never be a recognized EvolutionItemId`);
+  }
+});
+
+test("no duplicate evolution definitions: no Galar species is a key in more than one of LEVEL_EVOLUTIONS/BRANCH_EVOLUTIONS", () => {
+  const galarSpeciesIds = POKEMON_DATA.filter((species) => species.dexNumber >= 810 && species.dexNumber <= 898 || species.formLabel === "Galarian Form").map(
+    (species) => species.id
+  );
+  for (const speciesId of galarSpeciesIds) {
+    const hasLevel = getLevelEvolution(speciesId) !== undefined;
+    const hasBranch = getBranchEvolution(speciesId) !== undefined;
+    assert.ok(!(hasLevel && hasBranch), `${speciesId} must not be a key in both LEVEL_EVOLUTIONS and BRANCH_EVOLUTIONS`);
+  }
+});
+
+test("every Galar evolution target references a valid species id in the live catalog", () => {
+  const speciesIds = new Set(POKEMON_DATA.map((species) => species.id));
+  const galarSourceIds = [
+    "grookey", "thwackey", "scorbunny", "raboot", "sobble", "drizzile", "skwovet", "rookidee", "corvisquire",
+    "blipbug", "dottler", "nickit", "gossifleur", "wooloo", "chewtle", "yamper", "rolycoly", "carkol",
+    "applin", "silicobra", "arrokuda", "toxel", "sizzlipede", "clobbopus", "sinistea", "hatenna", "hattrem",
+    "impidimp", "morgrem", "milcery", "snom", "cufant", "dreepy", "drakloak", "kubfu",
+    "meowth-galar", "ponyta-galar", "slowpoke-galar", "farfetchd-galar", "mr-mime-galar", "corsola-galar",
+    "zigzagoon-galar", "linoone-galar", "darumaka-galar", "yamask-galar",
+  ];
+
+  for (const speciesId of galarSourceIds) {
+    assert.ok(speciesIds.has(speciesId), `test assumption: ${speciesId} must exist in the catalog`);
+
+    const levelEvolution = getLevelEvolution(speciesId);
+    if (levelEvolution) {
+      assert.ok(speciesIds.has(levelEvolution.evolvesToSpeciesId), `${levelEvolution.evolvesToSpeciesId} (level target of ${speciesId}) must be a valid species id`);
+    }
+
+    for (const itemEvolution of getEvolutionItemEvolutions(speciesId)) {
+      assert.ok(speciesIds.has(itemEvolution.evolvesToSpeciesId), `${itemEvolution.evolvesToSpeciesId} (item target of ${speciesId}) must be a valid species id`);
+      assert.ok(isEvolutionItemId(itemEvolution.itemId), `${itemEvolution.itemId} (item used by ${speciesId}) must be a recognized EvolutionItemId`);
+    }
+
+    const branchEvolution = getBranchEvolution(speciesId);
+    if (branchEvolution) {
+      for (const targetId of branchEvolution.targets) {
+        assert.ok(speciesIds.has(targetId), `${targetId} (branch target of ${speciesId}) must be a valid species id`);
+      }
+    }
+  }
+});
+
+// Counted explicitly: 33 new LEVEL_EVOLUTIONS entries keyed by a base Gen
+// VIII species (grookey/thwackey/scorbunny/raboot/sobble/drizzile/skwovet/
+// rookidee/corvisquire/blipbug/dottler/nickit/gossifleur/wooloo/chewtle/
+// yamper/rolycoly/carkol/silicobra/arrokuda/toxel/sizzlipede/clobbopus/
+// sinistea/hatenna/hattrem/impidimp/morgrem/snom/cufant/dreepy/drakloak/
+// kubfu) + 9 Galarian-Form LEVEL_EVOLUTIONS entries (meowth-galar/
+// ponyta-galar/slowpoke-galar/farfetchd-galar/mr-mime-galar/corsola-galar/
+// zigzagoon-galar/linoone-galar/yamask-galar) = 42 total new
+// LEVEL_EVOLUTIONS rows. Item evolutions: milcery (shiny-stone) +
+// darumaka-galar (ice-stone) + slowpoke-galar (kings-rock) = 3 new
+// EVOLUTION_ITEM_EVOLUTIONS rows. Branch evolutions: applin = 1 new
+// BRANCH_EVOLUTIONS entry.
+test("total evolution counts include exactly 42 new Galar level evolutions, 3 new Galar evolution-item evolutions, and 1 new Galar branch evolution", () => {
+  const galarBaseLevelIds = [
+    "grookey", "thwackey", "scorbunny", "raboot", "sobble", "drizzile", "skwovet", "rookidee", "corvisquire",
+    "blipbug", "dottler", "nickit", "gossifleur", "wooloo", "chewtle", "yamper", "rolycoly", "carkol",
+    "silicobra", "arrokuda", "toxel", "sizzlipede", "clobbopus", "sinistea", "hatenna", "hattrem",
+    "impidimp", "morgrem", "snom", "cufant", "dreepy", "drakloak", "kubfu",
+  ];
+  const galarianFormLevelIds = [
+    "meowth-galar", "ponyta-galar", "slowpoke-galar", "farfetchd-galar", "mr-mime-galar",
+    "corsola-galar", "zigzagoon-galar", "linoone-galar", "yamask-galar",
+  ];
+
+  assert.equal(galarBaseLevelIds.length, 33);
+  assert.equal(galarianFormLevelIds.length, 9);
+  for (const id of [...galarBaseLevelIds, ...galarianFormLevelIds]) {
+    assert.ok(getLevelEvolution(id), `${id} must have a level evolution entry`);
+  }
+
+  assert.equal(getEvolutionItemEvolutions("milcery").length, 1);
+  assert.equal(getEvolutionItemEvolutions("darumaka-galar").length, 1);
+  assert.equal(getEvolutionItemEvolutions("slowpoke-galar").length, 1);
+
+  assert.ok(getBranchEvolution("applin"));
 });
 
 test("deriveSpeciesWildLevelRange across the entire catalog never produces minimumLevel > maximumLevel", () => {

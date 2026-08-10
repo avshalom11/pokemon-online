@@ -730,6 +730,148 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // inventing a different Trade replacement just for Alola.
   "graveler-alola": { evolvesToSpeciesId: "golem-alola", requiredLevel: 36 },
   "grimer-alola": { evolvesToSpeciesId: "muk-alola", requiredLevel: 38 },
+
+  // Generation VIII (Galar, Phase 2) — same "unconditional level-up only"
+  // scope as every generation above, plus this phase's own explicit
+  // simplification rules for the official Galar mechanics this project
+  // doesn't implement:
+  //   - Move-Known (Clobbopus -> Grapploct/Taunt) is dropped; level 35 is
+  //     used instead (this phase's own explicit spec — no canonical level
+  //     exists in the source games either, since the real requirement is
+  //     purely the move, not a level).
+  //   - Friendship+Time(night) (Snom -> Frosmoth) is dropped; Snom has no
+  //     pre-evolution of its own, so it gets the same default level-16
+  //     every prior no-preevolution Friendship simplification in this file
+  //     uses (Woobat, Type: Null, etc.).
+  //   - Tower-progression/version-exclusive-style-item (Kubfu -> Urshifu,
+  //     Scroll of Darkness/Scroll of Waters choosing Single Strike vs Rapid
+  //     Strike Style) is dropped; this project only implements ONE Urshifu
+  //     representation (Single Strike Style, Galar Phase 1's own explicit
+  //     scope) so there is only one possible target — a plain level-40
+  //     evolution, no style choice, matching the same default this file's
+  //     other former-story-progression Legendary evolutions already use
+  //     (Type: Null -> Silvally, Meltan -> Melmetal, both level 40).
+  //   - Cracked Pot/Chipped Pot (Sinistea -> Polteageist, item choice
+  //     depending on Sinistea's own Antique/Phony form) is dropped; this
+  //     project only implemented ONE Sinistea/Polteageist representation
+  //     (Galar Phase 1's own explicit scope, no Antique/Phony form logic),
+  //     and neither pot item has a natural existing-item analog in this
+  //     catalog's 16 Evolution Stones/Items — a plain level-32 evolution is
+  //     used instead (priority 2 of this phase's own simplification
+  //     philosophy: existing item first, otherwise level).
+  //   - Every other Galar species below (Grookey/Scorbunny/Sobble lines,
+  //     Skwovet, Rookidee, Blipbug, Nickit, Gossifleur, Wooloo, Chewtle,
+  //     Yamper, Rolycoly, Silicobra, Arrokuda, Toxel, Sizzlipede, Hatenna,
+  //     Impidimp, Cufant, Dreepy) already uses a plain canonical level in
+  //     the source games — kept exactly as-is, no simplification needed.
+  //   - Applin's real-game item branch (Tart Apple -> Flapple, Sweet Apple
+  //     -> Appletun) is NOT here — see BRANCH_EVOLUTIONS below (neither
+  //     item has an existing-catalog analog, so this becomes an explicit
+  //     player choice, the same shape Wurmple/Nincada/Burmy already use).
+  //   - Milcery's real-game "spin while holding a Sweet" mechanic is NOT
+  //     here — see EVOLUTION_ITEM_EVOLUTIONS below (Shiny Stone, reusing
+  //     the exact same Fairy-dessert-species precedent Spritzee/Swirlix
+  //     already established in Kalos Phase 2).
+  //   - Standalone/fossil/legendary species (Cramorant, Falinks,
+  //     Stonjourner, Eiscue, Indeedee, Morpeko, Pincurchin, Dracozolt/
+  //     Arctozolt/Dracovish/Arctovish, Zacian, Zamazenta, Eternatus, Zarude,
+  //     Regieleki, Regidrago, Glastrier, Spectrier, Calyrex, and the three
+  //     Galarian Legendary birds) are all deliberately absent here — none
+  //     of them evolve.
+  grookey: { evolvesToSpeciesId: "thwackey", requiredLevel: 16 },
+  thwackey: { evolvesToSpeciesId: "rillaboom", requiredLevel: 35 },
+  scorbunny: { evolvesToSpeciesId: "raboot", requiredLevel: 16 },
+  raboot: { evolvesToSpeciesId: "cinderace", requiredLevel: 35 },
+  sobble: { evolvesToSpeciesId: "drizzile", requiredLevel: 16 },
+  drizzile: { evolvesToSpeciesId: "inteleon", requiredLevel: 35 },
+  skwovet: { evolvesToSpeciesId: "greedent", requiredLevel: 24 },
+  rookidee: { evolvesToSpeciesId: "corvisquire", requiredLevel: 18 },
+  corvisquire: { evolvesToSpeciesId: "corviknight", requiredLevel: 38 },
+  blipbug: { evolvesToSpeciesId: "dottler", requiredLevel: 10 },
+  dottler: { evolvesToSpeciesId: "orbeetle", requiredLevel: 30 },
+  nickit: { evolvesToSpeciesId: "thievul", requiredLevel: 18 },
+  gossifleur: { evolvesToSpeciesId: "eldegoss", requiredLevel: 20 },
+  wooloo: { evolvesToSpeciesId: "dubwool", requiredLevel: 24 },
+  chewtle: { evolvesToSpeciesId: "drednaw", requiredLevel: 22 },
+  yamper: { evolvesToSpeciesId: "boltund", requiredLevel: 25 },
+  rolycoly: { evolvesToSpeciesId: "carkol", requiredLevel: 18 },
+  carkol: { evolvesToSpeciesId: "coalossal", requiredLevel: 34 },
+  silicobra: { evolvesToSpeciesId: "sandaconda", requiredLevel: 36 },
+  arrokuda: { evolvesToSpeciesId: "barraskewda", requiredLevel: 26 },
+  toxel: { evolvesToSpeciesId: "toxtricity", requiredLevel: 30 },
+  sizzlipede: { evolvesToSpeciesId: "centiskorch", requiredLevel: 28 },
+  // Clobbopus -> Grapploct: former Move-Known (Taunt) evolution, now a
+  // plain level evolution — see this block's own top note.
+  clobbopus: { evolvesToSpeciesId: "grapploct", requiredLevel: 35 },
+  // Sinistea -> Polteageist: former Cracked Pot/Chipped Pot (Antique/Phony
+  // form dependent) evolution, now a plain level evolution — see this
+  // block's own top note.
+  sinistea: { evolvesToSpeciesId: "polteageist", requiredLevel: 32 },
+  hatenna: { evolvesToSpeciesId: "hattrem", requiredLevel: 32 },
+  hattrem: { evolvesToSpeciesId: "hatterene", requiredLevel: 42 },
+  impidimp: { evolvesToSpeciesId: "morgrem", requiredLevel: 32 },
+  morgrem: { evolvesToSpeciesId: "grimmsnarl", requiredLevel: 42 },
+  // Snom -> Frosmoth: former Friendship+Time(night) evolution, now the
+  // default level 16 (no pre-evolution of its own, so no collision) — see
+  // this block's own top note.
+  snom: { evolvesToSpeciesId: "frosmoth", requiredLevel: 16 },
+  cufant: { evolvesToSpeciesId: "copperajah", requiredLevel: 34 },
+  dreepy: { evolvesToSpeciesId: "drakloak", requiredLevel: 50 },
+  drakloak: { evolvesToSpeciesId: "dragapult", requiredLevel: 60 },
+  // Kubfu -> Urshifu: former tower-progression/style-item evolution, now a
+  // plain level evolution to this project's single Urshifu representation
+  // — see this block's own top note.
+  kubfu: { evolvesToSpeciesId: "urshifu", requiredLevel: 40 },
+
+  // Galarian Forms — regional variants whose BASE entries live in
+  // generation-1/2/3/5-pokemon-data.ts (Galar Phase 1's own Forms work).
+  // See this block's own top note for the full rationale of each
+  // simplification.
+  // Galarian Meowth -> Perrserker: real canonical level 28, identical to
+  // ordinary Meowth's own level-28 threshold into Persian — no
+  // simplification needed, already level-based in the source games.
+  "meowth-galar": { evolvesToSpeciesId: "perrserker", requiredLevel: 28 },
+  // Galarian Ponyta -> Galarian Rapidash: real canonical level 40,
+  // identical to ordinary Ponyta's own level-40 threshold — no
+  // simplification needed.
+  "ponyta-galar": { evolvesToSpeciesId: "rapidash-galar", requiredLevel: 40 },
+  // Galarian Slowpoke -> Galarian Slowbro: real canonical item (Galarica
+  // Cuff) is dropped; this project mirrors ordinary Slowpoke's own EXACT
+  // branch shape instead (level -> Slowbro, evolution-item -> Slowking,
+  // see EVOLUTION_ITEM_EVOLUTIONS below for the Galarian Slowking branch)
+  // — same level-37 threshold as ordinary Slowpoke -> Slowbro, reused
+  // rather than inventing a different number.
+  "slowpoke-galar": { evolvesToSpeciesId: "slowbro-galar", requiredLevel: 37 },
+  // Galarian Farfetch'd -> Sirfetch'd: real canonical condition is landing
+  // three critical hits in a single battle, a battle-achievement mechanic
+  // this project doesn't implement — mapped to a plain level-30 evolution
+  // instead (this phase's own explicit spec; Farfetch'd-galar has no
+  // pre-evolution of its own, so no collision).
+  "farfetchd-galar": { evolvesToSpeciesId: "sirfetchd", requiredLevel: 30 },
+  // Galarian Mr. Mime -> Mr. Rime: real canonical level 42 — no
+  // simplification needed, already level-based in the source games.
+  "mr-mime-galar": { evolvesToSpeciesId: "mr-rime", requiredLevel: 42 },
+  // Galarian Corsola -> Cursola: real canonical level 38 — no
+  // simplification needed, already level-based in the source games.
+  "corsola-galar": { evolvesToSpeciesId: "cursola", requiredLevel: 38 },
+  // Galarian Zigzagoon -> Galarian Linoone: real canonical level 20,
+  // identical to ordinary Zigzagoon's own level-20 threshold into Linoone
+  // — no simplification needed.
+  "zigzagoon-galar": { evolvesToSpeciesId: "linoone-galar", requiredLevel: 20 },
+  // Galarian Linoone -> Obstagoon: real canonical level 35 PLUS a
+  // Time-of-day(night) condition — the night requirement is dropped (same
+  // "no time-of-day mechanic" rule this file already applies everywhere
+  // else), the real canonical level 35 is kept.
+  "linoone-galar": { evolvesToSpeciesId: "obstagoon", requiredLevel: 35 },
+  // Galarian Yamask -> Runerigus: real canonical condition is taking at
+  // least 49 HP of damage in the Dusty Bowl without fainting then walking
+  // under a specific stone arch — a location/damage mechanic this project
+  // doesn't implement. Mapped to a plain level-34 evolution instead,
+  // matching ordinary (Unova) Yamask's own level-34 threshold into
+  // Cofagrigus — both Yamask lines share identical base stats (Galar
+  // Phase 1's own explicit judgment call), so the same threshold is reused
+  // rather than inventing a different number.
+  "yamask-galar": { evolvesToSpeciesId: "runerigus", requiredLevel: 34 },
 };
 
 // The one place a species' level-evolution target/threshold is ever looked
@@ -1064,6 +1206,33 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // in this catalog; no new evolution item introduced.
   "sandshrew-alola": [{ method: "evolution-item", evolvesToSpeciesId: "sandslash-alola", itemId: "ice-stone" }],
   "vulpix-alola": [{ method: "evolution-item", evolvesToSpeciesId: "ninetales-alola", itemId: "ice-stone" }],
+
+  // Generation VIII (Galar, Phase 2) — every itemId used here is one of the
+  // 16 EvolutionItemId values already in this catalog; no new evolution
+  // item is introduced for Galar.
+  // Milcery -> Alcremie: real-game mechanic is spinning (specific
+  // controller motion) while holding one of several decorative Sweets,
+  // which decide Alcremie's cosmetic flavor/deco variant — this project
+  // doesn't implement spinning or decorative-item mechanics, and Galar
+  // Phase 1 only implemented ONE Alcremie representation. Mapped onto
+  // Shiny Stone instead, reusing the exact same Fairy-dessert-species
+  // precedent Spritzee -> Aromatisse and Swirlix -> Slurpuff (Kalos Phase
+  // 2) already established, rather than inventing a new evolution product.
+  milcery: [{ method: "evolution-item", evolvesToSpeciesId: "alcremie", itemId: "shiny-stone" }],
+  // Galarian Slowpoke -> Galarian Slowking: real canonical item (Galarica
+  // Wreath) is dropped; this project mirrors ordinary Slowpoke's own EXACT
+  // Slowking branch instead — King's Rock, the same item ordinary Slowpoke
+  // already uses to reach ordinary Slowking (see slowpoke's own entry
+  // above), reused verbatim rather than inventing a different item.
+  // Galarian Slowpoke's OTHER branch (-> Galarian Slowbro) is a plain level
+  // evolution — see LEVEL_EVOLUTIONS above, never this table.
+  "slowpoke-galar": [{ method: "evolution-item", evolvesToSpeciesId: "slowking-galar", itemId: "kings-rock" }],
+  // Galarian Darumaka -> Galarian Darmanitan: real-game Ice Stone
+  // evolution — Ice Stone already exists in this catalog (introduced in
+  // the Sinnoh Phase 2 design correction for Eevee -> Glaceon), reused
+  // directly per this phase's own explicit instruction; no new evolution
+  // item is introduced.
+  "darumaka-galar": [{ method: "evolution-item", evolvesToSpeciesId: "darmanitan-galar", itemId: "ice-stone" }],
 };
 
 // Every evolution-item branch a species has, regardless of which item —
@@ -1231,6 +1400,18 @@ const BRANCH_EVOLUTIONS: Record<string, BranchEvolution> = {
   // condition of any kind decides between the two — the player always
   // explicitly picks.
   cubone: { requiredLevel: 28, targets: ["marowak", "marowak-alola"] },
+
+  // Generation VIII (Galar, Phase 2) — Applin's real-game evolution is
+  // decided by which of two items (Tart Apple -> Flapple, Sweet Apple ->
+  // Appletun) the player uses; neither has a natural existing-item analog
+  // in this catalog's 16 Evolution Stones/Items (unlike Milcery/Galarian
+  // Darumaka above, where an existing item fit cleanly — see
+  // EVOLUTION_ITEM_EVOLUTIONS' own Galar note), so — same "no
+  // hidden/random/unmapped-item value" rule Wurmple/Nincada/Burmy already
+  // established — it becomes an explicit level-25 player CHOICE between
+  // both real targets instead, reusing the exact same create-choice/
+  // then-confirm flow, zero new mechanics.
+  applin: { requiredLevel: 25, targets: ["flapple", "appletun"] },
 };
 
 // The one place a species' Branch Evolution is ever looked up — mirrors

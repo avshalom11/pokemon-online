@@ -80,7 +80,7 @@ test("every level-up entry has a positive integer level (never 0)", () => {
   }
 });
 
-test("the real registry loads all Generation 1, Generation 2, Generation 3, Generation 4, Generation 5, Generation 6, and Generation 7 learnsets", () => {
+test("the real registry loads all Generation 1, Generation 2, Generation 3, Generation 4, Generation 5, Generation 6, Generation 7, and Generation 8 learnsets", () => {
   // 151 Generation 1 + 100 Generation 2 + 138 Generation 3 + 113
   // Generation 4 (Sinnoh Moves & Learnsets Phase 3 — 107 Sinnoh base
   // species + 6 alternate forms) + 163 Generation 5 (Unova Moves &
@@ -88,10 +88,12 @@ test("the real registry loads all Generation 1, Generation 2, Generation 3, Gene
   // species + 7 alternate forms) + 73 Generation 6 (Kalos Moves &
   // Learnsets Phase 3 — 72 Kalos base species + 1 alternate form) + 108
   // Generation 7 (Alola Moves & Learnsets Phase 3 — 88 Alola base species
-  // + 18 Alolan Forms + 2 Lycanroc alternate forms) = 846. Update this
-  // number deliberately whenever a new generation's learnset data is
-  // registered — see engine/learnsets/data/index.ts.
-  assert.equal(getAllLearnsets().length, 846);
+  // + 18 Alolan Forms + 2 Lycanroc alternate forms) + 108 Generation 8
+  // (Galar Moves & Learnsets Phase 3 — 89 Galar base species + 19
+  // Galarian Forms) = 954. Update this number deliberately whenever a new
+  // generation's learnset data is registered — see
+  // engine/learnsets/data/index.ts.
+  assert.equal(getAllLearnsets().length, 954);
 });
 
 test("queries continue to work correctly against the populated registry", () => {
