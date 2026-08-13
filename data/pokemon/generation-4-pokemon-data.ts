@@ -6,6 +6,22 @@ import type { PokemonSpecies } from "@/shared/types/pokemon";
 // combined export remains the one source of truth every other module reads
 // from; nothing outside data/pokemon/ should import this file directly.
 //
+// PRE-PALDEA STEP — 7 more species appended at the end of this array
+// (#0899-#0905: Wyrdeer, Kleavor, Ursaluna, Basculegion, Sneasler, Overqwil,
+// Enamorus). This project has no per-species RegionId field — regional
+// ownership is represented purely by which generation-N-pokemon-data.ts
+// file a species lives in (see this project's own Region Registry,
+// features/regions/data/region-registry.ts, which has no species-level
+// membership concept at all). These 7 are explicitly Sinnoh-owned by
+// project decision (most are new evolutions of existing Sinnoh-catalog or
+// Johto species reachable in the Hisui setting), so they belong in THIS
+// file, not a new "generation 9"/Paldea file, even though their National
+// Dex numbers (899-905) fall immediately before Paldea's own #906+ range
+// and outside this file's own official #387-493 span. Extending
+// POKEMON_DATA's own base-dex sequence through #905 is a deliberate
+// side effect (see pokemon-data.test.ts); they are never counted as
+// Paldea species anywhere in this codebase.
+//
 // Sinnoh Phase 1 scope (species/catalog data only): evolutions, learnsets,
 // Sinnoh zone encounter tables, moves, the map, and battle are deliberately
 // NOT part of this file — those are separate future phases, the same
@@ -1177,5 +1193,372 @@ export const GENERATION_4_POKEMON_DATA: PokemonSpecies[] = [
     rarity: "legendary",
     baseStats: { health: 120, attack: 120, defense: 120, specialAttack: 120, specialDefense: 120, speed: 120 },
     imageUrl: "/pokemon/arceus.png",
+  },
+
+  // ==========================================================================
+  // PRE-PALDEA STEP — #0899-#0905, appended after Arceus (#493) rather than
+  // interleaved in dex order, since these 7 sit far outside this file's own
+  // official #387-493 range (see this file's own top-of-file note). Each is
+  // a genuinely new evolution of an existing Sinnoh/Johto species, reached
+  // through a Hisuian mechanic this project doesn't implement — see
+  // pokemon-evolutions.ts's own "PRE-PALDEA STEP" block for exactly how
+  // each unsupported mechanic (Agile/Strong Style move counts, Peat Block,
+  // recoil-damage tracking, day/night Razor Claw) was simplified to a plain
+  // level-40 evolution, the same "former unsupported mechanic -> default
+  // level 40" precedent Kubfu -> Urshifu / Type: Null -> Silvally / Meltan
+  // -> Melmetal already established. No Hisuian regional pre-evolution
+  // forms (White-Striped Basculin, Hisuian Sneasel, Hisuian Qwilfish) exist
+  // in this catalog — confirmed absent by inspection (see
+  // pokemon-data.test.ts's own "Basculin ... has no alternate-form
+  // entries" invariant, still true after this addition) — so Basculegion,
+  // Sneasler, and Overqwil all evolve directly from their ordinary,
+  // already-cataloged pre-evolution instead of an unapproved invented form.
+  // Rarity follows this project's existing "ordinary fully-evolved species
+  // are rare" rule (same tier as Weavile, another fully-evolved former-item
+  // evolution) for five of the six non-legendary species; Enamorus is
+  // "legendary", matching the Tornadus/Thundurus/Landorus family precedent
+  // it shares a Forme shape with. Kleavor's rarity was later revised from
+  // "rare" to real "very-rare" as part of the user-approved Sinnoh
+  // encounter-zone placement step (data/zones/sinnoh-zone-data.ts) — see
+  // that file's own encounterWeight convention note; no other species'
+  // rarity was touched by that revision. No Gigantamax, Alpha, or any other
+  // Hisui/Legends: Arceus battle-only visual is represented — same "never a
+  // species-level form" rule every prior generation's Forms work already
+  // follows.
+  // ==========================================================================
+  {
+    id: "wyrdeer",
+    name: "Wyrdeer",
+    description: "פוקימון איילים אצילי, קרניו המפותלות מאפשרות לו לשלוט בכוחות פסיכיים עתיקים.",
+    dexNumber: 899,
+    types: ["normal", "psychic"],
+    rarity: "rare",
+    baseStats: { health: 103, attack: 105, defense: 72, specialAttack: 105, specialDefense: 32, speed: 65 },
+    imageUrl: "/pokemon/wyrdeer.png",
+  },
+  {
+    id: "kleavor",
+    name: "Kleavor",
+    description: "פוקימון עם טפרים חדים כגרזן אבן, חוצב דרכו ביערות סבוכים בכוח בלתי נתפס.",
+    dexNumber: 900,
+    types: ["bug", "rock"],
+    // Final user-approved rarity (Sinnoh encounter-zone placement step):
+    // rare -> very-rare. Every other Pre-Paldea species keeps its original
+    // rarity from the previous step unchanged.
+    rarity: "very-rare",
+    baseStats: { health: 70, attack: 135, defense: 95, specialAttack: 45, specialDefense: 70, speed: 85 },
+    imageUrl: "/pokemon/kleavor.png",
+  },
+  {
+    id: "ursaluna",
+    name: "Ursaluna",
+    description: "פוקימון דוב ענק הספוג באנרגיית ירח מלא, חושיו המחודדים מאתרים טרף אף מתחת לאדמה.",
+    dexNumber: 901,
+    types: ["ground", "normal"],
+    rarity: "rare",
+    baseStats: { health: 130, attack: 140, defense: 105, specialAttack: 45, specialDefense: 80, speed: 50 },
+    imageUrl: "/pokemon/ursaluna.png",
+  },
+  {
+    id: "basculegion",
+    name: "Basculegion",
+    description: "פוקימון דג רוח, נוצר מנשמותיהם של באסקולין שנפלו במסע הנדידה המפרך.",
+    dexNumber: 902,
+    types: ["water", "ghost"],
+    rarity: "rare",
+    baseStats: { health: 120, attack: 112, defense: 65, specialAttack: 80, specialDefense: 75, speed: 78 },
+    imageUrl: "/pokemon/basculegion.png",
+  },
+  {
+    id: "sneasler",
+    name: "Sneasler",
+    description: "פוקימון עם טפרים ארסיים, מטפס במהירות על צוקים תלולים בעזרת אחיזתו החזקה.",
+    dexNumber: 903,
+    types: ["fighting", "poison"],
+    rarity: "rare",
+    baseStats: { health: 80, attack: 130, defense: 60, specialAttack: 40, specialDefense: 80, speed: 120 },
+    imageUrl: "/pokemon/sneasler.png",
+  },
+  {
+    id: "overqwil",
+    name: "Overqwil",
+    description: "פוקימון עם קוצים ארסיים חדים כמחט, יורה אותם בעוצמה רבה על כל מי שמאיים עליו.",
+    dexNumber: 904,
+    types: ["dark", "poison"],
+    rarity: "rare",
+    baseStats: { health: 85, attack: 115, defense: 95, specialAttack: 65, specialDefense: 65, speed: 85 },
+    imageUrl: "/pokemon/overqwil.png",
+  },
+  {
+    id: "enamorus",
+    name: "Enamorus",
+    description: "פוקימון אגדי, אנרגיית האהבה שבתוכו יכולה גם לרפא וגם להרוס ביבשות שלמות.",
+    dexNumber: 905,
+    types: ["fairy", "flying"],
+    rarity: "legendary",
+    baseStats: { health: 74, attack: 115, defense: 70, specialAttack: 135, specialDefense: 80, speed: 106 },
+    imageUrl: "/pokemon/enamorus.png",
+  },
+
+  // ==========================================================================
+  // PRE-PALDEA — 17 HISUIAN FORMS. Static alternate-form rows, the exact
+  // same architecture as the 18 Alolan Forms and 19 Galarian Forms
+  // (generation-1/7/8-pokemon-data.ts) — each shares ITS OWN dex-identity
+  // ordinary counterpart's dexNumber via `formOf`, uses formLabel "Hisuian
+  // Form", and a spriteId of the ordinary dex number + "H" (verified
+  // against the real on-disk sprite files, public/assets/pokemon/sprites/
+  // front|back/, before being referenced here — all 17 exist for both
+  // front and back). Placed here, in Sinnoh's own catalog file, rather
+  // than scattered across the generation-1/2/5/6/7 files their ordinary
+  // counterparts actually live in — same regional-ownership philosophy the
+  // earlier Pre-Paldea #899-905 species already established (this project
+  // has no per-species RegionId field; regional ownership is represented
+  // purely by catalog-file placement). buildAlternateFormsIndex (features/
+  // pokemon/forms/pokemon-forms.ts) groups purely by `formOf` string across
+  // the whole combined POKEMON_DATA, so catalog-file placement never
+  // matters to the Forms system itself — exactly the same "placement is
+  // free" note the Galarian Forms section already makes.
+  //
+  // REAL rarity (user-approved rule): every Hisuian Form copies its
+  // ordinary counterpart's exact live PokemonSpecies.rarity — never a
+  // canonical Hisui-availability judgment call. See pokemon-data.test.ts's
+  // own locking test for the full per-species mapping.
+  //
+  // Three of these 17 (Hisuian Qwilfish, Hisuian Sneasel, Hisuian Basculin)
+  // are explicitly non-evolving in both directions — user-approved
+  // game-design decision, NOT the real Legends: Arceus mechanics — see
+  // pokemon-evolutions.ts's own "PRE-PALDEA — 17 HISUIAN FORMS" blocks for
+  // the full evolution representation of all 17 (branch evolutions,
+  // evolution-item branches, and the two direct Hisuian-to-Hisuian level
+  // evolutions).
+  //
+  // Sprite ids for three species were corrected mid-implementation from the
+  // naive "own dex number + H" pattern after verifying the real on-disk
+  // files: Hisuian Sliggoo (dex 705) uses spriteId "0706H" (not "0705H"),
+  // Hisuian Goodra (dex 706) uses spriteId "0707H" (not "0706H"), and
+  // Hisuian Avalugg (dex 713) uses spriteId "0714H" (not "0713H") — all
+  // three verified to exist on disk under these exact filenames; dexNumber
+  // itself (the true National Dex identity) is unaffected for all three.
+  // ==========================================================================
+  {
+    id: "growlithe-hisui",
+    name: "Hisuian Growlithe",
+    description: "פוקימון כלב אש מהאזור ההררי היסוי, פרוותו הסלעית מגנה עליו מפגיעות בטריטוריה קשוחה.",
+    dexNumber: 58,
+    types: ["fire", "rock"],
+    rarity: "common",
+    baseStats: { health: 60, attack: 75, defense: 45, specialAttack: 65, specialDefense: 50, speed: 55 },
+    imageUrl: "/pokemon/growlithe-hisui.png",
+    formOf: "growlithe",
+    formLabel: "Hisuian Form",
+    spriteId: "0058H",
+  },
+  {
+    id: "arcanine-hisui",
+    name: "Hisuian Arcanine",
+    description: "פוקימון כלב אגדי מהיסוי, שילוב של אש וסלע הופך אותו לעוצמתי במיוחד בקרב פנים אל פנים.",
+    dexNumber: 59,
+    types: ["fire", "rock"],
+    rarity: "rare",
+    baseStats: { health: 90, attack: 115, defense: 80, specialAttack: 60, specialDefense: 80, speed: 90 },
+    imageUrl: "/pokemon/arcanine-hisui.png",
+    formOf: "arcanine",
+    formLabel: "Hisuian Form",
+    spriteId: "0059H",
+  },
+  {
+    id: "voltorb-hisui",
+    name: "Hisuian Voltorb",
+    description: "פוקימון עגול שנוצר בטעות מתוך פוקה-בול עתיק, טעון באנרגיית טבע ירוקה במקום חשמל טהור.",
+    dexNumber: 100,
+    types: ["electric", "grass"],
+    rarity: "common",
+    baseStats: { health: 40, attack: 30, defense: 50, specialAttack: 55, specialDefense: 55, speed: 100 },
+    imageUrl: "/pokemon/voltorb-hisui.png",
+    formOf: "voltorb",
+    formLabel: "Hisuian Form",
+    spriteId: "0100H",
+  },
+  {
+    id: "electrode-hisui",
+    name: "Hisuian Electrode",
+    description: "פוקימון עגול חשמלי-צמחי, מתפוצץ בעוצמה תוך שחרור ניצוצות ירוקים מרהיבים.",
+    dexNumber: 101,
+    types: ["electric", "grass"],
+    rarity: "common",
+    baseStats: { health: 60, attack: 50, defense: 70, specialAttack: 80, specialDefense: 80, speed: 150 },
+    imageUrl: "/pokemon/electrode-hisui.png",
+    formOf: "electrode",
+    formLabel: "Hisuian Form",
+    spriteId: "0101H",
+  },
+  {
+    id: "typhlosion-hisui",
+    name: "Hisuian Typhlosion",
+    description: "פוקימון עם רעמת אש רוחנית, נאמר שהוא מוביל את נשמות הפוקימונים שנפלו אל מנוחתן.",
+    dexNumber: 157,
+    types: ["fire", "ghost"],
+    rarity: "very-rare",
+    baseStats: { health: 73, attack: 84, defense: 78, specialAttack: 119, specialDefense: 85, speed: 95 },
+    imageUrl: "/pokemon/typhlosion-hisui.png",
+    formOf: "typhlosion",
+    formLabel: "Hisuian Form",
+    spriteId: "0157H",
+  },
+  {
+    id: "qwilfish-hisui",
+    name: "Hisuian Qwilfish",
+    description: "פוקימון עם קוצים ארסיים כהים, פעיל בעיקר בשעות החשכה ואינו מתפתח לצורה נוספת.",
+    dexNumber: 211,
+    types: ["dark", "poison"],
+    rarity: "rare",
+    baseStats: { health: 65, attack: 95, defense: 85, specialAttack: 55, specialDefense: 55, speed: 85 },
+    imageUrl: "/pokemon/qwilfish-hisui.png",
+    formOf: "qwilfish",
+    formLabel: "Hisuian Form",
+    spriteId: "0211H",
+  },
+  {
+    id: "sneasel-hisui",
+    name: "Hisuian Sneasel",
+    description: "פוקימון עם טפריים ארסיים, מטפס במהירות אך אינו מתפתח לצורה נוספת בניגוד לבן מינו הרגיל.",
+    dexNumber: 215,
+    types: ["fighting", "poison"],
+    rarity: "common",
+    baseStats: { health: 55, attack: 95, defense: 55, specialAttack: 35, specialDefense: 75, speed: 115 },
+    imageUrl: "/pokemon/sneasel-hisui.png",
+    formOf: "sneasel",
+    formLabel: "Hisuian Form",
+    spriteId: "0215H",
+  },
+  {
+    id: "samurott-hisui",
+    name: "Hisuian Samurott",
+    description: "פוקימון סמוראי אפל, קונכיית חרבו החדה נחשבת לנשק המסוכן ביותר ביסוי.",
+    dexNumber: 503,
+    types: ["water", "dark"],
+    rarity: "very-rare",
+    baseStats: { health: 90, attack: 108, defense: 80, specialAttack: 100, specialDefense: 65, speed: 85 },
+    imageUrl: "/pokemon/samurott-hisui.png",
+    formOf: "samurott",
+    formLabel: "Hisuian Form",
+    spriteId: "0503H",
+  },
+  {
+    id: "lilligant-hisui",
+    name: "Hisuian Lilligant",
+    description: "פוקימון פרחוני לוחם, מבצע בעיטות מהירות ומדויקות תוך שהוא שומר על חן מלכותי.",
+    dexNumber: 549,
+    types: ["grass", "fighting"],
+    rarity: "rare",
+    baseStats: { health: 70, attack: 105, defense: 75, specialAttack: 50, specialDefense: 75, speed: 105 },
+    imageUrl: "/pokemon/lilligant-hisui.png",
+    formOf: "lilligant",
+    formLabel: "Hisuian Form",
+    spriteId: "0549H",
+  },
+  {
+    id: "basculin-hisui",
+    name: "Hisuian Basculin",
+    description: "פוקימון דג עם פסים לבנים בולטים, שוחה בנחישות נגד הזרם החזק של נהרות היסוי.",
+    dexNumber: 550,
+    types: ["water"],
+    rarity: "rare",
+    baseStats: { health: 70, attack: 92, defense: 65, specialAttack: 80, specialDefense: 55, speed: 98 },
+    imageUrl: "/pokemon/basculin-hisui.png",
+    formOf: "basculin",
+    formLabel: "Hisuian Form",
+    spriteId: "0550H",
+  },
+  {
+    id: "zorua-hisui",
+    name: "Hisuian Zorua",
+    description: "פוקימון שועל רוחני, מסוגל להתחפש הודות לקשר עם עולם הרוחות של היסוי.",
+    dexNumber: 570,
+    types: ["normal", "ghost"],
+    rarity: "very-rare",
+    baseStats: { health: 35, attack: 60, defense: 40, specialAttack: 85, specialDefense: 40, speed: 70 },
+    imageUrl: "/pokemon/zorua-hisui.png",
+    formOf: "zorua",
+    formLabel: "Hisuian Form",
+    spriteId: "0570H",
+  },
+  {
+    id: "zoroark-hisui",
+    name: "Hisuian Zoroark",
+    description: "פוקימון שועל רוחני ערמומי, יוצר אשליות מבעיתות כדי להרתיע פולשים מטריטוריית להקתו.",
+    dexNumber: 571,
+    types: ["normal", "ghost"],
+    rarity: "very-rare",
+    baseStats: { health: 55, attack: 100, defense: 60, specialAttack: 125, specialDefense: 60, speed: 130 },
+    imageUrl: "/pokemon/zoroark-hisui.png",
+    formOf: "zoroark",
+    formLabel: "Hisuian Form",
+    spriteId: "0571H",
+  },
+  {
+    id: "braviary-hisui",
+    name: "Hisuian Braviary",
+    description: "פוקימון נשר פסיכי, נודד בין ממדים תוך שהוא חוזה את מסלול הקרב הבא.",
+    dexNumber: 628,
+    types: ["psychic", "flying"],
+    rarity: "rare",
+    baseStats: { health: 110, attack: 83, defense: 70, specialAttack: 112, specialDefense: 70, speed: 65 },
+    imageUrl: "/pokemon/braviary-hisui.png",
+    formOf: "braviary",
+    formLabel: "Hisuian Form",
+    spriteId: "0628H",
+  },
+  {
+    id: "sliggoo-hisui",
+    name: "Hisuian Sliggoo",
+    description: "פוקימון עם קליפה מתכתית, התפתח כך שיוכל לשרוד את גשמי החומצה של היסוי.",
+    dexNumber: 705,
+    types: ["steel", "dragon"],
+    rarity: "very-rare",
+    baseStats: { health: 68, attack: 75, defense: 53, specialAttack: 83, specialDefense: 113, speed: 60 },
+    imageUrl: "/pokemon/sliggoo-hisui.png",
+    formOf: "sliggoo",
+    formLabel: "Hisuian Form",
+    spriteId: "0706H",
+  },
+  {
+    id: "goodra-hisui",
+    name: "Hisuian Goodra",
+    description: "פוקימון דרקון מצופה פלדה, חיבוקו המתכתי מסוגל למחוץ אפילו סלעים קשים.",
+    dexNumber: 706,
+    types: ["steel", "dragon"],
+    rarity: "very-rare",
+    baseStats: { health: 90, attack: 100, defense: 70, specialAttack: 110, specialDefense: 150, speed: 80 },
+    imageUrl: "/pokemon/goodra-hisui.png",
+    formOf: "goodra",
+    formLabel: "Hisuian Form",
+    spriteId: "0707H",
+  },
+  {
+    id: "avalugg-hisui",
+    name: "Hisuian Avalugg",
+    description: "פוקימון קרחון עם שיניים חדות כסלע, גורף מכשולים בדרכו בכוח בלתי נתפס.",
+    dexNumber: 713,
+    types: ["ice", "rock"],
+    rarity: "rare",
+    baseStats: { health: 95, attack: 127, defense: 184, specialAttack: 44, specialDefense: 46, speed: 28 },
+    imageUrl: "/pokemon/avalugg-hisui.png",
+    formOf: "avalugg",
+    formLabel: "Hisuian Form",
+    spriteId: "0714H",
+  },
+  {
+    id: "decidueye-hisui",
+    name: "Hisuian Decidueye",
+    description: "פוקימון קשת לוחם, משלב טכניקות לחימה פיזיות עם דיוק הקשת המפורסם שלו.",
+    dexNumber: 724,
+    types: ["grass", "fighting"],
+    rarity: "very-rare",
+    baseStats: { health: 88, attack: 100, defense: 122, specialAttack: 65, specialDefense: 80, speed: 85 },
+    imageUrl: "/pokemon/decidueye-hisui.png",
+    formOf: "decidueye",
+    formLabel: "Hisuian Form",
+    spriteId: "0724H",
   },
 ];

@@ -12,8 +12,12 @@ test("a single-target item lists each eligible species by its plain name", () =>
   const labels = getEvolutionItemDisplayLabels("fire-stone");
 
   // Unova Phase 2 adds Pansear -> Simisear (Fire Stone) alongside the
-  // pre-existing Kanto/Sinnoh fire-stone species.
-  assert.deepEqual([...labels].sort(), ["Eevee", "Growlithe", "Magmar", "Pansear", "Vulpix"].sort());
+  // pre-existing Kanto/Sinnoh fire-stone species. The Pre-Paldea 17
+  // Hisuian Forms step adds Hisuian Growlithe (its own independent,
+  // single-branch Fire Stone entry into Hisuian Arcanine — a separate
+  // species key from ordinary Growlithe, so both are listed by their own
+  // plain name).
+  assert.deepEqual([...labels].sort(), ["Eevee", "Growlithe", "Hisuian Growlithe", "Magmar", "Pansear", "Vulpix"].sort());
 });
 
 test("Clamperl's Water Stone branch is shown as two disambiguated 'Species → Target' entries, never one ambiguous 'Clamperl'", () => {
@@ -115,13 +119,29 @@ test("Dusk Stone's mappings auto-pick up the Kalos Phase 2 addition (Doublade ->
 test("Sun Stone's mappings are unaffected by Kalos — still only the pre-existing species; Helioptile was corrected onto Thunder Stone, never Sun Stone", () => {
   const labels = getEvolutionItemDisplayLabels("sun-stone");
 
-  for (const name of ["Sunkern", "Gloom", "Cottonee", "Petilil"]) {
+  for (const name of ["Sunkern", "Gloom", "Cottonee"]) {
     assert.ok(labels.includes(name), `${name} must be listed under Sun Stone`);
   }
   assert.ok(!labels.includes("Helioptile"), "Helioptile must no longer be listed under Sun Stone after the evolution correction");
 
   const mappings = getEvolutionItemMappings("sun-stone");
   assert.ok(!mappings.some((row) => row.sourceName === "Helioptile"), "Sun Stone must have no Helioptile mapping");
+});
+
+// Petilil gained a second Sun Stone branch (Pre-Paldea 17 Hisuian Forms
+// step) — same "Species → Target" disambiguation the Clamperl Water Stone
+// test above already exercises, since a plain "Petilil" label alone would
+// now be ambiguous about which of its two targets it produces.
+test("Petilil's Sun Stone branch is shown as two disambiguated 'Species → Target' entries, never one ambiguous 'Petilil'", () => {
+  const labels = getEvolutionItemDisplayLabels("sun-stone");
+
+  assert.ok(labels.includes("Petilil → Lilligant"), "must list the ordinary Lilligant branch explicitly");
+  assert.ok(labels.includes("Petilil → Hisuian Lilligant"), "must list the Hisuian Lilligant branch explicitly");
+  assert.ok(!labels.includes("Petilil"), "must never list Petilil alone once it has two branches for this item");
+
+  const mappings = getEvolutionItemMappings("sun-stone");
+  assert.ok(mappings.some((row) => row.sourceName === "Petilil" && row.targetName === "Lilligant"));
+  assert.ok(mappings.some((row) => row.sourceName === "Petilil" && row.targetName === "Hisuian Lilligant"));
 });
 
 test("every one of the Shop's 16 evolution products has at least one mapping row", () => {

@@ -120,11 +120,26 @@ test("Kanto, Johto, Hoenn, and Sinnoh zone files are unaffected by Unova's addit
   ]);
   // Every Kanto/Johto/Hoenn/Sinnoh species is still dex 1-493, never
   // touched by the Unova range — a coarse but effective "nothing here was
-  // edited" guard.
+  // edited" guard. Exceptions: the Pre-Paldea step appended 7 Sinnoh-owned
+  // species at #899-905 (generation-4-pokemon-data.ts's own top-of-file
+  // note) — real dex numbers past Unova's own #494-649 span, but still
+  // genuinely Sinnoh, never Unova. The later Pre-Paldea 17 Hisuian Forms
+  // step similarly added 17 Sinnoh-owned alternate-form species (formLabel
+  // "Hisuian Form") sharing THEIR bases' real dex numbers, several of
+  // which fall inside or past Unova's own #494-649 span (Samurott-Hisui
+  // #503, Lilligant-Hisui #549, Basculin-Hisui #550, Zorua-Hisui #570,
+  // Zoroark-Hisui #571, Braviary-Hisui #628) — still genuinely Sinnoh,
+  // never Unova, identified by formLabel rather than a dex range since
+  // their dex numbers span nearly the whole Pokédex.
   for (const id of otherRegionIds) {
     const species = POKEMON_DATA.find((candidate) => candidate.id === id);
     assert.ok(species, `${id} must still resolve in the species catalog`);
-    assert.ok(species!.dexNumber <= 493, `${id} (dex ${species!.dexNumber}) must never be a Unova species`);
+    const isPrePaldeaSinnohSpecies = species!.dexNumber >= 899 && species!.dexNumber <= 905;
+    const isPrePaldeaHisuianForm = species!.formLabel === "Hisuian Form";
+    assert.ok(
+      species!.dexNumber <= 493 || isPrePaldeaSinnohSpecies || isPrePaldeaHisuianForm,
+      `${id} (dex ${species!.dexNumber}) must never be a Unova species`
+    );
   }
 });
 

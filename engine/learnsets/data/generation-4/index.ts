@@ -1401,4 +1401,337 @@ export const GENERATION_4_LEARNSETS: PokemonLearnset[] = [
       { moveId: "judgment", method: { kind: "level-up", level: 32 } },
     ],
   },
+
+  // ==========================================================================
+  // PRE-PALDEA STEP — learnsets for the 7 species appended to
+  // generation-4-pokemon-data.ts (#899-905). Same "existing generic
+  // level-up learnset architecture" every prior generation already uses,
+  // and every moveId below is an EXISTING id already in this project's move
+  // database (no new move was introduced for this step) — see
+  // pokemon-evolutions.ts's own "PRE-PALDEA STEP" block for how each
+  // species' real Legends: Arceus signature move (Psyshield Bash, Stone
+  // Axe, Headlong Rush, Wave Crash, Dire Claw, Barb Barrage) was left out
+  // entirely rather than importing the Legends: Arceus move catalog; a
+  // thematically close existing move stands in for it instead. Not counted
+  // by generation-4.completeness.test.ts's own dex-range check (species
+  // dexNumber 387-493) since none of these 7 fall in that range — see this
+  // file's own dedicated Pre-Paldea coverage test in that file instead.
+  // ==========================================================================
+  {
+    pokemonId: "wyrdeer",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "zen-headbutt", method: { kind: "level-up", level: 8 } },
+      { moveId: "take-down", method: { kind: "level-up", level: 16 } },
+      { moveId: "psybeam", method: { kind: "level-up", level: 24 } },
+      { moveId: "agility", method: { kind: "level-up", level: 32 } },
+      { moveId: "psychic", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "kleavor",
+    generation: 4,
+    entries: [
+      { moveId: "quick-attack", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "bug-bite", method: { kind: "level-up", level: 8 } },
+      { moveId: "pursuit", method: { kind: "level-up", level: 16 } },
+      { moveId: "x-scissor", method: { kind: "level-up", level: 24 } },
+      { moveId: "rock-slide", method: { kind: "level-up", level: 32 } },
+      { moveId: "stone-edge", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "ursaluna",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "take-down", method: { kind: "level-up", level: 8 } },
+      { moveId: "slash", method: { kind: "level-up", level: 16 } },
+      { moveId: "crunch", method: { kind: "level-up", level: 24 } },
+      { moveId: "hammer-arm", method: { kind: "level-up", level: 32 } },
+      { moveId: "earthquake", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "basculegion",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "tail-whip", method: { kind: "level-up", level: 1 } },
+      { moveId: "aqua-jet", method: { kind: "level-up", level: 8 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 16 } },
+      { moveId: "aqua-tail", method: { kind: "level-up", level: 24 } },
+      { moveId: "shadow-ball", method: { kind: "level-up", level: 32 } },
+      { moveId: "waterfall", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "sneasler",
+    generation: 4,
+    entries: [
+      { moveId: "quick-attack", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "fury-swipes", method: { kind: "level-up", level: 8 } },
+      { moveId: "poison-jab", method: { kind: "level-up", level: 16 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 24 } },
+      { moveId: "brick-break", method: { kind: "level-up", level: 32 } },
+      { moveId: "close-combat", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "overqwil",
+    generation: 4,
+    entries: [
+      { moveId: "poison-sting", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "pin-missile", method: { kind: "level-up", level: 8 } },
+      { moveId: "poison-jab", method: { kind: "level-up", level: 16 } },
+      { moveId: "crunch", method: { kind: "level-up", level: 24 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 32 } },
+      { moveId: "dark-pulse", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "enamorus",
+    generation: 4,
+    entries: [
+      { moveId: "gust", method: { kind: "level-up", level: 1 } },
+      { moveId: "growl", method: { kind: "level-up", level: 1 } },
+      { moveId: "air-cutter", method: { kind: "level-up", level: 15 } },
+      { moveId: "moonblast", method: { kind: "level-up", level: 30 } },
+      { moveId: "air-slash", method: { kind: "level-up", level: 45 } },
+      { moveId: "dazzling-gleam", method: { kind: "level-up", level: 55 } },
+      { moveId: "hurricane", method: { kind: "level-up", level: 65 } },
+    ],
+  },
+
+  // ==========================================================================
+  // PRE-PALDEA — 17 HISUIAN FORMS. Same "existing generic level-up learnset
+  // architecture" every Alolan/Galarian Form already uses — each Hisuian
+  // Form resolves independently through the generic learnset registry, no
+  // runtime inheritance from its ordinary counterpart. Every moveId below
+  // is an EXISTING id already in this project's move database — zero new
+  // moves were introduced for this step; no Agile/Strong Style mechanic of
+  // any kind is represented.
+  // ==========================================================================
+  {
+    pokemonId: "growlithe-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "ember", method: { kind: "level-up", level: 1 } },
+      { moveId: "rock-throw", method: { kind: "level-up", level: 1 } },
+      { moveId: "bite", method: { kind: "level-up", level: 8 } },
+      { moveId: "fire-fang", method: { kind: "level-up", level: 16 } },
+      { moveId: "take-down", method: { kind: "level-up", level: 24 } },
+      { moveId: "flame-wheel", method: { kind: "level-up", level: 32 } },
+    ],
+  },
+  {
+    pokemonId: "arcanine-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "ember", method: { kind: "level-up", level: 1 } },
+      { moveId: "rock-throw", method: { kind: "level-up", level: 1 } },
+      { moveId: "fire-fang", method: { kind: "level-up", level: 8 } },
+      { moveId: "take-down", method: { kind: "level-up", level: 16 } },
+      { moveId: "rock-slide", method: { kind: "level-up", level: 24 } },
+      { moveId: "flamethrower", method: { kind: "level-up", level: 32 } },
+      { moveId: "flare-blitz", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "voltorb-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "charge", method: { kind: "level-up", level: 1 } },
+      { moveId: "spark", method: { kind: "level-up", level: 8 } },
+      { moveId: "razor-leaf", method: { kind: "level-up", level: 16 } },
+      { moveId: "energy-ball", method: { kind: "level-up", level: 24 } },
+      { moveId: "thunderbolt", method: { kind: "level-up", level: 32 } },
+    ],
+  },
+  {
+    pokemonId: "electrode-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "charge", method: { kind: "level-up", level: 1 } },
+      { moveId: "spark", method: { kind: "level-up", level: 8 } },
+      { moveId: "razor-leaf", method: { kind: "level-up", level: 16 } },
+      { moveId: "energy-ball", method: { kind: "level-up", level: 24 } },
+      { moveId: "discharge", method: { kind: "level-up", level: 32 } },
+      { moveId: "explosion", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "typhlosion-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "ember", method: { kind: "level-up", level: 1 } },
+      { moveId: "astonish", method: { kind: "level-up", level: 1 } },
+      { moveId: "flame-wheel", method: { kind: "level-up", level: 8 } },
+      { moveId: "will-o-wisp", method: { kind: "level-up", level: 16 } },
+      { moveId: "hex", method: { kind: "level-up", level: 24 } },
+      { moveId: "shadow-ball", method: { kind: "level-up", level: 32 } },
+      { moveId: "eruption", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "qwilfish-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "poison-sting", method: { kind: "level-up", level: 1 } },
+      { moveId: "harden", method: { kind: "level-up", level: 1 } },
+      { moveId: "pin-missile", method: { kind: "level-up", level: 8 } },
+      { moveId: "poison-jab", method: { kind: "level-up", level: 16 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 24 } },
+      { moveId: "crunch", method: { kind: "level-up", level: 32 } },
+      { moveId: "dark-pulse", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "sneasel-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "quick-attack", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "fury-swipes", method: { kind: "level-up", level: 8 } },
+      { moveId: "poison-jab", method: { kind: "level-up", level: 16 } },
+      { moveId: "brick-break", method: { kind: "level-up", level: 24 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 32 } },
+      { moveId: "close-combat", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "samurott-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "tail-whip", method: { kind: "level-up", level: 1 } },
+      { moveId: "aqua-jet", method: { kind: "level-up", level: 8 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 16 } },
+      { moveId: "aqua-tail", method: { kind: "level-up", level: 24 } },
+      { moveId: "dark-pulse", method: { kind: "level-up", level: 32 } },
+      { moveId: "hydro-pump", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "lilligant-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "absorb", method: { kind: "level-up", level: 1 } },
+      { moveId: "growth", method: { kind: "level-up", level: 1 } },
+      { moveId: "magical-leaf", method: { kind: "level-up", level: 8 } },
+      { moveId: "brick-break", method: { kind: "level-up", level: 16 } },
+      { moveId: "energy-ball", method: { kind: "level-up", level: 24 } },
+      { moveId: "close-combat", method: { kind: "level-up", level: 32 } },
+      { moveId: "leaf-blade", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "basculin-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "tail-whip", method: { kind: "level-up", level: 1 } },
+      { moveId: "aqua-jet", method: { kind: "level-up", level: 8 } },
+      { moveId: "crunch", method: { kind: "level-up", level: 16 } },
+      { moveId: "aqua-tail", method: { kind: "level-up", level: 24 } },
+      { moveId: "waterfall", method: { kind: "level-up", level: 32 } },
+      { moveId: "hydro-pump", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "zorua-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "scratch", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "astonish", method: { kind: "level-up", level: 8 } },
+      { moveId: "pursuit", method: { kind: "level-up", level: 16 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 24 } },
+    ],
+  },
+  {
+    pokemonId: "zoroark-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "scratch", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "astonish", method: { kind: "level-up", level: 8 } },
+      { moveId: "pursuit", method: { kind: "level-up", level: 16 } },
+      { moveId: "night-slash", method: { kind: "level-up", level: 24 } },
+      { moveId: "shadow-ball", method: { kind: "level-up", level: 32 } },
+      { moveId: "hex", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "braviary-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "peck", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "wing-attack", method: { kind: "level-up", level: 8 } },
+      { moveId: "psybeam", method: { kind: "level-up", level: 16 } },
+      { moveId: "air-slash", method: { kind: "level-up", level: 24 } },
+      { moveId: "psychic", method: { kind: "level-up", level: 32 } },
+      { moveId: "brave-bird", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "sliggoo-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "harden", method: { kind: "level-up", level: 1 } },
+      { moveId: "metal-sound", method: { kind: "level-up", level: 8 } },
+      { moveId: "dragon-breath", method: { kind: "level-up", level: 16 } },
+      { moveId: "iron-head", method: { kind: "level-up", level: 24 } },
+      { moveId: "flash-cannon", method: { kind: "level-up", level: 32 } },
+    ],
+  },
+  {
+    pokemonId: "goodra-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "harden", method: { kind: "level-up", level: 1 } },
+      { moveId: "metal-sound", method: { kind: "level-up", level: 8 } },
+      { moveId: "dragon-breath", method: { kind: "level-up", level: 16 } },
+      { moveId: "iron-head", method: { kind: "level-up", level: 24 } },
+      { moveId: "dragon-pulse", method: { kind: "level-up", level: 32 } },
+      { moveId: "flash-cannon", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "avalugg-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "tackle", method: { kind: "level-up", level: 1 } },
+      { moveId: "harden", method: { kind: "level-up", level: 1 } },
+      { moveId: "ice-fang", method: { kind: "level-up", level: 8 } },
+      { moveId: "rock-throw", method: { kind: "level-up", level: 16 } },
+      { moveId: "avalanche", method: { kind: "level-up", level: 24 } },
+      { moveId: "rock-slide", method: { kind: "level-up", level: 32 } },
+      { moveId: "stone-edge", method: { kind: "level-up", level: 40 } },
+    ],
+  },
+  {
+    pokemonId: "decidueye-hisui",
+    generation: 4,
+    entries: [
+      { moveId: "leafage", method: { kind: "level-up", level: 1 } },
+      { moveId: "leer", method: { kind: "level-up", level: 1 } },
+      { moveId: "brick-break", method: { kind: "level-up", level: 8 } },
+      { moveId: "magical-leaf", method: { kind: "level-up", level: 16 } },
+      { moveId: "close-combat", method: { kind: "level-up", level: 24 } },
+      { moveId: "leaf-blade", method: { kind: "level-up", level: 32 } },
+      { moveId: "energy-ball", method: { kind: "level-up", level: 40 } },
+    ],
+  },
 ];

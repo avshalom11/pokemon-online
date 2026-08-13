@@ -15,10 +15,25 @@ import type { Zone } from "@/shared/types/zone";
 // own Forms architecture; all Rotom forms stay grouped under the single
 // #0479 Pokédex entry, both Giratina forms stay grouped under the single
 // #0487 entry, this file never creates a duplicate National Dex row) = 113
-// total entries below. No species is split across zones, none is omitted,
-// none is duplicated — this exact distribution was reviewed and approved
-// zone-by-zone before this file was written (see the project's own Sinnoh
-// Encounter Planning analysis).
+// entries, PLUS the 7 Pre-Paldea species (#899-905, appended to
+// generation-4-pokemon-data.ts — Sinnoh-owned despite sitting outside the
+// #387-493 range) added by the Pre-Paldea Encounter Integration step:
+// Wyrdeer (grassland), Ursaluna/Kleavor/Sneasler (cave), Basculegion/
+// Overqwil (water), Enamorus (haunted-house) = 120 entries, PLUS the 17
+// Pre-Paldea Hisuian Forms (also Sinnoh-owned per generation-4-pokemon-
+// data.ts's own top-of-file note) added by the Pre-Paldea 17 Hisuian
+// Forms Encounter Integration step: Voltorb-Hisui/Electrode-Hisui/
+// Lilligant-Hisui/Decidueye-Hisui (grassland), Qwilfish-Hisui/Basculin-
+// Hisui/Samurott-Hisui (water), Sneasel-Hisui/Sliggoo-Hisui/Goodra-Hisui/
+// Avalugg-Hisui (cave), Growlithe-Hisui/Arcanine-Hisui/Typhlosion-Hisui
+// (lava), Braviary-Hisui (beach), Zorua-Hisui/Zoroark-Hisui
+// (haunted-house) — every one of these 17 placements is user-approved,
+// never derived from canonical in-game habitat. Total = 137 entries below.
+// No species is split across zones, none is omitted, none is duplicated —
+// this exact distribution was reviewed and approved zone-by-zone before
+// this file was written (see the project's own Sinnoh Encounter Planning
+// analysis), with the 7 Pre-Paldea species and the 17 Pre-Paldea Hisuian
+// Forms each reviewed and approved separately afterward.
 //
 // Rarity: every `pokemonId` below resolves its actual encounter-rarity tier
 // from that species' own PokemonSpecies.rarity (data/pokemon/
@@ -154,6 +169,18 @@ export const SINNOH_ZONE_DATA: Zone[] = [
       { pokemonId: "magnezone", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "regigigas", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
       { pokemonId: "arceus", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
+      // Pre-Paldea encounter integration — Wyrdeer (real rare, a level-40
+      // evolution target of Stantler) uses this file's own "rare evolution
+      // target" weight (5), same band as Ambipom/Luxray/Staraptor above.
+      { pokemonId: "wyrdeer", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      // Pre-Paldea 17 Hisuian Forms — user-approved zone placement.
+      // Voltorb-Hisui/Electrode-Hisui are real common (weight 20, uniform).
+      // Lilligant-Hisui is real rare, an evolution-item target of Petilil
+      // (weight 5). Decidueye-Hisui is real very-rare (weight 5, uniform).
+      { pokemonId: "voltorb-hisui", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
+      { pokemonId: "electrode-hisui", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
+      { pokemonId: "lilligant-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "decidueye-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
   {
@@ -173,6 +200,18 @@ export const SINNOH_ZONE_DATA: Zone[] = [
       { pokemonId: "finneon", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
       { pokemonId: "lumineon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "mantyke", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
+      // Pre-Paldea encounter integration — both real rare, both level-40
+      // evolution targets (Basculin -> Basculegion, Qwilfish -> Overqwil),
+      // this file's own "rare evolution target" weight (5).
+      { pokemonId: "basculegion", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "overqwil", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      // Pre-Paldea 17 Hisuian Forms — user-approved zone placement.
+      // Qwilfish-Hisui and Basculin-Hisui are real rare with no
+      // predecessor of their own (standalone, weight 10). Samurott-Hisui
+      // is real very-rare (weight 5, uniform).
+      { pokemonId: "qwilfish-hisui", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
+      { pokemonId: "basculin-hisui", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
+      { pokemonId: "samurott-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
   {
@@ -191,6 +230,23 @@ export const SINNOH_ZONE_DATA: Zone[] = [
       { pokemonId: "gliscor", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "mamoswine", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "probopass", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      // Pre-Paldea encounter integration — Ursaluna and Sneasler are real
+      // rare, level-40 evolution targets (Ursaring -> Ursaluna, Sneasel ->
+      // Sneasler); Kleavor is real very-rare (Scyther's second, independent
+      // level-40 branch). All three use this file's own uniform weight-5
+      // band ("rare evolution target" and "very-rare" both resolve to 5).
+      { pokemonId: "ursaluna", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "kleavor", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "sneasler", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      // Pre-Paldea 17 Hisuian Forms — user-approved zone placement.
+      // Sneasel-Hisui is real common (weight 20, uniform). Sliggoo-Hisui
+      // and Goodra-Hisui are real very-rare (weight 5, uniform).
+      // Avalugg-Hisui is real rare, a Branch evolution target of Bergmite
+      // (weight 5, "rare evolution target").
+      { pokemonId: "sneasel-hisui", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
+      { pokemonId: "sliggoo-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "goodra-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "avalugg-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
   {
@@ -212,6 +268,14 @@ export const SINNOH_ZONE_DATA: Zone[] = [
       { pokemonId: "gabite", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "garchomp", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "dialga", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
+      // Pre-Paldea 17 Hisuian Forms — user-approved zone placement.
+      // Growlithe-Hisui is real common (weight 20, uniform). Arcanine-
+      // Hisui is real rare, an evolution-item target of Growlithe-Hisui
+      // (weight 5, "rare evolution target"). Typhlosion-Hisui is real
+      // very-rare (weight 5, uniform).
+      { pokemonId: "growlithe-hisui", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
+      { pokemonId: "arcanine-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "typhlosion-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
   {
@@ -230,6 +294,10 @@ export const SINNOH_ZONE_DATA: Zone[] = [
       { pokemonId: "bibarel", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "hippopotas", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
       { pokemonId: "hippowdon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      // Pre-Paldea 17 Hisuian Forms — user-approved zone placement.
+      // Braviary-Hisui is real rare, a Branch evolution target of Rufflet
+      // (weight 5, "rare evolution target").
+      { pokemonId: "braviary-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
   {
@@ -268,6 +336,15 @@ export const SINNOH_ZONE_DATA: Zone[] = [
       { pokemonId: "azelf", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
       { pokemonId: "rotom-heat", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
       { pokemonId: "cresselia", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
+      // Pre-Paldea encounter integration — Enamorus is real legendary, this
+      // file's own uniform legendary weight (1) and level band (55-60),
+      // same as every other legendary encounter above.
+      { pokemonId: "enamorus", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
+      // Pre-Paldea 17 Hisuian Forms — user-approved zone placement.
+      // Zorua-Hisui and Zoroark-Hisui are both real very-rare (weight 5,
+      // uniform).
+      { pokemonId: "zorua-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "zoroark-hisui", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
 ];

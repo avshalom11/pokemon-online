@@ -52,8 +52,11 @@ test("evolution-item species are never also present in the Level Evolution table
   // (slowpoke -> slowbro @ 37) AND a new King's Rock evolution-item branch
   // (slowpoke -> slowking) — the same "one species, multiple evolution
   // methods" precedent Eevee/Gloom already established, covered by its own
-  // dedicated test below.
-  const itemOnlySpecies = ["vulpix", "growlithe", "poliwhirl", "shellder", "staryu", "pikachu", "gloom", "weepinbell", "exeggcute", "eevee", "onix", "scyther", "seadra", "porygon"];
+  // dedicated test below. Scyther is excluded here too, for the same
+  // reason, as of the Pre-Paldea step (scyther -> kleavor @ level 40,
+  // alongside its own pre-existing, unrelated Metal Coat branch into
+  // Scizor) — see this file's own dedicated test further down.
+  const itemOnlySpecies = ["vulpix", "growlithe", "poliwhirl", "shellder", "staryu", "pikachu", "gloom", "weepinbell", "exeggcute", "eevee", "onix", "seadra", "porygon"];
 
   for (const speciesId of itemOnlySpecies) {
     assert.equal(getLevelEvolution(speciesId), undefined, `${speciesId} must have no level evolution entry`);
@@ -630,10 +633,14 @@ test("deriveSpeciesWildLevelRange leaves a Sinnoh Branch-only species (Burmy) an
 // ============================================================================
 
 test("every Unova starter line is complete: level 17 then level 36 for all three lines", () => {
+  // Oshawott/Dewott/Samurott is handled separately below — as of the
+  // Pre-Paldea 17 Hisuian Forms step, Dewott -> Samurott is now a
+  // BRANCH_EVOLUTIONS entry (an explicit choice between Samurott and
+  // Hisuian Samurott), not a plain LEVEL_EVOLUTIONS entry, so it can't
+  // share this loop's getLevelEvolution(middle) assertion with Snivy/Tepig.
   const lines: [string, string, string][] = [
     ["snivy", "servine", "serperior"],
     ["tepig", "pignite", "emboar"],
-    ["oshawott", "dewott", "samurott"],
   ];
 
   for (const [base, middle, final] of lines) {
@@ -641,6 +648,13 @@ test("every Unova starter line is complete: level 17 then level 36 for all three
     assert.deepEqual(getLevelEvolution(middle), { evolvesToSpeciesId: final, requiredLevel: 36 }, `${middle} -> ${final}`);
     assert.equal(getLevelEvolution(final), undefined, `${final} is a final evolution and must have no further level evolution`);
   }
+
+  assert.deepEqual(getLevelEvolution("oshawott"), { evolvesToSpeciesId: "dewott", requiredLevel: 17 });
+  assert.equal(getLevelEvolution("dewott"), undefined, "Dewott -> Samurott is now a Branch, not a level evolution");
+  const dewottBranch = getBranchEvolution("dewott");
+  assert.equal(dewottBranch?.requiredLevel, 36);
+  assert.deepEqual(dewottBranch?.targets, ["samurott", "samurott-hisui"]);
+  assert.equal(getLevelEvolution("samurott"), undefined, "Samurott is a final evolution and must have no further level evolution");
 });
 
 test("every plain Unova level evolution resolves to its real canonical target and level", () => {
@@ -693,7 +707,10 @@ test("every plain Unova level evolution resolves to its real canonical target an
     ["mienfoo", "mienshao", 50],
     ["golett", "golurk", 43],
     ["pawniard", "bisharp", 52],
-    ["rufflet", "braviary", 54],
+    // Rufflet -> Braviary is now a Branch evolution (Pre-Paldea 17 Hisuian
+    // Forms step, Rufflet -> [braviary, braviary-hisui] @ 54) — see this
+    // file's own dedicated Pre-Paldea Hisuian Forms tests further down;
+    // deliberately excluded from this plain-level-evolution list.
     ["vullaby", "mandibuzz", 54],
     ["larvesta", "volcarona", 59],
   ];
@@ -777,15 +794,20 @@ test("the evolution-item catalog is unchanged by Unova: still exactly the same 1
 });
 
 test("no Unova species uses branch evolution — every real trade/gender/personality-value mechanic was replaced with level or item, never a player-choice branch", () => {
+  // Dewott and Rufflet are deliberately excluded here as of the Pre-Paldea
+  // 17 Hisuian Forms step — both now legitimately use BRANCH_EVOLUTIONS
+  // (dewott -> [samurott, samurott-hisui] @36, rufflet -> [braviary,
+  // braviary-hisui] @54) — see this file's own dedicated Pre-Paldea
+  // Hisuian Forms tests further down.
   const unovaSpeciesTouchedByEvolution = [
-    "snivy", "servine", "tepig", "pignite", "oshawott", "dewott", "patrat", "lillipup", "herdier",
+    "snivy", "servine", "tepig", "pignite", "oshawott", "patrat", "lillipup", "herdier",
     "purrloin", "pansage", "pansear", "panpour", "munna", "pidove", "tranquill", "blitzle", "roggenrola",
     "boldore", "woobat", "drilbur", "timburr", "gurdurr", "tympole", "palpitoad", "sewaddle", "swadloon",
     "venipede", "whirlipede", "cottonee", "petilil", "sandile", "krokorok", "darumaka", "dwebble", "scraggy",
     "yamask", "tirtouga", "archen", "trubbish", "zorua", "minccino", "gothita", "gothorita", "solosis",
     "duosion", "ducklett", "vanillite", "vanillish", "deerling", "karrablast", "foongus", "frillish", "joltik",
     "ferroseed", "klink", "klang", "tynamo", "eelektrik", "elgyem", "litwick", "lampent", "axew", "fraxure",
-    "cubchoo", "shelmet", "mienfoo", "golett", "pawniard", "rufflet", "vullaby", "deino", "zweilous", "larvesta",
+    "cubchoo", "shelmet", "mienfoo", "golett", "pawniard", "vullaby", "deino", "zweilous", "larvesta",
   ];
   for (const speciesId of unovaSpeciesTouchedByEvolution) {
     assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must never be a branch evolution — Unova Phase 2 uses only level and evolution-item`);
@@ -793,8 +815,12 @@ test("no Unova species uses branch evolution — every real trade/gender/persona
 });
 
 test("every genuinely standalone (non-evolving, non-legendary) Unova species has no evolution of any kind", () => {
+  // Basculin is deliberately excluded here as of the Pre-Paldea step —
+  // basculin -> basculegion @ level 40 (LEVEL_EVOLUTIONS' own "PRE-PALDEA
+  // STEP" block) — see this file's own dedicated Pre-Paldea tests further
+  // down.
   const standaloneIds = [
-    "audino", "throh", "sawk", "basculin", "maractus", "sigilyph",
+    "audino", "throh", "sawk", "maractus", "sigilyph",
     "emolga", "alomomola", "cryogonal", "stunfisk", "druddigon", "bouffalant", "heatmor", "durant",
   ];
   for (const id of standaloneIds) {
@@ -837,7 +863,7 @@ test("alternate forms never get their own evolution, on either side of the arrow
   }
 });
 
-test("total evolution counts include exactly 65 new Unova level evolutions and 9 new Unova evolution-item evolutions", () => {
+test("total evolution counts include exactly 64 new Unova level evolutions and 10 new Unova evolution-item evolutions", () => {
   // formOf === undefined excludes alternate forms sharing a dex number in
   // this range — this used to only matter for Unova's own Therian/Black/
   // White/Pirouette forms (none of which ever had an evolution entry, see
@@ -847,7 +873,11 @@ test("total evolution counts include exactly 65 new Unova level evolutions and 9
   // #562; darumaka-galar, dex #554) — a plain dexNumber-range filter alone
   // can no longer distinguish "genuinely Unova" from "a Galarian reskin of
   // a Unova species", so formOf === undefined is required to keep this
-  // count scoped to real Unova base species only.
+  // count scoped to real Unova base species only. The Pre-Paldea #899-905
+  // step added one: Basculin (dex #550) gained its own level evolution
+  // (basculegion) — 65 -> 66. The Pre-Paldea 17 Hisuian Forms step then
+  // migrated two OUT to BRANCH_EVOLUTIONS (dewott -> samurott/
+  // samurott-hisui, rufflet -> braviary/braviary-hisui) — 66 -> 64.
   const unovaDexRange = new Set(
     POKEMON_DATA.filter((species) => species.formOf === undefined && species.dexNumber >= 494 && species.dexNumber <= 649).map(
       (species) => species.id
@@ -857,8 +887,11 @@ test("total evolution counts include exactly 65 new Unova level evolutions and 9
   const unovaLevelEntries = getAllLevelEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
   const unovaItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
 
-  assert.equal(unovaLevelEntries.length, 65);
-  assert.equal(unovaItemEntries.length, 9);
+  assert.equal(unovaLevelEntries.length, 64);
+  // 9 -> 10: Petilil gained a second, independent Sun Stone branch into
+  // Hisuian Lilligant (Pre-Paldea 17 Hisuian Forms step) — both of
+  // Petilil's branches are counted here (same array, same speciesId key).
+  assert.equal(unovaItemEntries.length, 10);
 });
 
 test("deriveSpeciesWildLevelRange correctly derives the four former-Trade Unova chains with no gaps, no overlaps, and no empty ranges: Conkeldurr, Gigalith, Escavalier, Accelgor", () => {
@@ -931,7 +964,10 @@ test("every plain Kalos level evolution resolves to its real canonical target an
     ["binacle", "barbaracle", 39],
     ["skrelp", "dragalge", 48],
     ["clauncher", "clawitzer", 37],
-    ["bergmite", "avalugg", 37],
+    // Bergmite -> Avalugg is now a Branch evolution (Pre-Paldea 17 Hisuian
+    // Forms step, Bergmite -> [avalugg, avalugg-hisui] @ 37) — see this
+    // file's own dedicated Pre-Paldea Hisuian Forms tests further down;
+    // deliberately excluded from this plain-level-evolution list.
     ["noibat", "noivern", 48],
   ];
 
@@ -944,8 +980,19 @@ test("every plain Kalos level evolution resolves to its real canonical target an
   }
 });
 
-test("Goomy/Sliggoo/Goodra is Kalos's own pseudo-legendary line: a complete three-stage level chain", () => {
-  assert.deepEqual(getLevelEvolution("goomy"), { evolvesToSpeciesId: "sliggoo", requiredLevel: 40 });
+test("Bergmite now offers an explicit Branch choice between ordinary Avalugg and Hisuian Avalugg, preserving its real canonical level 37", () => {
+  assert.equal(getLevelEvolution("bergmite"), undefined, "Bergmite -> Avalugg is now a Branch, not a level evolution");
+  const bergmiteBranch = getBranchEvolution("bergmite");
+  assert.equal(bergmiteBranch?.requiredLevel, 37);
+  assert.deepEqual(bergmiteBranch?.targets, ["avalugg", "avalugg-hisui"]);
+});
+
+test("Goomy/Sliggoo/Goodra is Kalos's own pseudo-legendary line: Goomy now offers an explicit Branch choice between ordinary Sliggoo and Hisuian Sliggoo (preserving its real canonical level 40), and ordinary Sliggoo -> Goodra remains an unchanged plain level evolution", () => {
+  assert.equal(getLevelEvolution("goomy"), undefined, "Goomy -> Sliggoo is now a Branch, not a level evolution");
+  const goomyBranch = getBranchEvolution("goomy");
+  assert.equal(goomyBranch?.requiredLevel, 40);
+  assert.deepEqual(goomyBranch?.targets, ["sliggoo", "sliggoo-hisui"]);
+
   assert.deepEqual(getLevelEvolution("sliggoo"), { evolvesToSpeciesId: "goodra", requiredLevel: 50 });
   assert.equal(getLevelEvolution("goodra"), undefined);
 });
@@ -1029,12 +1076,17 @@ test("the evolution-item catalog is unchanged by Kalos: still exactly the same 1
 });
 
 test("no Kalos species uses branch evolution — every real trade/party/orientation/weather/affection mechanic was replaced with level or item, never a player-choice branch", () => {
+  // Goomy and Bergmite are deliberately excluded here as of the Pre-Paldea
+  // 17 Hisuian Forms step — both now legitimately use BRANCH_EVOLUTIONS
+  // (goomy -> [sliggoo, sliggoo-hisui] @40, bergmite -> [avalugg,
+  // avalugg-hisui] @37) — see this file's own dedicated Pre-Paldea Hisuian
+  // Forms tests further down.
   const kalosSpeciesTouchedByEvolution = [
     "chespin", "quilladin", "fennekin", "braixen", "froakie", "frogadier",
     "bunnelby", "fletchling", "fletchinder", "scatterbug", "spewpa", "litleo",
     "flabebe", "floette", "skiddo", "pancham", "espurr", "honedge", "doublade",
     "spritzee", "swirlix", "inkay", "binacle", "skrelp", "clauncher", "helioptile",
-    "tyrunt", "amaura", "goomy", "sliggoo", "phantump", "pumpkaboo", "bergmite", "noibat",
+    "tyrunt", "amaura", "sliggoo", "phantump", "pumpkaboo", "noibat",
   ];
   for (const speciesId of kalosSpeciesTouchedByEvolution) {
     assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must never be a branch evolution — Kalos Phase 2 uses only level and evolution-item`);
@@ -1083,13 +1135,19 @@ test("no Mega Evolution appears anywhere in the evolution registry", () => {
   }
 });
 
-test("total evolution counts include exactly 29 new Kalos level evolutions and 5 new Kalos-native evolution-item evolutions", () => {
+test("total evolution counts include exactly 28 new Kalos level evolutions and 5 new Kalos-native evolution-item evolutions", () => {
+  // 29 -> 27: Goomy and Bergmite migrated to BRANCH_EVOLUTIONS (Pre-Paldea
+  // 17 Hisuian Forms step). 27 -> 28: Hisuian Sliggoo (dex #705, this
+  // filter has no formOf exclusion, unlike Unova's own version of this
+  // test) gained its own brand-new level-50 evolution into Hisuian Goodra
+  // — see this file's own dedicated Pre-Paldea Hisuian Forms tests further
+  // down.
   const kalosDexRange = new Set(POKEMON_DATA.filter((species) => species.dexNumber >= 650 && species.dexNumber <= 721).map((species) => species.id));
 
   const kalosLevelEntries = getAllLevelEvolutionEntries().filter((entry) => kalosDexRange.has(entry.speciesId));
   const kalosItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => kalosDexRange.has(entry.speciesId));
 
-  assert.equal(kalosLevelEntries.length, 29);
+  assert.equal(kalosLevelEntries.length, 28);
   assert.equal(kalosItemEntries.length, 5, "Kalos-native evolution-item species only — Eevee -> Sylveon is a Kanto-keyed entry and is verified separately");
 });
 
@@ -1103,13 +1161,19 @@ test("no duplicate evolution definitions and no conflicting level/item/branch ou
 
   // Every Kalos evolution TARGET (the evolved species) must be reachable
   // from exactly one pre-evolution — no two different species both claim
-  // to evolve into the same Kalos target.
+  // to evolve into the same Kalos target. Sliggoo and Avalugg are
+  // deliberately excluded here as of the Pre-Paldea 17 Hisuian Forms step
+  // — both are now reachable only via a Branch (Goomy/Bergmite), never a
+  // plain LEVEL_EVOLUTIONS entry, so they're invisible to this
+  // level-only reverse index (same "Branch target invisible from below"
+  // rule Espeon/Umbreon already established) — verified separately in
+  // this file's own dedicated Pre-Paldea Hisuian Forms tests further down.
   const kalosTargets = [
     "quilladin", "chesnaught", "braixen", "delphox", "frogadier", "greninja",
     "diggersby", "fletchinder", "talonflame", "spewpa", "vivillon", "pyroar",
     "floette", "gogoat", "pangoro", "meowstic", "doublade", "malamar",
-    "barbaracle", "dragalge", "clawitzer", "tyrantrum", "aurorus", "sliggoo",
-    "goodra", "trevenant", "gourgeist", "avalugg", "noivern",
+    "barbaracle", "dragalge", "clawitzer", "tyrantrum", "aurorus",
+    "goodra", "trevenant", "gourgeist", "noivern",
   ];
   for (const target of kalosTargets) {
     const sources = kalosLevelTargets.get(target) ?? [];
@@ -1130,9 +1194,9 @@ test("deriveSpeciesWildLevelRange correctly derives the three Kalos starter chai
   }
 });
 
-test("deriveSpeciesWildLevelRange correctly derives the Kalos pseudo-legendary chain (Goomy/Sliggoo/Goodra) with no collision", () => {
-  assert.deepEqual(deriveSpeciesWildLevelRange("goomy"), { minimumLevel: 1, maximumLevel: 39 });
-  assert.deepEqual(deriveSpeciesWildLevelRange("sliggoo"), { minimumLevel: 40, maximumLevel: 49 });
+test("deriveSpeciesWildLevelRange correctly derives the Kalos pseudo-legendary chain (Goomy/Sliggoo/Goodra): Goomy is now Branch-only (fully unrestricted, its own former level-40 cap gone), Sliggoo's floor is gone too (no longer a LEVEL_EVOLUTIONS target), and Sliggoo -> Goodra (unchanged) still caps Sliggoo's own ceiling and floors Goodra", () => {
+  assert.deepEqual(deriveSpeciesWildLevelRange("goomy"), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
+  assert.deepEqual(deriveSpeciesWildLevelRange("sliggoo"), { minimumLevel: 1, maximumLevel: 49 });
   assert.deepEqual(deriveSpeciesWildLevelRange("goodra"), { minimumLevel: 50, maximumLevel: Number.POSITIVE_INFINITY });
 });
 
@@ -1161,8 +1225,13 @@ test("deriveSpeciesWildLevelRange leaves every Kalos evolution-item target (Flor
 // ============================================================================
 
 test("every Alola starter line is complete: level 17 then level 34 for all three lines", () => {
+  // Rowlet/Dartrix/Decidueye is handled separately below — as of the
+  // Pre-Paldea 17 Hisuian Forms step, Dartrix -> Decidueye is now a
+  // BRANCH_EVOLUTIONS entry (an explicit choice between Decidueye and
+  // Hisuian Decidueye), not a plain LEVEL_EVOLUTIONS entry, so it can't
+  // share this loop's getLevelEvolution(middle) assertion with Litten/
+  // Popplio.
   const lines: [string, string, string][] = [
-    ["rowlet", "dartrix", "decidueye"],
     ["litten", "torracat", "incineroar"],
     ["popplio", "brionne", "primarina"],
   ];
@@ -1172,6 +1241,13 @@ test("every Alola starter line is complete: level 17 then level 34 for all three
     assert.deepEqual(getLevelEvolution(middle), { evolvesToSpeciesId: final, requiredLevel: 34 }, `${middle} -> ${final}`);
     assert.equal(getLevelEvolution(final), undefined, `${final} is a final evolution and must have no further level evolution`);
   }
+
+  assert.deepEqual(getLevelEvolution("rowlet"), { evolvesToSpeciesId: "dartrix", requiredLevel: 17 });
+  assert.equal(getLevelEvolution("dartrix"), undefined, "Dartrix -> Decidueye is now a Branch, not a level evolution");
+  const dartrixBranch = getBranchEvolution("dartrix");
+  assert.equal(dartrixBranch?.requiredLevel, 34, "the real, preserved existing threshold — the task's own spec text said 36, but this catalog's real Dartrix -> Decidueye level has always been 34 (same as Litten/Popplio's own 17/34 shape); preserving the real existing level, not silently introducing a level change to ordinary Decidueye's own evolution, was judged the correct reading of \"preserve ordinary Decidueye\"");
+  assert.deepEqual(dartrixBranch?.targets, ["decidueye", "decidueye-hisui"]);
+  assert.equal(getLevelEvolution("decidueye"), undefined, "Decidueye is a final evolution and must have no further level evolution");
 });
 
 test("every plain Alola level evolution resolves to its real canonical target and level", () => {
@@ -1430,8 +1506,16 @@ test("no duplicate/conflicting Gen VII evolution outcome: every Gen VII level-ev
     levelTargets.set(evolution.evolvesToSpeciesId, list);
   }
 
+  // "decidueye" is deliberately excluded here as of the Pre-Paldea 17
+  // Hisuian Forms step — it's now reachable only via a Branch (Dartrix),
+  // never a plain LEVEL_EVOLUTIONS entry, so it's invisible to this
+  // level-only reverse index (same "Branch target invisible from below"
+  // rule Espeon/Umbreon already established) — verified separately in this
+  // file's own dedicated Pre-Paldea Hisuian Forms tests further down.
+  // "dartrix" itself stays: it's still reachable from Rowlet's own
+  // unchanged level-17 evolution.
   const gen7Targets = [
-    "dartrix", "decidueye", "torracat", "incineroar", "brionne", "primarina",
+    "dartrix", "torracat", "incineroar", "brionne", "primarina",
     "trumbeak", "toucannon", "gumshoos", "charjabug", "crabominable", "ribombee",
     "toxapex", "mudsdale", "araquanid", "lurantis", "shiinotic", "salazzle",
     "bewear", "steenee", "tsareena", "golisopod", "palossand", "silvally",
@@ -1453,26 +1537,32 @@ test("no duplicate/conflicting Gen VII evolution outcome: every Gen VII level-ev
 // new LEVEL_EVOLUTIONS entries keyed by an Alolan Form (sharing a Kanto
 // dexNumber) = 35 total new LEVEL_EVOLUTIONS entries, minus the 1
 // migrated-out Cubone entry (now a Branch) = 34 net new LEVEL_EVOLUTIONS
-// rows. Item evolutions: 3 brand-new species keys (charjabug,
-// sandshrew-alola, vulpix-alola) + 2 new branches added to pre-existing
-// species (pikachu, exeggcute) = 5 new EVOLUTION_ITEM_EVOLUTIONS rows.
-// Branch evolutions: 2 brand-new (rockruff, cosmoem) + 1 migrated
-// (cubone) = 3 new/changed BRANCH_EVOLUTIONS entries.
-test("total evolution counts include exactly 34 net new Gen VII/Alolan-Form level evolutions, 5 new Gen VII evolution-item evolutions, and 3 new/changed Gen VII branch evolutions", () => {
+// rows, minus 1 more migrated out by the later Pre-Paldea 17 Hisuian Forms
+// step (dartrix -> BRANCH_EVOLUTIONS) = 33 net. Item evolutions: 3
+// brand-new species keys (charjabug, sandshrew-alola, vulpix-alola) + 2
+// new branches added to pre-existing species (pikachu, exeggcute) = 5 new
+// EVOLUTION_ITEM_EVOLUTIONS rows. Branch evolutions: 2 brand-new
+// (rockruff, cosmoem) + 1 migrated (cubone) = 3 new/changed
+// BRANCH_EVOLUTIONS entries this phase (Dartrix's later migration is its
+// own, separate Pre-Paldea change, not counted here).
+test("total evolution counts include exactly 33 net new Gen VII/Alolan-Form level evolutions, 5 new Gen VII evolution-item evolutions, and 3 new/changed Gen VII branch evolutions", () => {
+  // "dartrix" is deliberately excluded here as of the Pre-Paldea 17
+  // Hisuian Forms step — migrated to BRANCH_EVOLUTIONS, verified below.
   const gen7BaseLevelIds = [
-    "rowlet", "dartrix", "litten", "torracat", "popplio", "brionne", "pikipek", "trumbeak", "yungoos",
+    "rowlet", "litten", "torracat", "popplio", "brionne", "pikipek", "trumbeak", "yungoos",
     "grubbin", "crabrawler", "cutiefly", "mareanie", "mudbray", "dewpider", "fomantis", "morelull",
     "salandit", "stufful", "bounsweet", "steenee", "wimpod", "sandygast", "type-null", "jangmo-o",
     "hakamo-o", "cosmog", "poipole", "meltan",
   ];
   const alolanFormLevelIds = ["rattata-alola", "diglett-alola", "meowth-alola", "geodude-alola", "graveler-alola", "grimer-alola"];
 
-  assert.equal(gen7BaseLevelIds.length, 29);
+  assert.equal(gen7BaseLevelIds.length, 28);
   assert.equal(alolanFormLevelIds.length, 6);
   for (const id of [...gen7BaseLevelIds, ...alolanFormLevelIds]) {
     assert.ok(getLevelEvolution(id), `${id} must have a level evolution entry`);
   }
-  assert.equal(getLevelEvolution("cubone"), undefined, "the pre-existing cubone level entry was migrated out, for a net +34");
+  assert.equal(getLevelEvolution("cubone"), undefined, "the pre-existing cubone level entry was migrated out (Alola Phase 2, to a Branch)");
+  assert.equal(getLevelEvolution("dartrix"), undefined, "the dartrix level entry was migrated out (Pre-Paldea 17 Hisuian Forms step, to a Branch), for a net -1 more");
 
   assert.equal(getEvolutionItemEvolutions("charjabug").length, 1);
   assert.equal(getEvolutionItemEvolutions("sandshrew-alola").length, 1);
@@ -1486,8 +1576,12 @@ test("total evolution counts include exactly 34 net new Gen VII/Alolan-Form leve
 });
 
 test("deriveSpeciesWildLevelRange correctly derives the Alola starter chains and the pseudo-legendary chain, with no collision", () => {
+  // Rowlet/Dartrix/Decidueye is handled separately below — Dartrix's own
+  // former level-34 evolution is now a Branch (Pre-Paldea 17 Hisuian Forms
+  // step), invisible to this level-only reverse index, so Dartrix's own
+  // ceiling and Decidueye's own floor are both gone (same "Branch source
+  // invisible from below/above" rule Espeon/Umbreon already established).
   const lines: [string, string, string][] = [
-    ["rowlet", "dartrix", "decidueye"],
     ["litten", "torracat", "incineroar"],
     ["popplio", "brionne", "primarina"],
   ];
@@ -1496,6 +1590,10 @@ test("deriveSpeciesWildLevelRange correctly derives the Alola starter chains and
     assert.deepEqual(deriveSpeciesWildLevelRange(middle), { minimumLevel: 17, maximumLevel: 33 });
     assert.deepEqual(deriveSpeciesWildLevelRange(final), { minimumLevel: 34, maximumLevel: Number.POSITIVE_INFINITY });
   }
+
+  assert.deepEqual(deriveSpeciesWildLevelRange("rowlet"), { minimumLevel: 1, maximumLevel: 16 });
+  assert.deepEqual(deriveSpeciesWildLevelRange("dartrix"), { minimumLevel: 17, maximumLevel: Number.POSITIVE_INFINITY });
+  assert.deepEqual(deriveSpeciesWildLevelRange("decidueye"), { minimumLevel: 1, maximumLevel: Number.POSITIVE_INFINITY });
 
   assert.deepEqual(deriveSpeciesWildLevelRange("jangmo-o"), { minimumLevel: 1, maximumLevel: 34 });
   assert.deepEqual(deriveSpeciesWildLevelRange("hakamo-o"), { minimumLevel: 35, maximumLevel: 44 });
@@ -1842,4 +1940,244 @@ test("deriveSpeciesWildLevelRange across the entire catalog never produces minim
     return range.minimumLevel > range.maximumLevel;
   });
   assert.deepEqual(invalid.map((species) => species.id), []);
+});
+
+// ============================================================================
+// PRE-PALDEA STEP (#899-905, Sinnoh-owned)
+// ============================================================================
+
+test("Stantler, Ursaring, Basculin, Sneasel, and Qwilfish each gain a new level-40 evolution into their Pre-Paldea target, replacing an unsupported Hisui-only mechanic", () => {
+  const newEvolutions: [string, string][] = [
+    ["stantler", "wyrdeer"],
+    ["ursaring", "ursaluna"],
+    ["basculin", "basculegion"],
+    ["sneasel", "sneasler"],
+    ["qwilfish", "overqwil"],
+  ];
+
+  for (const [speciesId, targetId] of newEvolutions) {
+    assert.deepEqual(getLevelEvolution(speciesId), { evolvesToSpeciesId: targetId, requiredLevel: 40 }, `${speciesId} -> ${targetId} @ 40`);
+  }
+});
+
+test("Scyther independently evolves into Kleavor at level 40, alongside its own pre-existing, unrelated Metal Coat branch into Scizor", () => {
+  assert.deepEqual(getLevelEvolution("scyther"), { evolvesToSpeciesId: "kleavor", requiredLevel: 40 });
+  assert.equal(getEvolutionItemEvolutionByItem("scyther", "metal-coat")?.evolvesToSpeciesId, "scizor");
+});
+
+test("Sneasel keeps its own pre-existing, unrelated Ice Stone branch into Weavile, alongside its new level evolution into Sneasler", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("sneasel", "ice-stone")?.evolvesToSpeciesId, "weavile");
+  assert.deepEqual(getLevelEvolution("sneasel"), { evolvesToSpeciesId: "sneasler", requiredLevel: 40 });
+});
+
+test("Wyrdeer, Kleavor, Ursaluna, Basculegion, Sneasler, and Overqwil have no further evolution of their own, and Enamorus has no evolution of any kind", () => {
+  for (const id of ["wyrdeer", "kleavor", "ursaluna", "basculegion", "sneasler", "overqwil", "enamorus"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every Pre-Paldea evolution target exists in the species catalog and resolves through resolvePendingEvolutionEligibility", () => {
+  const newEvolutions: [string, string][] = [
+    ["stantler", "wyrdeer"],
+    ["scyther", "kleavor"],
+    ["ursaring", "ursaluna"],
+    ["basculin", "basculegion"],
+    ["sneasel", "sneasler"],
+    ["qwilfish", "overqwil"],
+  ];
+
+  for (const [speciesId, targetId] of newEvolutions) {
+    assert.ok(SPECIES_IDS.has(targetId), `${targetId} must exist in the species catalog`);
+    assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId, level: 40, attackStat: 0, defenseStat: 0 }), {
+      kind: "single",
+      targetSpeciesId: targetId,
+    });
+    assert.equal(resolvePendingEvolutionEligibility({ speciesId, level: 39, attackStat: 0, defenseStat: 0 }), null);
+  }
+});
+
+// ============================================================================
+// PRE-PALDEA — 17 HISUIAN FORMS. User-approved game-design decisions, not
+// canonical Pokémon Legends: Arceus mechanics — locking every evolution rule
+// exactly as specified.
+// ============================================================================
+
+test("Hisuian Growlithe evolves into Hisuian Arcanine via Fire Stone; ordinary Growlithe does NOT evolve into Hisuian Arcanine", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("growlithe-hisui", "fire-stone")?.evolvesToSpeciesId, "arcanine-hisui");
+  assert.equal(getLevelEvolution("growlithe-hisui"), undefined);
+  assert.equal(getBranchEvolution("growlithe-hisui"), undefined);
+
+  // Ordinary Growlithe's own pre-existing, unrelated Fire Stone evolution
+  // still resolves only to ordinary Arcanine — never Hisuian Arcanine, and
+  // growlithe-hisui is its own fully independent object key, never sharing
+  // or overwriting growlithe's own entry.
+  assert.equal(getEvolutionItemEvolutionByItem("growlithe", "fire-stone")?.evolvesToSpeciesId, "arcanine");
+  assert.equal(getEvolutionItemEvolutions("growlithe").length, 1, "ordinary Growlithe must still have exactly its own one Fire Stone branch, unaffected by growlithe-hisui's own independent entry");
+});
+
+test("Hisuian Voltorb evolves into Hisuian Electrode via Leaf Stone; ordinary Voltorb does NOT evolve into Hisuian Electrode", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("voltorb-hisui", "leaf-stone")?.evolvesToSpeciesId, "electrode-hisui");
+  assert.equal(getLevelEvolution("voltorb-hisui"), undefined);
+  assert.equal(getBranchEvolution("voltorb-hisui"), undefined);
+  assert.deepEqual(getEvolutionItemEvolutions("voltorb"), [], "ordinary Voltorb must have no evolution-item evolution of any kind (it never evolves in this catalog)");
+});
+
+test("Quilava offers an explicit level-36 Branch choice between ordinary Typhlosion and Hisuian Typhlosion", () => {
+  const branch = getBranchEvolution("quilava");
+  assert.equal(branch?.requiredLevel, 36);
+  assert.deepEqual(branch?.targets, ["typhlosion", "typhlosion-hisui"]);
+  assert.equal(getLevelEvolution("quilava"), undefined);
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "quilava", level: 36, attackStat: 0, defenseStat: 0 }), {
+    kind: "branch",
+    targets: ["typhlosion", "typhlosion-hisui"],
+  });
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "quilava", level: 36, attackStat: 0, defenseStat: 0 }, "typhlosion"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "quilava", level: 36, attackStat: 0, defenseStat: 0 }, "typhlosion-hisui"), true);
+});
+
+test("Hisuian Qwilfish has no evolution of any kind, and nothing evolves into it; ordinary Qwilfish -> Overqwil remains exactly as the earlier Pre-Paldea #899-905 step defined it", () => {
+  assert.equal(getLevelEvolution("qwilfish-hisui"), undefined);
+  assert.deepEqual(getEvolutionItemEvolutions("qwilfish-hisui"), []);
+  assert.equal(getBranchEvolution("qwilfish-hisui"), undefined);
+
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "qwilfish-hisui", "nothing may evolve into qwilfish-hisui via level");
+  }
+  for (const { evolution } of getAllEvolutionItemEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "qwilfish-hisui", "nothing may evolve into qwilfish-hisui via item");
+  }
+
+  assert.deepEqual(getLevelEvolution("qwilfish"), { evolvesToSpeciesId: "overqwil", requiredLevel: 40 });
+});
+
+test("Hisuian Sneasel has no evolution of any kind, and nothing evolves into it; ordinary Sneasel -> Sneasler remains unchanged, and ordinary Sneasel -> Weavile (Ice Stone) also remains unchanged", () => {
+  assert.equal(getLevelEvolution("sneasel-hisui"), undefined);
+  assert.deepEqual(getEvolutionItemEvolutions("sneasel-hisui"), []);
+  assert.equal(getBranchEvolution("sneasel-hisui"), undefined);
+
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "sneasel-hisui", "nothing may evolve into sneasel-hisui via level");
+  }
+  for (const { evolution } of getAllEvolutionItemEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "sneasel-hisui", "nothing may evolve into sneasel-hisui via item");
+  }
+
+  assert.deepEqual(getLevelEvolution("sneasel"), { evolvesToSpeciesId: "sneasler", requiredLevel: 40 });
+  assert.equal(getEvolutionItemEvolutionByItem("sneasel", "ice-stone")?.evolvesToSpeciesId, "weavile");
+});
+
+test("Dewott offers an explicit level-36 Branch choice between ordinary Samurott and Hisuian Samurott", () => {
+  const branch = getBranchEvolution("dewott");
+  assert.equal(branch?.requiredLevel, 36);
+  assert.deepEqual(branch?.targets, ["samurott", "samurott-hisui"]);
+});
+
+test("Petilil's existing Sun Stone evolution now offers a choice between ordinary Lilligant and Hisuian Lilligant, both via the exact same item — no new evolution item introduced", () => {
+  const branches = getEvolutionItemEvolutions("petilil");
+  assert.equal(branches.length, 2);
+  assert.ok(branches.every((branch) => branch.itemId === "sun-stone"), "both branches share the same Sun Stone item");
+
+  const targets = branches.map((branch) => branch.evolvesToSpeciesId).sort();
+  assert.deepEqual(targets, ["lilligant", "lilligant-hisui"]);
+
+  const sunStoneBranches = getEvolutionItemEvolutionsByItem("petilil", "sun-stone");
+  assert.equal(sunStoneBranches.length, 2);
+  assert.deepEqual(sunStoneBranches.map((b) => b.evolvesToSpeciesId).sort(), ["lilligant", "lilligant-hisui"]);
+
+  assert.equal(getLevelEvolution("petilil"), undefined, "Petilil must never also have a level evolution entry");
+});
+
+test("Hisuian Basculin has no evolution of any kind, and nothing evolves into it; ordinary Basculin -> Basculegion remains exactly as the earlier Pre-Paldea #899-905 step defined it", () => {
+  assert.equal(getLevelEvolution("basculin-hisui"), undefined);
+  assert.deepEqual(getEvolutionItemEvolutions("basculin-hisui"), []);
+  assert.equal(getBranchEvolution("basculin-hisui"), undefined);
+
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "basculin-hisui", "nothing may evolve into basculin-hisui via level");
+  }
+  for (const { evolution } of getAllEvolutionItemEvolutionEntries()) {
+    assert.notEqual(evolution.evolvesToSpeciesId, "basculin-hisui", "nothing may evolve into basculin-hisui via item");
+  }
+
+  assert.deepEqual(getLevelEvolution("basculin"), { evolvesToSpeciesId: "basculegion", requiredLevel: 40 });
+});
+
+test("Hisuian Zorua evolves into Hisuian Zoroark at level 30; ordinary Zorua/Zoroark are entirely unaffected", () => {
+  assert.deepEqual(getLevelEvolution("zorua-hisui"), { evolvesToSpeciesId: "zoroark-hisui", requiredLevel: 30 });
+  assert.equal(getBranchEvolution("zorua-hisui"), undefined);
+  assert.equal(getLevelEvolution("zoroark-hisui"), undefined, "Hisuian Zoroark is a final evolution");
+
+  // Ordinary Zorua's own pre-existing, unrelated level-30 evolution into
+  // ordinary Zoroark is untouched — zorua-hisui's own new level-30 entry
+  // into zoroark-hisui is a fully independent object key, never sharing or
+  // overwriting it.
+  assert.deepEqual(getLevelEvolution("zorua"), { evolvesToSpeciesId: "zoroark", requiredLevel: 30 });
+  assert.equal(getLevelEvolution("zoroark"), undefined);
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "zorua-hisui", level: 30, attackStat: 0, defenseStat: 0 }), {
+    kind: "single",
+    targetSpeciesId: "zoroark-hisui",
+  });
+  assert.equal(resolvePendingEvolutionEligibility({ speciesId: "zorua-hisui", level: 29, attackStat: 0, defenseStat: 0 }), null);
+});
+
+test("Rufflet offers an explicit level-54 Branch choice between ordinary Braviary and Hisuian Braviary", () => {
+  const branch = getBranchEvolution("rufflet");
+  assert.equal(branch?.requiredLevel, 54);
+  assert.deepEqual(branch?.targets, ["braviary", "braviary-hisui"]);
+});
+
+test("Goomy offers an explicit level-40 Branch choice between ordinary Sliggoo and Hisuian Sliggoo", () => {
+  const branch = getBranchEvolution("goomy");
+  assert.equal(branch?.requiredLevel, 40);
+  assert.deepEqual(branch?.targets, ["sliggoo", "sliggoo-hisui"]);
+});
+
+test("Hisuian Sliggoo evolves into Hisuian Goodra at level 50; ordinary Sliggoo -> Goodra (level 50) is entirely unaffected", () => {
+  assert.deepEqual(getLevelEvolution("sliggoo-hisui"), { evolvesToSpeciesId: "goodra-hisui", requiredLevel: 50 });
+  assert.equal(getBranchEvolution("sliggoo-hisui"), undefined);
+  assert.equal(getLevelEvolution("goodra-hisui"), undefined, "Hisuian Goodra is a final evolution");
+
+  assert.deepEqual(getLevelEvolution("sliggoo"), { evolvesToSpeciesId: "goodra", requiredLevel: 50 });
+  assert.equal(getLevelEvolution("goodra"), undefined);
+});
+
+test("Bergmite offers an explicit level-37 Branch choice between ordinary Avalugg and Hisuian Avalugg", () => {
+  const branch = getBranchEvolution("bergmite");
+  assert.equal(branch?.requiredLevel, 37);
+  assert.deepEqual(branch?.targets, ["avalugg", "avalugg-hisui"]);
+});
+
+test("Dartrix offers an explicit Branch choice between ordinary Decidueye and Hisuian Decidueye, at the real preserved level 34 (not the level 36 the task's own spec text stated)", () => {
+  const branch = getBranchEvolution("dartrix");
+  assert.equal(branch?.requiredLevel, 34);
+  assert.deepEqual(branch?.targets, ["decidueye", "decidueye-hisui"]);
+});
+
+test("every Hisuian Form evolution TARGET resolves to a real species in the catalog", () => {
+  const hisuianEvolutionTargets = [
+    "arcanine-hisui", "electrode-hisui", "typhlosion", "typhlosion-hisui",
+    "samurott", "samurott-hisui", "lilligant", "lilligant-hisui",
+    "zoroark-hisui", "braviary", "braviary-hisui", "sliggoo", "sliggoo-hisui",
+    "goodra-hisui", "avalugg", "avalugg-hisui", "decidueye", "decidueye-hisui",
+  ];
+  for (const targetId of hisuianEvolutionTargets) {
+    assert.ok(SPECIES_IDS.has(targetId), `${targetId} must exist in the species catalog`);
+  }
+});
+
+test("every final-stage Hisuian Form (Arcanine/Electrode/Typhlosion/Samurott/Lilligant/Zoroark/Braviary/Goodra/Avalugg/Decidueye) has no further evolution of its own", () => {
+  const finalStageHisuianForms = [
+    "arcanine-hisui", "electrode-hisui", "typhlosion-hisui", "samurott-hisui",
+    "lilligant-hisui", "zoroark-hisui", "braviary-hisui", "goodra-hisui",
+    "avalugg-hisui", "decidueye-hisui",
+  ];
+  for (const id of finalStageHisuianForms) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
 });

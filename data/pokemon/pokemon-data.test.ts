@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
+import { getBackSpritePath, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 
 // Generation 1 (Kanto, #0001-#0151) + Generation 2 (Johto, #0152-#0251) +
@@ -31,15 +32,29 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 // (regional variants of 19 Kanto/Johto/Hoenn/Unova species, sharing THEIR
 // bases' dex numbers — #52/#77/#78/#79/#80/#83/#110/#122/#144/#145/#146/
 // #199/#222/#263/#264/#554/#555/#562/#618 — added in the Galar Phase 1
-// species catalog). That makes two different, both-correct counts:
-//   - EXPECTED_BASE_DEX_COUNT (898): distinct dex numbers / Pokédex rows —
+// species catalog), and 17 Hisuian Forms (regional variants of 17 species
+// spanning Kanto/Johto/Unova/Kalos/Alola, sharing THEIR bases' dex
+// numbers — #58/#59/#100/#101/#157/#211/#215/#503/#549/#550/#570/#571/
+// #628/#705/#706/#713/#724 — added by the Pre-Paldea 17 Hisuian Forms
+// step, Sinnoh-owned per generation-4-pokemon-data.ts's own top-of-file
+// note despite their bases living in other generations' files). That
+// makes two different, both-correct counts:
+//   - EXPECTED_BASE_DEX_COUNT (905): distinct dex numbers / Pokédex rows —
 //     what "dex numbers cover 1..N with no gaps" and the Pokédex service's
-//     own row count are checked against.
-//   - EXPECTED_TOTAL_SPECIES_COUNT (954): every PokemonSpecies row in
-//     POKEMON_DATA, including all 56 alternate forms — what "every id is
-//     present exactly once" is checked against.
-const EXPECTED_BASE_DEX_COUNT = 898;
-const EXPECTED_TOTAL_SPECIES_COUNT = 954;
+//     own row count are checked against. Extended from 898 to 905 by the
+//     Pre-Paldea step (7 Sinnoh-owned species appended to
+//     generation-4-pokemon-data.ts — #899-905: Wyrdeer, Kleavor, Ursaluna,
+//     Basculegion, Sneasler, Overqwil, Enamorus; none are Paldea species).
+//     The 17 Hisuian Forms add zero new dex numbers (each shares its own
+//     ordinary counterpart's existing dex number via formOf), so this
+//     count is unaffected by them.
+//   - EXPECTED_TOTAL_SPECIES_COUNT (978): every PokemonSpecies row in
+//     POKEMON_DATA, including all 73 alternate forms — what "every id is
+//     present exactly once" is checked against. 954 + 7 Pre-Paldea species
+//     (none are alternate forms) + 17 Pre-Paldea Hisuian Forms (all 17 are
+//     alternate forms) = 978.
+const EXPECTED_BASE_DEX_COUNT = 905;
+const EXPECTED_TOTAL_SPECIES_COUNT = 978;
 
 const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legendary"];
 
@@ -101,14 +116,29 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // Galarian Forms (each inheriting its own base species' exact rarity tier
 // verbatim, including the 3 Legendary-bird forms — Articuno/Zapdos/
 // Moltres-Galar all stay "legendary" — no rarity audit was performed this
-// phase; see GALARIAN_FORM_EXPECTATIONS below). See generation-5/6/7/8-
-// pokemon-data.ts's own per-species rarity fields for the single source of
-// truth.
+// phase; see GALARIAN_FORM_EXPECTATIONS below), and the Pre-Paldea step's 7
+// new species (#899-905): Wyrdeer/Ursaluna/Basculegion/Sneasler/Overqwil
+// are "rare" (this project's standard "ordinary fully-evolved species are
+// rare" rule, same tier as Weavile — another fully-evolved former-item
+// evolution), Enamorus is "legendary" (matching the Tornadus/Thundurus/
+// Landorus family it shares a Forme shape with), and Kleavor is
+// "very-rare" (revised from its initial "rare" assignment during the
+// user-approved Sinnoh encounter-zone placement step — see
+// data/zones/sinnoh-zone-data.ts), and the 17 Pre-Paldea Hisuian Forms
+// (user-approved rule: each copies its ordinary counterpart's exact live
+// rarity — see HISUIAN_FORM_EXPECTATIONS below for the full per-species
+// mapping): 4 common (growlithe-hisui, voltorb-hisui, electrode-hisui,
+// sneasel-hisui), 6 rare (arcanine-hisui, qwilfish-hisui, lilligant-hisui,
+// basculin-hisui, braviary-hisui, avalugg-hisui), 7 very-rare
+// (typhlosion-hisui, samurott-hisui, zorua-hisui, zoroark-hisui,
+// sliggoo-hisui, goodra-hisui, decidueye-hisui). See
+// generation-5/6/7/8-pokemon-data.ts's own per-species rarity fields for
+// the single source of truth.
 const EXPECTED_RARITY_COUNTS: Record<PokemonRarity, number> = {
-  common: 365,
-  rare: 361,
-  "very-rare": 117,
-  legendary: 111,
+  common: 369,
+  rare: 372,
+  "very-rare": 125,
+  legendary: 112,
 };
 
 test("exactly 846 Pokémon species rows are loaded (809 base Dex entries + 37 alternate forms)", () => {
@@ -188,7 +218,7 @@ test("no alternate form points at another alternate form (every formOf target is
   }
 });
 
-test("dex numbers, deduped by base form, cover exactly 1 through 898 with no gaps", () => {
+test("dex numbers, deduped by base form, cover exactly 1 through 905 with no gaps", () => {
   const dexNumbers = POKEMON_DATA.filter((species) => species.formOf === undefined)
     .map((species) => species.dexNumber)
     .sort((a, b) => a - b);
@@ -196,9 +226,12 @@ test("dex numbers, deduped by base form, cover exactly 1 through 898 with no gap
   assert.deepEqual(dexNumbers, expected);
 });
 
-test("no species uses dexNumber 899 or higher (Galar Phase 1 stops at Calyrex, #898)", () => {
+// Galar Phase 1 stopped at Calyrex (#898); the Pre-Paldea step extended the
+// base-dex sequence through Enamorus (#905) — 7 Sinnoh-owned species, never
+// Paldea (Paldea itself still has zero species in this catalog).
+test("no species uses dexNumber 906 or higher (the Pre-Paldea step stops at Enamorus, #905; Paldea has not started)", () => {
   const maxDexNumber = Math.max(...POKEMON_DATA.map((species) => species.dexNumber));
-  assert.equal(maxDexNumber, 898);
+  assert.equal(maxDexNumber, 905);
 });
 
 test("Victini (#494) IS present in the catalog and is rarity legendary (Unova Phase 1's own explicit scope)", () => {
@@ -538,10 +571,25 @@ test("no unapproved Kalos form groups exist (Aegislash, Pumpkaboo, Gourgeist, Vi
   }
 });
 
-test("Basculin, Deerling, and Sawsbuck have no alternate-form entries (their real forms are explicitly out of this phase's scope)", () => {
-  for (const id of ["basculin", "deerling", "sawsbuck"]) {
+test("Deerling and Sawsbuck have no alternate-form entries (their real forms are explicitly out of this phase's scope)", () => {
+  for (const id of ["deerling", "sawsbuck"]) {
     const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
     assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
+  }
+});
+
+// Basculin is deliberately excluded from the "no alternate-form entries"
+// rule above as of the Pre-Paldea 17 Hisuian Forms step — it now legitimately
+// has exactly one alternate form (basculin-hisui, its real White-Striped
+// Hisuian counterpart) — see HISUIAN_FORM_EXPECTATIONS further down.
+test("Basculin has exactly one alternate-form entry (basculin-hisui), sharing its own dexNumber 550", () => {
+  const group = POKEMON_DATA.filter((species) => species.id === "basculin" || species.formOf === "basculin");
+  assert.deepEqual(
+    group.map((species) => species.id).sort(),
+    ["basculin", "basculin-hisui"]
+  );
+  for (const species of group) {
+    assert.equal(species.dexNumber, 550, `${species.id} must share dexNumber 550`);
   }
 });
 
@@ -564,27 +612,29 @@ test("Darmanitan has exactly two internal form entries (Kanto/base + Galarian), 
   }
 });
 
-test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, the 18 Alolan Form base species, and the 19 Galarian Form base species", () => {
+test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, the 18 Alolan Form base species, the 19 Galarian Form base species, and the 17 Pre-Paldea Hisuian Form base species", () => {
   const formGroupBases = new Set(
     POKEMON_DATA.filter((species) => species.formOf !== undefined).map((species) => species.formOf)
   );
   assert.deepEqual(
     [...formGroupBases].sort(),
     [
-      "articuno", "corsola", "darmanitan", "darumaka", "deoxys", "diglett", "dugtrio", "exeggutor",
-      "farfetchd", "geodude", "giratina", "golem", "graveler", "grimer", "hoopa",
-      "keldeo", "kyurem", "landorus", "linoone", "lycanroc", "marowak", "meloetta", "meowth",
-      "moltres", "mr-mime", "muk", "ninetales", "persian", "ponyta",
+      "arcanine", "articuno", "avalugg", "basculin", "braviary", "corsola", "darmanitan", "darumaka",
+      "decidueye", "deoxys", "diglett", "dugtrio", "electrode", "exeggutor",
+      "farfetchd", "geodude", "giratina", "golem", "goodra", "graveler", "grimer", "growlithe", "hoopa",
+      "keldeo", "kyurem", "landorus", "lilligant", "linoone", "lycanroc", "marowak", "meloetta", "meowth",
+      "moltres", "mr-mime", "muk", "ninetales", "persian", "ponyta", "qwilfish",
       "raichu", "rapidash", "raticate", "rattata", "rotom",
-      "sandshrew", "sandslash", "slowbro", "slowking", "slowpoke", "stunfisk",
-      "thundurus", "tornadus", "vulpix", "weezing", "yamask", "zapdos", "zigzagoon",
+      "samurott", "sandshrew", "sandslash", "sliggoo", "slowbro", "slowking", "slowpoke", "sneasel", "stunfisk",
+      "thundurus", "tornadus", "typhlosion", "voltorb", "vulpix", "weezing", "yamask", "zapdos", "zigzagoon",
+      "zoroark", "zorua",
     ].sort()
   );
 });
 
-test("exactly 56 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms + 19 Galarian Forms)", () => {
+test("exactly 73 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms + 19 Galarian Forms + 17 Pre-Paldea Hisuian Forms)", () => {
   const formRows = POKEMON_DATA.filter((species) => species.formOf !== undefined);
-  assert.equal(formRows.length, 56);
+  assert.equal(formRows.length, 73);
 });
 
 test("no Hoenn starter-line species (Treecko/Torchic/Mudkip lines) is marked isStarter", () => {
@@ -1016,4 +1066,175 @@ test("rarity tier counts match the assigned classification exactly", () => {
     actualCounts[species.rarity] += 1;
   }
   assert.deepEqual(actualCounts, EXPECTED_RARITY_COUNTS);
+});
+
+// ============================================================================
+// PRE-PALDEA STEP — #899-905, Sinnoh-owned (not Paldea)
+// ============================================================================
+
+const PRE_PALDEA_EXPECTATIONS: Array<{
+  id: string;
+  dexNumber: number;
+  types: PokemonSpecies["types"];
+  rarity: PokemonRarity;
+}> = [
+  { id: "wyrdeer", dexNumber: 899, types: ["normal", "psychic"], rarity: "rare" },
+  { id: "kleavor", dexNumber: 900, types: ["bug", "rock"], rarity: "very-rare" },
+  { id: "ursaluna", dexNumber: 901, types: ["ground", "normal"], rarity: "rare" },
+  { id: "basculegion", dexNumber: 902, types: ["water", "ghost"], rarity: "rare" },
+  { id: "sneasler", dexNumber: 903, types: ["fighting", "poison"], rarity: "rare" },
+  { id: "overqwil", dexNumber: 904, types: ["dark", "poison"], rarity: "rare" },
+  { id: "enamorus", dexNumber: 905, types: ["fairy", "flying"], rarity: "legendary" },
+];
+
+test("exactly 7 Pre-Paldea species were added (#899-905), each a plain base species (no formOf) with the assigned dexNumber, types, and rarity", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  assert.equal(PRE_PALDEA_EXPECTATIONS.length, 7);
+  for (const expectation of PRE_PALDEA_EXPECTATIONS) {
+    const species = byId.get(expectation.id);
+    assert.ok(species, `expected ${expectation.id} to exist in the catalog`);
+    assert.equal(species!.dexNumber, expectation.dexNumber);
+    assert.deepEqual(species!.types, expectation.types);
+    assert.equal(species!.rarity, expectation.rarity);
+    assert.equal(species!.formOf, undefined, `${expectation.id} must be a plain base species, not an alternate form`);
+  }
+});
+
+test("Pre-Paldea species' front and back sprites resolve to the real on-disk filenames (0899-0905.gif), no spriteId override needed", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const expectation of PRE_PALDEA_EXPECTATIONS) {
+    const species = byId.get(expectation.id)!;
+    assert.equal(species.spriteId, undefined, `${expectation.id} resolves its sprite from dexNumber alone`);
+    assert.equal(getFrontSpritePath(species), `/assets/pokemon/sprites/front/0${expectation.dexNumber}.gif`);
+    assert.equal(getBackSpritePath(species), `/assets/pokemon/sprites/back/0${expectation.dexNumber}.gif`);
+  }
+});
+
+test("no Pre-Paldea species is marked isStarter, and no existing #001-898 species or its rarity/types were disturbed by this addition", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  for (const expectation of PRE_PALDEA_EXPECTATIONS) {
+    assert.notEqual(byId.get(expectation.id)!.isStarter, true);
+  }
+
+  // Spot-check a handful of pre-existing pre-evolutions this step's new
+  // evolutions point away FROM — untouched by this addition.
+  const untouched: [string, number, PokemonRarity][] = [
+    ["stantler", 234, "common"],
+    ["scyther", 123, "rare"],
+    ["ursaring", 217, "rare"],
+    ["basculin", 550, "rare"],
+    ["sneasel", 215, "common"],
+    ["qwilfish", 211, "rare"],
+    ["calyrex", 898, "legendary"],
+  ];
+  for (const [id, dexNumber, rarity] of untouched) {
+    const species = byId.get(id);
+    assert.ok(species, `expected ${id} to still exist in the catalog`);
+    assert.equal(species!.dexNumber, dexNumber, `${id}'s dexNumber must be unchanged`);
+    assert.equal(species!.rarity, rarity, `${id}'s rarity must be unchanged`);
+  }
+});
+
+// ============================================================================
+// PRE-PALDEA — 17 HISUIAN FORMS
+// ============================================================================
+//
+// User-approved rule: every Hisuian Form's REAL rarity exactly equals its
+// ordinary counterpart's live PokemonSpecies.rarity — `rarity` below is the
+// live value read from generation-1/2/5/6/7-pokemon-data.ts at the time
+// this step was implemented, and this locking test re-derives it from the
+// live catalog rather than hardcoding a duplicate assumption, so a future
+// unrelated rarity change to any of the 17 ordinary counterparts would
+// correctly fail this test rather than silently drifting.
+const HISUIAN_FORM_EXPECTATIONS: Array<{
+  formId: string;
+  baseId: string;
+  baseDexNumber: number;
+  spriteId: string;
+}> = [
+  { formId: "growlithe-hisui", baseId: "growlithe", baseDexNumber: 58, spriteId: "0058H" },
+  { formId: "arcanine-hisui", baseId: "arcanine", baseDexNumber: 59, spriteId: "0059H" },
+  { formId: "voltorb-hisui", baseId: "voltorb", baseDexNumber: 100, spriteId: "0100H" },
+  { formId: "electrode-hisui", baseId: "electrode", baseDexNumber: 101, spriteId: "0101H" },
+  { formId: "typhlosion-hisui", baseId: "typhlosion", baseDexNumber: 157, spriteId: "0157H" },
+  { formId: "qwilfish-hisui", baseId: "qwilfish", baseDexNumber: 211, spriteId: "0211H" },
+  { formId: "sneasel-hisui", baseId: "sneasel", baseDexNumber: 215, spriteId: "0215H" },
+  { formId: "samurott-hisui", baseId: "samurott", baseDexNumber: 503, spriteId: "0503H" },
+  { formId: "lilligant-hisui", baseId: "lilligant", baseDexNumber: 549, spriteId: "0549H" },
+  { formId: "basculin-hisui", baseId: "basculin", baseDexNumber: 550, spriteId: "0550H" },
+  { formId: "zorua-hisui", baseId: "zorua", baseDexNumber: 570, spriteId: "0570H" },
+  { formId: "zoroark-hisui", baseId: "zoroark", baseDexNumber: 571, spriteId: "0571H" },
+  { formId: "braviary-hisui", baseId: "braviary", baseDexNumber: 628, spriteId: "0628H" },
+  // Hisuian Sliggoo/Goodra/Avalugg use a sprite id one dex-slot ahead of
+  // their own dex number (0706H/0707H/0714H, not the naive 0705H/0706H/
+  // 0713H) — verified against the real on-disk files before being
+  // referenced here; see generation-4-pokemon-data.ts's own note.
+  { formId: "sliggoo-hisui", baseId: "sliggoo", baseDexNumber: 705, spriteId: "0706H" },
+  { formId: "goodra-hisui", baseId: "goodra", baseDexNumber: 706, spriteId: "0707H" },
+  { formId: "avalugg-hisui", baseId: "avalugg", baseDexNumber: 713, spriteId: "0714H" },
+  { formId: "decidueye-hisui", baseId: "decidueye", baseDexNumber: 724, spriteId: "0724H" },
+];
+
+test("exactly 17 Hisuian Forms exist in the catalog", () => {
+  const hisuianFormIds = POKEMON_DATA.filter((species) => species.formLabel === "Hisuian Form").map(
+    (species) => species.id
+  );
+  assert.equal(hisuianFormIds.length, 17);
+  assert.deepEqual(
+    hisuianFormIds.sort(),
+    HISUIAN_FORM_EXPECTATIONS.map((expectation) => expectation.formId).sort()
+  );
+});
+
+for (const { formId, baseId, baseDexNumber, spriteId } of HISUIAN_FORM_EXPECTATIONS) {
+  test(`${formId}: formOf "${baseId}", shares its base's dexNumber #${baseDexNumber}, uses the verified sprite id "${spriteId}", is a plain base row itself (no formOf chaining), and copies its base's exact LIVE rarity`, () => {
+    const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+    const base = byId.get(baseId);
+    const form = byId.get(formId);
+
+    assert.ok(base, `expected base species "${baseId}" to exist in the catalog`);
+    assert.ok(form, `expected Hisuian Form "${formId}" to exist in the catalog`);
+
+    assert.equal(form!.formOf, baseId);
+    assert.equal(form!.dexNumber, baseDexNumber);
+    assert.equal(base!.dexNumber, baseDexNumber);
+    assert.equal(form!.spriteId, spriteId);
+    assert.equal(base!.formOf, undefined, `${baseId} must itself be a plain base species, not a nested form`);
+
+    // User-approved rarity rule: copy the ordinary counterpart's LIVE
+    // rarity exactly, never a canonical Hisui-availability judgment call.
+    assert.equal(form!.rarity, base!.rarity, `${formId} must copy its ordinary counterpart's exact live rarity ("${base!.rarity}")`);
+
+    // Valid types/base stats — non-empty typing, every stat a positive integer.
+    assert.ok(form!.types.length >= 1 && form!.types.length <= 2, `${formId} must have 1-2 types`);
+    for (const stat of Object.values(form!.baseStats)) {
+      assert.ok(Number.isInteger(stat) && stat > 0, `${formId}'s base stats must all be positive integers`);
+    }
+
+    assert.equal(getFrontSpritePath(form!), `/assets/pokemon/sprites/front/${spriteId}.gif`);
+    assert.equal(getBackSpritePath(form!), `/assets/pokemon/sprites/back/${spriteId}.gif`);
+  });
+}
+
+test("Hisuian Growlithe/Arcanine and Hisuian Voltorb/Electrode use real Hisuian typings, not their ordinary counterpart's typing", () => {
+  const byId = new Map(POKEMON_DATA.map((species) => [species.id, species]));
+
+  assert.deepEqual(byId.get("growlithe-hisui")!.types, ["fire", "rock"]);
+  assert.deepEqual(byId.get("arcanine-hisui")!.types, ["fire", "rock"]);
+  assert.deepEqual(byId.get("voltorb-hisui")!.types, ["electric", "grass"]);
+  assert.deepEqual(byId.get("electrode-hisui")!.types, ["electric", "grass"]);
+
+  // Never a blind copy of the ordinary counterpart's own typing.
+  assert.notDeepEqual(byId.get("growlithe-hisui")!.types, byId.get("growlithe")!.types);
+  assert.notDeepEqual(byId.get("voltorb-hisui")!.types, byId.get("voltorb")!.types);
+});
+
+test("existing 18 Alolan Forms and 19 Galarian Forms remain completely unaffected by the 17 Hisuian Forms addition", () => {
+  const alolanFormIds = POKEMON_DATA.filter((species) => species.formLabel === "Alolan Form").map((species) => species.id);
+  const galarianFormIds = POKEMON_DATA.filter((species) => species.formLabel === "Galarian Form").map((species) => species.id);
+  assert.equal(alolanFormIds.length, 18);
+  assert.equal(galarianFormIds.length, 19);
 });

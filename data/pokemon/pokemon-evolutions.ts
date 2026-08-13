@@ -121,7 +121,13 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   chikorita: { evolvesToSpeciesId: "bayleef", requiredLevel: 16 },
   bayleef: { evolvesToSpeciesId: "meganium", requiredLevel: 32 },
   cyndaquil: { evolvesToSpeciesId: "quilava", requiredLevel: 14 },
-  quilava: { evolvesToSpeciesId: "typhlosion", requiredLevel: 36 },
+  // quilava -> typhlosion (level 36) migrated to BRANCH_EVOLUTIONS below —
+  // Pre-Paldea 17 Hisuian Forms step: Quilava now offers an explicit choice
+  // between ordinary Typhlosion and Hisuian Typhlosion at the same
+  // preserved level 36. Kept OUT of this table so the two tables never
+  // disagree about Quilava's evolution method (same "migrated, not
+  // duplicated" rule Cubone's own Alola Phase 2 migration already
+  // established — see BRANCH_EVOLUTIONS' own comment there).
   totodile: { evolvesToSpeciesId: "croconaw", requiredLevel: 18 },
   croconaw: { evolvesToSpeciesId: "feraligatr", requiredLevel: 30 },
   sentret: { evolvesToSpeciesId: "furret", requiredLevel: 15 },
@@ -459,7 +465,10 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   tepig: { evolvesToSpeciesId: "pignite", requiredLevel: 17 },
   pignite: { evolvesToSpeciesId: "emboar", requiredLevel: 36 },
   oshawott: { evolvesToSpeciesId: "dewott", requiredLevel: 17 },
-  dewott: { evolvesToSpeciesId: "samurott", requiredLevel: 36 },
+  // dewott -> samurott (level 36) migrated to BRANCH_EVOLUTIONS below —
+  // Pre-Paldea 17 Hisuian Forms step: Dewott now offers an explicit choice
+  // between ordinary Samurott and Hisuian Samurott at the same preserved
+  // level 36.
   patrat: { evolvesToSpeciesId: "watchog", requiredLevel: 20 },
   lillipup: { evolvesToSpeciesId: "herdier", requiredLevel: 16 },
   herdier: { evolvesToSpeciesId: "stoutland", requiredLevel: 32 },
@@ -531,7 +540,10 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   mienfoo: { evolvesToSpeciesId: "mienshao", requiredLevel: 50 },
   golett: { evolvesToSpeciesId: "golurk", requiredLevel: 43 },
   pawniard: { evolvesToSpeciesId: "bisharp", requiredLevel: 52 },
-  rufflet: { evolvesToSpeciesId: "braviary", requiredLevel: 54 },
+  // rufflet -> braviary (level 54) migrated to BRANCH_EVOLUTIONS below —
+  // Pre-Paldea 17 Hisuian Forms step: Rufflet now offers an explicit choice
+  // between ordinary Braviary and Hisuian Braviary at the same preserved
+  // level 54.
   vullaby: { evolvesToSpeciesId: "mandibuzz", requiredLevel: 54 },
   // Deino/Zweilous/Hydreigon — Unova's pseudo-legendary line (very-rare at
   // every stage, see data/pokemon/generation-5-pokemon-data.ts's own rarity
@@ -617,9 +629,18 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // level evolution at its real canonical level — see this block's own top
   // note.
   amaura: { evolvesToSpeciesId: "aurorus", requiredLevel: 39 },
-  goomy: { evolvesToSpeciesId: "sliggoo", requiredLevel: 40 },
+  // goomy -> sliggoo (level 40) migrated to BRANCH_EVOLUTIONS below —
+  // Pre-Paldea 17 Hisuian Forms step: Goomy now offers an explicit choice
+  // between ordinary Sliggoo and Hisuian Sliggoo at the same preserved
+  // level 40.
+  //
   // Sliggoo -> Goodra: former weather (rain) evolution, now a plain level
   // evolution at its real canonical level — see this block's own top note.
+  // Ordinary Sliggoo's own evolution into ordinary Goodra is UNCHANGED by
+  // the Pre-Paldea 17 Hisuian Forms step — only Goomy's own evolution
+  // became a branch; Hisuian Sliggoo has its own independent, separate
+  // level-50 evolution into Hisuian Goodra (see this table's own
+  // "PRE-PALDEA — 17 HISUIAN FORMS" block further down).
   sliggoo: { evolvesToSpeciesId: "goodra", requiredLevel: 50 },
   // Phantump -> Trevenant: former Trade evolution, now level 35 — see this
   // block's own top note.
@@ -627,7 +648,10 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // Pumpkaboo -> Gourgeist: former Trade evolution, now level 35 — see this
   // block's own top note.
   pumpkaboo: { evolvesToSpeciesId: "gourgeist", requiredLevel: 35 },
-  bergmite: { evolvesToSpeciesId: "avalugg", requiredLevel: 37 },
+  // bergmite -> avalugg (level 37) migrated to BRANCH_EVOLUTIONS below —
+  // Pre-Paldea 17 Hisuian Forms step: Bergmite now offers an explicit
+  // choice between ordinary Avalugg and Hisuian Avalugg at the same
+  // preserved level 37.
   noibat: { evolvesToSpeciesId: "noivern", requiredLevel: 48 },
 
   // Generation VII (Alola, Phase 2) — same "unconditional level-up only"
@@ -670,7 +694,10 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   //     Sandshrew/Vulpix (-> Ice Stone) are NOT here — see
   //     EVOLUTION_ITEM_EVOLUTIONS below.
   rowlet: { evolvesToSpeciesId: "dartrix", requiredLevel: 17 },
-  dartrix: { evolvesToSpeciesId: "decidueye", requiredLevel: 34 },
+  // dartrix -> decidueye (level 34) migrated to BRANCH_EVOLUTIONS below —
+  // Pre-Paldea 17 Hisuian Forms step: Dartrix now offers an explicit choice
+  // between ordinary Decidueye and Hisuian Decidueye at the same preserved
+  // level 34 (Rowlet's own level-17 evolution into Dartrix is untouched).
   litten: { evolvesToSpeciesId: "torracat", requiredLevel: 17 },
   torracat: { evolvesToSpeciesId: "incineroar", requiredLevel: 34 },
   popplio: { evolvesToSpeciesId: "brionne", requiredLevel: 17 },
@@ -872,6 +899,61 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // Phase 1's own explicit judgment call), so the same threshold is reused
   // rather than inventing a different number.
   "yamask-galar": { evolvesToSpeciesId: "runerigus", requiredLevel: 34 },
+
+  // PRE-PALDEA STEP — 6 new evolutions into the 7 Sinnoh-owned species
+  // appended to generation-4-pokemon-data.ts (#899-905; Enamorus has no
+  // evolution). Every one of these is canonically a Hisui-only mechanic
+  // this project doesn't implement (Agile/Strong Style move-use counts,
+  // the Peat Block item at a full moon, cumulative recoil-damage tracking,
+  // a day/night-restricted item) — all six are flattened to the same
+  // default level-40 threshold this file's own LEVEL_EVOLUTIONS table
+  // already uses for "former special/story-progression mechanic, no
+  // real canonical level" cases (Kubfu -> Urshifu, Type: Null -> Silvally,
+  // Meltan -> Melmetal, all level 40).
+  //
+  // Basculegion, Sneasler, and Overqwil canonically require a Hisuian
+  // regional pre-evolution (White-Striped Basculin, Hisuian Sneasel,
+  // Hisuian Qwilfish) that does NOT exist in this catalog — confirmed
+  // absent by inspection of generation-2/5-pokemon-data.ts and this
+  // project's own Forms invariants (pokemon-data.test.ts's "Basculin ...
+  // has no alternate-form entries" test, still true). Rather than
+  // inventing an unapproved regional form, all three evolve directly from
+  // their ordinary, already-cataloged pre-evolution (basculin, sneasel,
+  // qwilfish) instead — the safest architecture-consistent representation.
+  //
+  // Scyther -> Kleavor is a genuinely independent SECOND evolution
+  // target for Scyther, alongside its own pre-existing, unrelated Metal
+  // Coat evolution-item branch into Scizor (EVOLUTION_ITEM_EVOLUTIONS
+  // below) — same "one species, level AND evolution-item together" shape
+  // Slowpoke (-> Slowbro by level, -> Slowking by King's Rock) and
+  // Kirlia/Snorunt (level AND an independent Dawn Stone branch) already
+  // established; Kleavor's real canonical item (Black Augurite) has no
+  // natural existing-catalog analog, so — same "no unmapped-item value"
+  // rule Applin already established (BRANCH_EVOLUTIONS below) — it becomes
+  // a level evolution rather than a forced/unfitting item reuse.
+  stantler: { evolvesToSpeciesId: "wyrdeer", requiredLevel: 40 },
+  scyther: { evolvesToSpeciesId: "kleavor", requiredLevel: 40 },
+  ursaring: { evolvesToSpeciesId: "ursaluna", requiredLevel: 40 },
+  basculin: { evolvesToSpeciesId: "basculegion", requiredLevel: 40 },
+  sneasel: { evolvesToSpeciesId: "sneasler", requiredLevel: 40 },
+  qwilfish: { evolvesToSpeciesId: "overqwil", requiredLevel: 40 },
+
+  // PRE-PALDEA — 17 HISUIAN FORMS. These are the only two direct
+  // Hisuian-Form -> Hisuian-Form level evolutions (both entirely
+  // independent of their species' ordinary-form counterpart — see this
+  // table's own top note): every other Hisuian Form evolution in this step
+  // is either an evolution-item use (EVOLUTION_ITEM_EVOLUTIONS below) or an
+  // explicit player-choice branch alongside the ordinary form
+  // (BRANCH_EVOLUTIONS further down). Hisuian Qwilfish, Hisuian Sneasel,
+  // and Hisuian Basculin are deliberately absent from every evolution table
+  // in this file — explicit user-approved game-design decision: none of
+  // the three evolves, and nothing evolves into any of them (in particular,
+  // they do NOT replace ordinary Qwilfish/Sneasel/Basculin as the
+  // pre-evolution of Overqwil/Sneasler/Basculegion — those three
+  // relationships, added by the earlier Pre-Paldea #899-905 step, above,
+  // are entirely unchanged).
+  "zorua-hisui": { evolvesToSpeciesId: "zoroark-hisui", requiredLevel: 30 },
+  "sliggoo-hisui": { evolvesToSpeciesId: "goodra-hisui", requiredLevel: 50 },
 };
 
 // The one place a species' level-evolution target/threshold is ever looked
@@ -1036,6 +1118,8 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // any of these.
   slowpoke: [{ method: "evolution-item", evolvesToSpeciesId: "slowking", itemId: "kings-rock" }],
   onix: [{ method: "evolution-item", evolvesToSpeciesId: "steelix", itemId: "metal-coat" }],
+  // PRE-PALDEA STEP — Scyther also independently evolves into Kleavor at
+  // level 40 (LEVEL_EVOLUTIONS above); this Metal Coat branch is unchanged.
   scyther: [{ method: "evolution-item", evolvesToSpeciesId: "scizor", itemId: "metal-coat" }],
   seadra: [{ method: "evolution-item", evolvesToSpeciesId: "kingdra", itemId: "dragon-scale" }],
   porygon: [{ method: "evolution-item", evolvesToSpeciesId: "porygon2", itemId: "upgrade" }],
@@ -1146,7 +1230,16 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   panpour: [{ method: "evolution-item", evolvesToSpeciesId: "simipour", itemId: "water-stone" }],
   munna: [{ method: "evolution-item", evolvesToSpeciesId: "musharna", itemId: "moon-stone" }],
   cottonee: [{ method: "evolution-item", evolvesToSpeciesId: "whimsicott", itemId: "sun-stone" }],
-  petilil: [{ method: "evolution-item", evolvesToSpeciesId: "lilligant", itemId: "sun-stone" }],
+  // Petilil gained a second, independent Sun Stone branch (Pre-Paldea 17
+  // Hisuian Forms step) — same "two entries, same itemId, is a genuine
+  // player-choice BRANCH" shape Clamperl's own Water Stone branch already
+  // established (see getEvolutionItemEvolutionsByItem below): the player
+  // explicitly picks Lilligant or Hisuian Lilligant, both from the exact
+  // same item, never a canonical Hisui-availability guess.
+  petilil: [
+    { method: "evolution-item", evolvesToSpeciesId: "lilligant", itemId: "sun-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "lilligant-hisui", itemId: "sun-stone" },
+  ],
   // Eelektrik (Unova, #603) -> Eelektross: real-game Thunder Stone
   // evolution — Eelektrik's own pre-existing level evolution FROM Tynamo
   // (LEVEL_EVOLUTIONS above) is untouched; the two tables stay mutually
@@ -1233,6 +1326,17 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // directly per this phase's own explicit instruction; no new evolution
   // item is introduced.
   "darumaka-galar": [{ method: "evolution-item", evolvesToSpeciesId: "darmanitan-galar", itemId: "ice-stone" }],
+
+  // PRE-PALDEA — 17 HISUIAN FORMS. User-approved game-design decisions,
+  // not the real-game Legends: Arceus mechanics (which use a
+  // location/no-item method for both) — reusing existing catalog items per
+  // this file's own established "existing item first" precedent.
+  "growlithe-hisui": [{ method: "evolution-item", evolvesToSpeciesId: "arcanine-hisui", itemId: "fire-stone" }],
+  "voltorb-hisui": [{ method: "evolution-item", evolvesToSpeciesId: "electrode-hisui", itemId: "leaf-stone" }],
+  // Petilil's own pre-existing Sun Stone entry (above, near the Unova
+  // block) was extended in place with a second Sun Stone branch into
+  // Hisuian Lilligant — see that entry's own updated comment; not
+  // redeclared here to avoid a duplicate object key.
 };
 
 // Every evolution-item branch a species has, regardless of which item —
@@ -1412,6 +1516,32 @@ const BRANCH_EVOLUTIONS: Record<string, BranchEvolution> = {
   // both real targets instead, reusing the exact same create-choice/
   // then-confirm flow, zero new mechanics.
   applin: { requiredLevel: 25, targets: ["flapple", "appletun"] },
+
+  // PRE-PALDEA — 17 HISUIAN FORMS. Explicit user-approved game-design
+  // decision: six species that used to hold a single-target LEVEL_EVOLUTIONS
+  // entry now offer the player an explicit choice between their ordinary
+  // final form and the new Hisuian Form instead, at the EXACT SAME preserved
+  // level (never a canonical-Hisui-availability guess, never a hidden/random
+  // value) — the same "migrated, not duplicated" shape Cubone's own Alola
+  // Phase 2 migration (-> Marowak / Marowak-Alola) already established.
+  // Each pre-evolution's own INCOMING evolution (Cyndaquil->Quilava,
+  // Oshawott->Dewott, etc.) is entirely untouched.
+  quilava: { requiredLevel: 36, targets: ["typhlosion", "typhlosion-hisui"] },
+  dewott: { requiredLevel: 36, targets: ["samurott", "samurott-hisui"] },
+  rufflet: { requiredLevel: 54, targets: ["braviary", "braviary-hisui"] },
+  goomy: { requiredLevel: 40, targets: ["sliggoo", "sliggoo-hisui"] },
+  bergmite: { requiredLevel: 37, targets: ["avalugg", "avalugg-hisui"] },
+  // Dartrix -> Decidueye: the user-provided spec text says level 36, but
+  // this catalog's own real, pre-existing, working Dartrix -> Decidueye
+  // threshold (LEVEL_EVOLUTIONS' own former entry, preserved here) is level
+  // 34 — see generation-7-pokemon-data.ts's own Rowlet/Litten/Popplio
+  // 17/34 precedent, identical for all three Alola starters. Preserving the
+  // real existing level (rather than silently introducing a level change
+  // to ordinary Decidueye's own evolution, which the task explicitly
+  // forbids — "preserve ordinary Decidueye") was judged the correct
+  // reading of "preserve ordinary X" here; flagged explicitly in this
+  // step's own Final Report rather than silently picking one.
+  dartrix: { requiredLevel: 34, targets: ["decidueye", "decidueye-hisui"] },
 };
 
 // The one place a species' Branch Evolution is ever looked up — mirrors

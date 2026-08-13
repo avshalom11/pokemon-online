@@ -420,10 +420,25 @@ test("Kanto, Johto, Hoenn, Sinnoh, and Unova zone files are unaffected by Kalos'
   ]);
   // Every earlier-region species is still dex 1-649, never touched by the
   // Kalos range — a coarse but effective "nothing here was edited" guard.
+  // Exceptions: the Pre-Paldea step appended 7 Sinnoh-owned species at
+  // #899-905 (generation-4-pokemon-data.ts's own top-of-file note) — real
+  // dex numbers past Kalos's own #650-721 span, but still genuinely Sinnoh,
+  // never Kalos. The later Pre-Paldea 17 Hisuian Forms step similarly
+  // added 17 Sinnoh-owned alternate-form species (formLabel "Hisuian
+  // Form") sharing THEIR bases' real dex numbers, several of which fall
+  // inside or past Kalos's own #650-721 span (Sliggoo-Hisui #705,
+  // Goodra-Hisui #706, Avalugg-Hisui #713, Decidueye-Hisui #724) — still
+  // genuinely Sinnoh, never Kalos, identified by formLabel rather than a
+  // dex range since their dex numbers span nearly the whole Pokédex.
   for (const id of otherRegionIds) {
     const species = POKEMON_DATA.find((candidate) => candidate.id === id);
     assert.ok(species, `${id} must still resolve in the species catalog`);
-    assert.ok(species!.dexNumber <= 649, `${id} (dex ${species!.dexNumber}) must never be a Kalos species`);
+    const isPrePaldeaSinnohSpecies = species!.dexNumber >= 899 && species!.dexNumber <= 905;
+    const isPrePaldeaHisuianForm = species!.formLabel === "Hisuian Form";
+    assert.ok(
+      species!.dexNumber <= 649 || isPrePaldeaSinnohSpecies || isPrePaldeaHisuianForm,
+      `${id} (dex ${species!.dexNumber}) must never be a Kalos species`
+    );
   }
 
   // Every earlier region still has its own Beach zone, untouched.
