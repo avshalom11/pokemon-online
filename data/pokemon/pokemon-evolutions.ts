@@ -954,6 +954,144 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // are entirely unchanged).
   "zorua-hisui": { evolvesToSpeciesId: "zoroark-hisui", requiredLevel: 30 },
   "sliggoo-hisui": { evolvesToSpeciesId: "goodra-hisui", requiredLevel: 50 },
+
+  // ==========================================================================
+  // PALDEA PHASE 2 (#906-1025 + the 4 Paldean Forms) — every level below was
+  // individually verified against the real Scarlet/Violet evolution-chain
+  // data before being written here. Species whose only canonical evolution
+  // is an evolution-item (tadbulb/capsakid/cetoddle) or an explicit
+  // player-choice branch (charcadet, applin's new dipplin target) are
+  // deliberately absent from this table — see EVOLUTION_ITEM_EVOLUTIONS and
+  // BRANCH_EVOLUTIONS below for those, same "mutually exclusive per method"
+  // rule this table has followed since Generation I.
+  // ==========================================================================
+  sprigatito: { evolvesToSpeciesId: "floragato", requiredLevel: 16 },
+  floragato: { evolvesToSpeciesId: "meowscarada", requiredLevel: 36 },
+  fuecoco: { evolvesToSpeciesId: "crocalor", requiredLevel: 16 },
+  crocalor: { evolvesToSpeciesId: "skeledirge", requiredLevel: 36 },
+  quaxly: { evolvesToSpeciesId: "quaxwell", requiredLevel: 16 },
+  quaxwell: { evolvesToSpeciesId: "quaquaval", requiredLevel: 36 },
+  lechonk: { evolvesToSpeciesId: "oinkologne", requiredLevel: 18 },
+  tarountula: { evolvesToSpeciesId: "spidops", requiredLevel: 15 },
+  nymble: { evolvesToSpeciesId: "lokix", requiredLevel: 24 },
+  // Pawmi -> Pawmo: real canonical level 18, no simplification needed.
+  // Pawmo -> Pawmot itself is deliberately absent here — its real canonical
+  // method is "walk 1000 steps together" (Let's Go), a step-counting
+  // mechanic this project doesn't implement; simplified to a level-40
+  // evolution instead, same default this file's own Pre-Paldea step already
+  // established for "no real canonical level" cases (Kubfu -> Urshifu,
+  // Stantler -> Wyrdeer, etc. — see that block's own top note).
+  pawmi: { evolvesToSpeciesId: "pawmo", requiredLevel: 18 },
+  pawmo: { evolvesToSpeciesId: "pawmot", requiredLevel: 40 },
+  tandemaus: { evolvesToSpeciesId: "maushold", requiredLevel: 25 },
+  fidough: { evolvesToSpeciesId: "dachsbun", requiredLevel: 26 },
+  smoliv: { evolvesToSpeciesId: "dolliv", requiredLevel: 25 },
+  dolliv: { evolvesToSpeciesId: "arboliva", requiredLevel: 35 },
+  nacli: { evolvesToSpeciesId: "naclstack", requiredLevel: 24 },
+  naclstack: { evolvesToSpeciesId: "garganacl", requiredLevel: 38 },
+  // Charcadet itself is deliberately absent here — see BRANCH_EVOLUTIONS
+  // below (Armarouge/Ceruledge, real canonical method is a held-item choice
+  // with no existing-catalog analog).
+  wattrel: { evolvesToSpeciesId: "kilowattrel", requiredLevel: 25 },
+  maschiff: { evolvesToSpeciesId: "mabosstiff", requiredLevel: 30 },
+  shroodle: { evolvesToSpeciesId: "grafaiai", requiredLevel: 28 },
+  // Bramblin -> Brambleghast: real canonical method is "walk 1000 steps
+  // while spinning" (Rotom-bike-style mechanic), not implemented —
+  // simplified to level 40, same default as Pawmo -> Pawmot above.
+  bramblin: { evolvesToSpeciesId: "brambleghast", requiredLevel: 40 },
+  toedscool: { evolvesToSpeciesId: "toedscruel", requiredLevel: 30 },
+  // Rellor -> Rabsca: real canonical method is "walk 1000 steps while
+  // spinning" (same mechanic as Bramblin above), not implemented —
+  // simplified to level 40, same default.
+  rellor: { evolvesToSpeciesId: "rabsca", requiredLevel: 40 },
+  flittle: { evolvesToSpeciesId: "espathra", requiredLevel: 35 },
+  tinkatink: { evolvesToSpeciesId: "tinkatuff", requiredLevel: 24 },
+  tinkatuff: { evolvesToSpeciesId: "tinkaton", requiredLevel: 38 },
+  wiglett: { evolvesToSpeciesId: "wugtrio", requiredLevel: 26 },
+  // Finizen -> Palafin: real canonical level 38 is kept; only the
+  // "needs_multiplayer" condition (Union Circle) is dropped — this project
+  // has no multiplayer mechanic, same "drop the unsupported condition, keep
+  // the real level" rule this file already applies to Greavard below and to
+  // every former time-of-day-gated evolution (see Galarian Linoone/Yamask's
+  // own notes further up).
+  finizen: { evolvesToSpeciesId: "palafin", requiredLevel: 38 },
+  varoom: { evolvesToSpeciesId: "revavroom", requiredLevel: 40 },
+  glimmet: { evolvesToSpeciesId: "glimmora", requiredLevel: 35 },
+  // Greavard -> Houndstone: real canonical level 30 is kept; only the
+  // Time-of-day(night) condition is dropped — same "no time-of-day
+  // mechanic" rule this file already applies everywhere else (Galarian
+  // Linoone -> Obstagoon, etc.).
+  greavard: { evolvesToSpeciesId: "houndstone", requiredLevel: 30 },
+  frigibax: { evolvesToSpeciesId: "arctibax", requiredLevel: 35 },
+  arctibax: { evolvesToSpeciesId: "baxcalibur", requiredLevel: 54 },
+  // Gimmighoul -> Gholdengo: real canonical method is collecting 999
+  // Gimmighoul Coins, a currency-collection mechanic this project doesn't
+  // implement (and never will — no new subsystem). Simplified to level 40,
+  // same default as Pawmo/Bramblin/Rellor above.
+  gimmighoul: { evolvesToSpeciesId: "gholdengo", requiredLevel: 40 },
+  // Poltchageist -> Sinistcha: real canonical method is using one of two
+  // teacup items (Unremarkable Teacup / Masterpiece Teacup, deciding which
+  // of two Sinistcha forms is produced) — Paldea Phase 1 only implemented
+  // ONE Sinistcha representation (no form split), so this collapses to a
+  // single-target evolution rather than a branch; neither teacup item has a
+  // natural existing-catalog analog, so — same "no unmapped-item value"
+  // rule Applin/Kleavor already established — it becomes a level-40
+  // evolution instead, same default as the other no-canonical-level cases
+  // above.
+  poltchageist: { evolvesToSpeciesId: "sinistcha", requiredLevel: 40 },
+  // Dipplin -> Hydrapple: real canonical method is "level up while knowing
+  // the move Dragon Cheer" (a specific-move-known condition this project
+  // doesn't implement — see Girafarig/Dunsparce below for the same rule).
+  // No real canonical level exists to preserve, so this is level 40, same
+  // default as the other no-canonical-level cases above. Dipplin's own
+  // INCOMING evolution (from Applin) is a BRANCH_EVOLUTIONS target, not
+  // this table — see that section below.
+  dipplin: { evolvesToSpeciesId: "hydrapple", requiredLevel: 40 },
+
+  // Older species with a genuinely new Generation IX evolution target —
+  // each species' own EXISTING pre-evolution/evolution (if any) is
+  // entirely untouched; only a new final-stage LEVEL_EVOLUTIONS row is
+  // added here, same "extend, never replace" shape the Pre-Paldea step
+  // (#899-905) already established for Stantler/Ursaring/Basculin/Sneasel/
+  // Qwilfish. All four real canonical methods below are move-based
+  // (use-count or known-move) or battle-count-based mechanics this project
+  // doesn't implement — none has a real canonical level to preserve, so
+  // three of the four use the same level-40 default (Bisharp -> Kingambit
+  // is the one exception — see its own entry below for why).
+  // Primeape -> Annihilape: real method is using the move Rage Fist 20
+  // times; Primeape's own pre-existing level-28 evolution FROM Mankey
+  // (LEVEL_EVOLUTIONS above) is untouched.
+  primeape: { evolvesToSpeciesId: "annihilape", requiredLevel: 40 },
+  // Girafarig -> Farigiraf: real method is leveling up while knowing the
+  // move Twin Beam; Girafarig itself has no pre-evolution of its own, so no
+  // collision.
+  girafarig: { evolvesToSpeciesId: "farigiraf", requiredLevel: 40 },
+  // Dunsparce -> Dudunsparce: real method is leveling up while knowing the
+  // move Hyper Drill; Dunsparce itself has no pre-evolution of its own, so
+  // no collision.
+  dunsparce: { evolvesToSpeciesId: "dudunsparce", requiredLevel: 40 },
+  // Bisharp -> Kingambit: real method is defeating 3 Bisharp (holding
+  // Leader's Crest) while in the player's party — a battle-achievement
+  // mechanic this project doesn't implement. Bisharp's own pre-existing
+  // level-52 evolution FROM Pawniard (LEVEL_EVOLUTIONS above) is untouched.
+  // Deliberately NOT the level-40 default used for every other
+  // no-canonical-level case above — Bisharp itself isn't reachable until
+  // level 52 (Pawniard's own threshold), so a level BELOW 52 here would
+  // make Kingambit unreachable (deriveSpeciesWildLevelRange would compute
+  // Bisharp's own minimumLevel 52 > its maximumLevel). Level 55 is used
+  // instead — the same tier as this catalog's other 55-level final-stage
+  // evolutions (Pupitar -> Tyranitar, Dragonair -> Dragonite).
+  bisharp: { evolvesToSpeciesId: "kingambit", requiredLevel: 55 },
+
+  // Paldean Wooper -> Clodsire: real canonical level 20, IDENTICAL to
+  // ordinary Wooper's own level-20 threshold into Quagsire — no
+  // simplification needed, just a genuinely different target for a
+  // genuinely different species id. Keyed by "wooper-paldea" (the Paldean
+  // Form's own independent species id, see generation-9-pokemon-data.ts),
+  // never "wooper" — ordinary Wooper's pre-existing level-20 evolution into
+  // Quagsire (above, Generation II block) is completely untouched and must
+  // never point at Clodsire.
+  "wooper-paldea": { evolvesToSpeciesId: "clodsire", requiredLevel: 20 },
 };
 
 // The one place a species' level-evolution target/threshold is ever looked
@@ -1337,6 +1475,15 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // block) was extended in place with a second Sun Stone branch into
   // Hisuian Lilligant — see that entry's own updated comment; not
   // redeclared here to avoid a duplicate object key.
+
+  // Paldea Phase 2 — every one of these is a real canonical Scarlet/Violet
+  // Stone evolution (verified against the live evolution-chain data before
+  // being written here), each reusing one of the 16 EvolutionItemId values
+  // already in this catalog; no new evolution item is introduced for
+  // Paldea.
+  tadbulb: [{ method: "evolution-item", evolvesToSpeciesId: "bellibolt", itemId: "thunder-stone" }],
+  capsakid: [{ method: "evolution-item", evolvesToSpeciesId: "scovillain", itemId: "fire-stone" }],
+  cetoddle: [{ method: "evolution-item", evolvesToSpeciesId: "cetitan", itemId: "ice-stone" }],
 };
 
 // Every evolution-item branch a species has, regardless of which item —
@@ -1515,7 +1662,29 @@ const BRANCH_EVOLUTIONS: Record<string, BranchEvolution> = {
   // established — it becomes an explicit level-25 player CHOICE between
   // both real targets instead, reusing the exact same create-choice/
   // then-confirm flow, zero new mechanics.
-  applin: { requiredLevel: 25, targets: ["flapple", "appletun"] },
+  //
+  // Paldea Phase 2 extends this in place with a THIRD real target: Applin's
+  // real-game evolution also produces Dipplin via a third item (Syrupy
+  // Apple, introduced in The Teal Mask), same "no unmapped-item value" rule
+  // as its two Sword/Shield siblings — added as a third BRANCH target at
+  // the exact same preserved level 25 rather than a second, conflicting
+  // Applin entry (same "migrated/extended in place, never duplicated" rule
+  // Petilil's own Sun Stone entry already established above). Flapple and
+  // Appletun are entirely unaffected.
+  applin: { requiredLevel: 25, targets: ["flapple", "appletun", "dipplin"] },
+  // Charcadet's real-game evolution is decided by which of two items
+  // (Auspicious Armor -> Armarouge, Malicious Armor -> Ceruledge) the
+  // player uses; neither has a natural existing-item analog in this
+  // catalog's 16 Evolution Stones/Items, and this phase's own explicit
+  // instruction forbids inventing Auspicious Armor/Malicious Armor as new
+  // evolution products — same "no unmapped-item value" rule Applin already
+  // established just above, so it becomes an explicit level-40 player
+  // CHOICE between both real targets instead (no real canonical level
+  // exists to preserve, so this uses the same level-40 default this file's
+  // Pre-Paldea step already established for "no real canonical level"
+  // cases). Both targets are preserved — the player explicitly picks
+  // Armarouge or Ceruledge, never a hidden/random/version-exclusive value.
+  charcadet: { requiredLevel: 40, targets: ["armarouge", "ceruledge"] },
 
   // PRE-PALDEA — 17 HISUIAN FORMS. Explicit user-approved game-design
   // decision: six species that used to hold a single-target LEVEL_EVOLUTIONS

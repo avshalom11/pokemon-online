@@ -863,7 +863,7 @@ test("alternate forms never get their own evolution, on either side of the arrow
   }
 });
 
-test("total evolution counts include exactly 64 new Unova level evolutions and 10 new Unova evolution-item evolutions", () => {
+test("total evolution counts include exactly 65 new Unova level evolutions and 10 new Unova evolution-item evolutions", () => {
   // formOf === undefined excludes alternate forms sharing a dex number in
   // this range — this used to only matter for Unova's own Therian/Black/
   // White/Pirouette forms (none of which ever had an evolution entry, see
@@ -877,7 +877,9 @@ test("total evolution counts include exactly 64 new Unova level evolutions and 1
   // step added one: Basculin (dex #550) gained its own level evolution
   // (basculegion) — 65 -> 66. The Pre-Paldea 17 Hisuian Forms step then
   // migrated two OUT to BRANCH_EVOLUTIONS (dewott -> samurott/
-  // samurott-hisui, rufflet -> braviary/braviary-hisui) — 66 -> 64.
+  // samurott-hisui, rufflet -> braviary/braviary-hisui) — 66 -> 64. Paldea
+  // Phase 2 then added one more: Bisharp (dex #625) gained its own new
+  // level-55 evolution into Kingambit — 64 -> 65.
   const unovaDexRange = new Set(
     POKEMON_DATA.filter((species) => species.formOf === undefined && species.dexNumber >= 494 && species.dexNumber <= 649).map(
       (species) => species.id
@@ -887,7 +889,7 @@ test("total evolution counts include exactly 64 new Unova level evolutions and 1
   const unovaLevelEntries = getAllLevelEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
   const unovaItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => unovaDexRange.has(entry.speciesId));
 
-  assert.equal(unovaLevelEntries.length, 64);
+  assert.equal(unovaLevelEntries.length, 65);
   // 9 -> 10: Petilil gained a second, independent Sun Stone branch into
   // Hisuian Lilligant (Pre-Paldea 17 Hisuian Forms step) — both of
   // Petilil's branches are counted here (same array, same speciesId key).
@@ -1696,20 +1698,25 @@ test("approved Galar mechanic simplifications: Clobbopus/Sinistea/Snom/Kubfu kee
   }
 });
 
-test("Applin is an explicit level-25 Branch choice between Flapple and Appletun, never a hidden/unmapped item value", () => {
+// Paldea Phase 2 extended this branch in place with a third real target
+// (Dipplin, via Applin's real Syrupy Apple item) — Flapple/Appletun are
+// entirely unaffected; see pokemon-evolutions.ts's own updated comment on
+// this entry.
+test("Applin is an explicit level-25 Branch choice between Flapple, Appletun, and Dipplin, never a hidden/unmapped item value", () => {
   const branch = getBranchEvolution("applin");
   assert.equal(branch?.requiredLevel, 25);
-  assert.deepEqual(branch?.targets, ["flapple", "appletun"]);
+  assert.deepEqual(branch?.targets, ["flapple", "appletun", "dipplin"]);
   assert.equal(getLevelEvolution("applin"), undefined, "Applin must never also have a level evolution entry");
   assert.deepEqual(getEvolutionItemEvolutions("applin"), [], "Applin must never also have an evolution-item evolution");
 
   assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "applin", level: 24, attackStat: 0, defenseStat: 0 }), null);
   assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }), {
     kind: "branch",
-    targets: ["flapple", "appletun"],
+    targets: ["flapple", "appletun", "dipplin"],
   });
   assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "flapple"), true);
   assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "appletun"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "dipplin"), true);
   assert.equal(isPendingEvolutionTargetValid({ speciesId: "applin", level: 25, attackStat: 0, defenseStat: 0 }, "rillaboom"), false);
 });
 
@@ -2180,4 +2187,298 @@ test("every final-stage Hisuian Form (Arcanine/Electrode/Typhlosion/Samurott/Lil
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
+});
+
+// ============================================================================
+// PALDEA PHASE 2 (#906-1025 + the 4 Paldean Forms)
+// ============================================================================
+
+test("Paldea's three starter lines are complete: level 16 then level 36 for all three lines", () => {
+  const starterChains: [string, string, number, string, number][] = [
+    ["sprigatito", "floragato", 16, "meowscarada", 36],
+    ["fuecoco", "crocalor", 16, "skeledirge", 36],
+    ["quaxly", "quaxwell", 16, "quaquaval", 36],
+  ];
+  for (const [stage1, stage2, level1, stage3, level2] of starterChains) {
+    assert.deepEqual(getLevelEvolution(stage1), { evolvesToSpeciesId: stage2, requiredLevel: level1 });
+    assert.deepEqual(getLevelEvolution(stage2), { evolvesToSpeciesId: stage3, requiredLevel: level2 });
+    assert.equal(getLevelEvolution(stage3), undefined, `${stage3} must have no further evolution`);
+  }
+});
+
+test("Frigibax/Arctibax/Baxcalibur is Paldea's own pseudo-legendary line: a complete three-stage level chain (35 then 54)", () => {
+  assert.deepEqual(getLevelEvolution("frigibax"), { evolvesToSpeciesId: "arctibax", requiredLevel: 35 });
+  assert.deepEqual(getLevelEvolution("arctibax"), { evolvesToSpeciesId: "baxcalibur", requiredLevel: 54 });
+  assert.equal(getLevelEvolution("baxcalibur"), undefined);
+});
+
+test("every plain Paldea level evolution resolves to its real canonical target and level", () => {
+  const plainLevelChains: [string, string, number][] = [
+    ["lechonk", "oinkologne", 18],
+    ["tarountula", "spidops", 15],
+    ["nymble", "lokix", 24],
+    ["pawmi", "pawmo", 18],
+    ["tandemaus", "maushold", 25],
+    ["fidough", "dachsbun", 26],
+    ["smoliv", "dolliv", 25],
+    ["dolliv", "arboliva", 35],
+    ["nacli", "naclstack", 24],
+    ["naclstack", "garganacl", 38],
+    ["wattrel", "kilowattrel", 25],
+    ["maschiff", "mabosstiff", 30],
+    ["shroodle", "grafaiai", 28],
+    ["toedscool", "toedscruel", 30],
+    ["flittle", "espathra", 35],
+    ["tinkatink", "tinkatuff", 24],
+    ["tinkatuff", "tinkaton", 38],
+    ["wiglett", "wugtrio", 26],
+    ["varoom", "revavroom", 40],
+    ["glimmet", "glimmora", 35],
+  ];
+  for (const [speciesId, targetId, level] of plainLevelChains) {
+    assert.deepEqual(getLevelEvolution(speciesId), { evolvesToSpeciesId: targetId, requiredLevel: level }, `${speciesId} -> ${targetId} @ ${level}`);
+  }
+});
+
+test("Finizen -> Palafin and Greavard -> Houndstone keep their real canonical levels (38, 30) with only the unsupported multiplayer/night-time condition dropped", () => {
+  assert.deepEqual(getLevelEvolution("finizen"), { evolvesToSpeciesId: "palafin", requiredLevel: 38 });
+  assert.deepEqual(getLevelEvolution("greavard"), { evolvesToSpeciesId: "houndstone", requiredLevel: 30 });
+});
+
+test("approved Paldea mechanic simplifications with no real canonical level all use this file's level-40 default: Pawmo/Bramblin/Rellor/Gimmighoul/Poltchageist/Dipplin/Primeape/Girafarig/Dunsparce", () => {
+  const level40Simplifications: [string, string][] = [
+    ["pawmo", "pawmot"],
+    ["bramblin", "brambleghast"],
+    ["rellor", "rabsca"],
+    ["gimmighoul", "gholdengo"],
+    ["poltchageist", "sinistcha"],
+    ["dipplin", "hydrapple"],
+    ["primeape", "annihilape"],
+    ["girafarig", "farigiraf"],
+    ["dunsparce", "dudunsparce"],
+  ];
+  for (const [speciesId, targetId] of level40Simplifications) {
+    assert.deepEqual(getLevelEvolution(speciesId), { evolvesToSpeciesId: targetId, requiredLevel: 40 }, `${speciesId} -> ${targetId} @ 40`);
+  }
+});
+
+test("Bisharp -> Kingambit uses level 55, NOT the usual level-40 simplification default, because Bisharp itself isn't reachable until level 52 (Pawniard's own threshold) — Pawniard -> Bisharp (52) is untouched", () => {
+  assert.deepEqual(getLevelEvolution("pawniard"), { evolvesToSpeciesId: "bisharp", requiredLevel: 52 });
+  assert.deepEqual(getLevelEvolution("bisharp"), { evolvesToSpeciesId: "kingambit", requiredLevel: 55 });
+
+  const range = deriveSpeciesWildLevelRange("bisharp");
+  assert.ok(range.minimumLevel <= range.maximumLevel, "bisharp's own wild level range must never invert");
+});
+
+test("Tadbulb, Capsakid, and Cetoddle each evolve via a real canonical Stone item, reusing an existing catalog item — no new evolution product introduced", () => {
+  assert.equal(getEvolutionItemEvolutionByItem("tadbulb", "thunder-stone")?.evolvesToSpeciesId, "bellibolt");
+  assert.equal(getEvolutionItemEvolutionByItem("capsakid", "fire-stone")?.evolvesToSpeciesId, "scovillain");
+  assert.equal(getEvolutionItemEvolutionByItem("cetoddle", "ice-stone")?.evolvesToSpeciesId, "cetitan");
+
+  for (const speciesId of ["tadbulb", "capsakid", "cetoddle"]) {
+    assert.equal(getLevelEvolution(speciesId), undefined, `${speciesId} must never also have a level evolution entry`);
+  }
+});
+
+test("Charcadet is an explicit level-40 Branch choice between Armarouge and Ceruledge — no Auspicious Armor/Malicious Armor product was invented", () => {
+  const branch = getBranchEvolution("charcadet");
+  assert.equal(branch?.requiredLevel, 40);
+  assert.deepEqual(branch?.targets, ["armarouge", "ceruledge"]);
+  assert.equal(getLevelEvolution("charcadet"), undefined, "Charcadet must never also have a level evolution entry");
+  assert.deepEqual(getEvolutionItemEvolutions("charcadet"), [], "Charcadet must never also have an evolution-item evolution");
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "charcadet", level: 39, attackStat: 0, defenseStat: 0 }), null);
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "charcadet", level: 40, attackStat: 0, defenseStat: 0 }), {
+    kind: "branch",
+    targets: ["armarouge", "ceruledge"],
+  });
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "charcadet", level: 40, attackStat: 0, defenseStat: 0 }, "armarouge"), true);
+  assert.equal(isPendingEvolutionTargetValid({ speciesId: "charcadet", level: 40, attackStat: 0, defenseStat: 0 }, "ceruledge"), true);
+
+  for (const itemId of ["fire-stone", "sun-stone", "dusk-stone"] as const) {
+    assert.equal(isEvolutionItemId(itemId), true, `test assumption: ${itemId} is a real catalog item`);
+    assert.equal(getEvolutionItemEvolutionByItem("charcadet", itemId), undefined, `Charcadet must never evolve via ${itemId}`);
+  }
+});
+
+test("no Auspicious Armor or Malicious Armor was added to the evolution item catalog: still exactly the same 16 EvolutionItemId values", () => {
+  const expectedItemIds = [
+    "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone", "moon-stone",
+    "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone", "kings-rock", "metal-coat",
+    "dragon-scale", "upgrade", "protector", "reaper-cloth",
+  ];
+  for (const itemId of expectedItemIds) {
+    assert.equal(isEvolutionItemId(itemId), true, `${itemId} must remain a recognized EvolutionItemId`);
+  }
+  assert.equal(isEvolutionItemId("auspicious-armor"), false);
+  assert.equal(isEvolutionItemId("malicious-armor"), false);
+  assert.equal(isEvolutionItemId("unremarkable-teacup"), false);
+  assert.equal(isEvolutionItemId("masterpiece-teacup"), false);
+  assert.equal(isEvolutionItemId("syrupy-apple"), false);
+});
+
+test("Paldean Wooper evolves into Clodsire at level 20; ordinary Wooper's own level-20 evolution into Quagsire is completely unaffected", () => {
+  assert.deepEqual(getLevelEvolution("wooper-paldea"), { evolvesToSpeciesId: "clodsire", requiredLevel: 20 });
+  assert.deepEqual(getLevelEvolution("wooper"), { evolvesToSpeciesId: "quagsire", requiredLevel: 20 });
+
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "wooper-paldea", level: 20, attackStat: 0, defenseStat: 0 }), {
+    kind: "single",
+    targetSpeciesId: "clodsire",
+  });
+  assert.deepEqual(resolvePendingEvolutionEligibility({ speciesId: "wooper", level: 20, attackStat: 0, defenseStat: 0 }), {
+    kind: "single",
+    targetSpeciesId: "quagsire",
+  });
+});
+
+test("ordinary Wooper never evolves into Clodsire, and Paldean Wooper never evolves into Quagsire", () => {
+  assert.notEqual(getLevelEvolution("wooper")?.evolvesToSpeciesId, "clodsire");
+  assert.notEqual(getLevelEvolution("wooper-paldea")?.evolvesToSpeciesId, "quagsire");
+});
+
+test("the three Paldean Tauros breeds remain standalone Forms — no evolution of any kind, on either side of the arrow", () => {
+  for (const formId of ["tauros-paldea-combat", "tauros-paldea-blaze", "tauros-paldea-aqua"]) {
+    assert.equal(getLevelEvolution(formId), undefined, `${formId} must never be a level-evolution source`);
+    assert.deepEqual(getEvolutionItemEvolutions(formId), [], `${formId} must never be an evolution-item source`);
+    assert.equal(getBranchEvolution(formId), undefined, `${formId} must never be a branch-evolution source`);
+  }
+
+  for (const { evolution } of getAllLevelEvolutionEntries()) {
+    assert.ok(
+      !["tauros-paldea-combat", "tauros-paldea-blaze", "tauros-paldea-aqua"].includes(evolution.evolvesToSpeciesId),
+      `${evolution.evolvesToSpeciesId} is a Paldean Tauros Form and must never be a level-evolution target`
+    );
+  }
+});
+
+test("every genuinely standalone Paldea species (no evolution family, non-Paradox, non-legendary) has no evolution of any kind", () => {
+  const standaloneIds = [
+    "squawkabilly", "klawf", "bombirdier", "cyclizar", "orthworm",
+    "veluza", "dondozo", "tatsugiri", "kingambit",
+  ];
+  for (const id of standaloneIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every Paldea Paradox species has no evolution of any kind", () => {
+  const paradoxIds = [
+    "great-tusk", "scream-tail", "brute-bonnet", "flutter-mane", "slither-wing", "sandy-shocks",
+    "iron-treads", "iron-bundle", "iron-hands", "iron-jugulis", "iron-moth", "iron-thorns",
+    "roaring-moon", "iron-valiant", "walking-wake", "iron-leaves",
+    "gouging-fire", "raging-bolt", "iron-boulder", "iron-crown",
+  ];
+  for (const id of paradoxIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("every Paldea legendary/mythical species (Treasures of Ruin, Loyal Three, box legendaries, Ogerpon, Terapagos, Pecharunt) has no evolution of any kind", () => {
+  const legendaryIds = [
+    "wo-chien", "chien-pao", "ting-lu", "chi-yu",
+    "koraidon", "miraidon",
+    "okidogi", "munkidori", "fezandipiti",
+    "ogerpon", "terapagos", "pecharunt",
+  ];
+  for (const id of legendaryIds) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
+    assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+test("no alternate/invented forms were created for standalone Paldea species: Maushold, Dudunsparce, Tatsugiri, Squawkabilly, Ogerpon, and Terapagos each remain single-entry in the catalog", () => {
+  const singleEntryIds = ["maushold", "dudunsparce", "tatsugiri", "squawkabilly", "ogerpon", "terapagos"];
+  for (const id of singleEntryIds) {
+    const matches = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
+    assert.deepEqual(matches.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
+  }
+});
+
+test("every Paldea evolution target references a valid species id in the live catalog", () => {
+  const paldeaSourceIds = [
+    "sprigatito", "floragato", "fuecoco", "crocalor", "quaxly", "quaxwell",
+    "lechonk", "tarountula", "nymble", "pawmi", "pawmo", "tandemaus", "fidough",
+    "smoliv", "dolliv", "nacli", "naclstack", "charcadet", "tadbulb", "wattrel",
+    "maschiff", "shroodle", "bramblin", "toedscool", "capsakid", "rellor", "flittle",
+    "tinkatink", "tinkatuff", "wiglett", "finizen", "varoom", "glimmet", "greavard",
+    "cetoddle", "frigibax", "arctibax", "gimmighoul", "poltchageist", "applin", "dipplin",
+    "primeape", "girafarig", "dunsparce", "bisharp", "wooper-paldea",
+  ];
+
+  for (const speciesId of paldeaSourceIds) {
+    assert.ok(SPECIES_IDS.has(speciesId), `test assumption: ${speciesId} must exist in the catalog`);
+
+    const levelEvolution = getLevelEvolution(speciesId);
+    if (levelEvolution) {
+      assert.ok(SPECIES_IDS.has(levelEvolution.evolvesToSpeciesId), `${levelEvolution.evolvesToSpeciesId} (level target of ${speciesId}) must be a valid species id`);
+    }
+
+    for (const itemEvolution of getEvolutionItemEvolutions(speciesId)) {
+      assert.ok(SPECIES_IDS.has(itemEvolution.evolvesToSpeciesId), `${itemEvolution.evolvesToSpeciesId} (item target of ${speciesId}) must be a valid species id`);
+      assert.ok(isEvolutionItemId(itemEvolution.itemId), `${itemEvolution.itemId} (item used by ${speciesId}) must be a recognized EvolutionItemId`);
+    }
+
+    const branchEvolution = getBranchEvolution(speciesId);
+    if (branchEvolution) {
+      for (const targetId of branchEvolution.targets) {
+        assert.ok(SPECIES_IDS.has(targetId), `${targetId} (branch target of ${speciesId}) must be a valid species id`);
+      }
+    }
+  }
+});
+
+test("no duplicate evolution definitions: no Paldea species is a key in more than one of LEVEL_EVOLUTIONS/EVOLUTION_ITEM_EVOLUTIONS/BRANCH_EVOLUTIONS", () => {
+  const paldeaSpeciesIds = POKEMON_DATA.filter(
+    (species) => (species.dexNumber >= 906 && species.dexNumber <= 1025) || species.id.startsWith("wooper-paldea") || species.id.startsWith("tauros-paldea")
+  ).map((species) => species.id);
+
+  for (const speciesId of paldeaSpeciesIds) {
+    const methodCount = [
+      getLevelEvolution(speciesId) !== undefined,
+      getEvolutionItemEvolutions(speciesId).length > 0,
+      getBranchEvolution(speciesId) !== undefined,
+    ].filter(Boolean).length;
+    assert.ok(methodCount <= 1, `${speciesId} must not be a key in more than one evolution method table`);
+  }
+});
+
+// Counted explicitly: 29 plain-level chains (sprigatito/floragato/fuecoco/
+// crocalor/quaxly/quaxwell/lechonk/tarountula/nymble/pawmi/tandemaus/
+// fidough/smoliv/dolliv/nacli/naclstack/wattrel/maschiff/shroodle/toedscool/
+// flittle/tinkatink/tinkatuff/wiglett/varoom/glimmet/frigibax/arctibax/
+// wooper-paldea) + 2 real-level-preserved chains (finizen, greavard) + 9
+// level-40-default simplifications (pawmo/bramblin/rellor/gimmighoul/
+// poltchageist/dipplin/primeape/girafarig/dunsparce) + 1 level-55 exception
+// (bisharp) = 41 new LEVEL_EVOLUTIONS rows. Item evolutions: tadbulb
+// (thunder-stone) + capsakid (fire-stone) + cetoddle (ice-stone) = 3 new
+// EVOLUTION_ITEM_EVOLUTIONS rows. Branch evolutions: charcadet = 1 new
+// BRANCH_EVOLUTIONS entry; applin's own pre-existing entry gained a third
+// target (dipplin) in place, not counted as a new entry here.
+test("total evolution counts include exactly 41 new Paldea level evolutions, 3 new Paldea evolution-item evolutions, and 1 new Paldea branch evolution (plus Applin's in-place third target)", () => {
+  const paldeaLevelIds = [
+    "sprigatito", "floragato", "fuecoco", "crocalor", "quaxly", "quaxwell",
+    "lechonk", "tarountula", "nymble", "pawmi", "tandemaus", "fidough", "smoliv",
+    "dolliv", "nacli", "naclstack", "wattrel", "maschiff", "shroodle", "toedscool",
+    "flittle", "tinkatink", "tinkatuff", "wiglett", "varoom", "glimmet", "frigibax",
+    "arctibax", "wooper-paldea",
+    "finizen", "greavard",
+    "pawmo", "bramblin", "rellor", "gimmighoul", "poltchageist", "dipplin", "primeape", "girafarig", "dunsparce",
+    "bisharp",
+  ];
+  assert.equal(paldeaLevelIds.length, 41);
+  for (const id of paldeaLevelIds) {
+    assert.ok(getLevelEvolution(id), `${id} must have a level evolution entry`);
+  }
+
+  assert.equal(getEvolutionItemEvolutions("tadbulb").length, 1);
+  assert.equal(getEvolutionItemEvolutions("capsakid").length, 1);
+  assert.equal(getEvolutionItemEvolutions("cetoddle").length, 1);
+
+  assert.ok(getBranchEvolution("charcadet"));
+  assert.equal(getBranchEvolution("applin")?.targets.length, 3);
 });

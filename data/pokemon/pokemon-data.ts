@@ -6,6 +6,7 @@ import { GENERATION_5_POKEMON_DATA } from "./generation-5-pokemon-data";
 import { GENERATION_6_POKEMON_DATA } from "./generation-6-pokemon-data";
 import { GENERATION_7_POKEMON_DATA } from "./generation-7-pokemon-data";
 import { GENERATION_8_POKEMON_DATA } from "./generation-8-pokemon-data";
+import { GENERATION_9_POKEMON_DATA } from "./generation-9-pokemon-data";
 import type { PokemonSpecies } from "@/shared/types/pokemon";
 
 // The canonical Pokémon species registry — every generation's catalog,
@@ -22,4 +23,5 @@ export const POKEMON_DATA: PokemonSpecies[] = [
   ...GENERATION_6_POKEMON_DATA,
   ...GENERATION_7_POKEMON_DATA,
   ...GENERATION_8_POKEMON_DATA,
+  ...GENERATION_9_POKEMON_DATA,
 ];

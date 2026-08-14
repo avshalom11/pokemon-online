@@ -58,6 +58,7 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
     party = realParty.map((pokemon) => ({
       dexNumber: pokemon.species.dexNumber,
       spriteId: pokemon.species.spriteId,
+      spriteExt: pokemon.species.spriteExt,
       displayName: pokemon.nickname ?? pokemon.species.name,
       level: pokemon.level,
     }));

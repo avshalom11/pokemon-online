@@ -86,4 +86,12 @@ export interface PokemonSpecies {
   // Attack Form -> spriteId "0386A" -> "0386A.gif"), never used to rename a
   // single-form species' sprite for any other reason.
   spriteId?: string;
+
+  // Sprite file extension override — see features/pokemon/media/
+  // pokemon-media-paths.ts's SpriteSource. Absent means "gif", the real
+  // on-disk extension for every species before Paldea. Set to "png" only
+  // when a species' real sprite files on disk are PNG rather than GIF (true
+  // for a minority of Paldea's #0991-1025 assets) — verified against disk
+  // per-species, never assumed from generation or dex range alone.
+  spriteExt?: "gif" | "png";
 }

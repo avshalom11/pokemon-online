@@ -16,8 +16,9 @@ test("a single-target item lists each eligible species by its plain name", () =>
   // Hisuian Forms step adds Hisuian Growlithe (its own independent,
   // single-branch Fire Stone entry into Hisuian Arcanine — a separate
   // species key from ordinary Growlithe, so both are listed by their own
-  // plain name).
-  assert.deepEqual([...labels].sort(), ["Eevee", "Growlithe", "Hisuian Growlithe", "Magmar", "Pansear", "Vulpix"].sort());
+  // plain name). Paldea Phase 2 adds Capsakid -> Scovillain (real canonical
+  // Fire Stone evolution).
+  assert.deepEqual([...labels].sort(), ["Capsakid", "Eevee", "Growlithe", "Hisuian Growlithe", "Magmar", "Pansear", "Vulpix"].sort());
 });
 
 test("Clamperl's Water Stone branch is shown as two disambiguated 'Species → Target' entries, never one ambiguous 'Clamperl'", () => {

@@ -16,6 +16,10 @@ export interface PublicPartyMemberView {
   // Attack Form) still renders its own real sprite here instead of its
   // base form's, without exposing anything else about the owned instance.
   spriteId?: string;
+  // Mirrors PokemonSpecies.spriteExt (shared/types/pokemon.ts) — carried
+  // through for the same reason as spriteId: Paldea species whose real
+  // sprite files are PNG must still render correctly here.
+  spriteExt?: "gif" | "png";
   displayName: string;
   level: number;
 }

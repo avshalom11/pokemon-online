@@ -3,6 +3,7 @@ import { GALAR_MAP_CONFIG } from "@/data/maps/galar-map-config";
 import { HOENN_MAP_CONFIG } from "@/data/maps/hoenn-map-config";
 import { JOHTO_MAP_CONFIG } from "@/data/maps/johto-map-config";
 import { KALOS_MAP_CONFIG } from "@/data/maps/kalos-map-config";
+import { PALDEA_MAP_CONFIG } from "@/data/maps/paldea-map-config";
 import { SINNOH_MAP_CONFIG } from "@/data/maps/sinnoh-map-config";
 import { UNOVA_MAP_CONFIG } from "@/data/maps/unova-map-config";
 import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
@@ -186,7 +187,29 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
     // battle-capable.
     mapConfig: GALAR_MAP_CONFIG,
   },
-  paldea: { id: "paldea", englishName: "Paldea", cardImageSrc: DEFAULT_CARD_IMAGE_SRC, hasMap: false },
+  paldea: {
+    id: "paldea",
+    englishName: "Paldea",
+    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    hasMap: true,
+    // Paldea now has real, clickable zones (data/maps/paldea-map-config.ts,
+    // manually placed via /dev/paldea-map-editor against the real
+    // /images/paldea-map.png) — same as Kanto/Johto/Hoenn/Sinnoh/Unova,
+    // mapConfig.imageSrc is the one source for the map image; mapImageSrc
+    // is left unset since mapConfig already covers it (MapContent renders
+    // from mapConfig whenever it's present). Paldea is a six-zone region
+    // (Beach IS included, unlike five-zone Kalos/Alola/Galar) —
+    // paldea-map-config.ts's own regions array reflects that; the global
+    // ZoneId type is unaffected.
+    //
+    // Paldea now also has real zone encounter data (data/zones/
+    // paldea-zone-data.ts, wired through data/zones/zone-data.ts) — the
+    // same "map before encounters" window Hoenn, Sinnoh, and (briefly)
+    // Kalos/Alola/Galar already went through has closed for Paldea too;
+    // app/(game)/battle/page.tsx's region gate (getZoneData(regionId).length
+    // === 0) now passes and Paldea is battle-capable.
+    mapConfig: PALDEA_MAP_CONFIG,
+  },
 };
 
 export const REGION_REGISTRY: RegionDefinition[] = Object.values(REGION_REGISTRY_BY_ID);

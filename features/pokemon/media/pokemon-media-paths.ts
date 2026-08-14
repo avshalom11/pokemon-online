@@ -24,26 +24,34 @@ export interface SpriteSource {
   // Absent means "derive the filename from dexNumber", the default for
   // every species with no dedicated alternate-form sprite sheet.
   spriteId?: string;
+  // See PokemonSpecies.spriteExt's own doc comment (shared/types/pokemon.ts).
+  // Absent means "gif", the real on-disk extension for every species before
+  // Paldea's mixed GIF/PNG sprite sheets.
+  spriteExt?: "gif" | "png";
 }
 
 function resolveSpriteStem(source: SpriteSource): string {
   return source.spriteId ?? formatDexNumber(source.dexNumber);
 }
 
+function resolveSpriteExt(source: SpriteSource): string {
+  return source.spriteExt ?? "gif";
+}
+
 export function getFrontSpritePath(source: SpriteSource): string {
-  return `${POKEMON_MEDIA_ROOT}/sprites/front/${resolveSpriteStem(source)}.gif`;
+  return `${POKEMON_MEDIA_ROOT}/sprites/front/${resolveSpriteStem(source)}.${resolveSpriteExt(source)}`;
 }
 
 export function getBackSpritePath(source: SpriteSource): string {
-  return `${POKEMON_MEDIA_ROOT}/sprites/back/${resolveSpriteStem(source)}.gif`;
+  return `${POKEMON_MEDIA_ROOT}/sprites/back/${resolveSpriteStem(source)}.${resolveSpriteExt(source)}`;
 }
 
 export function getShinyFrontSpritePath(source: SpriteSource): string {
-  return `${POKEMON_MEDIA_ROOT}/sprites/shiny-front/${resolveSpriteStem(source)}.gif`;
+  return `${POKEMON_MEDIA_ROOT}/sprites/shiny-front/${resolveSpriteStem(source)}.${resolveSpriteExt(source)}`;
 }
 
 export function getShinyBackSpritePath(source: SpriteSource): string {
-  return `${POKEMON_MEDIA_ROOT}/sprites/shiny-back/${resolveSpriteStem(source)}.gif`;
+  return `${POKEMON_MEDIA_ROOT}/sprites/shiny-back/${resolveSpriteStem(source)}.${resolveSpriteExt(source)}`;
 }
 
 export function getIconPath(dexNumber: number): string {

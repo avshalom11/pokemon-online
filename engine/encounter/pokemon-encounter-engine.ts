@@ -70,7 +70,7 @@ const ZONE_ENCOUNTERS_BY_REGION_AND_RARITY: Map<RegionId, Map<ZoneId, Encounters
 // data/pokemon/pokemon-data.ts), so this one flat map already covers every
 // region together — no region-scoping needed here.
 const SPRITE_SOURCE_BY_SPECIES_ID: Map<string, SpriteSource> = new Map(
-  POKEMON_DATA.map((species) => [species.id, { dexNumber: species.dexNumber, spriteId: species.spriteId }])
+  POKEMON_DATA.map((species) => [species.id, { dexNumber: species.dexNumber, spriteId: species.spriteId, spriteExt: species.spriteExt }])
 );
 
 // regionId -> zoneId -> every distinct front-sprite URL that region+zone

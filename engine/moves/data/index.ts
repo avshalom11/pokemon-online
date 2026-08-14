@@ -6,6 +6,7 @@ import { GENERATION_5_MOVES } from "./generation-5/index.ts";
 import { GENERATION_6_MOVES } from "./generation-6/index.ts";
 import { GENERATION_7_MOVES } from "./generation-7/index.ts";
 import { GENERATION_8_MOVES } from "./generation-8/index.ts";
+import { GENERATION_9_MOVES } from "./generation-9/index.ts";
 import type { Move } from "../types/move.types.ts";
 
 // Every generation's move data, concatenated. Adding a new generation means
@@ -19,4 +20,5 @@ export const ALL_MOVE_DEFINITIONS: Move[] = [
   ...GENERATION_6_MOVES,
   ...GENERATION_7_MOVES,
   ...GENERATION_8_MOVES,
+  ...GENERATION_9_MOVES,
 ];

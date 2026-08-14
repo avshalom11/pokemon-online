@@ -24,10 +24,10 @@ test("the real registry loads the full move database (every generation) without 
   // Generation 5 moves (Unova Moves & Learnsets Phase 3) + 60 Generation 6
   // moves (Kalos Moves & Learnsets Phase 3) + 54 Generation 7 moves (Alola
   // Moves & Learnsets Phase 3) + 65 Generation 8 moves (Galar Moves &
-  // Learnsets Phase 3) = 682. Update this number deliberately whenever a
-  // new generation's move data is registered — see
-  // engine/moves/data/index.ts.
-  assert.equal(getAllMoves().length, 682);
+  // Learnsets Phase 3) + 33 Generation 9 moves (Paldea Moves & Learnsets
+  // Phase 3) = 715. Update this number deliberately whenever a new
+  // generation's move data is registered — see engine/moves/data/index.ts.
+  assert.equal(getAllMoves().length, 715);
 });
 
 test("getMoveById finds a real Generation 1 move by its permanent id", () => {

@@ -38,10 +38,12 @@ test("the real registry loads the full learnset database (every generation) with
   // 89 Galar base species + 19 Galarian Forms) = 954, + 7 Pre-Paldea
   // learnsets (#899-905, appended to the Generation 4/Sinnoh learnset
   // file) = 961, + 17 Pre-Paldea Hisuian Forms (also appended to the
-  // Generation 4/Sinnoh learnset file) = 978. Update this number
-  // deliberately whenever a new generation's learnset data is registered —
-  // see engine/learnsets/data/index.ts.
-  assert.equal(getAllLearnsets().length, 978);
+  // Generation 4/Sinnoh learnset file) = 978, + 124 Generation 9 learnsets
+  // (Paldea Moves & Learnsets Phase 3 — 120 Paldea base species + 4
+  // Paldean Forms) = 1102. Update this number deliberately whenever a new
+  // generation's learnset data is registered — see
+  // engine/learnsets/data/index.ts.
+  assert.equal(getAllLearnsets().length, 1102);
 });
 
 test("getLearnsetByPokemonId finds a real Generation 1 Pokémon's learnset by its permanent id", () => {
