@@ -17,7 +17,9 @@ import { syncPartyHpAction } from "@/features/battle/actions/sync-party-hp.actio
 import { applyMedicineItemAction } from "@/features/battle/actions/use-medicine.action";
 import type { BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { endBattleSessionAction } from "@/features/battle-session/actions/end-battle-session.action";
+import { getActiveBattleStatusAction } from "@/features/battle-session/actions/get-active-battle-status.action";
 import { syncActivePokemonAction } from "@/features/battle-session/actions/sync-active-pokemon.action";
+import { useActiveBattle } from "@/features/battle-session/context/active-battle-context";
 import type { BattleVictoryReward } from "@/features/battle-session/services/battle-session.service";
 import type { BattleVolatileSummary } from "@/features/battle/services/battle-action.service";
 import {
@@ -44,6 +46,7 @@ import type { InventoryItemView } from "@/features/inventory/types/inventory.typ
 import { PartySelector } from "@/features/party/components/PartySelector";
 import { canSwitchTo } from "@/features/party/utils/party-rules";
 import { getPlayerProgressAction } from "@/features/player/actions/get-player-progression.action";
+import { useDailyBattleCount } from "@/features/player/context/daily-battle-count-context";
 import { usePlayerProgression } from "@/features/player/context/player-progression-context";
 import { progressFromLevelUpResult } from "@/features/player-progression/progression-calculations";
 import { playerXpToastMessage } from "@/features/player-progression/progression-messages";
@@ -185,6 +188,29 @@ export function BattleContent({
   const router = useRouter();
   const theme = getBattleTheme(zoneId);
   const { applyProgress } = usePlayerProgression();
+  const { applyDailyBattleCount } = useDailyBattleCount();
+  const { setActiveBattle } = useActiveBattle();
+
+  // The sidebar's own "in battle" gate (features/battle-session/context/
+  // active-battle-context.tsx). Mounting is a reliable "true" signal — this
+  // component only ever mounts when the server has already validated a real
+  // FieldBattleSession for this exact request (app/(game)/battle/page.tsx).
+  // Unmounting is NOT a reliable "false" signal on its own: leaving /battle
+  // (a route change, browser Back, or any other unmount) doesn't by itself
+  // end the session — only escape, capture, or a full party defeat does —
+  // so a player who hits Back mid-battle would otherwise still have a real,
+  // untouched FieldBattleSession row while the sidebar silently re-enabled.
+  // The cleanup below re-checks the real row instead of assuming
+  // (getActiveBattleStatusAction, a thin wrapper around the same
+  // hasActiveBattleSession the layout already seeds from) and only then
+  // releases the lock — so the sidebar always reflects the actual session,
+  // never merely whether this component happens to be mounted.
+  useEffect(() => {
+    setActiveBattle(true);
+    return () => {
+      getActiveBattleStatusAction().then(setActiveBattle);
+    };
+  }, [setActiveBattle]);
 
   const [wildState, setWildState] = useState(wild);
   const [partyHpMap, setPartyHpMap] = useState<Record<string, number>>(() =>
@@ -664,6 +690,9 @@ export function BattleContent({
       // delay of any kind.
       if (result.wildFainted) {
         applyVictoryReward(result.experienceGranted);
+        if (result.dailyBattleCount !== null) {
+          applyDailyBattleCount(result.dailyBattleCount);
+        }
 
         if (result.promotedWild) {
           startNewEncounter(result.promotedWild);

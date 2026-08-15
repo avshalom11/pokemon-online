@@ -64,13 +64,13 @@ test("Beach IS present in Paldea zone data (Paldea is a deliberate six-zone regi
 
 // --- 4-6: zone counts, total, uniqueness ---
 
-test("zone counts match the approved distribution exactly (33/12/20/17/25/17)", () => {
+test("zone counts match the approved distribution exactly (30/12/19/21/25/17)", () => {
   const counts = Object.fromEntries(PALDEA_ZONE_DATA.map((zone) => [zone.id, zone.encounters.length]));
   assert.deepEqual(counts, {
-    grassland: 33,
+    grassland: 30,
     water: 12,
-    cave: 20,
-    lava: 17,
+    cave: 19,
+    lava: 21,
     "haunted-house": 25,
     beach: 17,
   });
@@ -169,7 +169,7 @@ const APPROVED_MEMBERSHIP: Record<string, string[]> = {
   grassland: [
     "sprigatito", "floragato", "meowscarada", "lechonk", "oinkologne", "tarountula", "spidops", "nymble",
     "lokix", "pawmi", "pawmo", "pawmot", "tandemaus", "maushold", "smoliv", "dolliv", "arboliva",
-    "squawkabilly", "shroodle", "grafaiai", "capsakid", "scovillain", "rellor", "farigiraf", "dudunsparce",
+    "squawkabilly", "capsakid", "rellor", "farigiraf", "dudunsparce",
     "tauros-paldea-combat", "ogerpon", "iron-leaves", "dipplin", "hydrapple", "terapagos", "sandy-shocks",
     "raging-bolt",
   ],
@@ -180,12 +180,12 @@ const APPROVED_MEMBERSHIP: Record<string, string[]> = {
   cave: [
     "nacli", "naclstack", "garganacl", "maschiff", "mabosstiff", "glimmet", "glimmora", "great-tusk",
     "iron-treads", "iron-hands", "iron-thorns", "iron-valiant", "ting-lu", "iron-boulder", "iron-crown",
-    "kingambit", "archaludon", "orthworm", "tadbulb", "bellibolt",
+    "kingambit", "archaludon", "tadbulb", "bellibolt",
   ],
   lava: [
     "fuecoco", "crocalor", "skeledirge", "charcadet", "armarouge", "varoom", "revavroom", "slither-wing",
     "chi-yu", "koraidon", "gouging-fire", "iron-moth", "tauros-paldea-blaze", "frigibax", "arctibax",
-    "baxcalibur", "roaring-moon",
+    "baxcalibur", "roaring-moon", "scovillain", "orthworm", "shroodle", "grafaiai",
   ],
   "haunted-house": [
     "ceruledge", "greavard", "houndstone", "scream-tail", "brute-bonnet", "flutter-mane", "wo-chien",

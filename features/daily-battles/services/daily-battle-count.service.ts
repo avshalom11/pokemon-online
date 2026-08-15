@@ -32,14 +32,20 @@ export function getJerusalemDateKey(now: Date = new Date()): string {
 // capturing, a party wipe, or nextWild merely being pre-generated — see
 // promoteToNextEncounter's own doc comment for why a racing/retried call
 // for that same victory can never reach here twice.
-export async function incrementDailyBattleCount(tx: Prisma.TransactionClient, playerId: string): Promise<void> {
+// Returns the row's own post-increment count so callers already inside this
+// same transaction (promoteToNextEncounter, battle-session.service.ts) can
+// hand it straight to the client in that same response — never a second
+// read of a value this call just wrote.
+export async function incrementDailyBattleCount(tx: Prisma.TransactionClient, playerId: string): Promise<number> {
   const date = getJerusalemDateKey();
 
-  await tx.dailyFieldBattleCount.upsert({
+  const row = await tx.dailyFieldBattleCount.upsert({
     where: { playerId_date: { playerId, date } },
     update: { count: { increment: 1 } },
     create: { playerId, date, count: 1 },
   });
+
+  return row.count;
 }
 
 // The Home page's own read — today's count only (Asia/Jerusalem), 0 when

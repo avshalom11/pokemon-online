@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 
+import { InventoryEggCard } from "@/features/inventory/components/InventoryEggCard";
 import { InventoryItemGrid } from "@/features/inventory/components/InventoryItemGrid";
 import { InventorySellConfirmDialog } from "@/features/inventory/components/InventorySellConfirmDialog";
 import { InventorySellPanel } from "@/features/inventory/components/InventorySellPanel";
 import { BackButton } from "@/components/layout/BackButton";
+import type { OwnedEggView } from "@/features/eggs/services/egg-display.service";
 import { sellInventoryItemAction } from "@/features/inventory/actions/sell-inventory-item.action";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { EvolutionItemPanel } from "@/features/evolution/components/EvolutionItemPanel";
@@ -21,6 +23,13 @@ interface InventoryContentProps {
   // filter down to which owned Pokémon a selected Stone can evolve. Every
   // other Inventory flow (selling) never touches this.
   ownedPokemon: OwnedPokemon[];
+  // EGGS PHASE 6 — every owned egg NOT currently incubating (features/
+  // inventory/services/inventory-view.service.ts's getOwnedEggViews,
+  // itself backed by Phase 1's listOwnedEggs). Deliberately outside the
+  // ShopItem-based category/sell system below: an egg is never a
+  // ShopCategoryId item a player can sell here, only a read-only ownership
+  // list — starting incubation stays exclusively a /hatchery action.
+  eggs: OwnedEggView[];
 }
 
 // Page composition root for /inventory — same shell/flow convention as
@@ -40,7 +49,7 @@ interface InventoryContentProps {
 // fetch and flows a fresh `views` prop back down here automatically — same
 // mechanism release-pokemon.action.ts's revalidatePath already relies on
 // for MyPokemonContent (see that file's own doc comment).
-export function InventoryContent({ views, ownedPokemon }: InventoryContentProps) {
+export function InventoryContent({ views, ownedPokemon, eggs }: InventoryContentProps) {
   const categories = getShopCategories();
   const [selectedCategoryId, setSelectedCategoryId] = useState<ShopCategoryId | undefined>(
     getDefaultShopCategoryId()
@@ -172,6 +181,27 @@ export function InventoryContent({ views, ownedPokemon }: InventoryContentProps)
             {sellSuccessMessage}
           </p>
         ) : null}
+
+        {/* EGGS PHASE 6 — deliberately its own section, outside the
+            ShopItem category/sell system above: eggs are never sellable
+            here and never share a category tab with Poké Balls/Potions/
+            Stones. Only eggs NOT currently incubating ever appear (see
+            eggs prop's own doc comment); starting incubation is a
+            /hatchery-only action, never offered from this card. */}
+        <div>
+          <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">ביצים</h2>
+          {eggs.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-white/10 bg-slate-900/30 p-6 text-center text-sm text-slate-500">
+              עדיין אין לך ביצים זמינות. ביצים מתקבלות מקרבות שדה או מהחנות.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {eggs.map((egg) => (
+                <InventoryEggCard key={egg.id} egg={egg} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {isConfirmOpen && selectedView ? (

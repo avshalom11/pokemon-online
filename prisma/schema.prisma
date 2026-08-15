@@ -47,22 +47,22 @@ model User {
 // and the standard hardening option (a citext column or a functional
 // LOWER(username) unique index) if stronger defense-in-depth is ever wanted.
 model PlayerProfile {
-  id                     String                  @id @default(cuid())
-  userId                 String                  @unique
-  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName            String
-  level                  Int                     @default(1)
-  experience             Int                     @default(0)
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName         String
+  level               Int     @default(1)
+  experience          Int     @default(0)
   // Rare/premium currency. Renamed from `gems` — that system was never read
   // or written by any gameplay logic (display-only), and the project's
   // earlier separate `gold` column was equally dead, so this replaces both
   // rather than the game having three currency-ish fields. `coins` (below)
   // is the only other currency.
-  gold                   Int                     @default(0)
-  energy                 Int                     @default(100)
-  onboardingCompleted    Boolean                 @default(false)
-  starterPokemonId       String?
-  coins                  Int                     @default(500)
+  gold                Int     @default(0)
+  energy              Int     @default(100)
+  onboardingCompleted Boolean @default(false)
+  starterPokemonId    String?
+  coins               Int     @default(500)
 
   // Public Profile / Showcase (Phase 1) — features/profile. Every field
   // below is read by the PUBLIC profile view (features/profile/services/
@@ -79,29 +79,29 @@ model PlayerProfile {
   // shared/types/region.ts); the column exists so the game never has to
   // hardcode the Hebrew region label in UI code, and so more regions can
   // be added later without a schema change.
-  regionId               String                  @default("kanto")
+  regionId             String  @default("kanto")
   // Short public biography — plain text only, rendered as text content
   // (never dangerouslySetInnerHTML), so it can never carry HTML/links as
   // markup regardless of what characters it contains. Length-capped at the
   // validation layer (150 chars), trimmed before storage. Empty string
   // (never null) means "no bio set" — see showAboutMeOnProfile below for
   // the separate visibility toggle.
-  aboutMe                String                  @default("")
+  aboutMe              String  @default("")
   // One of the small curated set of Pokémon front-sprite avatars
   // (features/profile/themes/profile-avatars.ts) — null means "no avatar
   // chosen", which the UI renders as the existing initial-letter fallback.
   // Deliberately a dex number (validated against a fixed allow-list), never
   // a raw image URL, so an arbitrary/external image can never be injected.
-  avatarDexNumber        Int?
+  avatarDexNumber      Int?
   // One of the fixed theme ids (features/profile/themes/profile-themes.ts)
   // — a lookup key into a server-defined style map, never free-form CSS/
   // class names from the client.
-  profileThemeId         String                  @default("default")
+  profileThemeId       String  @default("default")
   // Privacy toggles for the public profile's three optional sections — see
   // public-profile-view.service.ts for exactly what each one gates.
-  showPartyOnProfile     Boolean                 @default(true)
-  showStatsOnProfile     Boolean                 @default(true)
-  showAboutMeOnProfile   Boolean                 @default(true)
+  showPartyOnProfile   Boolean @default(true)
+  showStatsOnProfile   Boolean @default(true)
+  showAboutMeOnProfile Boolean @default(true)
 
   // The owner's structured public showcase content — an ARRAY of
   // ProfileContentBlock (features/profile/types/profile-content.types.ts),
@@ -115,7 +115,7 @@ model PlayerProfile {
   // parseProfileContentBlocks) — same "invalid -> safe empty fallback"
   // philosophy this schema's other JSON columns (e.g.
   // FieldBattleSession.participants) already follow.
-  profileContentBlocks   Json                    @default("[]")
+  profileContentBlocks Json @default("[]")
 
   pokemon                PlayerPokemon[]
   fieldBattleSession     FieldBattleSession?
@@ -123,6 +123,8 @@ model PlayerProfile {
   dailyFieldBattleCounts DailyFieldBattleCount[]
   inventoryItems         PlayerInventoryItem[]
   seenSpecies            PlayerSeenSpecies[]
+  ownedEggs              PlayerOwnedEgg[]
+  incubators             PlayerIncubator[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -135,19 +137,19 @@ model PlayerProfile {
 // species catalog in data/pokemon/pokemon-data.ts, so that catalog stays the
 // only place species facts live.
 model PlayerPokemon {
-  id                   String        @id @default(cuid())
-  playerId             String
-  player               PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  speciesId            String
-  nickname             String?
-  level                Int           @default(5)
-  experience           Int           @default(0)
-  currentHp            Int
-  isStarter            Boolean       @default(false)
+  id                          String        @id @default(cuid())
+  playerId                    String
+  player                      PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  speciesId                   String
+  nickname                    String?
+  level                       Int           @default(5)
+  experience                  Int           @default(0)
+  currentHp                   Int
+  isStarter                   Boolean       @default(false)
   // 1-6, null = not in the active party. Range validated in app code
   // (features/party/validation/party.schema.ts) — Prisma's schema DSL has
   // no declarative CHECK constraint support in this setup.
-  partySlot            Int?
+  partySlot                   Int?
   // Phase 6F — the single major status condition this Pokémon currently
   // carries outside of battle-local stat stages (which never persist here
   // — see FieldBattleSession's own stage fields). Plain string ("burn" |
@@ -157,11 +159,11 @@ model PlayerPokemon {
   // like currentHp already does (it's real Pokémon-state, not ephemeral
   // battle UI state), and is cleared the same way currentHp is restored:
   // by the Pokémon Center heal flow.
-  status               String?
+  status                      String?
   // Sleep's remaining-turn counter (Phase 6G) — only ever meaningful while
   // status === "sleep"; null otherwise. Freeze has no counter (it's a
   // per-turn thaw-chance roll, not a fixed duration).
-  statusTurnsRemaining Int?
+  statusTurnsRemaining        Int?
   // Level-Based Evolution — the smallest clean design for "at most one
   // pending decision, plus a permanent yes/no" (deliberately not a
   // separate table like PlayerPendingMoveLearning: that model's queue
@@ -177,7 +179,7 @@ model PlayerPokemon {
   // exclusive with pendingEvolutionBranch: a row is never both a resolved
   // single target AND an unresolved branch choice at once (see
   // evolution-progress.service.ts's tryCreatePendingEvolution).
-  pendingEvolutionSpeciesId String?
+  pendingEvolutionSpeciesId   String?
   // Evolution Simplification phase — true exactly when this Pokémon
   // reached a Branch Evolution's required level (Eevee's Espeon/Umbreon
   // fork today — data/pokemon/pokemon-evolutions.ts's BRANCH_EVOLUTIONS)
@@ -190,7 +192,7 @@ model PlayerPokemon {
   // (reject-evolution.service.ts) clears it and sets
   // evolutionPermanentlyBlocked below, exactly like rejecting a normal
   // pending evolution.
-  pendingEvolutionBranch Boolean @default(false)
+  pendingEvolutionBranch      Boolean       @default(false)
   // Once true, this specific PlayerPokemon instance can never be offered
   // evolution again — set only by a player's explicit rejection, never
   // automatically, and never cleared by anything (a permanent decision per
@@ -198,9 +200,9 @@ model PlayerPokemon {
   // Pokémon of the same species, or this same Pokémon's own future
   // evolutionary stages once it *does* evolve, are never affected by
   // another instance's block.
-  evolutionPermanentlyBlocked Boolean @default(false)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  evolutionPermanentlyBlocked Boolean       @default(false)
+  createdAt                   DateTime      @default(now())
+  updatedAt                   DateTime      @updatedAt
 
   // A PlayerPokemon currently the active battler in a persisted field
   // session (see FieldBattleSession below) — used only to block release
@@ -565,6 +567,150 @@ model PlayerSeenSpecies {
   @@unique([playerId, speciesId])
   @@index([playerId])
   @@map("player_seen_species")
+}
+
+// EGGS PHASE 1 — Core Data & Database. One row per Pokémon egg the player
+// currently owns, unassigned or actively incubating (see
+// PlayerEggIncubation below for the latter). `rarity` is a plain String
+// (not a Prisma enum), validated at the app layer against PokemonRarity
+// (shared/types/pokemon.ts) — same "no enum synced to a TS union in this
+// setup" precedent as Notification.type/FieldBattleSession.zoneId
+// elsewhere in this file. This is deliberately the egg's REAL rarity value
+// (features/eggs/data/egg-definitions.ts is the one source of truth for
+// what that maps to — required battles, display name, image) — effective
+// encounter-rarity logic (engine/encounter-rarity) is a completely separate
+// concept this table never touches.
+//
+// `regionId` is a plain String (not RegionId directly — same precedent as
+// PlayerProfile.regionId), always the region the egg was acquired IN, set
+// once at creation and never a live pointer to "the player's current
+// region": a battle-dropped egg is stamped with that battle's own region,
+// a shop-bought egg with the player's region at purchase time. Neither
+// acquisition path is implemented yet (Phase 2+) — this column only exists
+// so a future write has somewhere real to put that value; nothing writes it
+// today beyond direct data-layer test/service calls.
+//
+// `source` is a plain String validated against EggAcquisitionSource
+// (features/eggs/types/egg.types.ts — "battle" | "shop"), nullable because
+// Phase 1 has no real acquisition path yet to always populate it from.
+//
+// Multiple eggs of the same (playerId, rarity, regionId) are fully
+// supported and expected — this is deliberately NOT a quantity counter
+// (unlike PlayerInventoryItem above): each egg is its own row with its own
+// identity/region/source, because two eggs of the same rarity can come from
+// different regions or sources and must stay independently distinguishable
+// (in particular, exactly one specific egg row is what an incubation
+// actually points at — see PlayerEggIncubation.ownedEggId below; a
+// quantity counter has no single identity a foreign key could reference).
+model PlayerOwnedEgg {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  rarity   String
+  regionId String
+  source   String?
+
+  createdAt DateTime @default(now())
+
+  activeIncubation PlayerEggIncubation?
+
+  @@index([playerId])
+  @@index([playerId, rarity])
+  @@map("player_owned_egg")
+}
+
+// One row per incubator instance a player owns — deliberately its own
+// table, never a PlayerInventoryItem quantity row: an incubator is
+// permanent and never consumed/traded away (PlayerInventoryItem's whole
+// shape is "how many of this consumable/held item does the player have
+// right now", which doesn't fit a permanent piece of equipment that also
+// needs its own identity for PlayerEggIncubation to point at — same
+// "quantity counter has no single identity a foreign key could reference"
+// reasoning as PlayerOwnedEgg's own doc comment above).
+//
+// `incubatorTypeId` resolves against the static incubator catalog
+// (features/eggs/data/incubator-definitions.ts — "standard" is the only
+// entry Phase 1 defines), same *Id-references-a-static-catalog precedent as
+// PlayerOwnedEgg.rarity/PlayerInventoryItem.itemId. Speed multiplier,
+// display name, etc. all live in that catalog — never duplicated onto this
+// row — so a future incubator type (e.g. an x2) is a data-only addition,
+// never a migration, and never bakes "1 battle = 1 progress" into this
+// schema.
+//
+// @@unique below is what makes "every player owns at most one standard
+// incubator" a real, always-on database guarantee rather than an
+// application-level convention: features/eggs/services/incubator.service.ts
+// ensures one via an upsert keyed by exactly this constraint (create on
+// first access, a harmless no-op on every call after — same idempotent
+// "lazy creation / ensure-on-access" shape PlayerSeenSpecies's own upsert
+// already established), so an existing player safely gets one the first
+// time anything asks for it, with no mass-data migration and no risk of a
+// second row ever being created for the same player+type.
+model PlayerIncubator {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  incubatorTypeId String
+
+  createdAt DateTime @default(now())
+
+  activeIncubation PlayerEggIncubation?
+
+  @@unique([playerId, incubatorTypeId])
+  @@index([playerId])
+  @@map("player_incubator")
+}
+
+// One egg's active incubation state — existence of a row *is* "this egg is
+// currently incubating in this incubator", the same "existence, not a
+// boolean flag" philosophy FieldBattleSession's own doc comment already
+// establishes for "is there an active battle". This is deliberately why
+// `ownedEggId` is this row's own primary key rather than a separate cuid:
+// a second `create` for the same egg is a primary-key collision at the
+// database level, so "one egg cannot be incubated twice" is enforced by
+// the schema itself, not merely by application code remembering to check
+// first. `incubatorId` carries its own @@unique for the mirror guarantee
+// ("one incubator can hold only one egg at a time") the exact same way.
+// features/eggs/services/incubation.service.ts's startIncubatingEgg still
+// checks both before writing (inside a transaction) so the caller gets a
+// clean rejection result instead of a raw constraint-violation error, but
+// the constraints below are the real backstop against a racing/retried
+// call, not merely a nicety.
+//
+// No direct playerId column — reachable via either egg.playerId or
+// incubator.playerId (both always agree, enforced by
+// startIncubatingEgg's own ownership check before creating this row), same
+// "don't duplicate a fact already reachable through an existing relation"
+// precedent PlayerKnownMove already follows (no playerId column there
+// either, only playerPokemonId).
+//
+// `battleProgress` starts at 0 and Phase 1 never increments it (Phase 3's
+// job). `requiredBattleTarget` is a snapshot computed once at start time
+// from the egg's own rarity (features/eggs/data/egg-definitions.ts) and the
+// incubator's own speed multiplier at that moment
+// (features/eggs/data/incubator-definitions.ts) — never a live formula
+// re-evaluated on every read, so a future incubator-type upgrade never
+// silently reshuffles an already-in-progress incubation's own target.
+// "Ready" is deliberately never a stored column — it's always derived as
+// `battleProgress >= requiredBattleTarget`
+// (features/eggs/services/incubation.service.ts's isIncubationReady), so
+// there is no second flag that could ever drift out of sync with the two
+// numbers that actually define it.
+model PlayerEggIncubation {
+  ownedEggId String         @id
+  egg        PlayerOwnedEgg @relation(fields: [ownedEggId], references: [id], onDelete: Cascade)
+
+  incubatorId String          @unique
+  incubator   PlayerIncubator @relation(fields: [incubatorId], references: [id], onDelete: Cascade)
+
+  battleProgress       Int @default(0)
+  requiredBattleTarget Int
+
+  startedAt DateTime @default(now())
+
+  @@map("player_egg_incubation")
 }
 
 model Session {

@@ -17,9 +17,11 @@ import type { Zone } from "@/shared/types/zone";
 // Paldean Tauros's three breeds — see data/pokemon/
 // generation-9-pokemon-data.ts's own header comment) = 124 total entries
 // below. This exact distribution — species-per-zone, encounter order, and
-// totals (33/12/20/17/25/17) — is FINAL and manually approved (Paldea
-// Phase 6 spec); nothing here may move a species, rebalance a zone,
-// substitute a species, or add/remove a Form.
+// totals (30/12/19/21/25/17) — is FINAL and manually approved (Paldea
+// Phase 6 spec, as amended by the Paldea Zone-Assignment Adjustment moving
+// Scovillain, Orthworm, Shroodle, and Grafaiai into `lava`); nothing here
+// may move a species, rebalance a zone, substitute a species, or add/remove
+// a Form beyond that approved change.
 //
 // Rarity: every `pokemonId` below resolves its actual encounter-rarity tier
 // from that species' own PokemonSpecies.rarity (data/pokemon/
@@ -145,10 +147,7 @@ export const PALDEA_ZONE_DATA: Zone[] = [
       { pokemonId: "dolliv", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
       { pokemonId: "arboliva", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "squawkabilly", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
-      { pokemonId: "shroodle", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "grafaiai", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "capsakid", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
-      { pokemonId: "scovillain", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "rellor", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
       { pokemonId: "farigiraf", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "dudunsparce", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
@@ -207,7 +206,6 @@ export const PALDEA_ZONE_DATA: Zone[] = [
       { pokemonId: "iron-crown", minimumLevel: 55, maximumLevel: 60, encounterWeight: 1 },
       { pokemonId: "kingambit", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "archaludon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
-      { pokemonId: "orthworm", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
       { pokemonId: "tadbulb", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
       { pokemonId: "bellibolt", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
@@ -236,6 +234,10 @@ export const PALDEA_ZONE_DATA: Zone[] = [
       { pokemonId: "arctibax", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "baxcalibur", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
       { pokemonId: "roaring-moon", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "scovillain", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
+      { pokemonId: "orthworm", minimumLevel: 4, maximumLevel: 8, encounterWeight: 10 },
+      { pokemonId: "shroodle", minimumLevel: 2, maximumLevel: 6, encounterWeight: 20 },
+      { pokemonId: "grafaiai", minimumLevel: 6, maximumLevel: 10, encounterWeight: 5 },
     ],
   },
   {

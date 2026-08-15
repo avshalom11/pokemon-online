@@ -77,6 +77,35 @@ interface PlayerSeenSpeciesRow {
   createdAt: Date;
 }
 
+// EGGS PHASE 1 fakes — mirrors prisma/schema.prisma's PlayerOwnedEgg/
+// PlayerIncubator/PlayerEggIncubation exactly (see those models' own doc
+// comments for the real design reasoning); this file only needs to
+// replicate their query/constraint SHAPE for the feature-layer services
+// under test.
+interface PlayerOwnedEggRow {
+  id: string;
+  playerId: string;
+  rarity: string;
+  regionId: string;
+  source: string | null;
+  createdAt: Date;
+}
+
+interface PlayerIncubatorRow {
+  id: string;
+  playerId: string;
+  incubatorTypeId: string;
+  createdAt: Date;
+}
+
+interface PlayerEggIncubationRow {
+  ownedEggId: string;
+  incubatorId: string;
+  battleProgress: number;
+  requiredBattleTarget: number;
+  startedAt: Date;
+}
+
 interface NotificationRow {
   id: string;
   playerId: string;
@@ -118,6 +147,9 @@ let dailyBattleCounts = new Map<string, DailyFieldBattleCountRow>();
 let notifications = new Map<string, NotificationRow>();
 let inventoryItems = new Map<string, PlayerInventoryItemRow>();
 let seenSpecies = new Map<string, PlayerSeenSpeciesRow>();
+let ownedEggs = new Map<string, PlayerOwnedEggRow>();
+let incubators = new Map<string, PlayerIncubatorRow>();
+let eggIncubations = new Map<string, PlayerEggIncubationRow>();
 let idCounter = 0;
 let playerPokemonUpdateCallCount = 0;
 
@@ -132,6 +164,10 @@ function dailyBattleCountKey(playerId: string, date: string): string {
 
 function inventoryItemKey(playerId: string, itemId: string): string {
   return `${playerId}::${itemId}`;
+}
+
+function incubatorKey(playerId: string, incubatorTypeId: string): string {
+  return `${playerId}::${incubatorTypeId}`;
 }
 
 function seenSpeciesKey(playerId: string, speciesId: string): string {
@@ -149,6 +185,9 @@ function cloneState() {
     notifications: new Map([...notifications].map(([id, row]) => [id, { ...row }])),
     inventoryItems: new Map([...inventoryItems].map(([id, row]) => [id, { ...row }])),
     seenSpecies: new Map([...seenSpecies].map(([id, row]) => [id, { ...row }])),
+    ownedEggs: new Map([...ownedEggs].map(([id, row]) => [id, { ...row }])),
+    incubators: new Map([...incubators].map(([id, row]) => [id, { ...row }])),
+    eggIncubations: new Map([...eggIncubations].map(([id, row]) => [id, { ...row }])),
   };
 }
 
@@ -162,6 +201,9 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   notifications = snapshot.notifications;
   inventoryItems = snapshot.inventoryItems;
   seenSpecies = snapshot.seenSpecies;
+  ownedEggs = snapshot.ownedEggs;
+  incubators = snapshot.incubators;
+  eggIncubations = snapshot.eggIncubations;
 }
 
 export function resetFakeDb() {
@@ -174,6 +216,9 @@ export function resetFakeDb() {
   notifications = new Map();
   inventoryItems = new Map();
   seenSpecies = new Map();
+  ownedEggs = new Map();
+  incubators = new Map();
+  eggIncubations = new Map();
   idCounter = 0;
   playerPokemonUpdateCallCount = 0;
 }
@@ -381,6 +426,53 @@ export function seedSeenSpecies(row: { playerId: string; speciesId: string }) {
   return full;
 }
 
+export function seedOwnedEgg(row: { id?: string; playerId: string; rarity: string; regionId: string; source?: string | null }) {
+  const id = row.id ?? nextId("egg");
+  const full: PlayerOwnedEggRow = {
+    id,
+    playerId: row.playerId,
+    rarity: row.rarity,
+    regionId: row.regionId,
+    source: row.source ?? null,
+    createdAt: new Date(),
+  };
+  ownedEggs.set(id, full);
+  return full;
+}
+
+export function getOwnedEggRow(id: string) {
+  const row = ownedEggs.get(id);
+  return row ? { ...row } : undefined;
+}
+
+// Keyed by plain id (not incubatorKey's playerId+incubatorTypeId
+// composite) so a test can seed more than one incubator for the same
+// player+type at once — several Phase 1 tests deliberately do this to
+// model "two independent incubators" ahead of a second real incubator
+// type existing (features/eggs/data/incubator-definitions.ts only defines
+// "standard" today). A real @@unique([playerId, incubatorTypeId]) would
+// forbid two genuine Standard Incubator rows for one player — this seed
+// helper intentionally does NOT replicate that constraint, unlike
+// playerIncubator.upsert itself (ensureStandardIncubator's own write
+// path), which does. A test that needs a seeded incubator to be the SAME
+// row ensureStandardIncubator later resolves should call
+// ensureStandardIncubator directly instead of seeding one by hand.
+export function seedIncubator(row: { id?: string; playerId: string; incubatorTypeId: string }) {
+  const id = row.id ?? nextId("incubator");
+  const full: PlayerIncubatorRow = { id, playerId: row.playerId, incubatorTypeId: row.incubatorTypeId, createdAt: new Date() };
+  incubators.set(id, full);
+  return full;
+}
+
+export function getIncubatorRows(playerId: string) {
+  return [...incubators.values()].filter((row) => row.playerId === playerId).map((row) => ({ ...row }));
+}
+
+export function getEggIncubationRow(ownedEggId: string) {
+  const row = eggIncubations.get(ownedEggId);
+  return row ? { ...row } : undefined;
+}
+
 function matchesValue(actual: unknown, expected: unknown): boolean {
   if (expected !== null && typeof expected === "object") {
     const operators = expected as Record<string, unknown>;
@@ -435,6 +527,45 @@ function applyOrderBy<T>(
 
 const client = {
   playerPokemon: {
+    // EGGS PHASE 4 — hatch.service.ts's own createOwnedPokemon call (shared
+    // with capture.service.ts/select-starter.service.ts) is the first real
+    // caller of this specific method in a test context; every field not
+    // explicitly passed defaults exactly like seedPlayerPokemon's own
+    // defaults above, matching the real schema's own @default(...) values.
+    async create({
+      data,
+    }: {
+      data: {
+        playerId: string;
+        speciesId: string;
+        level: number;
+        experience: number;
+        currentHp: number;
+        isStarter: boolean;
+        partySlot?: number | null;
+      };
+    }) {
+      const id = nextId("pokemon");
+      const full: PlayerPokemonRow = {
+        id,
+        playerId: data.playerId,
+        speciesId: data.speciesId,
+        nickname: null,
+        level: data.level,
+        experience: data.experience,
+        currentHp: data.currentHp,
+        isStarter: data.isStarter,
+        partySlot: data.partySlot ?? null,
+        createdAt: new Date(),
+        status: null,
+        statusTurnsRemaining: null,
+        pendingEvolutionSpeciesId: null,
+        pendingEvolutionBranch: false,
+        evolutionPermanentlyBlocked: false,
+      };
+      pokemons.set(id, full);
+      return { ...full };
+    },
     async findUnique({ where }: { where: { id: string } }) {
       return pokemons.get(where.id) ?? null;
     },
@@ -584,6 +715,163 @@ const client = {
     },
     async findMany({ where }: { where: Record<string, unknown> }) {
       return [...seenSpecies.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+  },
+  // EGGS PHASE 1 fakes — see the row interfaces' own doc comment above for
+  // what these mirror.
+  playerOwnedEgg: {
+    async create({ data }: { data: { playerId: string; rarity: string; regionId: string; source?: string | null } }) {
+      const id = nextId("egg");
+      const full: PlayerOwnedEggRow = {
+        id,
+        playerId: data.playerId,
+        rarity: data.rarity,
+        regionId: data.regionId,
+        source: data.source ?? null,
+        createdAt: new Date(),
+      };
+      ownedEggs.set(id, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = ownedEggs.get(where.id);
+      return row ? { ...row } : null;
+    },
+    // Only the two filter shapes egg-ownership.service.ts's listOwnedEggs
+    // actually sends: a plain playerId match, plus the relation filter
+    // `activeIncubation: null` — "no PlayerEggIncubation row references
+    // this egg as its ownedEggId" — handled by hand since the generic
+    // `matches()` helper only understands flat field equality, never a
+    // relation.
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where: { playerId?: string; activeIncubation?: null };
+      orderBy?: Record<string, "asc" | "desc">;
+    }) {
+      const rows = [...ownedEggs.values()]
+        .filter((row) => (where.playerId === undefined ? true : row.playerId === where.playerId))
+        .filter((row) => (where.activeIncubation === null ? !eggIncubations.has(row.id) : true));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    // EGGS PHASE 4 — the egg is consumed on a successful hatch
+    // (hatch.service.ts).
+    async delete({ where }: { where: { id: string } }) {
+      const row = ownedEggs.get(where.id);
+      if (!row) throw new Error(`fake prisma: playerOwnedEgg ${where.id} not found for delete`);
+      ownedEggs.delete(where.id);
+      return { ...row };
+    },
+  },
+  playerIncubator: {
+    // Mirrors playerInventoryItem's own upsert shape exactly — create on
+    // first access, a no-op update on every call after, the same
+    // idempotent "at most one row per key" guarantee
+    // ensureStandardIncubator (incubator.service.ts) relies on.
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { playerId_incubatorTypeId: { playerId: string; incubatorTypeId: string } };
+      create: { playerId: string; incubatorTypeId: string };
+      update: Record<string, unknown>;
+    }) {
+      const key = incubatorKey(where.playerId_incubatorTypeId.playerId, where.playerId_incubatorTypeId.incubatorTypeId);
+      const existing = incubators.get(key);
+      if (existing) return { ...existing };
+
+      const id = nextId("incubator");
+      const full: PlayerIncubatorRow = { id, createdAt: new Date(), ...create };
+      incubators.set(key, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = [...incubators.values()].find((candidate) => candidate.id === where.id);
+      return row ? { ...row } : null;
+    },
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc">;
+    }) {
+      const rows = [...incubators.values()].filter((row) => matches(row, where));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+  },
+  playerEggIncubation: {
+    async create({ data }: { data: { ownedEggId: string; incubatorId: string; requiredBattleTarget: number } }) {
+      const full: PlayerEggIncubationRow = {
+        ownedEggId: data.ownedEggId,
+        incubatorId: data.incubatorId,
+        battleProgress: 0,
+        requiredBattleTarget: data.requiredBattleTarget,
+        startedAt: new Date(),
+      };
+      eggIncubations.set(data.ownedEggId, full);
+      return { ...full };
+    },
+    // `ownedEggId` is this model's own primary key (see the real schema's
+    // own doc comment) and `incubatorId` carries its own real @@unique —
+    // callers pass exactly one of the two, mirroring real Prisma's
+    // WhereUniqueInput for a model with more than one unique field.
+    async findUnique({ where }: { where: { ownedEggId?: string; incubatorId?: string } }) {
+      if (where.ownedEggId !== undefined) {
+        const row = eggIncubations.get(where.ownedEggId);
+        return row ? { ...row } : null;
+      }
+      const row = [...eggIncubations.values()].find((candidate) => candidate.incubatorId === where.incubatorId);
+      return row ? { ...row } : null;
+    },
+    // The one relation filter listActiveIncubations (incubation.service.ts)
+    // sends — "every incubation whose incubator belongs to this player" —
+    // resolved by hand for the same reason playerOwnedEgg.findMany's
+    // activeIncubation filter is above.
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where: { incubator?: { playerId: string } };
+      orderBy?: Record<string, "asc" | "desc">;
+    }) {
+      let rows = [...eggIncubations.values()];
+      if (where.incubator) {
+        const incubatorIds = new Set(
+          [...incubators.values()].filter((row) => row.playerId === where.incubator!.playerId).map((row) => row.id)
+        );
+        rows = rows.filter((row) => incubatorIds.has(row.incubatorId));
+      }
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    // EGGS PHASE 3 — the one write path progressActiveIncubations
+    // (incubation.service.ts) uses to persist a battleProgress increment.
+    async update({
+      where,
+      data,
+    }: {
+      where: { ownedEggId: string };
+      data: { battleProgress: number };
+    }) {
+      const row = eggIncubations.get(where.ownedEggId);
+      if (!row) throw new Error(`fake prisma: playerEggIncubation ${where.ownedEggId} not found for update`);
+      row.battleProgress = data.battleProgress;
+      return { ...row };
+    },
+    // EGGS PHASE 4 — hatch.service.ts's own race guard: matches the exact
+    // battleProgress the caller already read, so a racing/retried hatch
+    // call (or an incubation whose progress changed since that read) finds
+    // zero rows here and safely aborts before creating anything.
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [key, row] of eggIncubations) {
+        if (matches(row, where)) {
+          eggIncubations.delete(key);
+          count += 1;
+        }
+      }
+      return { count };
     },
   },
   fieldBattleSession: {

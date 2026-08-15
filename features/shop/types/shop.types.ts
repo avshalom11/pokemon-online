@@ -6,8 +6,14 @@
 // needs no code change at all, only a new data entry — see
 // features/shop/data/shop-items.ts.
 import type { CurrencyType } from "@/features/currency/types/currency.types";
+import type { PokemonRarity } from "@/shared/types/pokemon";
 
-export type ShopCategoryId = "poke-balls" | "potions" | "stones";
+// EGGS PHASE 6 — "eggs" deliberately named for the whole category rather
+// than "eggs-and-incubators": ShopCategoryId is a route/data key, not the
+// user-facing label (that's ShopCategory.name below) — a future
+// purchasable incubator item is simply a second item under this same
+// category id, never a second category.
+export type ShopCategoryId = "poke-balls" | "potions" | "stones" | "eggs";
 
 export interface ShopCategory {
   id: ShopCategoryId;
@@ -57,4 +63,12 @@ export interface ShopItem {
   // a 20%-of-max-HP Potion. Never a flat HP amount: the same item always
   // scales with whichever Pokémon it's used on.
   healPercent?: number;
+  // EGGS PHASE 6 — set only on the 4 egg products (categoryId "eggs"),
+  // never on any other item. This is the ONE pointer into the existing
+  // Phase 1 egg catalog (features/eggs/data/egg-definitions.ts) a purchase
+  // needs to know which rarity of PlayerOwnedEgg to create — see
+  // features/shop/services/egg-shop-purchase.service.ts. Name/imageUrl are
+  // never duplicated here; shop-items.ts derives them straight from
+  // getEggDefinition(eggRarity) instead of typing them out by hand.
+  eggRarity?: PokemonRarity;
 }

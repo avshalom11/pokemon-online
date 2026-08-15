@@ -8,6 +8,9 @@ import type { StatStages } from "@/features/battle/stats/stat-stages";
 import { resetVolatileOnSwitch, type VolatileState } from "@/features/battle/volatile/volatile-condition.types";
 import { grantFieldBattleCurrencyRewards } from "@/features/currency/services/field-battle-currency-reward.service";
 import { incrementDailyBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
+import { rollAndAwardEgg } from "@/features/eggs/services/egg-drop.service";
+import { progressActiveIncubations } from "@/features/eggs/services/incubation.service";
+import type { EggDropOutcome, IncubationProgressSummary } from "@/features/eggs/types/egg.types";
 import { markSpeciesSeen } from "@/features/pokedex/services/mark-species-seen.service";
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
@@ -21,15 +24,24 @@ import type { LevelUpResult } from "@/features/player-progression/progression-ty
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
-import type { RegionId } from "@/shared/types/region";
+import { toRegionId, type RegionId } from "@/shared/types/region";
 import { ALL_ZONE_IDS, type ZoneId } from "@/shared/types/zone";
 
-// The authoritative result of a wild-Pokémon victory: both the
-// player-account reward (unchanged) and every eligible owned Pokémon's own
-// reward, granted atomically together — see syncWildHp below.
+// The authoritative result of a wild-Pokémon victory: the player-account
+// reward, every eligible owned Pokémon's own reward, (EGGS PHASE 2) whether
+// this exact victory dropped an egg, and (EGGS PHASE 3) whether it
+// progressed the player's active incubation — all granted atomically
+// together — see syncWildHp below.
 export interface BattleVictoryReward {
   player: LevelUpResult;
   pokemon: PokemonLevelUpResult[];
+  egg: EggDropOutcome;
+  // Today a player only ever has one active incubation (Phase 1: one
+  // Standard Incubator each), so this is a single nullable summary — see
+  // IncubationProgressSummary's own doc comment (features/eggs/types/
+  // egg.types.ts) for why progressActiveIncubations itself still stays
+  // generic over every active incubation underneath.
+  incubationProgress: IncubationProgressSummary;
 }
 
 // FieldBattleSession.participants is stored as Prisma.JsonValue — never
@@ -340,6 +352,21 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
   };
 }
 
+// The one true existence check for "does this player currently have an
+// active field battle session" — a plain boolean over the exact same
+// FieldBattleSession row every other function on this file reads/writes,
+// never a second tracked concept of "in battle." Used by app/(game)/layout.tsx
+// to seed the sidebar's ActiveBattleProvider (features/battle-session/
+// context/active-battle-context.tsx) for a hard refresh/direct navigation
+// landing straight on /battle — soft client-side navigation into/out of
+// battle updates that same context live instead (BattleContent's own mount/
+// unmount, since entering/leaving the battle screen is exactly when a real
+// session starts/ends here).
+export async function hasActiveBattleSession(playerId: string): Promise<boolean> {
+  const session = await prisma.fieldBattleSession.findUnique({ where: { playerId }, select: { playerId: true } });
+  return session !== null;
+}
+
 // Re-derives max HP from the row's own species/level rather than trusting a
 // client-sent value — same rule syncPartyHpAction already follows for party
 // HP (features/battle/actions/sync-party-hp.action.ts).
@@ -420,7 +447,29 @@ export async function syncWildHp(
     // own doc comment for the full reward flow.
     await grantFieldBattleCurrencyRewards(tx, playerId, species.name, randomSource);
 
-    return { player, pokemon };
+    // EGGS PHASE 2 — same confirmed-victory guarantee as every reward
+    // above, riding in the exact same transaction so an awarded egg can
+    // never be lost or duplicated independently of the rest of this
+    // victory's reward (see rollAndAwardEgg's own doc comment,
+    // egg-drop.service.ts). regionId is the field battle's own region —
+    // read fresh from PlayerProfile inside this same transaction, never the
+    // zone — matching the egg's own PlayerOwnedEgg.regionId semantics
+    // (Phase 1).
+    const profile = await tx.playerProfile.findUniqueOrThrow({ where: { id: playerId } });
+    const egg = await rollAndAwardEgg(tx, playerId, toRegionId(profile.regionId), randomSource);
+
+    // EGGS PHASE 3 — same confirmed-victory guarantee as every reward
+    // above, riding in the exact same transaction: a racing/retried call
+    // for the same kill can never progress incubation twice, since this
+    // whole branch only runs once per victory (see
+    // progressActiveIncubations's own doc comment, incubation.service.ts).
+    // Entirely independent of the egg roll just above — a freshly dropped
+    // egg has no PlayerEggIncubation row yet, so it can never be the one
+    // that gets progressed here; only an already-active incubation, if any,
+    // is affected.
+    const incubationUpdates = await progressActiveIncubations(tx, playerId);
+
+    return { player, pokemon, egg, incubationProgress: incubationUpdates[0] ?? null };
   });
 }
 
@@ -524,6 +573,12 @@ export async function endBattleSession(playerId: string): Promise<void> {
 export interface AdvancedEncounter {
   wild: EncounterResult;
   nextWild: EncounterResult;
+  // The daily battle counter's own post-increment value (see
+  // incrementDailyBattleCount, daily-battle-count.service.ts) — carried
+  // straight through from the same transaction so the client (the global
+  // header's live daily-battle count) never needs a second round trip to
+  // learn it.
+  dailyBattleCount: number;
 }
 
 // Promotes the already-prepared next encounter (nextWild* on the session
@@ -626,7 +681,7 @@ export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId, r
 
     if (updated.count === 0) return null;
 
-    await incrementDailyBattleCount(tx, playerId);
+    const dailyBattleCount = await incrementDailyBattleCount(tx, playerId);
 
     // Pokédex — `wild` here is the just-promoted species, actually shown to
     // the player for the first time at this exact moment; the freshly
@@ -636,6 +691,6 @@ export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId, r
     // reaches this line.
     await markSpeciesSeen(tx, playerId, wild.pokemon.id);
 
-    return { wild, nextWild };
+    return { wild, nextWild, dailyBattleCount };
   });
 }

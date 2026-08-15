@@ -8,6 +8,7 @@ import { ShopPurchaseConfirmDialog } from "./ShopPurchaseConfirmDialog";
 import { ShopPurchasePanel } from "./ShopPurchasePanel";
 import { BackButton } from "@/components/layout/BackButton";
 import type { CurrencyType } from "@/features/currency/types/currency.types";
+import { purchaseEggShopItemAction } from "@/features/shop/actions/purchase-egg-shop-item.action";
 import { purchaseShopItemAction } from "@/features/shop/actions/purchase-shop-item.action";
 import { getDefaultShopCategoryId, getShopCategories, getShopItemsByCategory } from "@/features/shop/services/shop-catalog.service";
 import type { ShopCategoryId } from "@/features/shop/types/shop.types";
@@ -82,7 +83,17 @@ export function ShopContent() {
     setPurchaseError(null);
 
     startTransition(async () => {
-      const result = await purchaseShopItemAction(item.id, quantity);
+      // EGGS PHASE 6 — an egg product's actual purchase effect
+      // (createOwnedEgg, region-stamped) is different enough from every
+      // other item's (addInventoryItem quantity) that it goes through its
+      // own dedicated action — see purchase-egg-shop-item.action.ts's own
+      // doc comment. Both actions return the exact same
+      // {status:"success", itemName, quantity, ...} shape on success, so
+      // the success branch below needs no further branching itself.
+      const result =
+        item.categoryId === "eggs"
+          ? await purchaseEggShopItemAction(item.id, quantity)
+          : await purchaseShopItemAction(item.id, quantity);
 
       if (result.status === "success") {
         setIsConfirmOpen(false);

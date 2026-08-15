@@ -1722,6 +1722,21 @@ export function getBranchEvolution(speciesId: string): BranchEvolution | undefin
   return BRANCH_EVOLUTIONS[speciesId];
 }
 
+export interface BranchEvolutionEntry {
+  speciesId: string;
+  evolution: BranchEvolution;
+}
+
+// The one way to traverse the WHOLE Branch Evolution table — same
+// "fresh array view over the single canonical table, never a second
+// catalog" contract getAllLevelEvolutionEntries/getAllEvolutionItemEvolutionEntries
+// already establish for their own methods. For a reverse lookup ("which
+// species evolves INTO this one"), a consumer checks each entry's own
+// `evolution.targets` array (a branch can have more than one target).
+export function getAllBranchEvolutionEntries(): BranchEvolutionEntry[] {
+  return Object.entries(BRANCH_EVOLUTIONS).map(([speciesId, evolution]) => ({ speciesId, evolution }));
+}
+
 // ============================================================================
 // Stat-Branch Evolution (Phase 2, Generation II) — Tyrogue only
 // ============================================================================
@@ -1745,6 +1760,20 @@ const LEVEL_STAT_EVOLUTIONS: Record<string, LevelStatEvolution> = {
 
 export function getLevelStatEvolution(speciesId: string): LevelStatEvolution | undefined {
   return LEVEL_STAT_EVOLUTIONS[speciesId];
+}
+
+export interface LevelStatEvolutionEntry {
+  speciesId: string;
+  evolution: LevelStatEvolution;
+}
+
+// The one way to traverse the WHOLE Stat-Branch Evolution table — same
+// "fresh array view, never a second catalog" contract every other getAll*
+// in this file already establishes. Tyrogue is the only entry today, but
+// this is never hand-special-cased by a caller doing a reverse lookup
+// across every evolution method — it goes through this exact same shape.
+export function getAllLevelStatEvolutionEntries(): LevelStatEvolutionEntry[] {
+  return Object.entries(LEVEL_STAT_EVOLUTIONS).map(([speciesId, evolution]) => ({ speciesId, evolution }));
 }
 
 // The one place a LevelStatEvolution is ever resolved down to a single

@@ -2,8 +2,12 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { GameHeader } from "@/components/layout/GameHeader";
+import { GameSidebar } from "@/components/layout/GameSidebar";
+import { ActiveBattleProvider } from "@/features/battle-session/context/active-battle-context";
+import { hasActiveBattleSession } from "@/features/battle-session/services/battle-session.service";
 import { getNotificationBellData } from "@/features/notifications/services/notification-service";
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
+import { DailyBattleCountProvider } from "@/features/player/context/daily-battle-count-context";
 import { PlayerProgressionProvider } from "@/features/player/context/player-progression-context";
 import { getPlayerHeaderData } from "@/features/player/services/player-header-data.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
@@ -41,15 +45,21 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // one DB round trip — needed here only to get the PlayerProfile id
   // getNotificationBellData is scoped by.
   const profile = await getPlayerProfile(session.user.id);
-  const [player, notifications] = await Promise.all([
+  const [player, notifications, activeBattle] = await Promise.all([
     getPlayerHeaderData(session.user.id, session.user.username ?? null),
     getNotificationBellData(profile.id),
+    hasActiveBattleSession(profile.id),
   ]);
 
   return (
     <PlayerProgressionProvider initial={player.progress}>
-      <GameHeader player={player} notifications={notifications} />
-      {children}
+      <DailyBattleCountProvider initial={player.dailyBattleCount}>
+        <ActiveBattleProvider initial={activeBattle}>
+          <GameHeader player={player} notifications={notifications} />
+          <GameSidebar username={player.username} />
+          {children}
+        </ActiveBattleProvider>
+      </DailyBattleCountProvider>
     </PlayerProgressionProvider>
   );
 }

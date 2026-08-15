@@ -15,4 +15,17 @@ export const SHOP_CATEGORIES: ShopCategory[] = [
     tip: "💡 טיפ למאמן:\nשיקויים מתקדמים עולים יותר, אך חוסכים תורות יקרים בקרב ומאפשרים לחזור ללחימה מהר יותר.",
   },
   { id: "stones", name: "אבנים", icon: "💎" },
+  // EGGS PHASE 6 — for now holds only the 4 egg products
+  // (features/shop/data/shop-items.ts); a future purchasable incubator is
+  // simply another item added under this same category id, never a second
+  // category. `tip` is the one explicit, required-by-spec explanation of
+  // how an egg's eventual region is decided — shown automatically by
+  // ShopItemGrid (the same generic per-category banner every other tip
+  // already uses), never a bespoke UI element of its own.
+  {
+    id: "eggs",
+    name: "ביצים ואינקובטורים",
+    icon: "🥚",
+    tip: "ביצה שנקנתה בחנות תכיל פוקימון רק מהמחוז שבו השחקן נמצא בזמן הקנייה, וביצה שנפלה בקרב תכיל פוקימון רק מהמחוז שבו נערך הקרב.",
+  },
 ];

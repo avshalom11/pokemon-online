@@ -1,5 +1,8 @@
+import { EGG_DEFINITIONS } from "@/features/eggs/data/egg-definitions";
 import { getShopItemImagePath } from "@/features/shop/media/shop-item-media-paths";
 import type { ShopItem } from "@/features/shop/types/shop.types";
+import type { PokemonRarity } from "@/shared/types/pokemon";
+import { POKEMON_RARITY_LABELS } from "@/shared/types/pokemon-labels";
 
 // The shop's static catalog — adding a new item under an existing category
 // is just a new entry here (no code change anywhere else: shop-purchase.
@@ -12,6 +15,37 @@ import type { ShopItem } from "@/features/shop/types/shop.types";
 // the same lowercase-kebab convention as its item id — the potions folder
 // originally arrived Title-Cased (e.g. "Potion.png") and was renamed to
 // match poke-balls/stones rather than special-casing this file's lookups.
+// EGGS PHASE 6 — initial placeholder prices, explicitly chosen for later
+// rebalancing (see this phase's own Final Report): Common/Rare in Coins
+// (relatively cheap → noticeably more expensive), Very Rare/Legendary in
+// Gold (Legendary significantly above Very Rare) — per this phase's own
+// pricing rules, weighed against the existing economy (Coins items top out
+// around 2700 for Max Revive; Gold items are a flat 70-100 for stones/
+// Master Ball today).
+const EGG_PRICES: Record<PokemonRarity, { price: number; currency: "money" | "gold" }> = {
+  common: { price: 750, currency: "money" },
+  rare: { price: 2500, currency: "money" },
+  "very-rare": { price: 250, currency: "gold" },
+  legendary: { price: 600, currency: "gold" },
+};
+
+// Built directly from EGG_DEFINITIONS (features/eggs/data/egg-definitions.ts)
+// — displayName/imageUrl/rarity are never re-typed here, only the two
+// shop-specific facts (price/currency) and a short description are new.
+// `id` is deliberately `${rarity}-egg` (e.g. "rare-egg"), a plain string
+// distinct from the rarity value itself, so a future non-rarity-keyed egg
+// product never collides with this naming.
+const EGG_SHOP_ITEMS: ShopItem[] = EGG_DEFINITIONS.map((definition) => ({
+  id: `${definition.id}-egg`,
+  categoryId: "eggs",
+  name: definition.displayName,
+  price: EGG_PRICES[definition.rarity].price,
+  currency: EGG_PRICES[definition.rarity].currency,
+  description: `ביצה שעשויה להכיל פוקימון ${POKEMON_RARITY_LABELS[definition.rarity]} מהאזור שבו תירכש.`,
+  imageUrl: definition.imageUrl,
+  eggRarity: definition.rarity,
+}));
+
 export const SHOP_ITEMS: ShopItem[] = [
   {
     id: "poke-ball",
@@ -267,4 +301,5 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: "אריג מסתורי בעל אנרגיה אפלה שמאפשר התפתחות מיוחדת.",
     imageUrl: getShopItemImagePath("stones", "reaper-cloth"),
   },
+  ...EGG_SHOP_ITEMS,
 ];

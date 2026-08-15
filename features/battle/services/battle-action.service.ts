@@ -228,6 +228,14 @@ export interface BattleActionSuccess {
   // turns out not to exist.
   promotedWild: EncounterResult | null;
 
+  // The daily battle counter's post-increment value the instant this same
+  // action newly promoted an encounter (see AdvancedEncounter,
+  // battle-session.service.ts) — null on every path promotedWild is also
+  // null on, for the exact same reasons. The client (GameHeader's daily
+  // battle pill, via features/player/context/daily-battle-count-context.tsx)
+  // applies this directly; nothing here re-derives or re-fetches it.
+  dailyBattleCount: number | null;
+
   // Phase 6A/6D-6I: the whole turn's structured Battle Events, in the
   // exact order they happened — see
   // features/battle/events/battle-event.types.ts. The UI (BattleContent.tsx)
@@ -1186,6 +1194,7 @@ export async function executeBattleAction(
     winner,
     experienceGranted,
     promotedWild: advancedEncounter?.wild ?? null,
+    dailyBattleCount: advancedEncounter?.dailyBattleCount ?? null,
     events,
   };
 }

@@ -6,6 +6,7 @@ import { ExperienceBar } from "@/components/battle/ExperienceBar";
 import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import type { NotificationBellData } from "@/features/notifications/types";
+import { useDailyBattleCount } from "@/features/player/context/daily-battle-count-context";
 import { usePlayerProgression } from "@/features/player/context/player-progression-context";
 import type { PlayerHeaderData } from "@/features/player/services/player-header-data.service";
 import { PlayerProfileLink } from "@/features/profile/components/PlayerProfileLink";
@@ -42,6 +43,7 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
   // (rarely change mid-session) still come directly from the
   // server-rendered prop.
   const { progress } = usePlayerProgression();
+  const { count: dailyBattleCount } = useDailyBattleCount();
   const avatarInitial = player.displayName.trim().charAt(0).toUpperCase() || "?";
   const remainingXp = progress.xpRequiredForNextLevel - progress.currentLevelXp;
   const remainingXpLabel = `נותרו ${remainingXp} XP לרמה הבאה`;
@@ -80,6 +82,11 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <ResourcePill
+            icon={<span aria-hidden="true">⚔️</span>}
+            label={`קרבות היום: ${dailyBattleCount}`}
+            title="קרבות היום"
+          />
           <ResourcePill icon={<CurrencyIcon type="money" />} label={player.coins.toLocaleString("he-IL")} title="מטבעות" />
           <ResourcePill icon={<CurrencyIcon type="gold" />} label={player.gold.toLocaleString("he-IL")} title="זהב" />
 

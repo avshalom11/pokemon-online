@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTodayBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
 import { getPlayerProgress } from "@/features/player-progression/progression-calculations";
 import type { PlayerProgress } from "@/features/player-progression/progression-types";
 import { getRegionDefinition } from "@/features/regions/data/region-registry";
@@ -25,6 +26,16 @@ export interface PlayerHeaderData {
 
   coins: number;
   gold: number;
+
+  // Today's (Asia/Jerusalem) wild-Pokémon-victory count — same source and
+  // same "day rolls over automatically, no reset job" semantics as
+  // features/home/services/home-data.service.ts's own dailyBattleCount
+  // field (both call the exact same getTodayBattleCount). This is only the
+  // seed value for features/player/context/daily-battle-count-context.tsx,
+  // which is what GameHeader actually reads — the same split
+  // `progress`/PlayerProgressionProvider already established for level/XP,
+  // so a battle victory updates the header live, without a refresh.
+  dailyBattleCount: number;
 }
 
 // The single authoritative data source for the global game header
@@ -37,6 +48,7 @@ export interface PlayerHeaderData {
 // read just for that one field.
 export async function getPlayerHeaderData(userId: string, username: string | null): Promise<PlayerHeaderData> {
   const profile = await getPlayerProfile(userId);
+  const dailyBattleCount = await getTodayBattleCount(profile.id);
 
   return {
     displayName: profile.displayName,
@@ -52,5 +64,6 @@ export async function getPlayerHeaderData(userId: string, username: string | nul
     progress: getPlayerProgress(profile.experience),
     coins: profile.coins,
     gold: profile.gold,
+    dailyBattleCount,
   };
 }
