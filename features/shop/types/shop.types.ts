@@ -5,7 +5,9 @@
 // ShopCategoryId union); every future item under an existing category
 // needs no code change at all, only a new data entry — see
 // features/shop/data/shop-items.ts.
+import type { ChestTypeId } from "@/features/chests/data/chest-definitions";
 import type { CurrencyType } from "@/features/currency/types/currency.types";
+import type { IncubatorTypeId } from "@/features/eggs/data/incubator-definitions";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 
 // EGGS PHASE 6 — "eggs" deliberately named for the whole category rather
@@ -13,7 +15,18 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // user-facing label (that's ShopCategory.name below) — a future
 // purchasable incubator item is simply a second item under this same
 // category id, never a second category.
-export type ShopCategoryId = "poke-balls" | "potions" | "stones" | "eggs";
+//
+// CHESTS PHASE 1 — "chests" is its own category, deliberately never placed
+// under "eggs": chests are not tied to the egg/incubator acquisition
+// system at all (see features/chests/services/chest-ownership.service.ts's
+// own doc comment). This category id is shared infrastructure between the
+// Shop and Inventory screens (both already read from the same
+// SHOP_CATEGORIES list — see features/shop/data/shop-categories.ts's own
+// doc comment) purely so Inventory's existing category/filter UI has
+// somewhere to group owned chests; no ShopItem is added under "chests" in
+// this phase (no chest acquisition method exists yet), so it renders
+// correctly empty on the Shop screen for now.
+export type ShopCategoryId = "poke-balls" | "potions" | "stones" | "eggs" | "chests";
 
 export interface ShopCategory {
   id: ShopCategoryId;
@@ -71,4 +84,25 @@ export interface ShopItem {
   // never duplicated here; shop-items.ts derives them straight from
   // getEggDefinition(eggRarity) instead of typing them out by hand.
   eggRarity?: PokemonRarity;
+  // INCUBATOR EXPANSION — set only on the 4 incubator products (also
+  // categoryId "eggs", per the spec's own "same category" requirement —
+  // see shop-categories.ts), never alongside eggRarity on the same item.
+  // The one pointer into the incubator catalog (features/eggs/data/
+  // incubator-definitions.ts) a purchase needs to know which type of
+  // consumable PlayerIncubator to grant — see features/shop/services/
+  // incubator-shop-purchase.service.ts's own grantIncubator call. Also what
+  // ShopContent.tsx's own purchase-action branch uses to route an incubator
+  // product to its dedicated action, the same way eggRarity already routes
+  // egg products.
+  incubatorTypeId?: IncubatorTypeId;
+  // CHESTS PHASE 5 — set only on the 3 chest products (categoryId
+  // "chests", the same category id CHESTS PHASE 1 already reserved for
+  // Inventory display — see shop-categories.ts). The one pointer into the
+  // chest catalog (features/chests/data/chest-definitions.ts) a purchase
+  // needs to know which type of chest to grant — see features/shop/
+  // services/chest-shop-purchase.service.ts's own grantChest call. Also
+  // what ShopContent.tsx's own purchase-action branch uses to route a
+  // chest product to its dedicated action, the same way eggRarity/
+  // incubatorTypeId already route their own products.
+  chestTypeId?: ChestTypeId;
 }

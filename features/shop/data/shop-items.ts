@@ -1,4 +1,6 @@
+import { CHEST_DEFINITIONS, type ChestTypeId } from "@/features/chests/data/chest-definitions";
 import { EGG_DEFINITIONS } from "@/features/eggs/data/egg-definitions";
+import { INCUBATOR_DEFINITIONS, type IncubatorTypeId } from "@/features/eggs/data/incubator-definitions";
 import { getShopItemImagePath } from "@/features/shop/media/shop-item-media-paths";
 import type { ShopItem } from "@/features/shop/types/shop.types";
 import type { PokemonRarity } from "@/shared/types/pokemon";
@@ -25,8 +27,8 @@ import { POKEMON_RARITY_LABELS } from "@/shared/types/pokemon-labels";
 const EGG_PRICES: Record<PokemonRarity, { price: number; currency: "money" | "gold" }> = {
   common: { price: 750, currency: "money" },
   rare: { price: 2500, currency: "money" },
-  "very-rare": { price: 250, currency: "gold" },
-  legendary: { price: 600, currency: "gold" },
+  "very-rare": { price: 100, currency: "gold" },
+  legendary: { price: 200, currency: "gold" },
 };
 
 // Built directly from EGG_DEFINITIONS (features/eggs/data/egg-definitions.ts)
@@ -44,6 +46,64 @@ const EGG_SHOP_ITEMS: ShopItem[] = EGG_DEFINITIONS.map((definition) => ({
   description: `ביצה שעשויה להכיל פוקימון ${POKEMON_RARITY_LABELS[definition.rarity]} מהאזור שבו תירכש.`,
   imageUrl: definition.imageUrl,
   eggRarity: definition.rarity,
+}));
+
+// INCUBATOR EXPANSION — the spec's own explicit prices, one per incubator
+// type. Deliberately its own map here rather than a field on
+// IncubatorDefinition (features/eggs/data/incubator-definitions.ts), same
+// "price is a Shop-domain fact, not an incubator-domain one" split
+// EGG_PRICES already establishes for egg products above.
+const INCUBATOR_PRICES: Record<IncubatorTypeId, { price: number; currency: "money" | "gold" }> = {
+  regular: { price: 700, currency: "money" },
+  advanced: { price: 1500, currency: "money" },
+  ultra: { price: 50, currency: "gold" },
+  master: { price: 80, currency: "gold" },
+};
+
+// Built directly from INCUBATOR_DEFINITIONS — displayName/imageUrl/
+// speedMultiplier are never re-typed here, only the shop-specific facts
+// (price/currency) and a short description are new. Every purchase always
+// grants ONE consumable (single-use) incubator instance, never the
+// player's permanent starter incubator — see
+// features/shop/services/incubator-shop-purchase.service.ts's own
+// grantIncubator call.
+const INCUBATOR_SHOP_ITEMS: ShopItem[] = INCUBATOR_DEFINITIONS.map((definition) => ({
+  id: `${definition.id}-incubator`,
+  categoryId: "eggs",
+  name: definition.displayName,
+  price: INCUBATOR_PRICES[definition.id].price,
+  currency: INCUBATOR_PRICES[definition.id].currency,
+  description: `אינקובטור חד-פעמי במהירות דגירה של ×${definition.speedMultiplier}.`,
+  imageUrl: definition.imageUrl,
+  incubatorTypeId: definition.id,
+}));
+
+// CHESTS PHASE 5 — the spec's own explicit prices, one per chest type.
+// Deliberately its own map here rather than a field on ChestDefinition
+// (features/chests/data/chest-definitions.ts), same "price is a
+// Shop-domain fact, not an item-domain one" split EGG_PRICES/
+// INCUBATOR_PRICES already establish above.
+const CHEST_PRICES: Record<ChestTypeId, { price: number; currency: "money" | "gold" }> = {
+  silver: { price: 2500, currency: "money" },
+  gold: { price: 150, currency: "gold" },
+  diamond: { price: 250, currency: "gold" },
+};
+
+// Built directly from CHEST_DEFINITIONS — displayName/imageUrl are never
+// re-typed here, only the shop-specific facts (price/currency) and a short
+// description are new. Every purchase always grants exactly one closed,
+// unopened chest — see features/shop/services/chest-shop-purchase.
+// service.ts's own grantChest call; opening stays exclusively an
+// Inventory/Phase 3 action.
+const CHEST_SHOP_ITEMS: ShopItem[] = CHEST_DEFINITIONS.map((definition) => ({
+  id: `${definition.id}-chest`,
+  categoryId: "chests",
+  name: definition.displayName,
+  price: CHEST_PRICES[definition.id].price,
+  currency: CHEST_PRICES[definition.id].currency,
+  description: `תיבה סגורה שמכילה ביצה, כסף, זהב ופרסים נוספים בעת פתיחתה.`,
+  imageUrl: definition.imageUrl,
+  chestTypeId: definition.id,
 }));
 
 export const SHOP_ITEMS: ShopItem[] = [
@@ -302,4 +362,6 @@ export const SHOP_ITEMS: ShopItem[] = [
     imageUrl: getShopItemImagePath("stones", "reaper-cloth"),
   },
   ...EGG_SHOP_ITEMS,
+  ...INCUBATOR_SHOP_ITEMS,
+  ...CHEST_SHOP_ITEMS,
 ];

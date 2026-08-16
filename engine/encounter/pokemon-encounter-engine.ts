@@ -233,10 +233,24 @@ function selectZoneEncounter(regionId: RegionId, zoneId: ZoneId, playerRange: Wi
 // different Pokémon pool) depending on which region is passed here, so a
 // caller can never accidentally roll a Kanto encounter while the player is
 // in Johto (or vice versa) by simply forgetting this argument.
+// MAP — SELECTABLE WILD LEVEL RANGE. `selectedWildLevelRange` is an
+// optional override for the bracket-derived-from-playerLevel range below —
+// when provided (always the caller's own server-validated, unlocked
+// selection — see features/player/services/wild-level-preference.service.ts),
+// it's used in place of getWildLevelRangeForPlayerLevel(playerLevel)
+// wherever `playerRange` is read from here on, so a player who picked an
+// earlier/lower bracket than their current level's own default still gets
+// encounters scaled to THAT bracket. Everything downstream (rarity
+// selection, region/zone encounter pool, encounterWeight, evolution-stage
+// eligibility intersection) is completely unchanged — this only swaps
+// which WildLevelRange plays the role of "the player's bracket" in the
+// exact same pipeline. Omitted (the default), this function's behavior is
+// byte-for-byte identical to before this feature existed.
 export function startPokemonEncounter(
   regionId: RegionId,
   zoneId: ZoneId,
-  playerLevel: number
+  playerLevel: number,
+  selectedWildLevelRange?: WildLevelRange
 ): EncounterResult {
   const zone = getZone(regionId, zoneId);
 
@@ -248,7 +262,7 @@ export function startPokemonEncounter(
     throw new Error(`Zone has no encounters: "${zoneId}" in region "${regionId}"`);
   }
 
-  const playerRange = getWildLevelRangeForPlayerLevel(playerLevel);
+  const playerRange = selectedWildLevelRange ?? getWildLevelRangeForPlayerLevel(playerLevel);
   const { encounter: selectedEncounter, eligibleRange } = selectZoneEncounter(regionId, zoneId, playerRange);
 
   const pokemon = POKEMON_DATA.find(

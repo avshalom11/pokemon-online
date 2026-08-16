@@ -1,7 +1,7 @@
-// EGGS PHASE 3 focused coverage — runs the real executeBattleAction (the
-// actual field-battle victory flow) unmodified, same "real service, fake
-// DB" shape battle-action.service.egg-drop.test.ts already established.
-// Every random-dependent outcome below is deterministic via an injected
+// Focused coverage — runs the real executeBattleAction (the actual
+// field-battle victory flow) unmodified, same "real service, fake DB" shape
+// battle-action.service.egg-drop.test.ts already established. Every
+// random-dependent outcome below is deterministic via an injected
 // randomSource — no statistical/flaky assertions.
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
@@ -23,10 +23,13 @@ import {
 import { prisma } from "@/lib/db/prisma";
 
 const ZONE_ID = "grassland";
+// INCUBATOR SPEED MODEL — every eligible victory always adds exactly +1,
+// regardless of incubator type (features/eggs/data/incubator-definitions.ts).
+const REGULAR_INCREMENT = 1;
 
-async function seedActiveStandardIncubation(playerId: string, rarity: string, battleProgress = 0) {
+async function seedActiveRegularIncubation(playerId: string, rarity: string, battleProgress = 0) {
   const egg = seedOwnedEgg({ playerId, rarity, regionId: "kanto" });
-  const incubator = seedIncubator({ playerId, incubatorTypeId: "standard" });
+  const incubator = seedIncubator({ playerId, incubatorTypeId: "regular", permanentSlot: 1 });
   const started = await startIncubatingEgg(playerId, incubator.id, egg.id);
   assert.equal(started.status, "started");
   if (battleProgress !== 0) {
@@ -54,22 +57,22 @@ beforeEach(() => {
   resetFakeDb();
 });
 
-test("a field-battle victory increments the active Standard incubation by exactly 1", async () => {
+test("a field-battle victory increments the active Regular incubation by exactly +1", async () => {
   seedGuaranteedVictorySetup("owner-1");
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 5);
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", 5);
 
   const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", () => 0.999999);
   assert.equal(result.status, "success");
   if (result.status !== "success") return;
 
-  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 6);
+  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 5 + REGULAR_INCREMENT);
   assert.equal(result.experienceGranted?.incubationProgress?.incubationId, eggId);
-  assert.equal(result.experienceGranted?.incubationProgress?.battleProgress, 6);
+  assert.equal(result.experienceGranted?.incubationProgress?.battleProgress, 5 + REGULAR_INCREMENT);
 });
 
 test("escaping does not increment incubation progress", async () => {
   seedGuaranteedVictorySetup("owner-1");
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 5);
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", 5);
 
   await endBattleSession("owner-1");
 
@@ -89,7 +92,7 @@ test("a loss (party defeated without the wild fainting) does not increment incub
     wildMaxHp: 100,
     activePlayerPokemonId: "p1",
   });
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 5);
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", 5);
 
   const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl", () => 0.9);
   assert.equal(result.status, "success");
@@ -113,7 +116,7 @@ test("a non-lethal (unfinished) battle action does not increment incubation prog
     wildMaxHp: 100,
     activePlayerPokemonId: "p1",
   });
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 5);
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", 5);
 
   const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "growl", () => 0);
   assert.equal(result.status, "success");
@@ -135,12 +138,15 @@ test("no active incubation means the response reports null and nothing crashes",
 
 test("progress caps at requiredBattleTarget and an already-ready incubation never exceeds it across two separate victories", async () => {
   seedGuaranteedVictorySetup("owner-1");
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 399);
+  // A common egg in a Regular (x1) incubator: requiredBattleTarget equals
+  // the base requirement exactly (Math.ceil(400 / 1) = 400).
+  const commonTarget = getEggDefinition("common").requiredBattlesStandard;
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", commonTarget - REGULAR_INCREMENT);
 
   const first = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", () => 0.999999);
   assert.equal(first.status, "success");
   if (first.status !== "success") return;
-  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 400);
+  assert.equal(getEggIncubationRow(eggId)?.battleProgress, commonTarget);
   assert.equal(first.experienceGranted?.incubationProgress?.isReady, true);
 
   // A second, independent victory (promoteToNextEncounter already advanced
@@ -157,7 +163,7 @@ test("progress caps at requiredBattleTarget and an already-ready incubation neve
   const second = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", () => 0.999999);
   assert.equal(second.status, "success");
   if (second.status !== "success") return;
-  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 400, "must never exceed 400/400");
+  assert.equal(getEggIncubationRow(eggId)?.battleProgress, commonTarget, `must never exceed ${commonTarget}/${commonTarget}`);
 });
 
 for (const [rarity, target] of Object.entries({ common: 400, rare: 600, "very-rare": 1000, legendary: 1500 })) {
@@ -168,20 +174,20 @@ for (const [rarity, target] of Object.entries({ common: 400, rare: 600, "very-ra
 
 test("the same defeat cannot progress incubation twice — a retried/racing syncWildHp call is a no-op", async () => {
   seedGuaranteedVictorySetup("owner-1");
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 5);
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", 5);
 
   const first = await syncWildHp("owner-1", ZONE_ID, 0, () => 0.999999);
   assert.ok(first, "the first call must grant the reward");
-  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 6);
+  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 5 + REGULAR_INCREMENT);
 
   const second = await syncWildHp("owner-1", ZONE_ID, 0, () => 0.999999);
   assert.equal(second, null, "wildDefeatRewardGranted is already true — a retried call must be a no-op");
-  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 6, "progress must not be incremented a second time");
+  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 5 + REGULAR_INCREMENT, "progress must not be incremented a second time");
 });
 
 test("egg-drop behavior stays independent of incubation progress — both happen together in the same victory", async () => {
   seedGuaranteedVictorySetup("owner-1");
-  const { eggId } = await seedActiveStandardIncubation("owner-1", "common", 5);
+  const { eggId } = await seedActiveRegularIncubation("owner-1", "common", 5);
 
   // random() = 0 guarantees both a hit/kill AND rollEggDrop(0) < 0.0025.
   const result = await executeBattleAction("owner-1", ZONE_ID, "attack", "scratch", () => 0);
@@ -189,7 +195,7 @@ test("egg-drop behavior stays independent of incubation progress — both happen
   if (result.status !== "success") return;
 
   assert.equal(result.experienceGranted?.egg.dropped, true, "the independent egg-drop roll still fires");
-  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 6, "the pre-existing incubation still progresses");
+  assert.equal(getEggIncubationRow(eggId)?.battleProgress, 5 + REGULAR_INCREMENT, "the pre-existing incubation still progresses");
 });
 
 test("a newly dropped egg is never auto-incubated", async () => {

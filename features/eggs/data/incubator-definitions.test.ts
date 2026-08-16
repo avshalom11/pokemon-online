@@ -1,24 +1,31 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { getIncubatorDefinition, INCUBATOR_DEFINITIONS, STANDARD_INCUBATOR_TYPE_ID } from "./incubator-definitions.ts";
+import { getIncubatorDefinition, INCUBATOR_DEFINITIONS, REGULAR_INCUBATOR_TYPE_ID } from "./incubator-definitions.ts";
 
-test("exactly one incubator type is defined for Phase 1: standard", () => {
-  assert.equal(INCUBATOR_DEFINITIONS.length, 1);
-  assert.equal(INCUBATOR_DEFINITIONS[0].id, "standard");
-  assert.equal(STANDARD_INCUBATOR_TYPE_ID, "standard");
+test("exactly 4 incubator types are defined: regular, advanced, ultra, master", () => {
+  assert.equal(INCUBATOR_DEFINITIONS.length, 4);
+  assert.deepEqual(
+    INCUBATOR_DEFINITIONS.map((definition) => definition.id).sort(),
+    ["advanced", "master", "regular", "ultra"]
+  );
+  assert.equal(REGULAR_INCUBATOR_TYPE_ID, "regular");
 });
 
-test("the standard incubator's speed multiplier is exactly 1", () => {
-  const standard = getIncubatorDefinition("standard");
-  assert.equal(standard.speedMultiplier, 1);
+test("speed multipliers match the spec exactly: regular x1, advanced x1.5, ultra x2, master x3", () => {
+  assert.equal(getIncubatorDefinition("regular").speedMultiplier, 1);
+  assert.equal(getIncubatorDefinition("advanced").speedMultiplier, 1.5);
+  assert.equal(getIncubatorDefinition("ultra").speedMultiplier, 2);
+  assert.equal(getIncubatorDefinition("master").speedMultiplier, 3);
 });
 
-test("the standard incubator is marked as the permanent default (never a consumable)", () => {
-  const standard = getIncubatorDefinition("standard");
-  assert.equal(standard.isPermanentDefault, true);
+test("every incubator's image lives under /images/eggs/, named exactly after its own id", () => {
+  for (const definition of INCUBATOR_DEFINITIONS) {
+    assert.equal(definition.imageUrl, `/images/eggs/${definition.id}.png`);
+  }
 });
 
 test("getIncubatorDefinition throws for an unknown incubator type", () => {
+  assert.throws(() => getIncubatorDefinition("standard"));
   assert.throws(() => getIncubatorDefinition("x2"));
 });

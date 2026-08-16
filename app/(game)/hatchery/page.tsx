@@ -10,8 +10,8 @@ import { getCurrentSession } from "@/lib/auth/auth-session";
 // no-session check below exists purely so TypeScript can narrow
 // session.user.id's type; getCurrentSession is cache()-wrapped, so this
 // costs no extra DB round trip. getHatcheryViewData itself ensures the
-// player's Standard Incubator exists (features/eggs/services/
-// incubator.service.ts's ensureStandardIncubator) — no separate migration
+// player's permanent starter incubator exists (features/eggs/services/
+// incubator.service.ts's ensureStarterIncubator) — no separate migration
 // step for existing players.
 export default async function HatcheryPage() {
   const session = await getCurrentSession();

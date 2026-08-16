@@ -91,6 +91,80 @@ test("selling the final quantity removes the inventory entry", async () => {
   assert.equal(getInventoryItemRow("owner-1", "fire-stone"), undefined);
 });
 
+// CHESTS — SELL FROM INVENTORY — chests need no dedicated sell service:
+// chestInventoryItemId's "${type}-chest" convention is the exact same id
+// the Shop catalog (features/shop/data/shop-items.ts) already uses for
+// that chest product, and a chest's PlayerInventoryItem row is
+// indistinguishable from an ordinary item's regardless of how it was
+// acquired (Shop purchase or a battle drop both write through the same
+// addInventoryItem) — so this existing generic service already covers
+// every chest-sell requirement unmodified.
+test("selling a chest returns exactly 50% of its current Shop price, per acquisition-source-agnostic ownership", async () => {
+  seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
+  // Simulates a chest owned via ANY source (Shop purchase or battle drop) —
+  // both write through the same addInventoryItem, so the row looks
+  // identical regardless of origin.
+  seedInventoryItem({ playerId: "owner-1", itemId: "silver-chest", quantity: 2 }); // Shop price 2,500 money
+
+  const result = await sellInventoryItem("owner-1", "silver-chest", 1);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+  assert.equal(result.totalReturn, 1250);
+  assert.equal(result.currency, "money");
+  assert.equal(getInventoryItemRow("owner-1", "silver-chest")?.quantity, 1, "decrements by exactly 1, keeping the remaining stack");
+});
+
+test("selling Gold/Diamond chests matches the spec exactly: 75 Gold and 125 Gold", async () => {
+  seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "gold-chest", quantity: 1 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "diamond-chest", quantity: 1 });
+
+  const gold = await sellInventoryItem("owner-1", "gold-chest", 1);
+  const diamond = await sellInventoryItem("owner-1", "diamond-chest", 1);
+
+  assert.equal(gold.status, "success");
+  assert.equal(diamond.status, "success");
+  if (gold.status !== "success" || diamond.status !== "success") return;
+  assert.equal(gold.totalReturn, 75);
+  assert.equal(diamond.totalReturn, 125);
+  assert.equal(getPlayerProfileRow("owner-1")?.gold, 200);
+});
+
+test("selling the last owned chest removes the row (card disappears per existing inventory behavior)", async () => {
+  seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "silver-chest", quantity: 1 });
+
+  const result = await sellInventoryItem("owner-1", "silver-chest", 1);
+
+  assert.equal(result.status, "success");
+  assert.equal(getInventoryItemRow("owner-1", "silver-chest"), undefined);
+});
+
+test("selling a chest the player doesn't own is rejected, never going negative", async () => {
+  seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
+
+  const result = await sellInventoryItem("owner-1", "gold-chest", 1);
+
+  assert.equal(result.status, "insufficient-quantity");
+  assert.equal(getInventoryItemRow("owner-1", "gold-chest"), undefined);
+});
+
+test("two racing chest sells against a single owned chest can't both succeed", async () => {
+  seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "silver-chest", quantity: 1 });
+
+  const [first, second] = await Promise.all([
+    sellInventoryItem("owner-1", "silver-chest", 1),
+    sellInventoryItem("owner-1", "silver-chest", 1),
+  ]);
+
+  const successes = [first, second].filter((result) => result.status === "success");
+  assert.equal(successes.length, 1, "exactly one of the two racing chest sells should have won");
+  assert.equal(getPlayerProfileRow("owner-1")?.coins, 1250, "currency credit must match exactly one sale, never zero or double");
+  assert.equal(getInventoryItemRow("owner-1", "silver-chest"), undefined);
+});
+
 test("two racing sells against a stack that can only satisfy one can't both succeed", async () => {
   seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
   seedInventoryItem({ playerId: "owner-1", itemId: "poke-ball", quantity: 1 });

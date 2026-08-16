@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { InteractiveWorldMap } from "./InteractiveWorldMap";
 import { getZoneData } from "@/data/zones/zone-data";
+import { WildLevelBracketSelector } from "@/features/player/components/WildLevelBracketSelector";
+import type { WildLevelBracketPreferenceView } from "@/features/player/services/wild-level-preference.service";
 import { RegionMapImage } from "@/features/regions/components/RegionMapImage";
 import { RegionMapPlaceholder } from "@/features/regions/components/RegionMapPlaceholder";
 import type { RegionDefinition } from "@/features/regions/types/region-registry.types";
@@ -24,6 +26,16 @@ interface MapContentProps {
   // absent — Johto), or RegionMapPlaceholder's "Coming Soon" screen
   // (region.hasMap false — every other region).
   region: RegionDefinition;
+
+  // MAP — SELECTABLE WILD LEVEL RANGE. Server-resolved once per page load
+  // (app/(game)/map/page.tsx, via features/player/services/
+  // wild-level-preference.service.ts) — already validated against the
+  // player's current level and already fallback-corrected if the stored
+  // selection was stale, so this component never has to re-derive or
+  // re-validate anything itself, only render it. Only rendered in the
+  // real-battles branch below (region.mapConfig present) — a region with
+  // no zones/battles yet has nothing for a wild-level bracket to apply to.
+  wildLevelBracket: WildLevelBracketPreferenceView;
 }
 
 const NOTICE_MESSAGES: Record<string, string> = {
@@ -38,7 +50,7 @@ const NOTICE_MESSAGES: Record<string, string> = {
 // zones yet (Johto) renders RegionMapImage instead — a plain <img>, no
 // polygons, no click handlers, so it can never reuse Kanto's zone overlays
 // or start a battle. Everything else renders RegionMapPlaceholder.
-export function MapContent({ notice, region }: MapContentProps) {
+export function MapContent({ notice, region, wildLevelBracket }: MapContentProps) {
   const router = useRouter();
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const noticeMessage = notice && !dismissedNotice ? NOTICE_MESSAGES[notice] : undefined;
@@ -171,6 +183,8 @@ export function MapContent({ notice, region }: MapContentProps) {
       >
         ⬅ חזור
       </button>
+
+      <WildLevelBracketSelector unlocked={wildLevelBracket.unlocked} selectedIndex={wildLevelBracket.selectedIndex} />
 
       {noticeMessage ? (
         <div

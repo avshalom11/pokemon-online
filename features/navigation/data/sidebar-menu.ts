@@ -29,6 +29,14 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
     id: "world",
     label: "עולם",
     items: [
+      // NAVIGATION UPDATE — the game's main/home screen (app/(game)/home/
+      // page.tsx), placed first in this category rather than a new one: it's
+      // the screen every other item here is reached FROM, so it belongs
+      // beside World/Map, not off on its own. Inherits the exact same
+      // generic battle-lock behavior every other sidebar item already gets
+      // from GameSidebar's own isActiveBattle check — no Home-specific
+      // logic added.
+      { id: "home", label: "מסך ראשי", icon: "🏠", href: "/home" },
       { id: "world", label: "עולם", icon: "🌍", href: "/world" },
       { id: "map", label: "מפה", icon: "🗺️", href: "/map" },
     ],

@@ -25,13 +25,18 @@
 // features/evolution/services/accept-evolution.service.ts on every
 // successfully accepted evolution — never on rejection, and never for the
 // pending decision itself (see that file's own doc comment).
+//
+// CHEST_OPENED: created by features/chests/services/chest-open.service.ts
+// on every successful chest opening — one notification per opening
+// (summarizing the chest type), never one per individual reward granted.
 export type NotificationType =
   | "PLAYER_LEVEL_UP"
   | "CURRENCY_MONEY_REWARD"
   | "CURRENCY_GOLD_REWARD"
   | "SHOP_PURCHASE"
   | "SHOP_SELL"
-  | "POKEMON_EVOLVED";
+  | "POKEMON_EVOLVED"
+  | "CHEST_OPENED";
 
 export interface NotificationSummary {
   id: string;

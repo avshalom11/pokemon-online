@@ -16,8 +16,8 @@ export const EGG_DROP_CHANCE = 0.0025;
 // rollEggRarity (egg-drop-roll.service.ts) walks it as cumulative
 // probability bands in insertion order.
 export const EGG_RARITY_DROP_WEIGHTS: Record<PokemonRarity, number> = {
-  common: 0.7,
-  rare: 0.2,
-  "very-rare": 0.08,
-  legendary: 0.02,
+  common: 0.47,
+  rare: 0.27,
+  "very-rare": 0.16,
+  legendary: 0.1,
 };

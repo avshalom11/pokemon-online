@@ -28,13 +28,18 @@ export type StartIncubationResult =
 // in prisma/schema.prisma. Neither ownership check trusts the caller: both
 // the egg and the incubator must actually belong to `playerId`.
 //
-// `requiredBattleTarget` is computed once here, from the egg's own rarity
-// (features/eggs/data/egg-definitions.ts's requiredBattlesStandard) divided
-// by the incubator's own speedMultiplier at this exact moment
-// (features/eggs/data/incubator-definitions.ts) — Standard's multiplier is
-// 1, so this is exactly 400/600/1000/1500 today, with the formula already
-// in place for a future faster incubator to produce a smaller target
-// without any schema change.
+// INCUBATOR SPEED MODEL — `requiredBattleTarget` is computed once here, as
+// Math.ceil(eggDefinition.requiredBattlesStandard / incubatorDefinition.
+// speedMultiplier) — a snapshot of the incubator's OWN speed at this exact
+// moment (features/eggs/data/incubator-definitions.ts), never a live
+// formula re-evaluated later. Math.ceil is what keeps this a whole battle
+// count even for a non-integer multiplier (Advanced's x1.5): a Very Rare
+// egg needs ceil(1000 / 1.5) = 667 battles, not 666.67 or a value that
+// silently gets truncated down. Every eligible victory afterward always
+// adds a flat +1 (progressActiveIncubations below) — this snapshot target
+// is the ONLY place speed enters the math, so a future balance pass to an
+// incubator type's speedMultiplier never reshuffles an already-in-progress
+// incubation's own target.
 export async function startIncubatingEgg(
   playerId: string,
   incubatorId: string,
@@ -93,23 +98,27 @@ export async function getActiveIncubationForIncubator(incubatorId: string): Prom
 // relies on, no separate mechanism needed here.
 //
 // Deliberately loops over EVERY active incubation this player owns (via
-// listActiveIncubations's own tx-scoped query below), never just "the one
-// incubator" — today that's always at most one row (Phase 1: every player
-// has exactly one Standard Incubator), but nothing here assumes that stays
-// true. Each incubation's own increment comes from its OWNING incubator's
-// speedMultiplier (features/eggs/data/incubator-definitions.ts), read fresh
-// per incubation rather than hardcoded — Standard's multiplier is 1, so
-// this is +1 today, and a future x2 incubator changes only that one
-// definition-layer number, never this loop or the schema.
+// listActiveIncubations's own tx-scoped query below) — a player who owns
+// several incubators may have several active incubations progressing in
+// parallel from a single field-battle victory, one increment per
+// incubation, fully independent of each other.
+//
+// INCUBATOR SPEED MODEL — every eligible victory always adds a flat +1
+// here, regardless of which incubator or its speedMultiplier: speed is
+// baked entirely into the shorter requiredBattleTarget a fast incubator's
+// incubation was started with (startIncubatingEgg above), never into a
+// bigger per-victory increment. This is the one place `battleProgress` is
+// ever written outside of incubation start (which always begins at 0) and
+// hatch (which deletes the row).
 //
 // Capped at `requiredBattleTarget` via Math.min: an already-ready
 // incubation (battleProgress already at or past target) receives a
 // harmless no-op update that leaves it exactly at target, never pushed
-// past it — 399/400 + a victory lands at exactly 400/400, and a further
-// victory after that stays at 400/400, never 401/400. Never auto-hatches:
-// nothing here reads or changes anything about the egg itself once it's
-// ready, it just stays "ready" (isIncubationReady) until a future
-// Hatchery-phase action consumes it.
+// past it — target-1/target + a victory lands at exactly target/target,
+// and a further victory after that stays there, never target+1/target.
+// Never auto-hatches: nothing here reads or changes anything about the egg
+// itself once it's ready, it just stays "ready" (isIncubationReady) until
+// a future Hatchery action consumes it.
 export async function progressActiveIncubations(
   tx: Prisma.TransactionClient,
   playerId: string
@@ -118,11 +127,7 @@ export async function progressActiveIncubations(
 
   const summaries: IncubationProgressSummary[] = [];
   for (const incubation of activeIncubations) {
-    const incubator = await tx.playerIncubator.findUnique({ where: { id: incubation.incubatorId } });
-    if (!incubator) continue; // Unreachable under a real FK constraint — defensive only.
-
-    const definition = getIncubatorDefinition(incubator.incubatorTypeId);
-    const nextProgress = Math.min(incubation.requiredBattleTarget, incubation.battleProgress + definition.speedMultiplier);
+    const nextProgress = Math.min(incubation.requiredBattleTarget, incubation.battleProgress + 1);
 
     const updated = await tx.playerEggIncubation.update({
       where: { ownedEggId: incubation.ownedEggId },

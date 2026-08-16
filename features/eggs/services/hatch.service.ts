@@ -3,6 +3,7 @@ import "server-only";
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { rollHatchLevel } from "@/features/eggs/services/hatch-level.service";
 import { rollHatchSpecies } from "@/features/eggs/services/hatch-pool.service";
+import { isIncubatorPermanent } from "@/features/eggs/services/incubator.service";
 import { isIncubationReady } from "@/features/eggs/services/incubation.service";
 import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
@@ -22,7 +23,7 @@ export interface HatchOutcome {
 }
 
 export type HatchIncubationResult =
-  | { status: "hatched"; result: HatchOutcome }
+  | { status: "hatched"; result: HatchOutcome; incubatorId: string; incubatorConsumed: boolean }
   | { status: "not-found" }
   | { status: "not-ready" }
   | { status: "empty-pool" };
@@ -82,10 +83,23 @@ export async function hatchIncubation(
     if (removed.count === 0) return { status: "not-ready" };
 
     // The egg itself is consumed — its PlayerOwnedEgg row is deleted, never
-    // left behind as a dangling "already hatched" row. The incubator
-    // (PlayerIncubator) is never touched here: it's permanent equipment,
-    // immediately free to hold a different egg next.
+    // left behind as a dangling "already hatched" row.
     await tx.playerOwnedEgg.delete({ where: { id: egg.id } });
+
+    // INCUBATOR EXPANSION — the incubator that held this egg is consumed
+    // ONLY if it's a single-use instance (isIncubatorPermanent false: every
+    // Shop-purchased or chest-granted incubator — see incubator.service.ts's
+    // grantIncubator). The player's one permanent starter incubator is
+    // never touched here: it's reusable equipment, immediately free to
+    // hold a different egg next, exactly like every incubator was in
+    // Phase 1. Runs inside this same transaction so "consume the
+    // incubator" and "create the Pokémon" always commit or roll back
+    // together — a failed Pokémon creation can never leave a silently
+    // vanished incubator behind.
+    const incubatorConsumed = !isIncubatorPermanent(incubator);
+    if (incubatorConsumed) {
+      await tx.playerIncubator.delete({ where: { id: incubator.id } });
+    }
 
     // createOwnedPokemon (shared with capture.service.ts/select-starter.
     // service.ts) — the one canonical PlayerPokemon creation path, same
@@ -106,6 +120,8 @@ export async function hatchIncubation(
 
     return {
       status: "hatched",
+      incubatorId: incubator.id,
+      incubatorConsumed,
       result: {
         ownedPokemonId: pokemon.id,
         speciesId: species.id,

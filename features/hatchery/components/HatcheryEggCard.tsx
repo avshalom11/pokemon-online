@@ -4,6 +4,7 @@ import type { HatcheryEggView } from "@/features/hatchery/services/hatchery-view
 const SOURCE_LABELS: Record<string, string> = {
   battle: "קרב שדה",
   shop: "חנות",
+  chest: "תיבה",
 };
 
 interface HatcheryEggCardProps {

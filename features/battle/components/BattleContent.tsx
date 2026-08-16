@@ -6,8 +6,14 @@ import { useRouter } from "next/navigation";
 import { BattleBagPanel, type MedicineResultView } from "./BattleBagPanel";
 import { BattleResultOverlay } from "./BattleResultOverlay";
 import { BattleWindow } from "./BattleWindow";
+import { ChestFoundDialog } from "./ChestFoundDialog";
+import { EggFoundDialog } from "./EggFoundDialog";
 import { MasterBallConfirmDialog } from "./MasterBallConfirmDialog";
 import { XpToast } from "./XpToast";
+import { chestFoundMessage } from "@/features/chests/messages/chest-found-messages";
+import { getEggDefinition } from "@/features/eggs/data/egg-definitions";
+import { eggFoundMessage } from "@/features/eggs/messages/egg-found-messages";
+import { POKEMON_RARITY_LABELS } from "@/shared/types/pokemon-labels";
 import { BattleScene } from "@/components/battle/BattleScene";
 import { RarityWarningBanner } from "@/components/battle/RarityWarningBanner";
 import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
@@ -301,6 +307,25 @@ export function BattleContent({
   // state carries that isn't already re-derivable from partyHpMap, needed
   // to display "restored X HP" without recomputing it from a stale value.
   const [medicineResult, setMedicineResult] = useState<MedicineResultView | null>(null);
+  // CHESTS PHASE 5 — non-null exactly while the "chest found" confirmation
+  // is showing, set by applyVictoryReward the instant a battle-victory
+  // response reports a dropped chest (BattleVictoryReward.chest). Same
+  // "opaque fixed-inset backdrop blocks interaction, not a battle-phase
+  // transition" pattern pendingEvolution/medicineResult above already
+  // establish — the normal post-battle flow (next encounter / return to
+  // map) already runs immediately after applyVictoryReward regardless;
+  // this dialog is a purely visual overlay on top of it.
+  const [chestFound, setChestFound] = useState<{ chestDisplayName: string; imageUrl: string; message: string } | null>(null);
+  // EGG DROP — CONFIRMATION DIALOG — same pattern as chestFound above, set
+  // by applyVictoryReward the instant a battle-victory response reports a
+  // dropped egg (BattleVictoryReward.egg). Rendered with priority over
+  // chestFound (see this file's own render section) so a victory that
+  // drops BOTH shows the egg dialog first, then the chest dialog once the
+  // egg one is confirmed — chestFound is never cleared or overwritten by
+  // this, only deferred.
+  const [eggFound, setEggFound] = useState<{ eggDisplayName: string; rarityLabel: string; imageUrl: string; message: string } | null>(
+    null
+  );
   const [pendingMasterBallConfirm, setPendingMasterBallConfirm] = useState(false);
   const [isUsingItem, startUseItemTransition] = useTransition();
   const [activeId, setActiveId] = useState(activePokemonId);
@@ -512,10 +537,42 @@ export function BattleContent({
   // to the UI together too — never a partial update where the header
   // reflects a new player level but a party card still shows a stale
   // Pokémon level, or vice versa.
-  function applyVictoryReward(reward: BattleVictoryReward | null) {
+  // `defeatedWildName` is the JUST-defeated wild's own display name,
+  // passed in by the caller (read from `wildState` before it's replaced by
+  // whatever comes next) — needed only for the chest-found message below;
+  // every other half of this function is unaffected by it.
+  function applyVictoryReward(reward: BattleVictoryReward | null, defeatedWildName: string) {
     if (!reward) return;
     applyBattleReward(reward.player);
     applyPokemonRewards(reward.pokemon);
+
+    // EGG DROP — CONFIRMATION DIALOG — entirely independent of the chest
+    // drop below: both can be present on the same reward with neither ever
+    // suppressing the other, since this only ever reads reward.egg. No
+    // battle-response shape change needed — reward.egg.rarity already
+    // carries everything the existing egg catalog (getEggDefinition) needs
+    // to resolve a display name/image, the same catalog egg cards already
+    // use elsewhere (features/eggs/data/egg-definitions.ts).
+    if (reward.egg.dropped) {
+      const definition = getEggDefinition(reward.egg.rarity);
+      setEggFound({
+        eggDisplayName: definition.displayName,
+        rarityLabel: POKEMON_RARITY_LABELS[reward.egg.rarity],
+        imageUrl: definition.imageUrl,
+        message: eggFoundMessage(defeatedWildName, definition.displayName),
+      });
+    }
+
+    // CHESTS PHASE 5 — entirely independent of the egg drop above: both
+    // can be present on the same reward with neither ever suppressing the
+    // other, since this only ever reads reward.chest.
+    if (reward.chest.dropped) {
+      setChestFound({
+        chestDisplayName: reward.chest.displayName,
+        imageUrl: reward.chest.imageUrl,
+        message: chestFoundMessage(defeatedWildName, reward.chest.displayName),
+      });
+    }
   }
 
   // Derived every render from the party prop + the live HP/progress maps —
@@ -689,7 +746,7 @@ export function BattleContent({
       // local state update, never a second round trip or any artificial
       // delay of any kind.
       if (result.wildFainted) {
-        applyVictoryReward(result.experienceGranted);
+        applyVictoryReward(result.experienceGranted, wildState.pokemon.name);
         if (result.dailyBattleCount !== null) {
           applyDailyBattleCount(result.dailyBattleCount);
         }
@@ -1222,6 +1279,30 @@ export function BattleContent({
           isSubmitting={isResolvingEvolution}
           onChoose={handleChooseEvolutionBranch}
           onReject={handleRejectEvolutionBranch}
+        />
+      ) : null}
+
+      {eggFound ? (
+        <EggFoundDialog
+          eggDisplayName={eggFound.eggDisplayName}
+          rarityLabel={eggFound.rarityLabel}
+          imageUrl={eggFound.imageUrl}
+          message={eggFound.message}
+          onConfirm={() => setEggFound(null)}
+        />
+      ) : chestFound ? (
+        // EGG DROP — CONFIRMATION DIALOG — the chest dialog only renders
+        // once the egg dialog (if any) has been confirmed and cleared;
+        // chestFound itself is never touched by that confirmation, so a
+        // simultaneous drop always resolves as: egg dialog -> "אישור" ->
+        // chest dialog -> "אישור" -> normal flow, deterministically, with
+        // both rewards already persisted server-side regardless of dialog
+        // order.
+        <ChestFoundDialog
+          chestDisplayName={chestFound.chestDisplayName}
+          imageUrl={chestFound.imageUrl}
+          message={chestFound.message}
+          onConfirm={() => setChestFound(null)}
         />
       ) : null}
     </BattleWindow>

@@ -28,4 +28,13 @@ export const SHOP_CATEGORIES: ShopCategory[] = [
     icon: "🥚",
     tip: "ביצה שנקנתה בחנות תכיל פוקימון רק מהמחוז שבו השחקן נמצא בזמן הקנייה, וביצה שנפלה בקרב תכיל פוקימון רק מהמחוז שבו נערך הקרב.",
   },
+  // CHESTS PHASE 1 — deliberately its own category, never merged into
+  // "eggs": chests are not part of the egg/incubator system. No ShopItem
+  // exists under this category id yet (no acquisition method is
+  // implemented in this phase — see features/chests's own doc comments),
+  // so it currently renders as an empty category wherever it's shown; it
+  // exists now purely so the Inventory screen's existing category/filter
+  // architecture has somewhere ready to group owned chests once a later
+  // phase adds them.
+  { id: "chests", name: "תיבות", icon: "🎁" },
 ];

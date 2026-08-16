@@ -12,6 +12,12 @@ const STATIC_NAVIGATION_ITEMS = [
   { title: "מפה", icon: "🗺️", href: "/map" },
   { title: "הפוקימונים שלי", icon: "🐾", href: "/my-pokemon" },
   { title: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },
+  // NAVIGATION UPDATE — the existing /hatchery page (features/hatchery),
+  // added through this same static config rather than a hardcoded card:
+  // same emoji icon the sidebar's own Hatchery item already uses
+  // (features/navigation/data/sidebar-menu.ts), so the two menus never
+  // drift into disagreeing iconography for the same destination.
+  { title: "מדגרה", icon: "🥚", href: "/hatchery" },
   { title: "תיק ציוד", icon: "🎒", href: "/inventory" },
   { title: "פוקדקס", icon: "📖", href: "/pokedex" },
   { title: "חנות", icon: "🛒", href: "/shop" },

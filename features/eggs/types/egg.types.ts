@@ -2,15 +2,22 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 
 // EGGS PHASE 1 — Core Data & Database.
 
-// How a PlayerOwnedEgg row (prisma/schema.prisma) came to exist. Neither
-// acquisition path is implemented yet (Phase 2+ — a 0.25% battle drop and
-// a shop purchase flow) — this type exists now purely so the column has a
-// real, closed set of values to validate against from day one, the same
-// "define the closed value set before anything writes it" precedent
-// features/notifications/types.ts's NotificationType already follows.
-export type EggAcquisitionSource = "battle" | "shop";
+// How a PlayerOwnedEgg row (prisma/schema.prisma) came to exist — a plain
+// string column (never a Prisma enum, so a new source is always a
+// data-only TS change, never a migration), validated at the app layer
+// against this closed set, the same "define the closed value set before
+// anything writes it" precedent features/notifications/types.ts's
+// NotificationType already follows.
+//
+// CHESTS PHASE 3 — "chest" added for an egg reward granted by
+// features/chests/services/chest-open.service.ts's own openChest. Never
+// reuses "shop" for this (a chest egg was never purchased as an egg
+// product), and never a new acquisition-source concept — this is the same
+// closed EggAcquisitionSource union every other egg-owning surface
+// (Hatchery/Inventory's own SOURCE_LABELS maps) already reads.
+export type EggAcquisitionSource = "battle" | "shop" | "chest";
 
-export const EGG_ACQUISITION_SOURCES: readonly EggAcquisitionSource[] = ["battle", "shop"];
+export const EGG_ACQUISITION_SOURCES: readonly EggAcquisitionSource[] = ["battle", "shop", "chest"];
 
 // EGGS PHASE 2 — the battle-response shape for "did this victory drop an
 // egg". Deliberately minimal/generic per this phase's own scope (no visual

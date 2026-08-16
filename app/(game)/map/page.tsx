@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { MapContent } from "./components/MapContent";
 import { getRegionDefinition } from "@/features/regions/data/region-registry";
+import { getWildLevelBracketPreference } from "@/features/player/services/wild-level-preference.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { toRegionId } from "@/shared/types/region";
@@ -25,6 +26,7 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
 
   const profile = await getPlayerProfile(session.user.id);
   const region = getRegionDefinition(toRegionId(profile.regionId));
+  const wildLevelBracket = await getWildLevelBracketPreference(profile.id);
 
-  return <MapContent notice={notice} region={region} />;
+  return <MapContent notice={notice} region={region} wildLevelBracket={wildLevelBracket} />;
 }

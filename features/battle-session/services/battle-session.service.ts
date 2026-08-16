@@ -6,6 +6,8 @@ import { resolveWildEncounter } from "@/engine/encounter/legendary-test-boost";
 import { ALL_STAT_NAMES } from "@/engine/moves";
 import type { StatStages } from "@/features/battle/stats/stat-stages";
 import { resetVolatileOnSwitch, type VolatileState } from "@/features/battle/volatile/volatile-condition.types";
+import { rollAndAwardChest } from "@/features/chests/services/chest-drop.service";
+import type { ChestDropOutcome } from "@/features/chests/types/chest-drop.types";
 import { grantFieldBattleCurrencyRewards } from "@/features/currency/services/field-battle-currency-reward.service";
 import { incrementDailyBattleCount } from "@/features/daily-battles/services/daily-battle-count.service";
 import { rollAndAwardEgg } from "@/features/eggs/services/egg-drop.service";
@@ -20,6 +22,7 @@ import { grantBattlePokemonXp } from "@/features/pokemon-progression/pokemon-pro
 import type { BattleParticipantRecord, PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
 import { calculateVictoryXpReward } from "@/features/player-progression/progression-calculations";
 import { addPlayerExperience, getPlayerLevel } from "@/features/player-progression/progression-service";
+import { resolveEffectiveWildLevelRange } from "@/features/player/services/wild-level-preference.service";
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -29,13 +32,18 @@ import { ALL_ZONE_IDS, type ZoneId } from "@/shared/types/zone";
 
 // The authoritative result of a wild-Pokémon victory: the player-account
 // reward, every eligible owned Pokémon's own reward, (EGGS PHASE 2) whether
-// this exact victory dropped an egg, and (EGGS PHASE 3) whether it
-// progressed the player's active incubation — all granted atomically
-// together — see syncWildHp below.
+// this exact victory dropped an egg, (CHESTS PHASE 5) whether it dropped a
+// chest, and (EGGS PHASE 3) whether it progressed the player's active
+// incubation — all granted atomically together — see syncWildHp below.
 export interface BattleVictoryReward {
   player: LevelUpResult;
   pokemon: PokemonLevelUpResult[];
   egg: EggDropOutcome;
+  // CHESTS PHASE 5 — entirely independent of `egg` above: its own
+  // separate 0.12% roll (features/chests/data/chest-drop-config.ts), never
+  // gating or gated by the egg roll. One victory may award an egg, a
+  // chest, both, or neither.
+  chest: ChestDropOutcome;
   // Today a player only ever has one active incubation (Phase 1: one
   // Standard Incubator each), so this is a single nullable summary — see
   // IncubationProgressSummary's own doc comment (features/eggs/types/
@@ -303,15 +311,21 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
   // Phase 1 — Wild Pokémon level scaling: read once and reused for both
   // rolls below, so the current and precomputed-next encounter are always
   // scaled to the same player-level snapshot.
+  // MAP — SELECTABLE WILD LEVEL RANGE: wildLevelRange is the player's own
+  // server-validated selected bracket (falls back to their highest
+  // unlocked bracket automatically — see resolveEffectiveWildLevelRange's
+  // own doc comment), read once and reused for both rolls below for the
+  // same reason playerLevel is.
   const playerLevel = await getPlayerLevel(playerId);
-  const wild = resolveWildEncounter(regionId, requestedZoneId, playerLevel);
+  const wildLevelRange = await resolveEffectiveWildLevelRange(playerId);
+  const wild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
   // The session is created already one encounter ahead — see the model's
   // own nextWild* doc comment. resolveWildEncounter is a pure, in-memory
   // weighted pick (no I/O), so precomputing this second encounter up front
   // costs nothing measurable; it just guarantees a promotion is always
   // instant, from the very first encounter of the session onward, never
   // only after the first defeat.
-  const nextWild = resolveWildEncounter(regionId, requestedZoneId, playerLevel);
+  const nextWild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
 
   await prisma.fieldBattleSession.create({
     data: {
@@ -458,6 +472,16 @@ export async function syncWildHp(
     const profile = await tx.playerProfile.findUniqueOrThrow({ where: { id: playerId } });
     const egg = await rollAndAwardEgg(tx, playerId, toRegionId(profile.regionId), randomSource);
 
+    // CHESTS PHASE 5 — same confirmed-victory guarantee as every reward
+    // above, riding in the exact same transaction so an awarded chest can
+    // never be lost or duplicated independently of the rest of this
+    // victory's reward (see rollAndAwardChest's own doc comment,
+    // chest-drop.service.ts). Entirely independent of the egg roll just
+    // above — its own separate 0.12% roll, never blocking or blocked by
+    // the egg roll; a single victory may award an egg, a chest, both, or
+    // neither.
+    const chest = await rollAndAwardChest(tx, playerId, randomSource);
+
     // EGGS PHASE 3 — same confirmed-victory guarantee as every reward
     // above, riding in the exact same transaction: a racing/retried call
     // for the same kill can never progress incubation twice, since this
@@ -469,7 +493,7 @@ export async function syncWildHp(
     // is affected.
     const incubationUpdates = await progressActiveIncubations(tx, playerId);
 
-    return { player, pokemon, egg, incubationProgress: incubationUpdates[0] ?? null };
+    return { player, pokemon, egg, chest, incubationProgress: incubationUpdates[0] ?? null };
   });
 }
 
@@ -639,9 +663,11 @@ export async function promoteToNextEncounter(playerId: string, zoneId: ZoneId, r
   };
   // Phase 1 — Wild Pokémon level scaling: the promoted `wild` above was
   // already generated (and leveled) earlier, off this critical path — only
-  // the freshly-generated replacement `nextWild` needs today's player level.
+  // the freshly-generated replacement `nextWild` needs today's player level
+  // (and, MAP — SELECTABLE WILD LEVEL RANGE, today's selected bracket).
   const playerLevel = await getPlayerLevel(playerId);
-  const nextWild = resolveWildEncounter(regionId, zoneId, playerLevel);
+  const wildLevelRange = await resolveEffectiveWildLevelRange(playerId);
+  const nextWild = resolveWildEncounter(regionId, zoneId, playerLevel, wildLevelRange);
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.fieldBattleSession.updateMany({

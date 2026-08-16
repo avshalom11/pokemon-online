@@ -8,7 +8,9 @@ import { ShopPurchaseConfirmDialog } from "./ShopPurchaseConfirmDialog";
 import { ShopPurchasePanel } from "./ShopPurchasePanel";
 import { BackButton } from "@/components/layout/BackButton";
 import type { CurrencyType } from "@/features/currency/types/currency.types";
+import { purchaseChestShopItemAction } from "@/features/shop/actions/purchase-chest-shop-item.action";
 import { purchaseEggShopItemAction } from "@/features/shop/actions/purchase-egg-shop-item.action";
+import { purchaseIncubatorShopItemAction } from "@/features/shop/actions/purchase-incubator-shop-item.action";
 import { purchaseShopItemAction } from "@/features/shop/actions/purchase-shop-item.action";
 import { getDefaultShopCategoryId, getShopCategories, getShopItemsByCategory } from "@/features/shop/services/shop-catalog.service";
 import type { ShopCategoryId } from "@/features/shop/types/shop.types";
@@ -83,17 +85,26 @@ export function ShopContent() {
     setPurchaseError(null);
 
     startTransition(async () => {
-      // EGGS PHASE 6 — an egg product's actual purchase effect
-      // (createOwnedEgg, region-stamped) is different enough from every
-      // other item's (addInventoryItem quantity) that it goes through its
-      // own dedicated action — see purchase-egg-shop-item.action.ts's own
-      // doc comment. Both actions return the exact same
-      // {status:"success", itemName, quantity, ...} shape on success, so
-      // the success branch below needs no further branching itself.
-      const result =
-        item.categoryId === "eggs"
-          ? await purchaseEggShopItemAction(item.id, quantity)
-          : await purchaseShopItemAction(item.id, quantity);
+      // EGGS PHASE 6 / INCUBATOR EXPANSION / CHESTS PHASE 5 — an egg
+      // product's actual purchase effect (createOwnedEgg, region-stamped),
+      // an incubator product's (grantIncubator), and a chest product's
+      // (grantChest) are each different enough from an ordinary item's
+      // (addInventoryItem quantity) — and from each other — that they go
+      // through their own dedicated actions — see purchase-egg-shop-item.
+      // action.ts's/purchase-incubator-shop-item.action.ts's/purchase-
+      // chest-shop-item.action.ts's own doc comments. Routed by which
+      // pointer field the catalog entry itself carries (eggRarity vs.
+      // incubatorTypeId vs. chestTypeId), never by categoryId alone. All
+      // four actions return the exact same {status:"success", itemName,
+      // quantity, ...} shape on success, so the success branch below needs
+      // no further branching itself.
+      const result = item.eggRarity
+        ? await purchaseEggShopItemAction(item.id, quantity)
+        : item.incubatorTypeId
+          ? await purchaseIncubatorShopItemAction(item.id, quantity)
+          : item.chestTypeId
+            ? await purchaseChestShopItemAction(item.id, quantity)
+            : await purchaseShopItemAction(item.id, quantity);
 
       if (result.status === "success") {
         setIsConfirmOpen(false);

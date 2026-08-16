@@ -42,12 +42,12 @@ test("once a purchased egg starts incubating, it is excluded from available inve
   const before = await getHatcheryViewData("owner-1");
   assert.equal(before.availableEggs.length, 1);
 
-  const started = await startIncubatingEgg("owner-1", before.incubatorId, purchased.eggIds[0]);
+  const started = await startIncubatingEgg("owner-1", before.incubators[0].id, purchased.eggIds[0]);
   assert.equal(started.status, "started");
 
   const after = await getHatcheryViewData("owner-1");
   assert.equal(after.availableEggs.length, 0);
-  assert.equal(after.activeIncubation?.egg.source, "shop");
+  assert.equal(after.incubators[0].activeIncubation?.egg.source, "shop");
 });
 
 test("purchasing does not change battle-drop chance/rarity distribution — the two systems remain independent", async () => {

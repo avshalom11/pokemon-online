@@ -80,6 +80,21 @@ model PlayerProfile {
   // hardcode the Hebrew region label in UI code, and so more regions can
   // be added later without a schema change.
   regionId             String  @default("kanto")
+  // MAP — SELECTABLE WILD LEVEL RANGE. An index into the fixed, ordered
+  // WILD_LEVEL_BRACKETS array (engine/player-level-scaling/
+  // wild-level-brackets.config.ts) — the SAME single source of truth field
+  // battle encounters already scale wild Pokémon levels from, never a
+  // second min/max pair duplicated here (a bracket's own min/max can be
+  // rebalanced in that one config file without ever touching this schema).
+  // null means "the player has never chosen a bracket yet" — the encounter
+  // path then falls back to the highest bracket currently unlocked for
+  // their level (features/player/services/wild-level-preference.service.ts),
+  // preserving today's existing gameplay behavior for every player who
+  // never touches this new control. Never trusted as-is when read: always
+  // re-validated against the player's CURRENT level (a stored index can go
+  // stale if the config itself is ever rebalanced, or — impossible today,
+  // but never assumed — if a player's level somehow decreased) before use.
+  selectedWildLevelBracketIndex Int?
   // Short public biography — plain text only, rendered as text content
   // (never dangerouslySetInnerHTML), so it can never carry HTML/links as
   // markup regardless of what characters it contains. Length-capped at the
@@ -620,45 +635,77 @@ model PlayerOwnedEgg {
   @@map("player_owned_egg")
 }
 
-// One row per incubator instance a player owns — deliberately its own
-// table, never a PlayerInventoryItem quantity row: an incubator is
-// permanent and never consumed/traded away (PlayerInventoryItem's whole
-// shape is "how many of this consumable/held item does the player have
-// right now", which doesn't fit a permanent piece of equipment that also
-// needs its own identity for PlayerEggIncubation to point at — same
-// "quantity counter has no single identity a foreign key could reference"
-// reasoning as PlayerOwnedEgg's own doc comment above).
+// One row per incubator INSTANCE a player owns — deliberately its own
+// table, never a PlayerInventoryItem quantity row: even a consumable
+// incubator instance needs its own identity for PlayerEggIncubation to
+// point at while it's actively holding an egg (same "quantity counter has
+// no single identity a foreign key could reference" reasoning as
+// PlayerOwnedEgg's own doc comment above) — a stackable quantity row could
+// never distinguish "this specific Ultra Incubator, mid-incubation" from
+// "the other three Ultra Incubators still sitting empty".
 //
 // `incubatorTypeId` resolves against the static incubator catalog
-// (features/eggs/data/incubator-definitions.ts — "standard" is the only
-// entry Phase 1 defines), same *Id-references-a-static-catalog precedent as
+// (features/eggs/data/incubator-definitions.ts — "regular" | "advanced" |
+// "ultra" | "master"), same *Id-references-a-static-catalog precedent as
 // PlayerOwnedEgg.rarity/PlayerInventoryItem.itemId. Speed multiplier,
-// display name, etc. all live in that catalog — never duplicated onto this
-// row — so a future incubator type (e.g. an x2) is a data-only addition,
-// never a migration, and never bakes "1 battle = 1 progress" into this
-// schema.
+// display name, shop price, etc. all live in that catalog (price lives one
+// layer up, in features/shop/data/shop-items.ts, mirroring the egg
+// products' own EGG_PRICES split) — never duplicated onto this row — so a
+// future incubator type is a data-only addition, never a migration.
 //
-// @@unique below is what makes "every player owns at most one standard
-// incubator" a real, always-on database guarantee rather than an
-// application-level convention: features/eggs/services/incubator.service.ts
-// ensures one via an upsert keyed by exactly this constraint (create on
-// first access, a harmless no-op on every call after — same idempotent
-// "lazy creation / ensure-on-access" shape PlayerSeenSpecies's own upsert
-// already established), so an existing player safely gets one the first
-// time anything asks for it, with no mass-data migration and no risk of a
-// second row ever being created for the same player+type.
+// INCUBATOR EXPANSION — every player has ever received at most one
+// permanent piece of equipment (the starter Regular Incubator); every
+// other incubator instance (bought in the Shop, or later granted by a
+// chest/reward system via grantIncubator — incubator.service.ts) is a
+// single-use consumable, fully independent of every other instance the
+// player owns, including duplicates of the exact same type. That is why
+// this model dropped its original Phase-1 `@@unique([playerId,
+// incubatorTypeId])` — "at most one incubator per player per type" is no
+// longer a true invariant now that a player can own, say, three Regular
+// Incubators (the permanent one plus two purchased ones) or four Ultra
+// Incubators at once.
+//
+// `permanentSlot` is the new mechanism that keeps "at most one permanent
+// starter incubator per player, ever" a real, always-on database guarantee
+// rather than an application-level convention, while placing zero
+// restriction on how many consumable instances (of any type, including
+// duplicates) the same player can also own: it is `1` on exactly the one
+// permanent row a player has, and `null` on every consumable row. Postgres
+// (like every SQL unique index) treats NULL as distinct from every other
+// NULL, so `@@unique([playerId, permanentSlot])` below only ever collides
+// for two rows that are BOTH `permanentSlot: 1` for the same player — two
+// consumable rows (`permanentSlot: null`) for that same player never
+// collide with each other or with the permanent row, no matter how many of
+// them exist. features/eggs/services/incubator.service.ts's
+// ensureStarterIncubator upserts keyed by exactly this constraint (create
+// on first access, a harmless no-op on every call after — the same
+// idempotent "lazy creation / ensure-on-access" shape this column's
+// predecessor already established), so an existing player safely keeps
+// their existing permanent incubator with no mass-data migration beyond a
+// one-time backfill (see this phase's own migration) stamping every
+// pre-expansion player_incubator row — every one of which WAS that
+// player's sole permanent Standard/Regular Incubator, by Phase 1's own
+// prior invariant — with `permanentSlot = 1`.
+//
+// "Is this instance permanent/reusable, or consumable/single-use" is
+// therefore always `permanentSlot !== null` — see incubator.service.ts's
+// isIncubatorPermanent — never a second redundant boolean column that could
+// drift out of sync with this one, same "derive it, don't duplicate it"
+// precedent PlayerEggIncubation's own isIncubationReady already
+// establishes for "ready".
 model PlayerIncubator {
   id       String        @id @default(cuid())
   playerId String
   player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   incubatorTypeId String
+  permanentSlot   Int?
 
   createdAt DateTime @default(now())
 
   activeIncubation PlayerEggIncubation?
 
-  @@unique([playerId, incubatorTypeId])
+  @@unique([playerId, permanentSlot])
   @@index([playerId])
   @@map("player_incubator")
 }
@@ -686,13 +733,24 @@ model PlayerIncubator {
 // precedent PlayerKnownMove already follows (no playerId column there
 // either, only playerPokemonId).
 //
-// `battleProgress` starts at 0 and Phase 1 never increments it (Phase 3's
-// job). `requiredBattleTarget` is a snapshot computed once at start time
-// from the egg's own rarity (features/eggs/data/egg-definitions.ts) and the
-// incubator's own speed multiplier at that moment
-// (features/eggs/data/incubator-definitions.ts) — never a live formula
-// re-evaluated on every read, so a future incubator-type upgrade never
-// silently reshuffles an already-in-progress incubation's own target.
+// `battleProgress` starts at 0 and is always counted in real, whole
+// battles: every eligible field-battle victory adds a flat +1 to it
+// (features/eggs/services/incubation.service.ts's progressActiveIncubations),
+// regardless of which incubator holds the egg. `requiredBattleTarget` is a
+// snapshot computed once at start time — Math.ceil(the egg's own rarity's
+// requiredBattlesStandard / the incubator's own speedMultiplier at that
+// exact moment, features/eggs/data/incubator-definitions.ts) — never a
+// live formula re-evaluated on every read, so a future balance pass to an
+// incubator type's speedMultiplier never reshuffles an already-in-progress
+// incubation's own target. Math.ceil is what keeps this column a whole
+// battle count even for a non-integer multiplier (Advanced's x1.5).
+//
+// INCUBATOR SPEED MODEL — a faster incubator's speed lives entirely in
+// this SHORTER target, never in a bigger per-victory increment: an earlier
+// revision of this feature instead scaled `battleProgress` itself by the
+// incubator's own multiplier (via a fixed PROGRESS_SCALE unit system) —
+// deliberately reverted, since a flat "+1 per victory, shorter target"
+// model is simpler and matches how this feature was ultimately specified.
 // "Ready" is deliberately never a stored column — it's always derived as
 // `battleProgress >= requiredBattleTarget`
 // (features/eggs/services/incubation.service.ts's isIncubationReady), so

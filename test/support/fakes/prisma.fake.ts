@@ -55,6 +55,10 @@ interface PlayerProfileRow {
   coins: number;
   gold: number;
   regionId: string;
+  // MAP — SELECTABLE WILD LEVEL RANGE. Mirrors PlayerProfile.
+  // selectedWildLevelBracketIndex (prisma/schema.prisma) — null means "no
+  // bracket chosen yet", same default every real new profile row has.
+  selectedWildLevelBracketIndex: number | null;
 }
 
 interface DailyFieldBattleCountRow {
@@ -95,6 +99,13 @@ interface PlayerIncubatorRow {
   id: string;
   playerId: string;
   incubatorTypeId: string;
+  // INCUBATOR EXPANSION — 1 on the player's one permanent starter
+  // incubator, null on every consumable instance (mirrors
+  // prisma/schema.prisma's PlayerIncubator.permanentSlot exactly — see that
+  // column's own doc comment for why NULL, not a boolean, is what makes
+  // "at most one permanent row per player" a real composite-unique
+  // guarantee here too).
+  permanentSlot: number | null;
   createdAt: Date;
 }
 
@@ -166,12 +177,27 @@ function inventoryItemKey(playerId: string, itemId: string): string {
   return `${playerId}::${itemId}`;
 }
 
-function incubatorKey(playerId: string, incubatorTypeId: string): string {
-  return `${playerId}::${incubatorTypeId}`;
+// Only ever used for the permanent-starter-slot upsert (ensureStarterIncubator)
+// — permanentSlot is always the literal 1 there. Consumable instances
+// (grantIncubator) always go through playerIncubator.create below instead,
+// never this keyed-upsert path, so a composite key scheme that could only
+// ever describe "one particular permanentSlot value for one player" is
+// sufficient.
+function incubatorKey(playerId: string, permanentSlot: number): string {
+  return `${playerId}::${permanentSlot}`;
 }
 
 function seenSpeciesKey(playerId: string, speciesId: string): string {
   return `${playerId}::${speciesId}`;
+}
+
+// INVENTORY SELL — the incubator side of the same "activeIncubation: null"
+// relation-null filter playerOwnedEgg's own findMany/deleteMany already
+// resolve by hand: true when some PlayerEggIncubation row currently
+// references this incubator (mirrors the real schema's own
+// PlayerEggIncubation.incubatorId @unique relation).
+function incubatorHasActiveIncubation(incubatorId: string): boolean {
+  return [...eggIncubations.values()].some((incubation) => incubation.incubatorId === incubatorId);
 }
 
 function cloneState() {
@@ -291,7 +317,15 @@ export function seedPendingMove(row: {
   return full;
 }
 
-export function seedPlayerProfile(row: { id: string; level?: number; experience?: number; coins?: number; gold?: number; regionId?: string }) {
+export function seedPlayerProfile(row: {
+  id: string;
+  level?: number;
+  experience?: number;
+  coins?: number;
+  gold?: number;
+  regionId?: string;
+  selectedWildLevelBracketIndex?: number | null;
+}) {
   const full: PlayerProfileRow = {
     id: row.id,
     level: row.level ?? 1,
@@ -302,6 +336,11 @@ export function seedPlayerProfile(row: { id: string; level?: number; experience?
     // prisma/schema.prisma — every existing test that never explicitly
     // seeds a region keeps behaving exactly as it did before Phase 4.
     regionId: row.regionId ?? "kanto",
+    // Matches PlayerProfile.selectedWildLevelBracketIndex's own nullable,
+    // no-@default column — every existing test that never explicitly seeds
+    // this keeps behaving exactly as it did before this feature (null ->
+    // falls back to the highest unlocked bracket).
+    selectedWildLevelBracketIndex: row.selectedWildLevelBracketIndex ?? null,
   };
   profiles.set(row.id, full);
   return full;
@@ -445,21 +484,24 @@ export function getOwnedEggRow(id: string) {
   return row ? { ...row } : undefined;
 }
 
-// Keyed by plain id (not incubatorKey's playerId+incubatorTypeId
-// composite) so a test can seed more than one incubator for the same
-// player+type at once — several Phase 1 tests deliberately do this to
-// model "two independent incubators" ahead of a second real incubator
-// type existing (features/eggs/data/incubator-definitions.ts only defines
-// "standard" today). A real @@unique([playerId, incubatorTypeId]) would
-// forbid two genuine Standard Incubator rows for one player — this seed
-// helper intentionally does NOT replicate that constraint, unlike
-// playerIncubator.upsert itself (ensureStandardIncubator's own write
-// path), which does. A test that needs a seeded incubator to be the SAME
-// row ensureStandardIncubator later resolves should call
-// ensureStandardIncubator directly instead of seeding one by hand.
-export function seedIncubator(row: { id?: string; playerId: string; incubatorTypeId: string }) {
+// Keyed by plain id (not incubatorKey's playerId+permanentSlot composite)
+// so a test can freely seed several independent incubators for the same
+// player, including duplicates of the same type and/or more than one row
+// with permanentSlot: 1 — this seed helper intentionally does NOT replicate
+// the real @@unique([playerId, permanentSlot]) constraint, unlike
+// playerIncubator.upsert itself (ensureStarterIncubator's own write path),
+// which does. A test that needs a seeded incubator to be the SAME row
+// ensureStarterIncubator later resolves should call ensureStarterIncubator
+// directly instead of seeding one by hand.
+export function seedIncubator(row: { id?: string; playerId: string; incubatorTypeId: string; permanentSlot?: number | null }) {
   const id = row.id ?? nextId("incubator");
-  const full: PlayerIncubatorRow = { id, playerId: row.playerId, incubatorTypeId: row.incubatorTypeId, createdAt: new Date() };
+  const full: PlayerIncubatorRow = {
+    id,
+    playerId: row.playerId,
+    incubatorTypeId: row.incubatorTypeId,
+    permanentSlot: row.permanentSlot ?? null,
+    createdAt: new Date(),
+  };
   incubators.set(id, full);
   return full;
 }
@@ -763,27 +805,62 @@ const client = {
       ownedEggs.delete(where.id);
       return { ...row };
     },
+    // INVENTORY SELL — sell-egg.service.ts's own guarded delete: the
+    // `activeIncubation: null` relation filter is resolved by hand, same
+    // reasoning findMany's own doc comment above already gives (the
+    // generic `matches()` helper only understands flat field equality,
+    // never a relation).
+    async deleteMany({ where }: { where: { id?: string; playerId?: string; activeIncubation?: null } }) {
+      let count = 0;
+      for (const [id, row] of ownedEggs) {
+        if (where.id !== undefined && row.id !== where.id) continue;
+        if (where.playerId !== undefined && row.playerId !== where.playerId) continue;
+        if (where.activeIncubation === null && eggIncubations.has(row.id)) continue;
+        ownedEggs.delete(id);
+        count += 1;
+      }
+      return { count };
+    },
   },
   playerIncubator: {
     // Mirrors playerInventoryItem's own upsert shape exactly — create on
     // first access, a no-op update on every call after, the same
-    // idempotent "at most one row per key" guarantee
-    // ensureStandardIncubator (incubator.service.ts) relies on.
+    // idempotent "at most one row per key" guarantee ensureStarterIncubator
+    // (incubator.service.ts) relies on. Only ever called for the permanent
+    // starter slot (permanentSlot: 1) — consumable instances are always
+    // created via the plain `create` below instead.
     async upsert({
       where,
       create,
     }: {
-      where: { playerId_incubatorTypeId: { playerId: string; incubatorTypeId: string } };
-      create: { playerId: string; incubatorTypeId: string };
+      where: { playerId_permanentSlot: { playerId: string; permanentSlot: number } };
+      create: { playerId: string; incubatorTypeId: string; permanentSlot: number };
       update: Record<string, unknown>;
     }) {
-      const key = incubatorKey(where.playerId_incubatorTypeId.playerId, where.playerId_incubatorTypeId.incubatorTypeId);
+      const key = incubatorKey(where.playerId_permanentSlot.playerId, where.playerId_permanentSlot.permanentSlot);
       const existing = incubators.get(key);
       if (existing) return { ...existing };
 
       const id = nextId("incubator");
       const full: PlayerIncubatorRow = { id, createdAt: new Date(), ...create };
       incubators.set(key, full);
+      return { ...full };
+    },
+    // INCUBATOR EXPANSION — grantIncubator's (incubator.service.ts) own
+    // write path: always a brand-new, independent consumable instance
+    // (permanentSlot: null), never keyed/deduplicated against anything —
+    // calling this twice for the same player+type yields two separate rows,
+    // matching the real Prisma `create` this mirrors exactly.
+    async create({ data }: { data: { playerId: string; incubatorTypeId: string; permanentSlot: number | null } }) {
+      const id = nextId("incubator");
+      const full: PlayerIncubatorRow = {
+        id,
+        playerId: data.playerId,
+        incubatorTypeId: data.incubatorTypeId,
+        permanentSlot: data.permanentSlot,
+        createdAt: new Date(),
+      };
+      incubators.set(id, full);
       return { ...full };
     },
     async findUnique({ where }: { where: { id: string } }) {
@@ -799,6 +876,44 @@ const client = {
     }) {
       const rows = [...incubators.values()].filter((row) => matches(row, where));
       return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    // INVENTORY SELL — sell-incubator.service.ts's own candidate lookup:
+    // the `activeIncubation: null` relation filter is stripped out and
+    // resolved by hand (same reasoning findMany's sibling models already
+    // give — `matches()` only understands flat field equality), the
+    // remaining flat fields (playerId/incubatorTypeId/permanentSlot) go
+    // through the normal `matches()` helper.
+    async findFirst({ where }: { where: Record<string, unknown> }) {
+      const { activeIncubation, ...flatWhere } = where;
+      const rows = [...incubators.values()].filter((row) => matches(row, flatWhere));
+      const filtered = activeIncubation === null ? rows.filter((row) => !incubatorHasActiveIncubation(row.id)) : rows;
+      return filtered[0] ? { ...filtered[0] } : null;
+    },
+    // INCUBATOR EXPANSION — hatch.service.ts's own consume-on-hatch step: a
+    // single-use incubator is removed entirely the instant a hatch it held
+    // succeeds (the permanent starter incubator is never passed here — see
+    // hatchIncubation's own isIncubatorPermanent guard).
+    async delete({ where }: { where: { id: string } }) {
+      const entry = [...incubators.entries()].find(([, candidate]) => candidate.id === where.id);
+      if (!entry) throw new Error(`fake prisma: playerIncubator ${where.id} not found for delete`);
+      incubators.delete(entry[0]);
+      return { ...entry[1] };
+    },
+    // INVENTORY SELL — sell-incubator.service.ts's own guarded delete: same
+    // by-hand `activeIncubation: null` relation handling as findFirst
+    // above. The exact-id + permanentSlot: null + activeIncubation: null
+    // WHERE is what makes this safe under a race (a concurrent sell or a
+    // just-started incubation for this same candidate finds zero rows).
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      const { activeIncubation, ...flatWhere } = where;
+      let count = 0;
+      for (const [key, row] of incubators) {
+        if (!matches(row, flatWhere)) continue;
+        if (activeIncubation === null && incubatorHasActiveIncubation(row.id)) continue;
+        incubators.delete(key);
+        count += 1;
+      }
+      return { count };
     },
   },
   playerEggIncubation: {

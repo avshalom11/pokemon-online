@@ -65,6 +65,35 @@ test("a different player level produces levels from that level's own bracket, no
   }
 });
 
+// MAP — SELECTABLE WILD LEVEL RANGE
+test("an explicit selectedWildLevelRange override is used in place of the player-level-derived bracket, but never bypasses evolution-stage eligibility", () => {
+  // A deliberately low override range, independent of TEST_PLAYER_LEVEL's
+  // own bracket (see getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL) in
+  // the tests above) — proves the override, not the player level, drives
+  // the roll whenever it's provided.
+  const override = { minimumLevel: 2, maximumLevel: 4 };
+
+  for (let i = 0; i < 200; i++) {
+    const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL, override);
+    assert.ok(
+      result.level >= override.minimumLevel && result.level <= override.maximumLevel,
+      `level ${result.level} outside the explicit override range [${override.minimumLevel}, ${override.maximumLevel}]`
+    );
+    // The final level must still respect this species' own evolution-stage
+    // eligibility at the override range — never a species illegal there.
+    assert.ok(isSpeciesEligibleForWildRange(result.pokemon.id, override));
+  }
+});
+
+test("omitting selectedWildLevelRange keeps the exact same behavior as before this feature existed", () => {
+  const { minimumLevel, maximumLevel } = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
+
+  for (let i = 0; i < 100; i++) {
+    const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
+    assert.ok(result.level >= minimumLevel && result.level <= maximumLevel);
+  }
+});
+
 test("Stage 1 reads probabilities from data/encounter/rarity-config.ts, never a literal object defined inline", () => {
   const engineSource = readFileSync(new URL("./pokemon-encounter-engine.ts", import.meta.url), "utf8");
   assert.ok(

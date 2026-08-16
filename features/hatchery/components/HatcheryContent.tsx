@@ -8,6 +8,7 @@ import { startIncubationAction } from "@/features/hatchery/actions/start-incubat
 import { HatchResultDialog } from "@/features/hatchery/components/HatchResultDialog";
 import { HatcheryEggCard } from "@/features/hatchery/components/HatcheryEggCard";
 import { HatcheryIncubatorPanel } from "@/features/hatchery/components/HatcheryIncubatorPanel";
+import { IncubatorPickerDialog } from "@/features/hatchery/components/IncubatorPickerDialog";
 import type { HatcheryViewData } from "@/features/hatchery/services/hatchery-view.service";
 import type { HatchOutcome } from "@/features/eggs/services/hatch.service";
 
@@ -33,24 +34,44 @@ const HATCH_ERROR_MESSAGES: Record<string, string> = {
 // Page composition root for /hatchery — same shell convention (gradient
 // background, radial overlay, BackButton, centered max-width column)
 // ShopContent/PokemonCenterContent already establish. Owns only UI-state
-// (which action is pending, the latest error message, and the hatch-result
-// dialog); every real mutation is server-side through the existing EGGS
-// PHASE 1-4 services via the two Hatchery actions. Local `data` state is
-// updated directly from each action's own returned result (never
-// router.refresh()) — the same convention every other *Content.tsx in this
-// project already follows; revalidatePath (inside the actions) keeps the
-// next full navigation fresh independently.
+// (which action is pending, the latest error message, the hatch-result
+// dialog, and — INCUBATOR EXPANSION — which egg is currently awaiting an
+// incubator choice); every real mutation is server-side through the
+// existing eggs/incubator services via the two Hatchery actions. Local
+// `data` state is updated directly from each action's own returned result
+// (never router.refresh()) — the same convention every other *Content.tsx
+// in this project already follows; revalidatePath (inside the actions)
+// keeps the next full navigation fresh independently.
 export function HatcheryContent({ initialData }: HatcheryContentProps) {
   const [data, setData] = useState(initialData);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hatchResult, setHatchResult] = useState<HatchOutcome | null>(null);
+  // INCUBATOR EXPANSION — the egg awaiting an explicit incubator choice
+  // (opened by HatcheryEggCard's own button, resolved by
+  // IncubatorPickerDialog). null means no picker is open.
+  const [pickerEggId, setPickerEggId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handlePlaceInIncubator(ownedEggId: string) {
+  const emptyIncubators = data.incubators.filter((incubator) => !incubator.activeIncubation);
+  const hasEmptyIncubator = emptyIncubators.length > 0;
+
+  function handleOpenPicker(ownedEggId: string) {
+    setErrorMessage(null);
+    setPickerEggId(ownedEggId);
+  }
+
+  function handleCancelPicker() {
+    setPickerEggId(null);
+  }
+
+  function handleSelectIncubator(incubatorId: string) {
+    const ownedEggId = pickerEggId;
+    if (!ownedEggId) return;
+
     setErrorMessage(null);
 
     startTransition(async () => {
-      const result = await startIncubationAction(ownedEggId);
+      const result = await startIncubationAction(ownedEggId, incubatorId);
 
       if (result.status === "started") {
         const egg = data.availableEggs.find((candidate) => candidate.id === ownedEggId);
@@ -59,18 +80,27 @@ export function HatcheryContent({ initialData }: HatcheryContentProps) {
         setData((current) => ({
           ...current,
           availableEggs: current.availableEggs.filter((candidate) => candidate.id !== ownedEggId),
-          activeIncubation: {
-            incubationId: result.incubation.ownedEggId,
-            battleProgress: result.incubation.battleProgress,
-            requiredBattleTarget: result.incubation.requiredBattleTarget,
-            isReady: result.incubation.battleProgress >= result.incubation.requiredBattleTarget,
-            egg,
-          },
+          incubators: current.incubators.map((incubator) =>
+            incubator.id === incubatorId
+              ? {
+                  ...incubator,
+                  activeIncubation: {
+                    incubationId: result.incubation.ownedEggId,
+                    battleProgress: result.incubation.battleProgress,
+                    requiredBattleTarget: result.incubation.requiredBattleTarget,
+                    isReady: result.incubation.battleProgress >= result.incubation.requiredBattleTarget,
+                    egg,
+                  },
+                }
+              : incubator
+          ),
         }));
+        setPickerEggId(null);
         return;
       }
 
       setErrorMessage(START_ERROR_MESSAGES[result.status] ?? START_ERROR_MESSAGES.error);
+      setPickerEggId(null);
     });
   }
 
@@ -81,10 +111,18 @@ export function HatcheryContent({ initialData }: HatcheryContentProps) {
       const result = await hatchIncubationAction(incubationId);
 
       if (result.status === "hatched") {
-        // The incubator is empty again immediately — the server already
-        // consumed the egg/incubation in the same transaction that created
-        // the Pokémon (EGGS PHASE 4's own hatchIncubation).
-        setData((current) => ({ ...current, activeIncubation: null }));
+        // The incubator is free (or gone) again immediately — the server
+        // already consumed the egg/incubation, and the incubator itself if
+        // it was single-use, in the same transaction that created the
+        // Pokémon (hatchIncubation's own incubatorConsumed flag).
+        setData((current) => ({
+          ...current,
+          incubators: result.incubatorConsumed
+            ? current.incubators.filter((incubator) => incubator.id !== result.incubatorId)
+            : current.incubators.map((incubator) =>
+                incubator.id === result.incubatorId ? { ...incubator, activeIncubation: null } : incubator
+              ),
+        }));
         setHatchResult(result.result);
         return;
       }
@@ -111,12 +149,7 @@ export function HatcheryContent({ initialData }: HatcheryContentProps) {
 
         <h1 className="text-lg font-bold text-slate-100">מדגרה</h1>
 
-        <HatcheryIncubatorPanel
-          incubatorDisplayName={data.incubatorDisplayName}
-          activeIncubation={data.activeIncubation}
-          isPending={isPending}
-          onHatch={handleHatch}
-        />
+        <HatcheryIncubatorPanel incubators={data.incubators} isPending={isPending} onHatch={handleHatch} />
 
         {errorMessage ? (
           <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-400">
@@ -129,9 +162,9 @@ export function HatcheryContent({ initialData }: HatcheryContentProps) {
 
           {data.availableEggs.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-white/10 bg-slate-900/30 p-6 text-center text-sm text-slate-500">
-              {data.activeIncubation
-                ? "כל הביצים שלך נמצאות כרגע בדגירה."
-                : "עדיין אין לך ביצים. נצח בקרבות שדה כדי לקבל ביצים."}
+              {hasEmptyIncubator
+                ? "עדיין אין לך ביצים. נצח בקרבות שדה כדי לקבל ביצים."
+                : "כל האינקובטורים שלך תפוסים כרגע."}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -139,14 +172,23 @@ export function HatcheryContent({ initialData }: HatcheryContentProps) {
                 <HatcheryEggCard
                   key={egg.id}
                   egg={egg}
-                  disabled={isPending || Boolean(data.activeIncubation)}
-                  onPlaceInIncubator={handlePlaceInIncubator}
+                  disabled={isPending || !hasEmptyIncubator}
+                  onPlaceInIncubator={handleOpenPicker}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {pickerEggId ? (
+        <IncubatorPickerDialog
+          emptyIncubators={emptyIncubators}
+          onSelect={handleSelectIncubator}
+          onCancel={handleCancelPicker}
+          disabled={isPending}
+        />
+      ) : null}
 
       {hatchResult ? <HatchResultDialog result={hatchResult} onClose={() => setHatchResult(null)} /> : null}
     </div>

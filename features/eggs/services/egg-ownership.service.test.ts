@@ -74,7 +74,7 @@ test("listOwnedEggs only returns this player's own eggs", async () => {
 
 test("an egg with an active incubation is excluded from listOwnedEggs — no longer available as an unassigned egg", async () => {
   const egg = seedOwnedEgg({ playerId: "owner-1", rarity: "common", regionId: "kanto" });
-  const incubator = seedIncubator({ playerId: "owner-1", incubatorTypeId: "standard" });
+  const incubator = seedIncubator({ playerId: "owner-1", incubatorTypeId: "regular", permanentSlot: 1 });
   await prisma.playerEggIncubation.create({
     data: { ownedEggId: egg.id, incubatorId: incubator.id, requiredBattleTarget: 400 },
   });

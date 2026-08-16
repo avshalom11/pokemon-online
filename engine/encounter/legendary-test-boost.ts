@@ -196,14 +196,24 @@ function buildEncounterResult(zoneId: ZoneId, candidate: WeightedCandidate): Enc
 // directly. `regionId` is threaded straight through to both paths (Phase 4)
 // — the dev-only boost must resolve the exact same region+zone pool the
 // real engine would have.
-export function resolveWildEncounter(regionId: RegionId, zoneId: ZoneId, playerLevel: number): EncounterResult {
+export function resolveWildEncounter(
+  regionId: RegionId,
+  zoneId: ZoneId,
+  playerLevel: number,
+  // MAP — SELECTABLE WILD LEVEL RANGE — same optional override
+  // pokemon-encounter-engine.ts's own startPokemonEncounter accepts,
+  // threaded straight through to both this dev-only boosted path AND the
+  // real engine fallback below, so a player's selected bracket applies
+  // identically whether or not the dev flag happens to be on.
+  selectedWildLevelRange?: WildLevelRange
+): EncounterResult {
   if (isLegendaryEncounterTestModeEnabled()) {
-    const playerRange = getWildLevelRangeForPlayerLevel(playerLevel);
+    const playerRange = selectedWildLevelRange ?? getWildLevelRangeForPlayerLevel(playerLevel);
     const candidates = buildBoostedCandidates(regionId, zoneId, playerRange);
     if (candidates) {
       return buildEncounterResult(zoneId, pickWeighted(candidates));
     }
   }
 
-  return startPokemonEncounter(regionId, zoneId, playerLevel);
+  return startPokemonEncounter(regionId, zoneId, playerLevel, selectedWildLevelRange);
 }
