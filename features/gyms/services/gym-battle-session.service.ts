@@ -3,6 +3,7 @@ import "server-only";
 import { calculatePokemonStats } from "@/engine/battle/pokemon-stat-calculations";
 import type { MajorStatus } from "@/features/battle/status/major-status";
 import type { VolatileState } from "@/features/battle/volatile/volatile-condition.types";
+import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { getAllOwnedPokemon, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getPlayerLevel } from "@/features/player-progression/progression-service";
@@ -61,7 +62,13 @@ export type StartNpcBattleResult =
   // within-region order".
   | { status: "locked-previous-region" }
   | { status: "invalid-target" }
-  | { status: "no-usable-party" };
+  | { status: "no-usable-party" }
+  // PRE-BATTLE PARTY SELECTION (later task, section 6) — `selectedPlayerPokemonIds`
+  // failed validation: not a subset of the player's own current party, a
+  // duplicate id, a fainted (currentHp <= 0) Pokémon, or a count other than
+  // the required selection size for this battle format (see
+  // requiredSelectionCount below).
+  | { status: "invalid-selection" };
 
 function parseJsonRecord<T>(value: Prisma.JsonValue, fallback: T): T {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
@@ -107,37 +114,33 @@ function sameTarget(session: NpcBattleSession, target: StartNpcBattleTarget): bo
   return true;
 }
 
-// Starts (or resumes) an NPC battle attempt for `target`, after validating
-// every server-side rule from this Phase's spec, in the exact order Phase
-// 4's section 4 lists: (1) player level >= MIN_GYM_PLAYER_LEVEL, (2) this
-// region's Gym sequence gate, (3) the existing Phase 1 Gym/battle-slot
-// unlock rule, (4) not already completed. Never trusts a client's own
-// belief about any of these — every check re-derives from the DB.
-export async function startNpcBattle(playerId: string, target: StartNpcBattleTarget, randomSource?: () => number): Promise<StartNpcBattleResult> {
+type TargetValidationResult =
+  | { status: "ok"; playerLevel: number; fixedTeam: readonly { speciesId: string }[] }
+  | { status: "invalid-target" | "locked-level" | "locked-previous-region" | "locked" | "already-completed" };
+
+// PRE-BATTLE PARTY SELECTION (later task) — every level/sequence/unlock/
+// already-completed rule from Phase 4's section 4, extracted so BOTH
+// startNpcBattle (which also creates the session) and the new read-only
+// getGymBattlePartyOptions (the selection screen's own data source, which
+// must show the exact same lock reasons without ever creating anything) go
+// through the identical checks, in the identical order — never two
+// slightly different copies of "is this Gym/Champion actually available".
+async function validateNpcBattleTarget(playerId: string, target: StartNpcBattleTarget): Promise<TargetValidationResult> {
   const fixedTeam = fixedTeamFor(target);
   if (!fixedTeam || fixedTeam.length === 0) {
     return { status: "invalid-target" };
   }
 
-  // GYMS & LEAGUES PHASE 4, section 1 — the global minimum-level gate.
-  // Applies uniformly to every Gym battle slot AND every Regional Champion,
-  // checked before any other rule. Fetched once and reused below (NPC-team
-  // level resolution) rather than a second query later.
   const playerLevel = await getPlayerLevel(playerId);
   if (playerLevel < MIN_GYM_PLAYER_LEVEL) {
     return { status: "locked-level" };
   }
 
-  // GYMS & LEAGUES PHASE 4, section 2 — sequential Region Gym progression.
-  // A no-op (always true) for Kanto and for any region whose previous
-  // region's Regional Champion is already defeated.
   const regionSequenceUnlocked = await isRegionGymSequenceUnlocked(playerId, target.regionId);
   if (!regionSequenceUnlocked) {
     return { status: "locked-previous-region" };
   }
 
-  // Unlock check — Gym order (1 -> 2 -> 3, Easy -> Medium -> Leader) or
-  // "all 3 Badges earned" for a Regional Champion.
   const unlocked =
     target.source === "regional-champion"
       ? await isRegionalChampionUnlocked(playerId, target.regionId)
@@ -146,8 +149,6 @@ export async function startNpcBattle(playerId: string, target: StartNpcBattleTar
     return { status: "locked" };
   }
 
-  // Already-completed check — permanent, no replay, regardless of any
-  // other state (approved design, section 4/5).
   const alreadyCompleted =
     target.source === "regional-champion"
       ? await isRegionalChampionDefeated(playerId, target.regionId)
@@ -155,6 +156,102 @@ export async function startNpcBattle(playerId: string, target: StartNpcBattleTar
   if (alreadyCompleted) {
     return { status: "already-completed" };
   }
+
+  return { status: "ok", playerLevel, fixedTeam };
+}
+
+export interface GymPartySelectionOption {
+  readonly id: string;
+  readonly speciesId: string;
+  readonly name: string;
+  readonly level: number;
+  readonly frontSpriteUrl: string;
+  readonly currentHp: number;
+  readonly maxHp: number;
+  readonly fainted: boolean;
+}
+
+export type GymPartySelectionResult =
+  | { status: "ok"; requiredCount: number; maxCount: number; options: readonly GymPartySelectionOption[]; resuming: boolean }
+  | { status: Exclude<StartNpcBattleResult["status"], "started" | "resumed" | "invalid-selection"> };
+
+// PRE-BATTLE PARTY SELECTION (later task, section 6/7) — the selection
+// screen's own read-only data source: every lock/already-completed rule
+// startNpcBattle itself enforces (via validateNpcBattleTarget, unmodified),
+// plus the player's own CURRENT party with its REAL currentHp/maxHp (never
+// battle-local — there is no battle yet), so the player can see exactly
+// which Pokémon are healthy/injured/fainted before choosing. Creates
+// nothing; a resumed in-progress session is reported via `resuming` so the
+// UI can skip straight to it instead of asking the player to re-select.
+export async function getGymBattlePartyOptions(playerId: string, target: StartNpcBattleTarget): Promise<GymPartySelectionResult> {
+  const validation = await validateNpcBattleTarget(playerId, target);
+  if (validation.status !== "ok") return { status: validation.status };
+
+  const existing = await prisma.npcBattleSession.findUnique({ where: { playerId } });
+  if (existing && !sameTarget(existing, target)) {
+    return { status: "in-progress-elsewhere" };
+  }
+
+  const { format } = battleFormatFor(target);
+  const party = await getPlayerParty(playerId);
+  const aliveParty = party.filter((pokemon) => pokemon.currentHp > 0);
+  const requiredCount = requiredSelectionCount(format.maxPlayerPokemon, aliveParty.length);
+
+  return {
+    status: "ok",
+    requiredCount,
+    maxCount: format.maxPlayerPokemon,
+    resuming: existing !== null,
+    options: party.map((pokemon) => ({
+      id: pokemon.id,
+      speciesId: pokemon.species.id,
+      name: pokemon.nickname ?? pokemon.species.name,
+      level: pokemon.level,
+      frontSpriteUrl: getFrontSpritePath(pokemon.species),
+      currentHp: pokemon.currentHp,
+      maxHp: pokemon.maxHp,
+      fainted: pokemon.currentHp <= 0,
+    })),
+  };
+}
+
+// If the player's own current party has fewer than `formatMax` Pokémon
+// still standing, the existing architecture already allows an undersized
+// team (startNpcBattle's own long-standing "no-usable-party only if truly
+// zero" rule) — never invent Pokémon to fill the gap. The required
+// selection count is therefore whichever is smaller.
+function requiredSelectionCount(formatMax: number, aliveCount: number): number {
+  return Math.min(formatMax, aliveCount);
+}
+
+// Starts (or resumes) an NPC battle attempt for `target`, after validating
+// every server-side rule from this Phase's spec, in the exact order Phase
+// 4's section 4 lists: (1) player level >= MIN_GYM_PLAYER_LEVEL, (2) this
+// region's Gym sequence gate, (3) the existing Phase 1 Gym/battle-slot
+// unlock rule, (4) not already completed. Never trusts a client's own
+// belief about any of these — every check re-derives from the DB.
+//
+// PRE-BATTLE PARTY SELECTION + HP PERSISTENCE (later task, sections 6/8) —
+// `selectedPlayerPokemonIds` is now REQUIRED and is exactly what
+// participates, never an auto-sliced first-N; every id must belong to the
+// player's own current party, be alive, appear at most once, and the count
+// must match requiredSelectionCount's own rule. The OLD "battle participants
+// always start at full HP" rule is explicitly gone: playerBattleHp is
+// seeded from each selected Pokémon's REAL, CURRENT PlayerPokemon.currentHp
+// (and playerBattleStatus from its real status/statusTurnsRemaining) — a
+// damaged or statused Pokémon enters the Gym battle exactly as damaged/
+// statused as it already was. Resuming an existing in-progress attempt
+// (`sameTarget`) never re-validates or re-applies a selection — the
+// original one, frozen at that attempt's own start, still stands.
+export async function startNpcBattle(
+  playerId: string,
+  target: StartNpcBattleTarget,
+  selectedPlayerPokemonIds: readonly string[],
+  randomSource?: () => number
+): Promise<StartNpcBattleResult> {
+  const validation = await validateNpcBattleTarget(playerId, target);
+  if (validation.status !== "ok") return { status: validation.status };
+  const { playerLevel, fixedTeam } = validation;
 
   const existing = await prisma.npcBattleSession.findUnique({ where: { playerId } });
   if (existing) {
@@ -166,24 +263,42 @@ export async function startNpcBattle(playerId: string, target: StartNpcBattleTar
 
   const { format, difficulty } = battleFormatFor(target);
 
-  // PLAYER PARTY LIMIT (section 5) — the player's CURRENT party, first N
-  // valid slots per this format's own max, in existing party-slot order.
-  // Never mutates the real party; never invents a separate Gym-party
-  // storage system — this is only ever a read-only snapshot of ids.
+  // PLAYER PARTY SELECTION VALIDATION (section 6) — every selected id must
+  // belong to the player's own CURRENT party, be alive right now, and never
+  // repeat; the exact count is re-derived server-side from the same rule
+  // the selection screen itself used to show it, never trusted from the
+  // client's own count.
   const party = await getPlayerParty(playerId);
-  const participants = party.slice(0, format.maxPlayerPokemon);
-  if (participants.length === 0) {
-    return { status: "no-usable-party" };
+  const partyById = new Map(party.map((pokemon) => [pokemon.id, pokemon]));
+  const aliveParty = party.filter((pokemon) => pokemon.currentHp > 0);
+  const requiredCount = requiredSelectionCount(format.maxPlayerPokemon, aliveParty.length);
+
+  const uniqueSelectedIds = new Set(selectedPlayerPokemonIds);
+  if (uniqueSelectedIds.size !== selectedPlayerPokemonIds.length) {
+    return { status: "invalid-selection" };
+  }
+  if (requiredCount === 0 || uniqueSelectedIds.size !== requiredCount) {
+    return requiredCount === 0 ? { status: "no-usable-party" } : { status: "invalid-selection" };
   }
 
-  // FULL HP AT START (section 6) — battle-local only, see this model's own
-  // doc comment (prisma/schema.prisma): PlayerPokemon.currentHp is never
-  // read or written here, so a fainted/damaged real Pokémon can still
-  // enter this battle at full strength without that ever "healing" it in
-  // the outside world.
+  const participants = [];
+  for (const id of selectedPlayerPokemonIds) {
+    const pokemon = partyById.get(id);
+    if (!pokemon || pokemon.currentHp <= 0) {
+      return { status: "invalid-selection" };
+    }
+    participants.push(pokemon);
+  }
+
+  // HP PERSISTENCE — REMOVES THE OLD "FULL HP AT START" RULE (later task,
+  // section 8, explicitly overriding Phase 3/4's original battle-local-only
+  // design). Seeded from each participant's REAL currentHp/status right
+  // now — never recalculated max HP, never a fresh, unstatused Pokémon.
   const playerBattleHp: Record<string, number> = {};
+  const playerBattleStatus: Record<string, { status: string | null; turnsRemaining: number | null }> = {};
   for (const pokemon of participants) {
-    playerBattleHp[pokemon.id] = calculatePokemonStats({ baseStats: pokemon.species.baseStats, level: pokemon.level }).maxHp;
+    playerBattleHp[pokemon.id] = pokemon.currentHp;
+    playerBattleStatus[pokemon.id] = { status: pokemon.status ?? null, turnsRemaining: pokemon.statusTurnsRemaining ?? null };
   }
 
   // FIXED NPC TEAM LOADING (section 7) — Phase 2's own fixed species,
@@ -221,7 +336,7 @@ export async function startNpcBattle(playerId: string, target: StartNpcBattleTar
       playerPokemonIds: participants.map((p) => p.id) as unknown as Prisma.InputJsonValue,
       activePlayerPokemonId: participants[0].id,
       playerBattleHp: playerBattleHp as unknown as Prisma.InputJsonValue,
-      playerBattleStatus: {},
+      playerBattleStatus: playerBattleStatus as unknown as Prisma.InputJsonValue,
       playerStatStages: {},
       playerVolatileState: {},
     },
@@ -230,11 +345,88 @@ export async function startNpcBattle(playerId: string, target: StartNpcBattleTar
   return { status: "started", session };
 }
 
+// HP PERSISTENCE (later task, section 9) — the ONE place a Gym battle's
+// battle-local player HP/status is written back to the REAL, permanent
+// PlayerPokemon row. Called by every action that changes a participant's
+// battle-local HP/status (a normal turn, a Bag item, the final state at
+// victory/loss) — never by switching (no HP change) and never by abandon
+// (deliberately no-op: an abandoned attempt's damage already persisted
+// incrementally on whichever earlier turn caused it, and abandon itself
+// must not additionally touch HP). Always takes an existing transaction
+// client so this write is atomic with whatever else that same action does
+// (session update, completion, reward). Only ever targets the ONE
+// participant that actually changed — every other party/storage Pokémon is
+// untouched by construction (this function never even sees their ids).
+export async function syncParticipantToRealPokemon(
+  tx: Prisma.TransactionClient,
+  playerPokemonId: string,
+  update: { currentHp: number; status: string | null; statusTurnsRemaining: number | null }
+): Promise<void> {
+  await tx.playerPokemon.update({
+    where: { id: playerPokemonId },
+    data: { currentHp: Math.max(0, update.currentHp), status: update.status, statusTurnsRemaining: update.statusTurnsRemaining },
+  });
+}
+
 export async function getNpcBattleSession(playerId: string): Promise<NpcBattleSession | null> {
   return prisma.npcBattleSession.findUnique({ where: { playerId } });
 }
 
-export type SwitchNpcBattleActivePokemonResult = { status: "ok" } | { status: "not-owned" } | { status: "no-session" };
+// TURN SAFETY / RACE GUARD (GYM BATTLE POLISH task, section 2) — a small
+// internal sentinel thrown from inside a `$transaction` callback when a
+// guarded write's CAS check (guardedSessionUpdate/guardedSessionDelete
+// below) finds the session has already been mutated by some OTHER action
+// since the caller's own pre-transaction read. Thrown only inside a
+// transaction, which rolls the whole thing back (Prisma's own behavior on
+// a thrown error) — a caller that got this far already computed its result
+// (turn resolution, heal amount, switch target) off what turned out to be
+// a stale snapshot, so nothing that action did may be written. Every public
+// action below catches this and converts it to its own "stale-action"
+// result rather than letting it escape as a raw exception.
+export class StaleNpcBattleSessionError extends Error {}
+
+// The ONE guarded write every session-mutating action's FIRST write must
+// go through. Folds the CAS check into the SAME query that would run
+// anyway (never a separate check-then-write, which would just move the
+// race rather than closing it) by adding `updatedAt: expectedUpdatedAt` to
+// the `where` — NpcBattleSession's own Prisma `@updatedAt` column, bumped
+// on every write, doubling as a version token with zero schema change.
+// `expectedUpdatedAt` must always be the value read by the caller BEFORE
+// its own transaction started. A second/later write by the SAME action,
+// inside the SAME already-guarded transaction, never needs to re-guard —
+// nothing else can have interleaved once inside it.
+export async function guardedSessionUpdate(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  expectedUpdatedAt: Date,
+  data: Record<string, unknown>
+): Promise<void> {
+  const result = await tx.npcBattleSession.updateMany({ where: { playerId, updatedAt: expectedUpdatedAt }, data });
+  if (result.count === 0) throw new StaleNpcBattleSessionError();
+}
+
+export async function guardedSessionDelete(tx: Prisma.TransactionClient, playerId: string, expectedUpdatedAt: Date): Promise<void> {
+  const result = await tx.npcBattleSession.deleteMany({ where: { playerId, updatedAt: expectedUpdatedAt } });
+  if (result.count === 0) throw new StaleNpcBattleSessionError();
+}
+
+// BAG / VOLUNTARY SWITCH — PLAYER TURN ONLY (GYM BATTLE POLISH task,
+// section 2) — true exactly when the currently-active participant has
+// already fainted, i.e. the client's forced-replacement panel is the only
+// action that should be reachable right now. Read straight off the live
+// battle-local HP map, never a separate/duplicated flag, so it can never
+// drift from switchNpcBattleActivePokemon's/executeGymBattleAction's own
+// notion of "needs a replacement".
+export function isActiveParticipantFainted(session: NpcBattleSession): boolean {
+  const playerBattleHp = parseNpcBattleHpMap(session.playerBattleHp);
+  return (playerBattleHp[session.activePlayerPokemonId] ?? 0) <= 0;
+}
+
+export type SwitchNpcBattleActivePokemonResult =
+  | { status: "ok" }
+  | { status: "not-owned" }
+  | { status: "no-session" }
+  | { status: "stale-action" };
 
 // Switches the player's active participant within an in-progress NPC
 // battle — the "existing forced-replacement flow" this Phase's spec asks
@@ -249,8 +441,8 @@ export async function switchNpcBattleActivePokemon(playerId: string, playerPokem
   const participantIds = parseStringArray(session.playerPokemonIds);
   if (!participantIds.includes(playerPokemonId)) return { status: "not-owned" };
 
-  await prisma.npcBattleSession.updateMany({
-    where: { playerId },
+  const updated = await prisma.npcBattleSession.updateMany({
+    where: { playerId, updatedAt: session.updatedAt },
     data: {
       activePlayerPokemonId: playerPokemonId,
       // Same rule Field Battle's syncActivePokemon already follows: stat
@@ -261,6 +453,7 @@ export async function switchNpcBattleActivePokemon(playerId: string, playerPokem
       playerVolatileState: {},
     },
   });
+  if (updated.count === 0) return { status: "stale-action" };
 
   return { status: "ok" };
 }

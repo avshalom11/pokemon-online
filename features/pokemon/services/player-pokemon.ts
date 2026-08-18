@@ -39,6 +39,17 @@ function hydrateOwnedPokemon(row: PlayerPokemonModel): OwnedPokemon | null {
   };
 }
 
+// The "partySlot not null, ordered by slot, capped at MAX_ACTIVE_TEAM_SIZE"
+// shape every active-party query uses — a single source of truth reused by
+// both getPlayerParty (a standalone top-level query, `playerId` merged into
+// its own `where`) and a caller that needs the party fetched alongside OTHER
+// related data in ONE Prisma call (nested inside a `playerProfile.findUnique`'s
+// own `select`, where `playerId` is already implied by the relation — see
+// battle-session.service.ts's getActiveBattleSessionWithParty).
+const PARTY_SLOT_FILTER = { partySlot: { not: null } } as const;
+const PARTY_ORDER_AND_LIMIT = { orderBy: { partySlot: "asc" }, take: MAX_ACTIVE_TEAM_SIZE } as const;
+export const PLAYER_PARTY_QUERY_ARGS = { where: PARTY_SLOT_FILTER, ...PARTY_ORDER_AND_LIMIT } as const;
+
 // The player's real, persisted active party (PlayerPokemon.partySlot),
 // ordered by slot 1-6. Slot 1 is the battle starter — see
 // features/battle/services/battle-view.service.ts. `take` is a defensive
@@ -46,11 +57,18 @@ function hydrateOwnedPokemon(row: PlayerPokemonModel): OwnedPokemon | null {
 // than MAX_ACTIVE_TEAM_SIZE occupied slots impossible.
 export async function getPlayerParty(playerId: string): Promise<OwnedPokemon[]> {
   const rows = await prisma.playerPokemon.findMany({
-    where: { playerId, partySlot: { not: null } },
-    orderBy: { partySlot: "asc" },
-    take: MAX_ACTIVE_TEAM_SIZE,
+    where: { playerId, ...PARTY_SLOT_FILTER },
+    ...PARTY_ORDER_AND_LIMIT,
   });
 
+  return hydrateOwnedPokemonRows(rows);
+}
+
+// Row -> OwnedPokemon hydration for a caller that already fetched its own
+// PlayerPokemon rows (e.g. as a nested relation on a different top-level
+// query) rather than calling getPlayerParty itself — keeps hydrateOwnedPokemon's
+// per-row logic private to this file either way.
+export function hydrateOwnedPokemonRows(rows: PlayerPokemonModel[]): OwnedPokemon[] {
   return rows.flatMap((row) => hydrateOwnedPokemon(row) ?? []);
 }
 

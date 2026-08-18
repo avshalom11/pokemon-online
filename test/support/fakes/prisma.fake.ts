@@ -65,6 +65,11 @@ interface PlayerProfileRow {
   // selectedWildLevelBracketIndex (prisma/schema.prisma) — null means "no
   // bracket chosen yet", same default every real new profile row has.
   selectedWildLevelBracketIndex: number | null;
+  // PROFILE ACHIEVEMENTS (later task) — mirrors PlayerProfile.
+  // showGymAchievementsOnProfile's own @default(true); every existing test
+  // that never explicitly seeds this keeps behaving as if the setting is
+  // ON, same convention selectedWildLevelBracketIndex above established.
+  showGymAchievementsOnProfile: boolean;
 }
 
 interface DailyFieldBattleCountRow {
@@ -546,6 +551,7 @@ export function seedPlayerProfile(row: {
   gold?: number;
   regionId?: string;
   selectedWildLevelBracketIndex?: number | null;
+  showGymAchievementsOnProfile?: boolean;
 }) {
   const full: PlayerProfileRow = {
     id: row.id,
@@ -563,6 +569,9 @@ export function seedPlayerProfile(row: {
     // this keeps behaving exactly as it did before this feature (null ->
     // falls back to the highest unlocked bracket).
     selectedWildLevelBracketIndex: row.selectedWildLevelBracketIndex ?? null,
+    // Matches PlayerProfile.showGymAchievementsOnProfile's own
+    // @default(true).
+    showGymAchievementsOnProfile: row.showGymAchievementsOnProfile ?? true,
   };
   profiles.set(row.id, full);
   return full;
@@ -895,6 +904,41 @@ const client = {
       if (!row) throw new Error(`fake prisma: playerProfile ${where.id} not found`);
       return { ...row };
     },
+    // FIELD BATTLE PERFORMANCE — mirrors getActiveBattleSessionWithParty's
+    // (battle-session.service.ts) one-query read of PlayerProfile's own
+    // `fieldBattleSession`/`pokemon` relations, since the real Prisma schema
+    // has no separate normalized fake for relation traversal — this reads
+    // straight out of the same `sessions`/`pokemons` maps every other fake
+    // method here already uses, keyed by the profile's own id (== playerId
+    // throughout these tests, exactly like every other fake table).
+    async findUnique({
+      where,
+      select,
+    }: {
+      where: { id: string };
+      select?: {
+        fieldBattleSession?: boolean;
+        pokemon?: { where?: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc">; take?: number };
+      };
+    }) {
+      const row = profiles.get(where.id);
+      if (!row) return null;
+      if (!select) return { ...row };
+
+      const result: Record<string, unknown> = {};
+      if (select.fieldBattleSession) {
+        result.fieldBattleSession = sessions.get(where.id) ?? null;
+      }
+      if (select.pokemon) {
+        const pokemonArgs = select.pokemon;
+        const rows = [...pokemons.values()].filter(
+          (pokemon) => pokemon.playerId === where.id && matches(pokemon, pokemonArgs.where)
+        );
+        const sorted = applyOrderBy(rows, pokemonArgs.orderBy);
+        result.pokemon = (pokemonArgs.take ? sorted.slice(0, pokemonArgs.take) : sorted).map((r) => ({ ...r }));
+      }
+      return result;
+    },
     async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
       const row = profiles.get(where.id);
       if (!row) throw new Error(`fake prisma: playerProfile ${where.id} not found for update`);
@@ -1034,15 +1078,25 @@ const client = {
       const row = npcBattleSessions.get(where.playerId);
       return row ? { ...row } : null;
     },
-    async updateMany({ where, data }: { where: { playerId: string }; data: Record<string, unknown> }) {
+    // GYM BATTLE POLISH (later task) — `where` may now also carry an
+    // `updatedAt` CAS guard (see gym-battle-session.service.ts's
+    // guardedSessionUpdate/guardedSessionDelete): a full matches() check
+    // against the row, not just the playerId lookup, so a stale guard
+    // correctly reports count:0 instead of blindly mutating — the same
+    // "count is the fact" idiom every other guarded updateMany in this fake
+    // already uses (e.g. playerInventoryItem.updateMany's own
+    // quantity:{gte} guard).
+    async updateMany({ where, data }: { where: { playerId: string } & Record<string, unknown>; data: Record<string, unknown> }) {
       const row = npcBattleSessions.get(where.playerId);
-      if (!row) return { count: 0 };
+      if (!row || !matches(row, where)) return { count: 0 };
       Object.assign(row, data, { updatedAt: new Date() });
       return { count: 1 };
     },
-    async deleteMany({ where }: { where: { playerId: string } }) {
-      const existed = npcBattleSessions.delete(where.playerId);
-      return { count: existed ? 1 : 0 };
+    async deleteMany({ where }: { where: { playerId: string } & Record<string, unknown> }) {
+      const row = npcBattleSessions.get(where.playerId);
+      if (!row || !matches(row, where)) return { count: 0 };
+      npcBattleSessions.delete(where.playerId);
+      return { count: 1 };
     },
   },
   // GYMS & LEAGUES PHASE 1 fakes — same idempotent-upsert idiom as
@@ -1175,6 +1229,12 @@ const client = {
     async findUnique({ where }: { where: { playerId_regionId: { playerId: string; regionId: string } } }) {
       const row = regionalMedals.get(regionalChampionOrMedalKey(where.playerId_regionId.playerId, where.playerId_regionId.regionId));
       return row ? { ...row } : null;
+    },
+    // PROFILE ACHIEVEMENTS (later task) — mirrors playerGymBadge.findMany's
+    // own generic matches()-filtered listing, needed by
+    // getOwnedRegionalMedals (gym-progression.service.ts).
+    async findMany({ where }: { where: Record<string, unknown> }) {
+      return [...regionalMedals.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
     },
   },
   // GYMS & LEAGUES PHASE 5 fakes.

@@ -13,6 +13,11 @@
 // Pure sprite-flash animation — not a "reading" pause at all.
 export const HIT_FLASH_DURATION_MS = 400;
 
+// The universal player-attack lunge + sound (see battle-attack-effect.ts) —
+// deliberately short and non-blocking, same "cosmetic only" rule as every
+// other constant here. Target: ~250-350ms total felt time.
+export const ATTACK_EFFECT_DURATION_MS = 300;
+
 // How long the brief, non-blocking XP toast stays visible before
 // auto-dismissing on its own — no user interaction, never blocks input.
 export const XP_TOAST_DURATION_MS = 1800;

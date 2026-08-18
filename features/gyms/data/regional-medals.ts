@@ -1,4 +1,5 @@
 import type { RegionId } from "@/shared/types/region";
+import { getRegionalMedalImageUrl } from "./gym-badge-images";
 
 // GYMS & LEAGUES PHASE 1 — 9 Regional Medal definitions, one per region.
 // Same "progression achievement, not an inventory item" rules as Gym
@@ -12,11 +13,10 @@ export interface RegionalMedalDefinition {
   readonly id: string;
   readonly regionId: RegionId;
   readonly displayName: string;
-  // Deterministic, not-yet-populated artwork path — same /images/<category>/
-  // convention as gym-badges.ts's own imageUrl. Flat (one file per region,
-  // no per-region subfolder) since there is exactly one Medal per region —
-  // unlike Badges' 3-per-region grouping, nesting would add a directory
-  // with a single file in it for no benefit.
+  // GYM BADGES / MEDALS — SIMPLE NUMERIC IMAGE ARCHITECTURE (later task) —
+  // deterministically derived via getRegionalMedalImageUrl
+  // (gym-badge-images.ts, the one source of truth for this path), never
+  // computed/hardcoded a second time here.
   readonly imageUrl: string;
 }
 
@@ -28,7 +28,7 @@ function buildMedalDefinition(regionId: RegionId): RegionalMedalDefinition {
     id,
     regionId,
     displayName: `${displayRegionName} Regional Medal`,
-    imageUrl: `/images/gyms/medals/${id}.png`,
+    imageUrl: getRegionalMedalImageUrl(regionId),
   };
 }
 

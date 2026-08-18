@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { BackButton } from "@/components/layout/BackButton";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { getChestDefinition } from "@/features/chests/data/chest-definitions";
-import { startGymBattleAction } from "@/features/gyms/actions/gym-battle.actions";
+import { getGymBattlePartySelectionAction, startGymBattleAction } from "@/features/gyms/actions/gym-battle.actions";
 import {
   GYM_BATTLE_SLOT_LABELS_HE,
+  REGION_DISPLAY_NAMES_HE,
   gymBattleActionLabelHe,
   gymBattleFormatLabelHe,
   gymStartResultMessageHe,
@@ -16,46 +17,116 @@ import {
   regionGymLockMessageHe,
   regionStatusLabelHe,
 } from "@/features/gyms/data/gym-labels";
+import { getGymCharacterImageUrl, getRegionalChampionCharacterImageUrl } from "@/features/gyms/data/gym-trainer-images";
+import { getGymTrainerName } from "@/features/gyms/data/gym-trainer-names";
 import type { RegionGymOverviewView, RegionGymView } from "@/features/gyms/services/gym-overview-view.service";
-import type { StartNpcBattleTarget } from "@/features/gyms/services/gym-battle-session.service";
+import type { GymPartySelectionOption, StartNpcBattleTarget } from "@/features/gyms/services/gym-battle-session.service";
 import type { GymBattleSlotId } from "@/features/gyms/types/gym.types";
+import { GymIntroDialog } from "./GymIntroDialog";
+import { GymPartySelectionModal } from "./GymPartySelectionModal";
 
 interface GymsContentProps {
-  journey: RegionGymOverviewView[];
+  region: RegionGymOverviewView;
 }
 
-// GYMS & LEAGUES PHASE 4/9 — the /gyms page body: the player's whole
-// 9-region Gym journey, always shown in progression order (locked future
-// regions included, never hidden — section 7). Reuses the existing
-// region-card/accordion visual language WorldContent.tsx already
-// established for this app rather than inventing a new one. Starting a
-// battle here only ever calls startGymBattleAction (Phase 3's own
-// startNpcBattle, unmodified) and redirects to /gyms/battle — no NPC battle
-// logic is duplicated in this component. Every status/label/reward number
-// below reads straight off the server-built RegionGymOverviewView (Phase 4,
-// extended Phase 9 with regionStatus/pokemonType/hasActiveSession) — nothing
-// here re-derives an unlock rule or a reward amount itself.
-export function GymsContent({ journey }: GymsContentProps) {
+interface SelectionState {
+  readonly target: StartNpcBattleTarget;
+  readonly requiredCount: number;
+  readonly options: readonly GymPartySelectionOption[];
+  readonly errorMessage: string | null;
+}
+
+// GYM INTRO DIALOG — EASY TRAINER ONLY (later task, section 6) — only ever
+// set for an Easy-Trainer click (see handleGymStart below); Medium/Leader/
+// Champion always call openSelection directly and never touch this state.
+interface EasyIntroTarget {
+  readonly regionId: RegionGymOverviewView["regionId"];
+  readonly gymNumber: 1 | 2 | 3;
+}
+
+// GYMS & LEAGUES PHASE 4/9, REGION-SCOPED UI, PARTY SELECTION (later tasks)
+// — the /gyms page body: the player's own CURRENT region's Gym content only
+// — 3 Gyms + a Regional Champion, never the other 8 regions. "Start" now
+// opens the pre-battle party-selection modal FIRST (section 6/7) rather
+// than immediately creating a session — the actual session is only ever
+// created once the player explicitly confirms a valid selection
+// (startGymBattleAction, Phase 3's own startNpcBattle, unmodified beyond
+// requiring that selection). No NPC battle logic is duplicated here.
+export function GymsContent({ region }: GymsContentProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [expandedRegionId, setExpandedRegionId] = useState<string | null>(
-    journey.find((region) => region.regionUnlocked)?.regionId ?? journey[0]?.regionId ?? null
-  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selection, setSelection] = useState<SelectionState | null>(null);
+  const [easyIntroTarget, setEasyIntroTarget] = useState<EasyIntroTarget | null>(null);
 
-  function startBattle(target: StartNpcBattleTarget) {
+  // GYM INTRO DIALOG — EASY TRAINER ONLY (later task, section 5/6/8) — the
+  // ONE routing point that decides whether a battle-slot click needs the
+  // intro gate first. Medium/Leader/Champion (see their own onStart props
+  // below) call openSelection directly, unchanged from before this task —
+  // this function is never reached for them, so the intro dialog can only
+  // ever be reached via an Easy-Trainer click. Nothing here creates a
+  // session; that still only ever happens inside confirmSelection, exactly
+  // as before — this just adds one more explicit confirmation IN FRONT of
+  // the existing flow for Easy specifically.
+  function handleGymStart(regionId: RegionGymOverviewView["regionId"], gymNumber: 1 | 2 | 3, battleSlot: GymBattleSlotId) {
+    if (battleSlot === "easy") {
+      setEasyIntroTarget({ regionId, gymNumber });
+      return;
+    }
+    openSelection({ source: "gym", regionId, gymNumber, battleSlot });
+  }
+
+  function confirmEasyIntro() {
+    if (!easyIntroTarget) return;
+    const target: StartNpcBattleTarget = { source: "gym", regionId: easyIntroTarget.regionId, gymNumber: easyIntroTarget.gymNumber, battleSlot: "easy" };
+    setEasyIntroTarget(null);
+    openSelection(target);
+  }
+
+  function openSelection(target: StartNpcBattleTarget) {
     if (isPending) return;
     setErrorMessage(null);
 
     startTransition(async () => {
-      const result = await startGymBattleAction(target);
+      const result = await getGymBattlePartySelectionAction(target);
+
+      if (result.status !== "ok") {
+        setErrorMessage(gymStartResultMessageHe(result.status));
+        return;
+      }
+
+      // An in-progress attempt for this EXACT target already exists —
+      // selection was already locked in when it started; resume it
+      // directly, never re-ask (section 6's own "once battle starts,
+      // selection is fixed for that attempt").
+      if (result.resuming) {
+        router.push("/gyms/battle");
+        return;
+      }
+
+      setSelection({ target, requiredCount: result.requiredCount, options: result.options, errorMessage: null });
+    });
+  }
+
+  function confirmSelection(selectedIds: readonly string[]) {
+    if (!selection || isPending) return;
+
+    startTransition(async () => {
+      const result = await startGymBattleAction(selection.target, selectedIds);
       if (result.status === "started" || result.status === "resumed") {
         router.push("/gyms/battle");
         return;
       }
-      setErrorMessage(gymStartResultMessageHe(result.status));
+      setSelection({ ...selection, errorMessage: gymStartResultMessageHe(result.status) });
     });
   }
+
+  const lockMessage =
+    region.lockReason === "locked-level"
+      ? regionGymLockMessageHe("locked-level", region.regionId)
+      : region.lockReason === "locked-previous-region"
+        ? regionGymLockMessageHe("locked-previous-region", region.regionId, region.previousRegionId)
+        : null;
 
   return (
     <div dir="rtl" className="relative h-full w-full overflow-y-auto bg-gradient-to-b from-slate-950 via-indigo-950/40 to-slate-950">
@@ -63,8 +134,13 @@ export function GymsContent({ journey }: GymsContentProps) {
         <BackButton />
 
         <div>
-          <h1 className="text-lg font-bold text-slate-100">מכונים</h1>
-          <p className="mt-1 text-sm text-slate-400">מסע המכונים שלך — תשעה אזורים, שלושה מכונים ומנהל מחוז בכל אחד</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-100">מכוני {REGION_DISPLAY_NAMES_HE[region.regionId]}</h1>
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${REGION_STATUS_STYLE[region.regionStatus]}`}>
+              {regionStatusLabelHe(region.regionStatus)}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-slate-400">שלושה מכונים ומנהל מחוז — {region.englishName}</p>
         </div>
 
         {errorMessage ? (
@@ -73,22 +149,43 @@ export function GymsContent({ journey }: GymsContentProps) {
           </div>
         ) : null}
 
+        {lockMessage ? <p className="text-xs text-amber-300/80">{lockMessage}</p> : null}
+
         <div className="flex flex-col gap-3">
-          {journey.map((region) => (
-            <RegionSection
-              key={region.regionId}
-              region={region}
-              isExpanded={expandedRegionId === region.regionId}
+          {region.gyms.map((gym) => (
+            <GymRow
+              key={gym.gymId}
+              regionId={region.regionId}
+              gym={gym}
               isPending={isPending}
-              onToggle={() => setExpandedRegionId((current) => (current === region.regionId ? null : region.regionId))}
-              onStartGymBattle={(gymNumber, battleSlot) =>
-                startBattle({ source: "gym", regionId: region.regionId, gymNumber, battleSlot })
-              }
-              onStartChampionBattle={() => startBattle({ source: "regional-champion", regionId: region.regionId })}
+              onStart={(battleSlot) => handleGymStart(region.regionId, gym.gymNumber, battleSlot)}
             />
           ))}
+
+          <ChampionRow region={region} isPending={isPending} onStart={() => openSelection({ source: "regional-champion", regionId: region.regionId })} />
         </div>
       </div>
+
+      {easyIntroTarget ? (
+        <GymIntroDialog
+          trainerName={getGymTrainerName(easyIntroTarget.regionId, easyIntroTarget.gymNumber, "leader")}
+          characterImageUrl={getGymCharacterImageUrl(easyIntroTarget.regionId, easyIntroTarget.gymNumber)}
+          isPending={isPending}
+          onConfirm={confirmEasyIntro}
+          onCancel={() => setEasyIntroTarget(null)}
+        />
+      ) : null}
+
+      {selection ? (
+        <GymPartySelectionModal
+          options={selection.options}
+          requiredCount={selection.requiredCount}
+          isPending={isPending}
+          errorMessage={selection.errorMessage}
+          onConfirm={confirmSelection}
+          onCancel={() => setSelection(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -104,78 +201,28 @@ const REGION_STATUS_STYLE: Record<RegionGymOverviewView["regionStatus"], string>
   completed: "border-emerald-400/30 bg-emerald-950/30 text-emerald-300",
 };
 
-interface RegionSectionProps {
-  region: RegionGymOverviewView;
-  isExpanded: boolean;
-  isPending: boolean;
-  onToggle: () => void;
-  onStartGymBattle: (gymNumber: 1 | 2 | 3, battleSlot: GymBattleSlotId) => void;
-  onStartChampionBattle: () => void;
-}
-
-function RegionSection({ region, isExpanded, isPending, onToggle, onStartGymBattle, onStartChampionBattle }: RegionSectionProps) {
-  const lockMessage =
-    region.lockReason === "locked-level"
-      ? regionGymLockMessageHe("locked-level", region.regionId)
-      : region.lockReason === "locked-previous-region"
-        ? regionGymLockMessageHe("locked-previous-region", region.regionId, region.previousRegionId)
-        : null;
-
-  return (
-    <div className={`overflow-hidden rounded-xl border ${region.regionUnlocked ? "border-white/10 bg-slate-900/50" : "border-white/5 bg-slate-900/25"}`}>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isExpanded}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right"
-      >
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-semibold ${region.regionUnlocked ? "text-slate-100" : "text-slate-500"}`}>{region.englishName}</span>
-          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${REGION_STATUS_STYLE[region.regionStatus]}`}>
-            {regionStatusLabelHe(region.regionStatus)}
-          </span>
-          {!region.regionUnlocked ? <span aria-hidden="true">🔒</span> : null}
-        </div>
-        <span aria-hidden="true" className="text-[10px] text-slate-500">
-          {isExpanded ? "▲" : "▼"}
-        </span>
-      </button>
-
-      {isExpanded ? (
-        <div className="flex flex-col gap-3 border-t border-white/5 px-4 py-3">
-          {lockMessage ? <p className="text-xs text-amber-300/80">{lockMessage}</p> : null}
-
-          {region.gyms.map((gym) => (
-            <GymRow
-              key={gym.gymId}
-              gym={gym}
-              isPending={isPending}
-              onStart={(battleSlot) => onStartGymBattle(gym.gymNumber, battleSlot)}
-            />
-          ))}
-
-          <ChampionRow region={region} isPending={isPending} onStart={onStartChampionBattle} />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 interface GymRowProps {
+  regionId: RegionGymOverviewView["regionId"];
   gym: RegionGymView;
   isPending: boolean;
   onStart: (battleSlot: GymBattleSlotId) => void;
 }
 
-function GymRow({ gym, isPending, onStart }: GymRowProps) {
+function GymRow({ regionId, gym, isPending, onStart }: GymRowProps) {
+  // SIMPLE CHARACTER IMAGE ARCHITECTURE — one representative character
+  // image for the whole Gym card, shared by Easy/Medium/Leader alike (never
+  // a different image per battle slot); derived, never hardcoded — see
+  // gym-trainer-images.ts.
+  const characterImageUrl = getGymCharacterImageUrl(regionId, gym.gymNumber);
+
   return (
     <div className="rounded-lg border border-white/5 bg-slate-950/40 p-3">
       <div className="flex items-center gap-3">
         <SpriteImage
-          src={gym.badgeImageUrl}
+          src={characterImageUrl}
           alt={gym.typeSpecialization}
-          className="h-10 w-10 object-contain"
-          fallbackClassName="flex h-10 w-10 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
+          className="h-14 w-14 rounded-lg object-contain"
+          fallbackClassName="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
         />
         <div className="flex-1">
           <p className="text-sm font-semibold text-slate-100">
@@ -223,15 +270,16 @@ interface ChampionRowProps {
 
 function ChampionRow({ region, isPending, onStart }: ChampionRowProps) {
   const champion = region.regionalChampion;
+  const characterImageUrl = getRegionalChampionCharacterImageUrl(region.regionId);
 
   return (
     <div className="rounded-lg border border-amber-400/20 bg-amber-950/10 p-3">
       <div className="flex items-center gap-3">
         <SpriteImage
-          src={champion.medalImageUrl}
-          alt="מדליית מחוז"
-          className="h-10 w-10 object-contain"
-          fallbackClassName="flex h-10 w-10 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
+          src={characterImageUrl}
+          alt="מנהל מחוז"
+          className="h-14 w-14 rounded-lg object-contain"
+          fallbackClassName="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
         />
         <div className="flex-1">
           <p className="text-sm font-semibold text-amber-200">מנהל מחוז {region.englishName}</p>

@@ -24,9 +24,14 @@ export function HealthBar({ current, max }: HealthBarProps) {
           {current} / {max}
         </span>
       </div>
+      {/* BATTLE FLOW SPEED — shorter than ProgressBar's 300ms default: HP
+          changes every turn, so a snappier settle reads as "fast" without
+          losing the visual drain entirely (see ProgressBar's own doc
+          comment for why this is scoped to HealthBar alone). */}
       <ProgressBar
         percent={percent}
         fillStyle={{ backgroundColor: color, boxShadow: `0 0 6px ${color}aa` }}
+        durationMs={150}
       />
     </div>
   );

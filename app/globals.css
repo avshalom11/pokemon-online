@@ -179,3 +179,46 @@ body {
 .animate-battle-hit-flash {
   animation: battle-hit-flash 0.4s ease-in-out;
 }
+
+/* Universal fast player-attack lunge — a quick forward/scale motion, played
+   once whenever the player's attack is accepted/executed (never on a
+   disabled/failed click — see BattleContent's triggerPlayerAttack). Same
+   "one shared effect for every attack/type for now" rule as
+   battle-attack-effect.ts's sound — later type-specific move animations
+   swap this class out, never the trigger site. Direction is toward the
+   enemy platform, which sits visually "forward" of the player regardless
+   of the FLIP_PLAYER_SPRITE_HORIZONTALLY mirroring (lib/battle/battleLayout.ts),
+   so this only ever needs a single, unmirrored translateX. */
+@keyframes battle-attack-lunge {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+  40% {
+    transform: translateX(10px) scale(1.06);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-battle-attack-lunge {
+  animation: battle-attack-lunge 0.3s ease-out;
+}
+
+/* Small impact burst overlay — a brief radial flash layered on top of
+   whichever sprite is currently hit-flashing (see PokemonSprite's `isHit`).
+   Purely decorative, never gates anything. */
+@keyframes battle-impact-burst {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.animate-battle-impact-burst {
+  animation: battle-impact-burst 0.3s ease-out;
+}

@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
-import type { RegionId } from "@/shared/types/region";
+import { toRegionId, type RegionId } from "@/shared/types/region";
 import { GYM_BATTLE_SLOT_ORDER } from "../data/gym-registry";
 import { getPreviousRegionInGymSequence } from "../data/region-gym-sequence";
 import {
@@ -106,6 +106,28 @@ export async function hasRegionalMedal(playerId: string, regionId: RegionId): Pr
     select: { id: true },
   });
   return row !== null;
+}
+
+// PROFILE ACHIEVEMENTS (later task) — every Gym Badge/Regional Medal a
+// player has ever earned, across ALL regions, unordered (the caller —
+// profile-achievements-view.service.ts — is responsible for progression
+// ordering, since that's a profile-presentation concern, not a
+// progression-persistence one). PlayerGymBadge/PlayerRegionalMedal remain
+// the ONE source of truth this reads from directly — no separate
+// profile-achievement table, nothing inferred from client state.
+export interface OwnedGymBadge {
+  readonly regionId: RegionId;
+  readonly gymNumber: 1 | 2 | 3;
+}
+
+export async function getOwnedGymBadges(playerId: string): Promise<OwnedGymBadge[]> {
+  const rows = await prisma.playerGymBadge.findMany({ where: { playerId }, select: { regionId: true, gymNumber: true } });
+  return rows.map((row) => ({ regionId: toRegionId(row.regionId), gymNumber: row.gymNumber as 1 | 2 | 3 }));
+}
+
+export async function getOwnedRegionalMedals(playerId: string): Promise<RegionId[]> {
+  const rows = await prisma.playerRegionalMedal.findMany({ where: { playerId }, select: { regionId: true } });
+  return rows.map((row) => toRegionId(row.regionId));
 }
 
 // A full per-region snapshot for a future Gym screen — one round trip

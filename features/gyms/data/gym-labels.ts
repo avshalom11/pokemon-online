@@ -19,7 +19,8 @@ type StartGymBattleStatus =
   | "locked-level"
   | "locked-previous-region"
   | "invalid-target"
-  | "no-usable-party";
+  | "no-usable-party"
+  | "invalid-selection";
 
 // GYMS & LEAGUES PHASE 4 — the ONE place Hebrew display copy for Gym
 // concepts lives, so the region-overview page, the individual-Gym section,
@@ -29,7 +30,7 @@ type StartGymBattleStatus =
 export const REGION_DISPLAY_NAMES_HE: Record<RegionId, string> = {
   kanto: "קאנטו",
   johto: "ג'וטו",
-  hoenn: "הוען",
+  hoenn: "הואן",
   sinnoh: "סינו",
   unova: "יונובה",
   kalos: "קאלוס",
@@ -106,6 +107,40 @@ export function gymBattleActionLabelHe(hasActiveSession: boolean): string {
   return hasActiveSession ? "המשך קרב" : "התחל קרב";
 }
 
+// Mirrors UseGymBattleItemResult's own non-success `status` union
+// (gym-battle-item.service.ts) — same structural-mirror-not-dependency
+// reasoning as StartGymBattleStatus above (server-only file, client-imported
+// label module).
+type GymBagItemErrorStatus =
+  | "invalid-item"
+  | "not-participant"
+  | "not-owned"
+  | "no-item"
+  | "invalid-target"
+  | "forced-replacement-pending"
+  | "stale-action";
+
+// BAG DURING GYM BATTLE (later task, section 4) — every non-success
+// useGymBattleItem status, worded for the Bag panel's own inline error.
+export function gymBagItemErrorMessageHe(status: GymBagItemErrorStatus): string {
+  switch (status) {
+    case "invalid-item":
+      return "לא ניתן להשתמש בפריט זה בקרב";
+    case "not-participant":
+      return "הפוקימון אינו משתתף בקרב הזה";
+    case "not-owned":
+      return "הפוקימון אינו שייך לך";
+    case "no-item":
+      return "אין לך יותר פריטים אלו";
+    case "invalid-target":
+      return "לא ניתן להשתמש בפריט על פוקימון זה";
+    case "forced-replacement-pending":
+      return "יש להחליף פוקימון לפני שימוש בתיק";
+    case "stale-action":
+      return "הפעולה לא בוצעה — נסה שוב";
+  }
+}
+
 // Every non-success startNpcBattle status, worded for a toast/inline error
 // under the "התחל קרב" button — "started"/"resumed" are handled by the
 // caller (a redirect to /gyms/battle), never shown as text.
@@ -123,6 +158,8 @@ export function gymStartResultMessageHe(status: StartGymBattleStatus): string {
       return "יש קרב פעיל אחר — יש לסיים אותו קודם";
     case "no-usable-party":
       return "אין פוקימונים זמינים בקבוצה";
+    case "invalid-selection":
+      return "בחירת הפוקימונים אינה תקינה";
     case "invalid-target":
       return "קרב לא תקין";
     default:

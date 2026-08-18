@@ -11,6 +11,8 @@ import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
 import {
+  getOwnedGymBadges,
+  getOwnedRegionalMedals,
   getRegionGymProgress,
   hasBadge,
   hasRegionalMedal,
@@ -86,4 +88,44 @@ test("getRegionGymProgress reflects real persisted progress end to end", async (
   assert.equal(progress.regionalChampionUnlocked, false, "only 1 of 3 badges earned so far");
   assert.equal(progress.regionalChampionDefeated, false);
   assert.equal(progress.regionalMedalEarned, false);
+});
+
+// PROFILE ACHIEVEMENTS (later task) — getOwnedGymBadges/
+// getOwnedRegionalMedals are the profile feature's own read path into
+// this SAME PlayerGymBadge/PlayerRegionalMedal persistence — no separate
+// profile-achievement table, nothing inferred from client state.
+test("getOwnedGymBadges lists every badge actually earned, across regions, and none that weren't", async () => {
+  await markGymBattleCompleted(prisma, PLAYER_ID, "kanto", 1, "leader");
+  await markGymBattleCompleted(prisma, PLAYER_ID, "johto", 2, "leader");
+  // Easy/Medium wins never award a badge — must not leak into this list.
+  await markGymBattleCompleted(prisma, PLAYER_ID, "kanto", 2, "easy");
+
+  const owned = await getOwnedGymBadges(PLAYER_ID);
+
+  assert.equal(owned.length, 2);
+  assert.ok(owned.some((badge) => badge.regionId === "kanto" && badge.gymNumber === 1));
+  assert.ok(owned.some((badge) => badge.regionId === "johto" && badge.gymNumber === 2));
+});
+
+test("getOwnedGymBadges returns an empty array for a player with no badges yet", async () => {
+  assert.deepEqual(await getOwnedGymBadges(PLAYER_ID), []);
+});
+
+test("getOwnedGymBadges never returns another player's badges", async () => {
+  seedPlayerProfile({ id: "other-player" });
+  await markGymBattleCompleted(prisma, "other-player", "kanto", 1, "leader");
+
+  assert.deepEqual(await getOwnedGymBadges(PLAYER_ID), []);
+});
+
+test("getOwnedRegionalMedals lists every medal actually earned, and none that weren't", async () => {
+  await markRegionalChampionDefeated(prisma, PLAYER_ID, "kanto");
+
+  const owned = await getOwnedRegionalMedals(PLAYER_ID);
+
+  assert.deepEqual(owned, ["kanto"]);
+});
+
+test("getOwnedRegionalMedals returns an empty array for a player with no medals yet", async () => {
+  assert.deepEqual(await getOwnedRegionalMedals(PLAYER_ID), []);
 });

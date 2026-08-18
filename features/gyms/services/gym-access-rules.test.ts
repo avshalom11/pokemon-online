@@ -6,8 +6,14 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
+async function selectPartyFor(playerId: string, target: Parameters<typeof startNpcBattle>[1]): Promise<string[]> {
+  const options = await getGymBattlePartyOptions(playerId, target);
+  if (options.status !== "ok") return [];
+  return options.options.filter((o) => !o.fainted).slice(0, options.requiredCount).map((o) => o.id);
+}
+
 import { MIN_GYM_PLAYER_LEVEL } from "@/features/gyms/config/gym-access-rules.config";
-import { startNpcBattle } from "@/features/gyms/services/gym-battle-session.service";
+import { startNpcBattle, getGymBattlePartyOptions } from "@/features/gyms/services/gym-battle-session.service";
 import { markGymBattleCompleted, markRegionalChampionDefeated } from "@/features/gyms/services/gym-progression.service";
 import { REGION_GYM_SEQUENCE } from "@/features/gyms/data/region-gym-sequence";
 import { prisma } from "@/lib/db/prisma";
@@ -37,28 +43,28 @@ async function winRegionalChampion(regionId: string) {
 test(`Level ${MIN_GYM_PLAYER_LEVEL - 1} cannot start Kanto Gym 1 — locked-level`, async () => {
   seedPlayerProfile({ id: PLAYER_ID, level: MIN_GYM_PLAYER_LEVEL - 1, experience: 0 });
   seedParty();
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.deepEqual(result, { status: "locked-level" });
 });
 
 test(`Level ${MIN_GYM_PLAYER_LEVEL} can start Kanto Gym 1`, async () => {
   seedPlayerProfile({ id: PLAYER_ID, level: MIN_GYM_PLAYER_LEVEL, experience: 0 });
   seedParty();
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
 });
 
 test("the Level-10 gate also blocks a Regional Champion battle, not just Gym battles", async () => {
   seedPlayerProfile({ id: PLAYER_ID, level: 1, experience: 0 });
   seedParty();
-  const result = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }, await selectPartyFor(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }));
   assert.deepEqual(result, { status: "locked-level" });
 });
 
 test("Level 50 cannot start Johto Gym 1 before Kanto's Regional Champion is defeated — locked-previous-region", async () => {
   seedPlayerProfile({ id: PLAYER_ID, level: 50, experience: 0 });
   seedParty();
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "johto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "johto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "johto", gymNumber: 1, battleSlot: "easy" }));
   assert.deepEqual(result, { status: "locked-previous-region" });
 });
 
@@ -67,7 +73,7 @@ test("Johto unlocks immediately after Kanto's Regional Champion is defeated", as
   seedParty();
   await winRegionalChampion("kanto");
 
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "johto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "johto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "johto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
 });
 
@@ -76,11 +82,11 @@ test("Hoenn requires Johto's Regional Champion specifically — Kanto's alone is
   seedParty();
   await winRegionalChampion("kanto");
 
-  const stillLocked = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "hoenn", gymNumber: 1, battleSlot: "easy" });
+  const stillLocked = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "hoenn", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "hoenn", gymNumber: 1, battleSlot: "easy" }));
   assert.deepEqual(stillLocked, { status: "locked-previous-region" });
 
   await winRegionalChampion("johto");
-  const nowUnlocked = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "hoenn", gymNumber: 1, battleSlot: "easy" });
+  const nowUnlocked = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "hoenn", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "hoenn", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(nowUnlocked.status, "started");
 });
 
@@ -90,7 +96,7 @@ test("the full region chain unlocks in order, all the way through Paldea", async
 
   for (let i = 0; i < REGION_GYM_SEQUENCE.length; i++) {
     const regionId = REGION_GYM_SEQUENCE[i];
-    const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId, gymNumber: 1, battleSlot: "easy" });
+    const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId, gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId, gymNumber: 1, battleSlot: "easy" }));
     assert.equal(result.status, "started", `${regionId} Gym 1 should be reachable once every earlier region's champion is defeated`);
     await prisma.npcBattleSession.deleteMany({ where: { playerId: PLAYER_ID } });
     await winRegionalChampion(regionId);

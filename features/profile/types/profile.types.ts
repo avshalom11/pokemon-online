@@ -36,6 +36,54 @@ export interface PublicStatsView {
   totalOwnedPokemon: number;
 }
 
+// PROFILE ACHIEVEMENTS (later task) — one earned Gym Badge / Regional
+// Medal, ready to render. Labels/images are always read from the existing
+// Gym catalog (gym-badges.ts/regional-medals.ts, getGymBadgeDefinition/
+// getRegionalMedalDefinition) — never recreated/duplicated here; this
+// shape only carries what the profile UI actually needs, nothing an
+// owned-achievement row itself wouldn't already have (no player id, no
+// awardedAt timestamp — irrelevant to a public display).
+export interface PublicBadgeView {
+  regionId: RegionId;
+  gymNumber: 1 | 2 | 3;
+  displayName: string;
+  imageUrl: string;
+}
+
+export interface PublicRegionalMedalView {
+  regionId: RegionId;
+  displayName: string;
+  imageUrl: string;
+}
+
+// The generic "הישגים" (Achievements) container — deliberately not named
+// "GymAchievements" or scoped to Gyms in its own shape, so a future
+// League-trophy array (League I/II/III/Champions League Trophies, Silver/
+// Bronze Medals — see this feature's own spec, section 17) can be added as
+// one more sibling field here later without restructuring the profile
+// architecture or touching ProfileContent.tsx's own composition.
+//
+// `visibleToViewer` is the ONE server-side privacy decision the profile UI
+// ever needs to branch on: true means `badges`/`regionalMedals` below are
+// the CURRENT viewer's real, populated data (owner viewing their own
+// profile — always; any other viewer — only when the owner's
+// showGymAchievementsOnProfile setting is ON); false means they are
+// deliberately EMPTY arrays — hidden achievement counts are never sent to
+// an unauthorized viewer, never just hidden by CSS (see
+// profile-achievements-view.service.ts's own doc comment).
+//
+// `hiddenFromOtherUsers` is the raw, owner-controlled setting value,
+// carried separately so the OWNER's own view (where visibleToViewer is
+// always true) can still show "הישגים מוסתרים ממשתמשים אחרים" — a
+// non-owner viewer never needs this field (their own visibleToViewer
+// already reflects it).
+export interface ProfileAchievementsView {
+  visibleToViewer: boolean;
+  hiddenFromOtherUsers: boolean;
+  badges: readonly PublicBadgeView[];
+  regionalMedals: readonly PublicRegionalMedalView[];
+}
+
 // The one shape both the public visitor view AND the owner's own view of
 // their profile page render from — see public-profile-view.service.ts's
 // own doc comment for why the owner sees the exact same privacy-filtered
@@ -62,6 +110,13 @@ export interface PublicProfileView {
   party: PublicPartyMemberView[] | null;
   // null when the owner has hidden their stats (showStatsOnProfile false).
   stats: PublicStatsView | null;
+  // PROFILE ACHIEVEMENTS (later task) — the "הישגים" section. Always
+  // present (never null) — even when hidden, the UI needs
+  // achievements.visibleToViewer to decide whether to render the neutral
+  // "user chose to hide" message versus nothing at all; see
+  // ProfileAchievementsView's own doc comment for the full privacy
+  // contract.
+  achievements: ProfileAchievementsView;
   // The owner's structured showcase content — an ADDITIONAL section, never
   // gated by any of the three privacy toggles above (per this feature's
   // own spec: "an additional showcase area, not a replacement for the
@@ -86,6 +141,10 @@ export interface ProfileEditViewModel {
   showPartyOnProfile: boolean;
   showStatsOnProfile: boolean;
   showAboutMeOnProfile: boolean;
+  // PROFILE ACHIEVEMENTS (later task) — the ONE setting that gates BOTH
+  // earned Gym Badges and Regional Medals (never a separate switch for
+  // each — see this feature's own spec).
+  showGymAchievementsOnProfile: boolean;
   partyPreview: PublicPartyMemberView[];
   contentBlocks: ProfileContentBlock[];
 }

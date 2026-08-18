@@ -112,11 +112,17 @@ model PlayerProfile {
   // — a lookup key into a server-defined style map, never free-form CSS/
   // class names from the client.
   profileThemeId       String  @default("default")
-  // Privacy toggles for the public profile's three optional sections — see
+  // Privacy toggles for the public profile's optional sections — see
   // public-profile-view.service.ts for exactly what each one gates.
   showPartyOnProfile   Boolean @default(true)
   showStatsOnProfile   Boolean @default(true)
   showAboutMeOnProfile Boolean @default(true)
+  // PROFILE ACHIEVEMENTS (later task) — gates BOTH earned Gym Badges AND
+  // Regional Medals as a single setting (never 36 individual switches, and
+  // no separate Badge/Medal toggle yet — see this feature's own spec).
+  // Same "default true, coalesced with `?? true` on every read for a stale
+  // Prisma Client" convention as the three toggles above.
+  showGymAchievementsOnProfile Boolean @default(true)
 
   // The owner's structured public showcase content — an ARRAY of
   // ProfileContentBlock (features/profile/types/profile-content.types.ts),

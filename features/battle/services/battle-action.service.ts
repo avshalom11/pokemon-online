@@ -1,71 +1,34 @@
 import "server-only";
 
-import { calculatePokemonStats } from "@/engine/battle/pokemon-stat-calculations";
-import {
-  rollAccuracyCheck,
-  rollCriticalHit,
-  rollDamageRandomFactor,
-  UnknownMoveError,
-  type CalculateMoveDamageResult,
-} from "@/engine/damage";
+import { UnknownMoveError } from "@/engine/damage";
 import { getStartingKnownMoves } from "@/engine/known-moves";
-import { getMoveById, type Move, type MoveEffect } from "@/engine/moves";
+import { getMoveById } from "@/engine/moves";
 import type { EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import { selectEnemyMove } from "@/features/battle/ai/select-enemy-move";
 import {
+  applyWildHpSync,
   endBattleSession,
+  getActiveBattleSessionWithParty,
   markParticipantFainted,
   parseStatStages,
   parseVolatileState,
   promoteToNextEncounter,
   serializeStatStages,
   serializeVolatileState,
-  syncWildHp,
   type BattleVictoryReward,
 } from "@/features/battle-session/services/battle-session.service";
-import { resolveAttackDamage, type DamageBattler } from "@/features/battle/utils/battle-damage-rules";
-import type { BattleActor, BattleEvent } from "@/features/battle/events/battle-event.types";
-import { buildActionSkippedEvent, buildAttackEvents, buildHitEvents } from "@/features/battle/events/build-attack-events";
-import { resolveMoveEffects } from "@/features/battle/effects/resolve-move-effects";
-import { resolveHealing } from "@/features/battle/healing/resolve-healing";
-import { resolveDrainHealing, resolveRecoilDamage } from "@/features/battle/healing/resolve-hp-transfer";
-import { resolveHitCount } from "@/features/battle/multi-hit/resolve-hit-count";
+import type { BattleEvent } from "@/features/battle/events/battle-event.types";
+import { resolveBattleTurn, summarizeVolatile, type BattleVolatileSummary } from "@/features/battle/services/battle-turn-engine";
 import type { MajorStatus } from "@/features/battle/status/major-status";
-import { isMajorStatus } from "@/features/battle/status/major-status";
-import { resolvePreActionStatus } from "@/features/battle/status/resolve-pre-action-status";
-import { resolveEndOfTurnStatusDamage } from "@/features/battle/status/resolve-end-of-turn-status";
-import { applyStatStagesToStats, type StatStages } from "@/features/battle/stats/stat-stages";
-import { resolveTurnOrder, rollTurnOrderTieBreak } from "@/features/battle/turn-order/resolve-turn-order";
 import { getUsableMoveIds } from "@/features/battle/volatile/move-legality";
-import { resolveConfusionSelfDamage } from "@/features/battle/volatile/resolve-confusion-self-damage";
-import { resolveEndOfTurnVolatile } from "@/features/battle/volatile/resolve-end-of-turn-volatile";
-import { resolvePreActionConfusion, resolvePreActionFlinch } from "@/features/battle/volatile/resolve-pre-action-volatile";
-import { isProtected, resolveProtectAttempt, resolveVolatileEffects } from "@/features/battle/volatile/resolve-volatile-effects";
 import type { VolatileState } from "@/features/battle/volatile/volatile-condition.types";
 import { getKnownMoveIds } from "@/features/known-moves/known-moves-queries";
-import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { isPartyDefeated } from "@/features/party/utils/party-rules";
 import { getActiveRegionIdByPlayerId } from "@/features/regions/services/region.service";
 import { prisma } from "@/lib/db/prisma";
+import type { RegionId } from "@/shared/types/region";
 import type { ZoneId } from "@/shared/types/zone";
-
-// Phase 7 — a move's effect is "volatile" (handled by
-// resolve-volatile-effects.ts, never resolve-move-effects.ts) when it's
-// one of the dedicated volatile kinds, OR a status/damage-with-status-
-// chance whose StatusCondition isn't a MajorStatus (confusion/flinch).
-// "protect" is deliberately excluded here — it's self-targeted and always
-// resolved separately, before accuracy, never through this hit-gated
-// dispatch (see runAttack's own "protect" branch).
-function isVolatileEffect(effect: MoveEffect): boolean {
-  if (effect.kind === "leech-seed" || effect.kind === "disable-move" || effect.kind === "partial-trap" || effect.kind === "encore") {
-    return true;
-  }
-  if (effect.kind === "status" || effect.kind === "damage-with-status-chance") {
-    return !isMajorStatus(effect.status);
-  }
-  return false;
-}
 
 // Phase 4F: Battle Action Pipeline. This is now the ONLY place a player's
 // battle action is resolved — React (BattleContent) no longer computes
@@ -162,15 +125,11 @@ export type BattleActionType = "attack";
 // return shape). disabledMoveId/encoreMoveId are only ever meaningful for
 // the PLAYER's own summary (the client selects its own moves, never the
 // wild's), but kept on the same shared shape for both sides rather than
-// splitting into two near-duplicate types.
-export interface BattleVolatileSummary {
-  confused: boolean;
-  protecting: boolean;
-  disabledMoveId: string | null;
-  encoreMoveId: string | null;
-  leechSeeded: boolean;
-  trapped: boolean;
-}
+// splitting into two near-duplicate types. Now defined once, shared with
+// Gym/Regional-Champion Battle, in battle-turn-engine.ts — re-exported
+// here so existing callers (e.g. BattleContent.tsx) never had to change
+// their import path for this refactor.
+export type { BattleVolatileSummary };
 
 export interface BattleActionSuccess {
   status: "success";
@@ -257,20 +216,6 @@ export type BattleActionResult =
   // rather than a separate variant per specific reason.
   | { status: "invalid-move"; moveId: string };
 
-// Phase 6G — paralysis halves effective Speed (the modern-generation rule
-// this project already favors elsewhere), applied on top of stat stages
-// rather than a second Speed formula.
-const PARALYSIS_SPEED_MULTIPLIER = 0.5;
-
-function effectiveSpeed(battler: DamageBattler): number {
-  const stats = applyStatStagesToStats(
-    calculatePokemonStats({ baseStats: battler.baseStats, level: battler.level }),
-    battler.stages
-  );
-  const multiplier = battler.status === "paralysis" ? PARALYSIS_SPEED_MULTIPLIER : 1;
-  return Math.floor(stats.speed * multiplier);
-}
-
 // The single server-side entry point for executing a player's battle
 // action. Every validation below is a defense-in-depth check against a
 // client that cannot be trusted, independent of whatever the UI's own
@@ -285,16 +230,34 @@ export async function executeBattleAction(
   // Passing a fixed function here is how tests get deterministic rolls
   // without stubbing Math.random globally (see engine/damage/random.ts's
   // own design note).
-  randomSource?: () => number
+  randomSource?: () => number,
+  // FIELD BATTLE PERFORMANCE — the caller (battle-action.action.ts) already
+  // read this exact player's PlayerProfile.regionId one call earlier
+  // (getPlayerProfile, needed for `playerId` itself). Passing it through
+  // avoids a THIRD read of the same row on a kill turn — this function used
+  // to re-fetch it itself via getActiveRegionIdByPlayerId, purely to feed
+  // the one-in-many-turns promotion branch below. Optional and only ever
+  // used on that exact branch: every existing test call site (and any
+  // future caller that doesn't have it handy) simply omits this and falls
+  // back to the original query, unchanged.
+  regionId?: RegionId
 ): Promise<BattleActionResult> {
   if (actionType !== "attack") {
     return { status: "invalid-action" };
   }
 
-  // Validate the battle exists: a session for this exact player and zone,
-  // never trusting a client-sent session id (there isn't one — the session
-  // is always resolved from the authenticated player alone).
-  const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
+  // FIELD BATTLE PERFORMANCE — the FieldBattleSession row and the player's
+  // party used to be fetched via Promise.all as two independent top-level
+  // Prisma calls. Measured against this project's actual remote Neon setup,
+  // that was consistently SLOWER than one merged query (~400-500ms vs.
+  // under 100ms) — each concurrent top-level call appears to pay its own
+  // connection-acquisition cost on this pooled/serverless DB, so "parallel"
+  // meant two connection round trips instead of one reused connection. Both
+  // are now read through PlayerProfile's own two relations in a single
+  // Prisma call (getActiveBattleSessionWithParty, battle-session.service.ts)
+  // — same data, same validation below, one round trip instead of two.
+  const { session, party } = await getActiveBattleSessionWithParty(playerId);
+
   if (!session || session.zoneId !== zoneId) {
     return { status: "no-session" };
   }
@@ -310,12 +273,6 @@ export async function executeBattleAction(
     return { status: "battle-inactive" };
   }
 
-  // Validate the player + the active Pokémon's ownership together: re-load
-  // this player's own party (never a client-supplied party) and confirm
-  // the session's activePlayerPokemonId is actually one of their own —
-  // same ownership guarantee restoreFromRow already relies on
-  // (battle-session.service.ts).
-  const party = await getPlayerParty(playerId);
   const activePokemon = party.find((pokemon) => pokemon.id === session.activePlayerPokemonId);
 
   if (!activePokemon) {
@@ -390,700 +347,60 @@ export async function executeBattleAction(
   const wildSpeciesId = wildSpecies.id;
   const resolvedWildSpecies = wildSpecies;
   const wildLevel = session.wildLevel;
-  const playerMove: Move = move;
-  const resolvedEnemyMove: Move = enemyMove;
 
-  function drawRoll(): number {
-    return randomSource ? randomSource() : Math.random();
-  }
-
-  // ---- Phase 6E/6F: current battle-local stages + persisted status ------
-  let playerStages: StatStages = parseStatStages(session.playerStatStages);
-  let wildStages: StatStages = parseStatStages(session.wildStatStages);
-  let playerStatus: MajorStatus | null = (activePokemon.status as MajorStatus | null) ?? null;
-  let playerStatusTurnsRemaining: number | null = activePokemon.statusTurnsRemaining;
-  let wildStatus: MajorStatus | null = (session.wildStatus as MajorStatus | null) ?? null;
-  let wildStatusTurnsRemaining: number | null = session.wildStatusTurnsRemaining;
-
-  // ---- Phase 7: current battle-local Volatile Conditions ----------------
-  let playerVolatile: VolatileState = initialPlayerVolatile;
-  let wildVolatile: VolatileState = initialWildVolatile;
-
-  function playerBattler(): DamageBattler {
-    return {
+  // ---- Turn resolution ----------------------------------------------------
+  // SHARED BATTLE TURN ENGINE — see features/battle/services/
+  // battle-turn-engine.ts's own doc comment: this call is the ONLY place a
+  // player's attack + the wild's own counter-attack (turn order, damage,
+  // move effects, status, volatile conditions, end-of-turn residual
+  // effects) are resolved, shared verbatim with Gym/Regional-Champion
+  // Battle (Gyms & Leagues Phase 3) — not a second, parallel battle system.
+  const turnResult = resolveBattleTurn(
+    {
+      pokemonId: activePokemonId,
       baseStats: activeSpecies.baseStats,
       level: activeLevel,
       types: activeSpecies.types,
-      stages: playerStages,
-      status: playerStatus,
-    };
-  }
-
-  function enemyBattler(): DamageBattler {
-    return {
+      stages: parseStatStages(session.playerStatStages),
+      status: (activePokemon.status as MajorStatus | null) ?? null,
+      statusTurnsRemaining: activePokemon.statusTurnsRemaining,
+      volatile: initialPlayerVolatile,
+      currentHp: activePokemon.currentHp,
+      knownMoveIds,
+      moveId,
+    },
+    {
+      pokemonId: wildSpeciesId,
       baseStats: resolvedWildSpecies.baseStats,
       level: wildLevel,
       types: resolvedWildSpecies.types,
-      stages: wildStages,
-      status: wildStatus,
-    };
-  }
-
-  // Phase 6B/6C/6G — turn order: Move Priority, then effective Speed
-  // (stat stages + paralysis halving), then the injected tie-break.
-  const playerSpeed = effectiveSpeed(playerBattler());
-  const enemySpeed = effectiveSpeed(enemyBattler());
-  const tieBreakRoll = rollTurnOrderTieBreak(randomSource);
-  const order = resolveTurnOrder({
-    playerAction: { actor: "player", priority: playerMove.priority },
-    enemyAction: { actor: "enemy", priority: resolvedEnemyMove.priority },
-    playerSpeed,
-    enemySpeed,
-    tieBreakRoll,
-  });
-
-  const events: BattleEvent[] = [];
-  let updatedWildHp = session.wildCurrentHp;
-  let updatedPartyHp = activePokemon.currentHp;
-  let wildFainted = false;
-  let partyPokemonFainted = false;
-  let playerDamage = 0;
-  let enemyDamage = 0;
-
-  // Hoisted once — needed by healing/drain (max-HP-based) below, and
-  // already needed by the end-of-turn residual-damage section further
-  // down, which now reuses these instead of recomputing them itself.
-  const playerMaxHp = calculatePokemonStats({ baseStats: activeSpecies.baseStats, level: activeLevel }).maxHp;
-  const wildMaxHp = calculatePokemonStats({ baseStats: resolvedWildSpecies.baseStats, level: wildLevel }).maxHp;
-
-  function resolveAndApply(attackerMove: Move, attacker: DamageBattler, defender: DamageBattler): CalculateMoveDamageResult {
-    return resolveAttackDamage(
-      attackerMove,
-      attacker,
-      defender,
-      rollDamageRandomFactor(randomSource),
-      rollAccuracyCheck(randomSource),
-      rollCriticalHit(randomSource)
-    );
-  }
-
-  // Phase 6L / Phase 6-cleanup — every hit after the first one in a
-  // multi-hit sequence: the move's own accuracy was already confirmed
-  // once (hit 1, via resolveAndApply above). Passes
-  // accuracyAlreadyConfirmed through to the Damage Engine (see
-  // damage-types.ts's own doc comment) rather than synthesizing a
-  // guaranteed-hit accuracyRoll — no accuracy check runs at all for these
-  // hits, so no assumption about the move's own accuracy value is needed.
-  function resolveConfirmedHit(attackerMove: Move, attacker: DamageBattler, defender: DamageBattler): CalculateMoveDamageResult {
-    return resolveAttackDamage(
-      attackerMove,
-      attacker,
-      defender,
-      rollDamageRandomFactor(randomSource),
-      undefined,
-      rollCriticalHit(randomSource),
-      true
-    );
-  }
-
-  // Applies one move's effect — stat-change/major-status (via the existing,
-  // untouched resolveMoveEffects) OR a Volatile Condition (via Phase 7's
-  // resolveVolatileEffects) — the one generic dispatch every move's
-  // `effect` runs through, regardless of who used it or what it does.
-  // Exactly one of the two resolvers ever does real work per move (see
-  // isVolatileEffect above), so a chance-gated effect is never rolled
-  // twice. A no-op for heal/drain/recoil/multi-hit/protect kinds (handled
-  // directly in runAttack below), same as it already is for any other
-  // not-yet-implemented kind.
-  function applyMoveEffect(usedMove: Move, actor: BattleActor, result: CalculateMoveDamageResult, targetJustFainted: boolean): void {
-    const effectTargetActor: BattleActor = usedMove.target === "self" ? actor : actor === "player" ? "enemy" : "player";
-    const hit = result.kind !== "miss";
-    const immuneToTarget = result.kind === "damage" && result.effectiveness === "none";
-    const effectTargetFainted = effectTargetActor !== actor && targetJustFainted;
-    const targetTypes = effectTargetActor === "player" ? activeSpecies.types : resolvedWildSpecies.types;
-
-    if (isVolatileEffect(usedMove.effect)) {
-      const targetVolatile = effectTargetActor === "player" ? playerVolatile : wildVolatile;
-
-      const volatileResult = resolveVolatileEffects({
-        effect: usedMove.effect,
-        actor,
-        effectTargetActor,
-        hit,
-        immuneToTarget,
-        effectTargetFainted,
-        effectTargetTypes: targetTypes,
-        effectTargetVolatile: targetVolatile,
-        effectChanceRoll: drawRoll,
-        confusionDurationRoll: drawRoll,
-        disableDurationRoll: drawRoll,
-        encoreDurationRoll: drawRoll,
-        trappingDurationRoll: drawRoll,
-      });
-
-      events.push(...volatileResult.events);
-
-      if (effectTargetActor === "player") {
-        playerVolatile = volatileResult.updatedTargetVolatile;
-      } else {
-        wildVolatile = volatileResult.updatedTargetVolatile;
-      }
-      return;
-    }
-
-    const targetStages = effectTargetActor === "player" ? playerStages : wildStages;
-    const targetStatus = effectTargetActor === "player" ? playerStatus : wildStatus;
-
-    const effectResult = resolveMoveEffects({
-      effect: usedMove.effect,
-      effectTargetActor,
-      hit,
-      immuneToTarget,
-      effectTargetFainted,
-      effectTargetStages: targetStages,
-      effectTargetCurrentStatus: targetStatus,
-      effectTargetTypes: targetTypes,
-      effectChanceRoll: drawRoll,
-      sleepDurationRoll: drawRoll,
-    });
-
-    events.push(...effectResult.events);
-
-    if (effectTargetActor === "player") {
-      playerStages = effectResult.updatedStages;
-    } else {
-      wildStages = effectResult.updatedStages;
-    }
-
-    if (effectResult.appliedStatus) {
-      if (effectTargetActor === "player") {
-        playerStatus = effectResult.appliedStatus.status;
-        playerStatusTurnsRemaining = effectResult.appliedStatus.turnsRemaining;
-      } else {
-        wildStatus = effectResult.appliedStatus.status;
-        wildStatusTurnsRemaining = effectResult.appliedStatus.turnsRemaining;
-      }
-    }
-  }
-
-  // ---- Small per-actor accessors, so the dispatcher below never repeats
-  // the player-vs-enemy branch that used to be duplicated across
-  // runPlayerAttack/runEnemyAttack. ----
-  function currentHpOf(actor: BattleActor): number {
-    return actor === "player" ? updatedPartyHp : updatedWildHp;
-  }
-
-  function setHpOf(actor: BattleActor, hp: number): void {
-    if (actor === "player") {
-      updatedPartyHp = hp;
-      partyPokemonFainted = hp <= 0;
-    } else {
-      updatedWildHp = hp;
-      wildFainted = hp <= 0;
-    }
-  }
-
-  function maxHpOf(actor: BattleActor): number {
-    return actor === "player" ? playerMaxHp : wildMaxHp;
-  }
-
-  function pokemonIdOf(actor: BattleActor): string {
-    return actor === "player" ? activePokemonId : wildSpeciesId;
-  }
-
-  // Phase 7 — re-validated at the moment of execution (not just at initial
-  // submission/selection), in case the OTHER actor's own effect — having
-  // gone first this same turn — just disabled or encored this actor's
-  // already-chosen move. Falls back to that side's own first still-usable
-  // Known Move rather than executing an illegal one; the safest simple
-  // fallback this project's Disable/Encore rules call for, same spirit as
-  // getUsableMoveIds's own empty-list fallback (never Struggle, never a
-  // crash). In the overwhelming majority of turns nothing changes here at
-  // all — the chosen move was already validated usable before either
-  // action ran.
-  function moveIdOf(actor: BattleActor): string {
-    const chosen = actor === "player" ? moveId : enemyMoveId;
-    const knownIds = actor === "player" ? knownMoveIds : enemyKnownMoveIds;
-    const volatile = actor === "player" ? playerVolatile : wildVolatile;
-    const usable = getUsableMoveIds(knownIds, volatile);
-    return usable.includes(chosen) ? chosen : usable[0];
-  }
-
-  function moveOf(actor: BattleActor): Move {
-    const id = moveIdOf(actor);
-    // Falls back to the originally-chosen Move only in the practically
-    // unreachable case of a corrupt/unregistered known-move id — every
-    // real Known Move id always resolves (engine/known-moves enforces
-    // this at write time), so this is a safety net, never the normal path.
-    return getMoveById(id) ?? (actor === "player" ? playerMove : resolvedEnemyMove);
-  }
-
-  function battlerOf(actor: BattleActor): DamageBattler {
-    return actor === "player" ? playerBattler() : enemyBattler();
-  }
-
-  function setDamageOf(actor: BattleActor, damage: number): void {
-    if (actor === "player") {
-      playerDamage = damage;
-    } else {
-      enemyDamage = damage;
-    }
-  }
-
-  // Phase 6L — resolves one multi-hit move: one accuracy check for the
-  // whole move (hit 1, above), then (only on a hit, and only for a
-  // non-fixed range) one hit-count roll, then each additional hit
-  // independently — stopping immediately, drawing no further rolls, the
-  // instant the target reaches 0 HP. Drain/recoil aren't reachable on a
-  // multi-hit move in the current Move Registry (a move's `effect` is a
-  // single kind, never both) — see this file's header comment.
-  function runMultiHitAttack(actor: BattleActor, move: Move, target: BattleActor): void {
-    const attackerId = pokemonIdOf(actor);
-    const usedMoveId = moveIdOf(actor);
-
-    const firstResult = resolveAndApply(move, battlerOf(actor), battlerOf(target));
-
-    // Phase 7 — Protect stops a multi-hit move before its first hit is
-    // ever applied (no partial damage, no multi-hit-complete event at
-    // all) — accuracy is still resolved above first (this project's
-    // documented move-execution order resolves accuracy before checking
-    // Protect), it just never gets acted on.
-    if (isProtected(target === "player" ? playerVolatile : wildVolatile)) {
-      events.push({ type: "protected", actor: target });
-      setDamageOf(actor, 0);
-      return;
-    }
-
-    if (firstResult.kind !== "damage") {
-      if (firstResult.kind === "miss") {
-        events.push({ type: "move-missed", actor, pokemonId: attackerId, moveId: usedMoveId });
-      }
-      setDamageOf(actor, 0);
-      return;
-    }
-
-    if (move.effect.kind !== "multi-hit") return; // unreachable — narrows the type below.
-
-    const hitCount = resolveHitCount(move.effect, drawRoll);
-    let totalDamageDealt = 0;
-    let hitsCompleted = 0;
-    let targetFainted = false;
-
-    for (let hitNumber = 1; hitNumber <= hitCount; hitNumber++) {
-      const hitResult = hitNumber === 1 ? firstResult : resolveConfirmedHit(move, battlerOf(actor), battlerOf(target));
-      const damage = hitResult.kind === "damage" ? hitResult.damage : 0;
-      const previousTargetHp = currentHpOf(target);
-      const newTargetHp = Math.max(0, previousTargetHp - damage);
-      setHpOf(target, newTargetHp);
-      totalDamageDealt += previousTargetHp - newTargetHp;
-      hitsCompleted += 1;
-
-      events.push(...buildHitEvents({ actor, defenderPokemonId: pokemonIdOf(target), result: hitResult, remainingDefenderHp: newTargetHp }));
-
-      if (newTargetHp <= 0) {
-        targetFainted = true;
-        break;
-      }
-    }
-
-    setDamageOf(actor, totalDamageDealt);
-    events.push({ type: "multi-hit-complete", actor, hits: hitsCompleted });
-
-    // No currently-configured multi-hit move carries a secondary status/
-    // stat-change effect — this is a no-op today (resolveMoveEffects's
-    // default branch), kept for the same reason applyMoveEffect is always
-    // called from the normal single-hit path below.
-    applyMoveEffect(move, actor, firstResult, targetFainted);
-  }
-
-  // Phase 7 — records this exact move as the actor's own
-  // lastUsedMoveId (Disable/Encore both target "the opponent's last
-  // successfully used move" — see resolve-volatile-effects.ts) whenever
-  // the actor actually attempts a move this turn, hit or miss alike; a
-  // prevented actor (asleep, flinched, confused self-hit, ...) never
-  // reaches this at all, since it's only ever called from inside
-  // runAttack. Also resets Protect's own streak the instant the actor
-  // uses anything OTHER than Protect — see resolveProtectAttempt's own
-  // doc comment for why a non-Protect turn always breaks the streak.
-  function recordMoveUsage(actor: BattleActor, usedMoveId: string, isProtectMove: boolean): void {
-    const current = actor === "player" ? playerVolatile : wildVolatile;
-    const updated: VolatileState = {
-      ...current,
-      lastUsedMoveId: usedMoveId,
-      protect: isProtectMove ? current.protect : undefined,
-    };
-    if (actor === "player") {
-      playerVolatile = updated;
-    } else {
-      wildVolatile = updated;
-    }
-  }
-
-  // Phase 6J-6L/7 — the one dispatcher every actor's action goes through,
-  // branching only on the move's own `effect.kind` (never its id/name).
-  function runAttack(actor: BattleActor): void {
-    const move = moveOf(actor);
-    const attackerId = pokemonIdOf(actor);
-    const usedMoveId = moveIdOf(actor);
-    const target: BattleActor = actor === "player" ? "enemy" : "player";
-
-    recordMoveUsage(actor, usedMoveId, move.effect.kind === "protect");
-
-    if (move.effect.kind === "protect") {
-      events.push({ type: "move-used", actor, pokemonId: attackerId, moveId: usedMoveId });
-
-      const currentVolatile = actor === "player" ? playerVolatile : wildVolatile;
-      const protectResult = resolveProtectAttempt(actor, currentVolatile, drawRoll);
-      events.push(protectResult.event);
-      if (actor === "player") {
-        playerVolatile = protectResult.updatedVolatile;
-      } else {
-        wildVolatile = protectResult.updatedVolatile;
-      }
-      setDamageOf(actor, 0);
-      return;
-    }
-
-    if (move.effect.kind === "heal") {
-      events.push({ type: "move-used", actor, pokemonId: attackerId, moveId: usedMoveId });
-
-      const healResult = resolveHealing({
-        currentHp: currentHpOf(actor),
-        maxHp: maxHpOf(actor),
-        healPercent: move.effect.healPercent,
-      });
-      setHpOf(actor, healResult.remainingHp);
-      setDamageOf(actor, 0);
-
-      events.push(
-        healResult.success
-          ? { type: "healed", actor, amount: healResult.healed, remainingHp: healResult.remainingHp, source: "move" }
-          : { type: "healing-failed", actor, reason: "full-hp" }
-      );
-      return;
-    }
-
-    if (move.effect.kind === "multi-hit") {
-      events.push({ type: "move-used", actor, pokemonId: attackerId, moveId: usedMoveId });
-      runMultiHitAttack(actor, move, target);
-      return;
-    }
-
-    // Normal single-hit path — covers plain damage, status moves,
-    // stat-change/status (chance-gated or guaranteed), and drain/recoil
-    // (both layered on top of the same damage result below).
-    const result = resolveAndApply(move, battlerOf(actor), battlerOf(target));
-
-    // Phase 7 — Protect: self-targeted effects are never blocked (this
-    // whole check is skipped for them), and this project's documented
-    // move-execution order resolves accuracy BEFORE checking Protect —
-    // the roll above still happens even when Protect ends up blocking
-    // everything that would have followed it. The move-used event still
-    // fires (already pushed by the caller for multi-hit/heal, and
-    // explicitly here since buildAttackEvents — which would otherwise
-    // push it — is skipped entirely below); no damage/status/stat-change
-    // event of any kind is ever emitted for a blocked target.
-    if (move.target !== "self" && isProtected(target === "player" ? playerVolatile : wildVolatile)) {
-      events.push({ type: "move-used", actor, pokemonId: attackerId, moveId: usedMoveId });
-      events.push({ type: "protected", actor: target });
-      setDamageOf(actor, 0);
-      return;
-    }
-
-    const damageDealt = result.kind === "damage" ? result.damage : 0;
-    setDamageOf(actor, damageDealt);
-
-    const previousTargetHp = currentHpOf(target);
-    const newTargetHp = Math.max(0, previousTargetHp - damageDealt);
-    setHpOf(target, newTargetHp);
-    const actualDamageDealt = previousTargetHp - newTargetHp;
-
-    events.push(
-      ...buildAttackEvents({
-        actor,
-        attackerPokemonId: attackerId,
-        defenderPokemonId: pokemonIdOf(target),
-        moveId: usedMoveId,
-        result,
-        remainingDefenderHp: newTargetHp,
-      })
-    );
-
-    // Phase 6K — drain: heals the attacker off the target's ACTUAL HP loss
-    // (never the raw calculated damage). Applies even if the target then
-    // faints from this same hit — draining life happens as the damage
-    // lands, independent of the target's own fate.
-    if (move.effect.kind === "drain" && actualDamageDealt > 0) {
-      const drainResult = resolveDrainHealing({
-        actualDamageDealt,
-        drainPercent: move.effect.drainPercent,
-        currentHp: currentHpOf(actor),
-        maxHp: maxHpOf(actor),
-      });
-      if (drainResult.healed > 0) {
-        setHpOf(actor, drainResult.remainingHp);
-        events.push({ type: "healed", actor, amount: drainResult.healed, remainingHp: drainResult.remainingHp, source: "drain" });
-      }
-    }
-
-    // Phase 6K — recoil: damages the attacker off the target's ACTUAL HP
-    // loss. Can faint the attacker; both faints (target from the hit,
-    // attacker from its own recoil) are always emitted in that
-    // chronological order.
-    if (move.effect.kind === "recoil" && actualDamageDealt > 0) {
-      const recoilResult = resolveRecoilDamage({
-        actualDamageDealt,
-        recoilPercent: move.effect.recoilPercent,
-        currentHp: currentHpOf(actor),
-      });
-      setHpOf(actor, recoilResult.remainingHp);
-      events.push({ type: "recoil-damage", actor, damage: recoilResult.damage, remainingHp: recoilResult.remainingHp });
-      if (recoilResult.remainingHp <= 0) {
-        events.push({ type: "fainted", actor, pokemonId: attackerId });
-      }
-    }
-
-    applyMoveEffect(move, actor, result, newTargetHp <= 0);
-  }
-
-  // Phase 6G/7 — immediately before an actor's action, check whether it
-  // actually gets to attempt its move this turn at all. Documented order
-  // (this project's own, since none of these are mutually exclusive —
-  // a Pokémon can be flinched AND paralyzed AND confused all at once):
-  // 1. Flinch. 2. Major status (sleep/freeze/paralysis, existing
-  // resolvePreActionStatus, untouched). 3. Confusion. Each one that
-  // prevents the action returns immediately — the later checks never run
-  // at all, and never draw their own rolls, exactly like a fainted target
-  // never draws move-resolution rolls.
-  function runActorTurn(actor: BattleActor): void {
-    const isPlayerActor = actor === "player";
-    const volatile = isPlayerActor ? playerVolatile : wildVolatile;
-
-    // 1. Flinch — a same-turn-only flag, consumed (cleared) the instant
-    // it's checked, whether or not it actually prevents anything this
-    // check (it's already false if it doesn't apply).
-    if (resolvePreActionFlinch(volatile)) {
-      const cleared: VolatileState = { ...volatile, flinch: false };
-      if (isPlayerActor) {
-        playerVolatile = cleared;
-      } else {
-        wildVolatile = cleared;
-      }
-      events.push({ type: "volatile-prevented-action", actor, condition: "flinch" });
-      return;
-    }
-
-    // 2. Major status (unchanged Phase 6G machinery).
-    const status = isPlayerActor ? playerStatus : wildStatus;
-    const sleepTurnsRemaining = isPlayerActor ? playerStatusTurnsRemaining : wildStatusTurnsRemaining;
-
-    const preAction = resolvePreActionStatus({
-      status,
-      sleepTurnsRemaining,
-      fullParalysisRoll: drawRoll,
-      freezeThawRoll: drawRoll,
-    });
-
-    if (isPlayerActor) {
-      playerStatus = preAction.status;
-      playerStatusTurnsRemaining = preAction.sleepTurnsRemaining;
-    } else {
-      wildStatus = preAction.status;
-      wildStatusTurnsRemaining = preAction.sleepTurnsRemaining;
-    }
-
-    if (preAction.outcome === "fully-paralyzed" || preAction.outcome === "asleep" || preAction.outcome === "frozen") {
-      events.push({ type: "status-prevented-action", actor, status: preAction.outcome === "fully-paralyzed" ? "paralysis" : preAction.outcome === "asleep" ? "sleep" : "freeze" });
-      return;
-    }
-
-    if (preAction.outcome === "woke-up") {
-      // Waking up still consumes this turn's action — see
-      // resolve-pre-action-status.ts's own documented rule.
-      events.push({ type: "status-recovered", actor, status: "sleep" });
-      return;
-    }
-
-    if (preAction.outcome === "thawed") {
-      events.push({ type: "status-recovered", actor, status: "freeze" });
-    }
-
-    // 3. Confusion — checked after major status, per this file's own
-    // documented order. Recovering this turn does NOT consume the
-    // action (real-game behavior — see resolve-pre-action-volatile.ts);
-    // hurting itself does.
-    const confusionResult = resolvePreActionConfusion({
-      confusion: (isPlayerActor ? playerVolatile : wildVolatile).confusion,
-      selfHitRoll: drawRoll,
-    });
-
-    if (confusionResult.outcome === "recovered") {
-      const updated: VolatileState = { ...(isPlayerActor ? playerVolatile : wildVolatile), confusion: undefined };
-      if (isPlayerActor) {
-        playerVolatile = updated;
-      } else {
-        wildVolatile = updated;
-      }
-      events.push({ type: "volatile-recovered", actor, condition: "confusion" });
-    } else if (confusionResult.outcome !== "not-confused") {
-      const updated: VolatileState = {
-        ...(isPlayerActor ? playerVolatile : wildVolatile),
-        confusion: confusionResult.updatedConfusion,
-      };
-      if (isPlayerActor) {
-        playerVolatile = updated;
-      } else {
-        wildVolatile = updated;
-      }
-
-      if (confusionResult.outcome === "hurts-itself") {
-        events.push({ type: "volatile-prevented-action", actor, condition: "confusion" });
-
-        const battler = battlerOf(actor);
-        const effectiveStats = applyStatStagesToStats(
-          calculatePokemonStats({ baseStats: battler.baseStats, level: battler.level }),
-          battler.stages
-        );
-        const selfDamage = resolveConfusionSelfDamage(
-          battler.level,
-          effectiveStats.attack,
-          effectiveStats.defense,
-          rollDamageRandomFactor(randomSource)
-        );
-
-        const previousHp = currentHpOf(actor);
-        const newHp = Math.max(0, previousHp - selfDamage);
-        setHpOf(actor, newHp);
-        events.push({ type: "confusion-self-damage", actor, damage: selfDamage, remainingHp: newHp });
-        if (newHp <= 0) {
-          events.push({ type: "fainted", actor, pokemonId: pokemonIdOf(actor) });
-        }
-        return;
-      }
-    }
-
-    runAttack(actor);
-  }
-
-  const [firstActor, secondActor] = order;
-  runActorTurn(firstActor);
-
-  // Phase 6/6K/6-cleanup — if the first action left EITHER side fainted,
-  // the second action never happens at all this turn: no roll of any
-  // kind is drawn for it, no counterattack lands, and nothing attacks an
-  // already-fainted Pokémon. The reason differs depending on WHICH side
-  // fainted, since only one of these actually describes the second
-  // actor's own Pokémon:
-  //   - secondActor's own Pokémon fainted (from firstActor's damage) —
-  //     "fainted-before-action", the original Phase 6A-C rule.
-  //   - firstActor's own Pokémon fainted from its OWN recoil (Phase 6K) —
-  //     secondActor's own Pokémon is perfectly healthy, it simply has no
-  //     one left to attack, so "no-valid-target" is the accurate reason
-  //     rather than reusing "fainted-before-action" for a Pokémon that
-  //     never fainted at all. Checked in this order so the (rare) case
-  //     where both sides faint in the same action still reports the more
-  //     specific, self-evident "fainted-before-action".
-  const secondActorOwnPokemonFainted = secondActor === "player" ? partyPokemonFainted : wildFainted;
-  const firstActorOwnPokemonFainted = firstActor === "player" ? partyPokemonFainted : wildFainted;
-
-  if (secondActorOwnPokemonFainted) {
-    events.push(buildActionSkippedEvent(secondActor, "fainted-before-action"));
-  } else if (firstActorOwnPokemonFainted) {
-    events.push(buildActionSkippedEvent(secondActor, "no-valid-target"));
-  } else {
-    runActorTurn(secondActor);
-  }
-
-  // ---- Phase 6H: end-of-turn burn/poison residual damage -----------------
-  // Processed player-then-enemy, one documented stable order, only for a
-  // side that's still active (not already fainted this turn).
-  if (!partyPokemonFainted) {
-    const residual = resolveEndOfTurnStatusDamage(playerStatus, updatedPartyHp, playerMaxHp);
-    if (residual) {
-      updatedPartyHp = residual.remainingHp;
-      partyPokemonFainted = updatedPartyHp <= 0;
-      events.push({ type: "status-damage", actor: "player", status: playerStatus as "burn" | "poison", damage: residual.damage, remainingHp: updatedPartyHp });
-      if (partyPokemonFainted) events.push({ type: "fainted", actor: "player", pokemonId: activePokemonId });
-    }
-  }
-
-  if (!wildFainted) {
-    const residual = resolveEndOfTurnStatusDamage(wildStatus, updatedWildHp, wildMaxHp);
-    if (residual) {
-      updatedWildHp = residual.remainingHp;
-      wildFainted = updatedWildHp <= 0;
-      events.push({ type: "status-damage", actor: "enemy", status: wildStatus as "burn" | "poison", damage: residual.damage, remainingHp: updatedWildHp });
-      if (wildFainted) events.push({ type: "fainted", actor: "enemy", pokemonId: wildSpeciesId });
-    }
-  }
-
-  // ---- Phase 7: end-of-turn Leech Seed + trapping residual effects ------
-  // Processed player-then-enemy, same stable order/fainted-guard as burn/
-  // poison above. Leech Seed's actual HP loss heals the OPPONENT (reusing
-  // resolveDrainHealing at 100% — an "actual HP lost, clamped to max HP"
-  // heal is exactly drain's own rule, never duplicated here) — applied
-  // only if the healing recipient isn't itself already fainted.
-  if (!partyPokemonFainted) {
-    const result = resolveEndOfTurnVolatile({
-      actor: "player",
-      volatile: playerVolatile,
-      currentHp: updatedPartyHp,
-      maxHp: playerMaxHp,
-      opponentFainted: wildFainted,
-    });
-    playerVolatile = result.updatedVolatile;
-    updatedPartyHp = result.updatedHp;
-    partyPokemonFainted = result.fainted;
-    events.push(...result.events);
-    if (partyPokemonFainted) events.push({ type: "fainted", actor: "player", pokemonId: activePokemonId });
-
-    if (result.leechSeedDrainAmount > 0 && !wildFainted) {
-      const healResult = resolveDrainHealing({
-        actualDamageDealt: result.leechSeedDrainAmount,
-        drainPercent: 100,
-        currentHp: updatedWildHp,
-        maxHp: wildMaxHp,
-      });
-      if (healResult.healed > 0) {
-        updatedWildHp = healResult.remainingHp;
-        events.push({ type: "healed", actor: "enemy", amount: healResult.healed, remainingHp: healResult.remainingHp, source: "drain" });
-      }
-    }
-  }
-
-  if (!wildFainted) {
-    const result = resolveEndOfTurnVolatile({
-      actor: "enemy",
-      volatile: wildVolatile,
-      currentHp: updatedWildHp,
-      maxHp: wildMaxHp,
-      opponentFainted: partyPokemonFainted,
-    });
-    wildVolatile = result.updatedVolatile;
-    updatedWildHp = result.updatedHp;
-    wildFainted = result.fainted;
-    events.push(...result.events);
-    if (wildFainted) events.push({ type: "fainted", actor: "enemy", pokemonId: wildSpeciesId });
-
-    if (result.leechSeedDrainAmount > 0 && !partyPokemonFainted) {
-      const healResult = resolveDrainHealing({
-        actualDamageDealt: result.leechSeedDrainAmount,
-        drainPercent: 100,
-        currentHp: updatedPartyHp,
-        maxHp: playerMaxHp,
-      });
-      if (healResult.healed > 0) {
-        updatedPartyHp = healResult.remainingHp;
-        events.push({ type: "healed", actor: "player", amount: healResult.healed, remainingHp: healResult.remainingHp, source: "drain" });
-      }
-    }
-  }
-
-  // Phase 7 — flinch is same-turn-only; whichever side never got a
-  // chance to consume it this turn (already acted before it was applied,
-  // or was never due to act again) must not carry it into the next call.
-  if (playerVolatile.flinch) playerVolatile = { ...playerVolatile, flinch: false };
-  if (wildVolatile.flinch) wildVolatile = { ...wildVolatile, flinch: false };
+      stages: parseStatStages(session.wildStatStages),
+      status: (session.wildStatus as MajorStatus | null) ?? null,
+      statusTurnsRemaining: session.wildStatusTurnsRemaining,
+      volatile: initialWildVolatile,
+      currentHp: session.wildCurrentHp,
+      knownMoveIds: enemyKnownMoveIds,
+      moveId: enemyMoveId,
+    },
+    randomSource
+  );
+
+  const events: BattleEvent[] = turnResult.events;
+  const updatedPartyHp = turnResult.player.updatedHp;
+  const partyPokemonFainted = turnResult.player.fainted;
+  const playerDamage = turnResult.player.damageDealt;
+  const playerStatus = turnResult.player.status;
+  const playerStatusTurnsRemaining = turnResult.player.statusTurnsRemaining;
+  const playerStages = turnResult.player.stages;
+  const playerVolatile: VolatileState = turnResult.player.volatile;
+
+  const updatedWildHp = turnResult.enemy.updatedHp;
+  const wildFainted = turnResult.enemy.fainted;
+  const enemyDamage = turnResult.enemy.damageDealt;
+  const wildStatus = turnResult.enemy.status;
+  const wildStatusTurnsRemaining = turnResult.enemy.statusTurnsRemaining;
+  const wildStages = turnResult.enemy.stages;
+  const wildVolatile: VolatileState = turnResult.enemy.volatile;
 
   // ---- Persistence --------------------------------------------------------
   // Always written (simplicity over micro-optimizing away a same-value
@@ -1091,6 +408,18 @@ export async function executeBattleAction(
   // (a self-buff), a pre-action wake/thaw, or end-of-turn residual damage
   // — not only from "the other side's attack ran", so the old
   // conditional-write shortcuts no longer capture every case that matters.
+  //
+  // LATENCY AUDIT — the common, non-lethal case (the wild survives this
+  // turn) merges wildCurrentHp into this SAME updateMany, saving the extra
+  // round trip syncWildHp's own (now-redundant) write would otherwise cost:
+  // updatedWildHp is already guaranteed within [0, wildMaxHp] by every
+  // upstream mutation (damage/heal/drain/recoil all clamp themselves — see
+  // resolve-healing.ts/resolve-hp-transfer.ts), the exact same clamp
+  // syncWildHp's own non-lethal branch would otherwise redundantly
+  // recompute. A lethal hit (wildFainted) is deliberately excluded — its
+  // wildCurrentHp write must go through applyWildHpSync's own
+  // wildDefeatRewardGranted-guarded transaction below (see that function's
+  // own doc comment) rather than this plain, unguarded update.
   await prisma.fieldBattleSession.updateMany({
     where: { playerId, zoneId },
     data: {
@@ -1100,10 +429,20 @@ export async function executeBattleAction(
       wildStatusTurnsRemaining,
       wildVolatileState: serializeVolatileState(wildVolatile),
       playerVolatileState: serializeVolatileState(playerVolatile),
+      ...(wildFainted ? null : { wildCurrentHp: updatedWildHp }),
     },
   });
 
-  const experienceGranted = await syncWildHp(playerId, zoneId, updatedWildHp, randomSource);
+  // LATENCY AUDIT — applyWildHpSync reuses the exact same session row this
+  // function already read at the top (see its own doc comment,
+  // battle-session.service.ts) instead of re-querying FieldBattleSession a
+  // second time for data that hasn't changed since. Only ever called on an
+  // actual kill (wildFainted) — the plain non-lethal write already happened
+  // above, merged into the update just before this, so there is nothing
+  // left for this call to do (and no reward to grant) on any other turn.
+  const experienceGranted = wildFainted
+    ? await applyWildHpSync(playerId, zoneId, updatedWildHp, session, randomSource)
+    : null;
 
   await prisma.playerPokemon.update({
     where: { id: activePokemon.id },
@@ -1137,16 +476,17 @@ export async function executeBattleAction(
   // the client falls back to its existing "no session" -> return-to-map
   // handling for that case.
   //
-  // Phase 4 — regionId is only fetched here, lazily, on the one path that
-  // actually needs it (a promotion, which resolves a brand new encounter),
-  // never on every ordinary attack — this keeps the common case (no wild
-  // defeated this turn) at zero extra DB round trips. See
-  // getActiveRegionIdByPlayerId's own doc comment for why this looks up by
-  // playerId rather than reusing getPlayerProfile (which is keyed by the
-  // auth session's userId, not available at this layer).
+  // Phase 4 / FIELD BATTLE PERFORMANCE — regionId is only ever needed on
+  // the one path that actually promotes a new encounter, never on every
+  // ordinary attack. The production caller (battle-action.action.ts) now
+  // passes its own already-read PlayerProfile.regionId straight through
+  // (the `regionId` param above), so this branch costs zero extra DB round
+  // trips in production; the getActiveRegionIdByPlayerId fallback only
+  // fires for a caller that genuinely doesn't have it on hand (every
+  // existing test).
   const advancedEncounter =
     wildFainted && !battleEnded
-      ? await promoteToNextEncounter(playerId, zoneId, await getActiveRegionIdByPlayerId(playerId))
+      ? await promoteToNextEncounter(playerId, zoneId, regionId ?? (await getActiveRegionIdByPlayerId(playerId)))
       : null;
 
   // Phase 6-cleanup — explicit double-faint resolution. Both sides can
@@ -1163,17 +503,6 @@ export async function executeBattleAction(
   // is granted unconditionally and never reads `winner`; neither does
   // capture eligibility or the switching-after-faint flow.
   const winner: "player" | "wild" | null = battleEnded ? "wild" : wildFainted ? "player" : null;
-
-  function summarizeVolatile(volatile: VolatileState): BattleVolatileSummary {
-    return {
-      confused: Boolean(volatile.confusion),
-      protecting: Boolean(volatile.protect?.active),
-      disabledMoveId: volatile.disable?.moveId ?? null,
-      encoreMoveId: volatile.encore?.moveId ?? null,
-      leechSeeded: Boolean(volatile.leechSeed),
-      trapped: Boolean(volatile.trapping),
-    };
-  }
 
   return {
     status: "success",

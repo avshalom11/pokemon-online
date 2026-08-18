@@ -64,18 +64,55 @@ function requireFilled(results: (NpcTeamMember | null)[], context: string): NpcT
 }
 
 // ---- Gym NPC teams (81) --------------------------------------------------
+//
+// GYM TEAM VARIETY (later task, section 1) — Easy/Medium/Leader must not
+// repeat the same species WITHIN a Gym when a valid alternative exists.
+// `usedInGym` accumulates every species already given to an earlier battle
+// slot in this SAME Gym (Easy -> seeds Medium -> seeds Leader), so
+// selectNpcTeam's own dedup naturally extends across all 3 slots. If that
+// makes a slot genuinely unfillable (no valid alternative remains anywhere
+// in the approved fallback chain), this falls back to the ORIGINAL
+// per-slot-only selection (no cross-Gym seed) for that one battle slot —
+// "the minimum necessary repeat" — and records it in `repeatReports` for
+// the final summary rather than silently swallowing it.
 
+interface RepeatReport {
+  readonly gymId: string;
+  readonly battleSlot: GymBattleSlotId;
+  readonly repeatedSpeciesIds: readonly string[];
+}
+
+const repeatReports: RepeatReport[] = [];
 const gymTeams: GymNpcTeamDefinition[] = [];
 
 for (const gym of getAllGymDefinitions()) {
+  const usedInGym = new Set<string>();
+
   for (const battleSlot of GYM_BATTLE_SLOT_ORDER) {
     const rarityTargets = BATTLE_SLOT_TARGETS[battleSlot];
     const preferredSpeciesIds =
       battleSlot === "leader" && gym.regionId === "kanto" && gym.gymNumber === 2 ? KANTO_FIRE_GYM_LEADER_PREFERRED_SPECIES_IDS : undefined;
 
     const requests = buildSlotRequests(rarityTargets, gym.typeSpecialization, preferredSpeciesIds);
-    const results = selectNpcTeam(getSpeciesForRegion(gym.regionId), requests);
+    const pool = getSpeciesForRegion(gym.regionId);
+
+    let results = selectNpcTeam(pool, requests, usedInGym);
+    const unfillableWithSeed = results.some((member) => member === null);
+
+    if (unfillableWithSeed) {
+      // Fallback: the minimum necessary repeat — retry this ONE battle
+      // slot without the cross-Gym seed (still deduped within itself,
+      // exactly like before this task).
+      const fallbackResults = selectNpcTeam(pool, requests);
+      const repeated = fallbackResults.flatMap((member) => (member && usedInGym.has(member.speciesId) ? [member.speciesId] : []));
+      if (repeated.length > 0) {
+        repeatReports.push({ gymId: gym.id, battleSlot, repeatedSpeciesIds: repeated });
+      }
+      results = fallbackResults;
+    }
+
     const members = requireFilled(results, `${gym.id} (${battleSlot})`);
+    for (const member of members) usedInGym.add(member.speciesId);
 
     gymTeams.push({ regionId: gym.regionId, gymNumber: gym.gymNumber, battleSlot, members });
   }
@@ -217,5 +254,10 @@ import type { RegionId } from "@/shared/types/region";
   return REGIONAL_CHAMPION_TEAMS.find((team) => team.regionId === regionId);
 }`
 );
+
+console.log(`\n=== GYM TEAM VARIETY — minimum-necessary repeats: ${repeatReports.length} ===`);
+for (const report of repeatReports) {
+  console.log(`  ${report.gymId} (${report.battleSlot}): repeated ${report.repeatedSpeciesIds.join(", ")} — no valid alternative remained`);
+}
 
 console.log(`\nDone: ${gymTeams.length} Gym teams, ${championTeams.length} Champion teams.`);

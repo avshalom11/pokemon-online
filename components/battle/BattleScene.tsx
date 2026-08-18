@@ -38,10 +38,19 @@ export interface BattleSceneProps {
    * them is a no-op for any caller that doesn't need this. */
   enemyHit?: boolean;
   playerHit?: boolean;
+  /** Universal fast player-attack lunge, forwarded to the player's
+   * PokemonSprite — see its own `isAttacking` doc comment. */
+  playerAttacking?: boolean;
   /** Forwarded straight through to BattleBackground — see its own
    * `rarityOverlayClassName` doc comment
    * (components/battle/BattleBackground.tsx). */
   rarityOverlayClassName?: string;
+  /** GYM BATTLE POLISH — forwarded straight through to each side's own
+   * BattleHUD as its `footer` slot (see that component's own doc comment).
+   * Both default to undefined — a no-op for every caller that doesn't pass
+   * them (Field Battle today). */
+  playerHudFooter?: ReactNode;
+  enemyHudFooter?: ReactNode;
 }
 
 // Anchors a Pokémon sprite so its feet land exactly on a given point of the
@@ -84,7 +93,10 @@ export function BattleScene({
   onMenuAction,
   enemyHit,
   playerHit,
+  playerAttacking,
   rarityOverlayClassName,
+  playerHudFooter,
+  enemyHudFooter,
 }: BattleSceneProps) {
   return (
     // `isolate` establishes a new stacking context so BattleBackground's
@@ -106,6 +118,7 @@ export function BattleScene({
           fallbackSpriteUrl={player.fallbackSpriteUrl}
           name={player.name}
           isHit={playerHit}
+          isAttacking={playerAttacking}
         />
       </PlatformAnchor>
 
@@ -117,7 +130,7 @@ export function BattleScene({
           (lib/battle/battleLayout.ts) for why an arena-relative offset
           couldn't reliably clear the wild Pokémon in every zone. */}
       <div className={PLAYER_HUD_SIDE_CLASS} style={{ top: `${PLAYER_HUD_TOP_PERCENT}%` }}>
-        <BattleHUD theme={theme} participant={player} experience={player.experience} />
+        <BattleHUD theme={theme} participant={player} experience={player.experience} footer={playerHudFooter} />
       </div>
 
       {/* Enemy HUD — corner-anchored within the space above the footer.
@@ -126,7 +139,7 @@ export function BattleScene({
           never ends up covered by it regardless of screen size. */}
       <div className="relative min-h-0 flex-1 p-3 sm:p-6 lg:p-8">
         <div className={ENEMY_HUD_POSITION_CLASS}>
-          <BattleHUD theme={theme} participant={enemy} />
+          <BattleHUD theme={theme} participant={enemy} footer={enemyHudFooter} />
         </div>
       </div>
 

@@ -37,13 +37,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "pidgey",
+        "speciesId": "rattata",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "pidgeot",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -55,6 +50,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "lickitung",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "kangaskhan",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -64,12 +64,12 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "pidgeot",
+        "speciesId": "tauros",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "farfetchd",
+        "speciesId": "ditto",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
@@ -123,13 +123,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "vulpix",
+        "speciesId": "ponyta",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "ninetales",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -141,6 +136,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "rapidash",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "magmar",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -150,14 +150,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "rapidash",
+        "speciesId": "beedrill",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "magmar",
+        "speciesId": "pidgeot",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "charizard",
@@ -209,13 +209,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "psyduck",
+        "speciesId": "poliwag",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "poliwrath",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -227,6 +222,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "starmie",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "gyarados",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -236,12 +236,12 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "poliwrath",
+        "speciesId": "lapras",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "staryu",
+        "speciesId": "omanyte",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
@@ -295,13 +295,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "chinchou",
+        "speciesId": "mareep",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "lanturn",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -313,6 +308,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "noctowl",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "crobat",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -322,14 +322,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "lanturn",
+        "speciesId": "togetic",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "ampharos",
+        "speciesId": "xatu",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "chikorita",
@@ -381,13 +381,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "hoppip",
+        "speciesId": "sunkern",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "bellossom",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -399,6 +394,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "sunflora",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "noctowl",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -408,14 +408,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "bellossom",
+        "speciesId": "crobat",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "jumpluff",
+        "speciesId": "lanturn",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "chikorita",
@@ -467,13 +467,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "sneasel",
+        "speciesId": "smoochum",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "piloswine",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -485,6 +480,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "noctowl",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "crobat",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -494,14 +494,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "piloswine",
+        "speciesId": "lanturn",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "delibird",
+        "speciesId": "togetic",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "chikorita",
@@ -553,14 +553,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "makuhita",
+        "speciesId": "poochyena",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "breloom",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "hariyama",
@@ -571,6 +566,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "medicham",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "mightyena",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -580,14 +580,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "breloom",
+        "speciesId": "linoone",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "hariyama",
+        "speciesId": "beautifly",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "combusken",
@@ -639,14 +639,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "gulpin",
+        "speciesId": "zigzagoon",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "dustox",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "roselia",
@@ -655,6 +650,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "swalot",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "seviper",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       }
@@ -666,14 +666,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "dustox",
+        "speciesId": "mightyena",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "roselia",
+        "speciesId": "linoone",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "treecko",
@@ -725,13 +725,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "nincada",
+        "speciesId": "trapinch",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "camerupt",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -743,6 +738,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "whiscash",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "claydol",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -752,14 +752,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "camerupt",
+        "speciesId": "mightyena",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "flygon",
+        "speciesId": "linoone",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "marshtomp",
@@ -811,13 +811,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "starly",
+        "speciesId": "combee",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "staraptor",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -829,6 +824,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "vespiquen",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "drifblim",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -838,12 +838,12 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "staraptor",
+        "speciesId": "honchkrow",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "mothim",
+        "speciesId": "chatot",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
@@ -897,13 +897,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "chingling",
+        "speciesId": "mime-jr",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "bronzong",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -915,6 +910,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "braviary-hisui",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "wyrdeer",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -924,14 +924,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "bronzong",
+        "speciesId": "arcanine-hisui",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "gallade",
+        "speciesId": "qwilfish-hisui",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "typhlosion-hisui",
@@ -983,13 +983,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "kricketot",
+        "speciesId": "combee",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "kricketune",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -1001,6 +996,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "mothim",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "vespiquen",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -1010,14 +1010,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "kricketune",
+        "speciesId": "yanmega",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "wormadam",
+        "speciesId": "arcanine-hisui",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "kleavor",
@@ -1069,13 +1069,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "roggenrola",
+        "speciesId": "dwebble",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "gigalith",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -1087,6 +1082,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "carracosta",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "archeops",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -1096,14 +1096,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "gigalith",
+        "speciesId": "watchog",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "crustle",
+        "speciesId": "stoutland",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "snivy",
@@ -1155,13 +1155,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "yamask",
+        "speciesId": "litwick",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "cofagrigus",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -1173,6 +1168,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "chandelure",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "golurk",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -1182,14 +1182,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "cofagrigus",
+        "speciesId": "watchog",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "jellicent",
+        "speciesId": "stoutland",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "snivy",
@@ -1241,14 +1241,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "axew",
+        "speciesId": "patrat",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "haxorus",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "druddigon",
@@ -1257,6 +1252,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "watchog",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "stoutland",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
       }
@@ -1268,14 +1268,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "haxorus",
+        "speciesId": "liepard",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "druddigon",
+        "speciesId": "simisage",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "deino",
@@ -1327,14 +1327,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "inkay",
+        "speciesId": "fletchling",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "pangoro",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "malamar",
@@ -1343,6 +1338,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "diggersby",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "talonflame",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
       }
@@ -1354,14 +1354,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "pangoro",
+        "speciesId": "vivillon",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "malamar",
+        "speciesId": "pyroar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "greninja",
@@ -1413,14 +1413,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "honedge",
+        "speciesId": "bunnelby",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "aegislash",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "klefki",
@@ -1429,6 +1424,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "diggersby",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "talonflame",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
       }
@@ -1440,14 +1440,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "aegislash",
+        "speciesId": "vivillon",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "klefki",
+        "speciesId": "pyroar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "chespin",
@@ -1499,13 +1499,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "flabebe",
+        "speciesId": "spritzee",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "florges",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -1517,6 +1512,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "slurpuff",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "sylveon",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -1526,12 +1526,12 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "florges",
+        "speciesId": "dedenne",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "aromatisse",
+        "speciesId": "carbink",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
@@ -1585,13 +1585,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "rattata-alola",
+        "speciesId": "yungoos",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "raticate-alola",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -1603,6 +1598,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "toucannon",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "gumshoos",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
       }
     ]
   },
@@ -1612,12 +1612,12 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "raticate-alola",
+        "speciesId": "oranguru",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "trumbeak",
+        "speciesId": "silvally",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
@@ -1671,13 +1671,8 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "geodude-alola",
+        "speciesId": "charjabug",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "vikavolt",
-        "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
@@ -1689,6 +1684,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "ninetales-alola",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "muk-alola",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -1698,12 +1698,12 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "vikavolt",
+        "speciesId": "trumbeak",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "raticate-alola",
+        "speciesId": "toucannon",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
       },
@@ -1757,14 +1757,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "stufful",
+        "speciesId": "rattata-alola",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "crabrawler",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "crabominable",
@@ -1775,6 +1770,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "passimian",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "raticate-alola",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -1784,14 +1784,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "crabrawler",
+        "speciesId": "ninetales-alola",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "crabominable",
+        "speciesId": "muk-alola",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "hakamo-o",
@@ -1843,14 +1843,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "carkol",
+        "speciesId": "meowth-galar",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "coalossal",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "centiskorch",
@@ -1859,6 +1854,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "rapidash-galar",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
+      },
+      {
+        "speciesId": "farfetchd-galar",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-off-type"
       }
@@ -1870,14 +1870,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "coalossal",
+        "speciesId": "mr-mime-galar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "centiskorch",
+        "speciesId": "slowking-galar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "scorbunny",
@@ -1929,14 +1929,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "chewtle",
+        "speciesId": "meowth-galar",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "drednaw",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "cramorant",
@@ -1945,6 +1940,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "barraskewda",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "dracovish",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       }
@@ -1956,14 +1956,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "drednaw",
+        "speciesId": "arctovish",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       },
       {
-        "speciesId": "cramorant",
+        "speciesId": "rapidash-galar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "sobble",
@@ -2015,14 +2015,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "gossifleur",
+        "speciesId": "meowth-galar",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "eldegoss",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "flapple",
@@ -2033,6 +2028,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "appletun",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "rapidash-galar",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -2042,14 +2042,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "eldegoss",
+        "speciesId": "farfetchd-galar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "flapple",
+        "speciesId": "mr-mime-galar",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "grookey",
@@ -2101,14 +2101,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "flittle",
+        "speciesId": "lechonk",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "rabsca",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "espathra",
@@ -2117,6 +2112,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "veluza",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "farigiraf",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       }
@@ -2128,14 +2128,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "rabsca",
+        "speciesId": "tauros-paldea-combat",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "espathra",
+        "speciesId": "tauros-paldea-blaze",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "armarouge",
@@ -2187,14 +2187,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "maschiff",
+        "speciesId": "lechonk",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "lokix",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "mabosstiff",
@@ -2203,6 +2198,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
       },
       {
         "speciesId": "bombirdier",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "kingambit",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
       }
@@ -2214,14 +2214,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "lokix",
+        "speciesId": "tauros-paldea-combat",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "mabosstiff",
+        "speciesId": "tauros-paldea-blaze",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "meowscarada",
@@ -2273,14 +2273,9 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "medium",
     "members": [
       {
-        "speciesId": "dipplin",
+        "speciesId": "lechonk",
         "targetRarity": "common",
-        "fallbackTier": "exact-rarity-matching-type"
-      },
-      {
-        "speciesId": "cyclizar",
-        "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "tatsugiri",
@@ -2291,6 +2286,11 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
         "speciesId": "hydrapple",
         "targetRarity": "rare",
         "fallbackTier": "exact-rarity-matching-type"
+      },
+      {
+        "speciesId": "tauros-paldea-combat",
+        "targetRarity": "rare",
+        "fallbackTier": "exact-rarity-off-type"
       }
     ]
   },
@@ -2300,14 +2300,14 @@ export const GYM_NPC_TEAMS: readonly GymNpcTeamDefinition[] = [
     "battleSlot": "leader",
     "members": [
       {
-        "speciesId": "cyclizar",
+        "speciesId": "tauros-paldea-blaze",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
-        "speciesId": "tatsugiri",
+        "speciesId": "tauros-paldea-aqua",
         "targetRarity": "rare",
-        "fallbackTier": "exact-rarity-matching-type"
+        "fallbackTier": "exact-rarity-off-type"
       },
       {
         "speciesId": "frigibax",

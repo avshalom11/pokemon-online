@@ -7,11 +7,17 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
+async function selectPartyFor(playerId: string, target: Parameters<typeof startNpcBattle>[1]): Promise<string[]> {
+  const options = await getGymBattlePartyOptions(playerId, target);
+  if (options.status !== "ok") return [];
+  return options.options.filter((o) => !o.fainted).slice(0, options.requiredCount).map((o) => o.id);
+}
+
 import { deriveGymNpcLevelRange } from "@/features/gyms/config/gym-level-scaling-lookup";
 import { getGymNpcTeam } from "@/features/gyms/data/gym-npc-teams";
 import { getRegionalChampionTeam } from "@/features/gyms/data/regional-champion-teams";
 import { markGymBattleCompleted } from "@/features/gyms/services/gym-progression.service";
-import { abandonNpcBattleSession, startNpcBattle } from "@/features/gyms/services/gym-battle-session.service";
+import { abandonNpcBattleSession, startNpcBattle, getGymBattlePartyOptions } from "@/features/gyms/services/gym-battle-session.service";
 import { deriveSpeciesWildLevelRange } from "@/engine/evolution-stage-scaling/species-wild-level-range";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { prisma } from "@/lib/db/prisma";
@@ -45,13 +51,13 @@ function seedParty(count: number) {
 
 test("Gym 2 cannot start before Gym 1 is fully completed (locked)", async () => {
   seedParty(1);
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 2, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 2, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 2, battleSlot: "easy" }));
   assert.deepEqual(result, { status: "locked" });
 });
 
 test("a Gym Leader battle slot cannot start before Easy+Medium are completed (locked)", async () => {
   seedParty(1);
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }));
   assert.deepEqual(result, { status: "locked" });
 });
 
@@ -61,14 +67,14 @@ test("an already-completed battle cannot be replayed", async () => {
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "easy");
   });
 
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.deepEqual(result, { status: "already-completed" });
 });
 
 test("Regional Champion is locked before all 3 Badges are earned, and unlocks once they are", async () => {
   seedParty(1);
 
-  const stillLocked = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" });
+  const stillLocked = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }, await selectPartyFor(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }));
   assert.deepEqual(stillLocked, { status: "locked" });
 
   await prisma.$transaction(async (tx) => {
@@ -77,13 +83,13 @@ test("Regional Champion is locked before all 3 Badges are earned, and unlocks on
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 3, "leader");
   });
 
-  const nowUnlocked = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" });
+  const nowUnlocked = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }, await selectPartyFor(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }));
   assert.equal(nowUnlocked.status, "started");
 });
 
 test("the correct fixed NPC team (Phase 2) is loaded, unmodified", async () => {
   seedParty(1);
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
 
@@ -97,7 +103,7 @@ test("the correct fixed NPC team (Phase 2) is loaded, unmodified", async () => {
 
 test("NPC levels are resolved only from Gym scaling — never from evolution-stage legality", async () => {
   seedParty(1);
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, () => 0);
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }), () => 0);
   // Leader locked — Easy/Medium not completed yet (this PLAYER_ID is
   // already seeded at MIN_GYM_PLAYER_LEVEL, so this is purely the
   // within-Gym-order lock, not the Level-10 gate).
@@ -108,7 +114,7 @@ test("NPC levels are resolved only from Gym scaling — never from evolution-sta
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "medium");
   });
 
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, () => 0);
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }), () => 0);
   assert.equal(started.status, "started");
   if (started.status !== "started") return;
 
@@ -133,7 +139,7 @@ test("NPC levels are resolved only from Gym scaling — never from evolution-sta
 
 test("resolved NPC levels stay fixed for the whole attempt — never rerolled turn to turn", async () => {
   seedParty(1);
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(started.status, "started");
   if (started.status !== "started") return;
 
@@ -144,7 +150,7 @@ test("resolved NPC levels stay fixed for the whole attempt — never rerolled tu
 
 test("Easy uses at most 3 of the player's current party, in slot order", async () => {
   seedParty(5);
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
   const ids = result.session.playerPokemonIds as unknown as string[];
@@ -156,7 +162,7 @@ test("Medium uses at most 4 of the player's current party", async () => {
   await prisma.$transaction(async (tx) => {
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "easy");
   });
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "medium" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "medium" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "medium" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
   assert.equal((result.session.playerPokemonIds as unknown as string[]).length, 4);
@@ -168,34 +174,55 @@ test("Gym Leader / Regional Champion use at most 6 of the player's current party
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "easy");
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "medium");
   });
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
   assert.equal((result.session.playerPokemonIds as unknown as string[]).length, 6);
 });
 
-test("every participating Pokémon starts at full battle-local HP, regardless of its real (possibly damaged) HP", async () => {
-  seedPlayerPokemon({ id: "p1", playerId: PLAYER_ID, speciesId: "charmander", level: 100, currentHp: 1, partySlot: 1 });
+// HP PERSISTENCE RULE CHANGE (later task, section 8) — this OVERRIDES the
+// old Phase 3/4 "always full battle-local HP" rule: a Gym/Regional Champion
+// battle now seeds battle-local HP from the participant's REAL, current
+// (possibly damaged) PlayerPokemon.currentHp, and never auto-heals it.
+test("a participating Pokémon starts at its REAL current HP, not full HP — the old always-full-HP rule no longer applies", async () => {
+  seedPlayerPokemon({ id: "p1", playerId: PLAYER_ID, speciesId: "charmander", level: 100, currentHp: 37, partySlot: 1 });
   seedKnownMove({ playerPokemonId: "p1", moveId: "scratch", slot: 1 });
 
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
 
   const battleHp = result.session.playerBattleHp as unknown as Record<string, number>;
-  const species = getSpeciesById("charmander")!;
-  const expectedMaxHp = (await import("@/engine/battle/pokemon-stat-calculations")).calculatePokemonStats({ baseStats: species.baseStats, level: 100 }).maxHp;
-  assert.equal(battleHp.p1, expectedMaxHp);
+  assert.equal(battleHp.p1, 37);
 
-  // The real PlayerPokemon row is completely untouched — proves isolation
-  // from Field Battle/Pokémon Center state.
+  // The real PlayerPokemon row's HP is the actual source of the seeded
+  // battle-local value above — unaffected by starting the battle itself.
   const { getPlayerPokemonRow } = await import("../../../test/support/fakes/prisma.fake.ts");
-  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 1);
+  assert.equal(getPlayerPokemonRow("p1")?.currentHp, 37);
+});
+
+// A fully-healthy Pokémon's real and battle-local HP are simply the same
+// number — this is not a special case, just the natural result of seeding
+// from real HP when real HP already happens to be full.
+test("a fully-healthy participating Pokémon's battle-local HP equals its real (full) HP", async () => {
+  const species = getSpeciesById("charmander")!;
+  const { calculatePokemonStats } = await import("@/engine/battle/pokemon-stat-calculations");
+  const expectedMaxHp = calculatePokemonStats({ baseStats: species.baseStats, level: 100 }).maxHp;
+
+  seedPlayerPokemon({ id: "p1", playerId: PLAYER_ID, speciesId: "charmander", level: 100, currentHp: expectedMaxHp, partySlot: 1 });
+  seedKnownMove({ playerPokemonId: "p1", moveId: "scratch", slot: 1 });
+
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
+  assert.equal(result.status, "started");
+  if (result.status !== "started") return;
+
+  const battleHp = result.session.playerBattleHp as unknown as Record<string, number>;
+  assert.equal(battleHp.p1, expectedMaxHp);
 });
 
 test("the NPC team's first Pokémon starts at its own full HP", async () => {
   seedParty(1);
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
 
@@ -208,7 +235,7 @@ test("the NPC team's first Pokémon starts at its own full HP", async () => {
 
 test("abandoning an in-progress battle deletes the session and marks no completion", async () => {
   seedParty(1);
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(started.status, "started");
 
   await abandonNpcBattleSession(PLAYER_ID);
@@ -225,7 +252,7 @@ test("Regional Champion team is loaded from Phase 2 (getRegionalChampionTeam), n
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 3, "leader");
   });
 
-  const result = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }, await selectPartyFor(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }));
   assert.equal(result.status, "started");
   if (result.status !== "started") return;
 

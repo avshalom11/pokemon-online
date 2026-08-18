@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { HealthBar } from "./HealthBar";
 import { PokemonXpBar } from "./PokemonXpBar";
 import { getRarityPresentation } from "@/lib/battle/battleRarityPresentation";
@@ -11,6 +13,15 @@ interface BattleHUDProps {
    * Pokémon-XP bar; total lifetime XP, not a {current,max} pair, per
    * PokemonXpBar's own doc comment. */
   experience?: number;
+  /** GYM BATTLE POLISH — a generic, optional slot rendered INSIDE this
+   * same status card, directly beneath the HP bar (and the XP bar, when
+   * present) — never a second, detached overlay. Used by Gym/Regional
+   * Champion battles for their Poké Ball team-status row so it visually
+   * belongs to this side's Pokémon rather than floating near the trainer
+   * name; omitted entirely (default) by every other caller (Field Battle),
+   * so this is a zero-risk, purely additive extension of the one shared
+   * HUD component both battle types already render through. */
+  footer?: ReactNode;
 }
 
 // Phase 6F — short status badges, same abbreviation convention every
@@ -34,7 +45,7 @@ const STATUS_BADGE_COLOR: Record<string, string> = {
 // Trimmed from the original w-56/sm:w-64 card (width, padding, and name
 // text all reduced slightly) as part of a visual-polish pass — HealthBar
 // itself is untouched, so the HP bar stays exactly as readable as before.
-export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
+export function BattleHUD({ theme, participant, experience, footer }: BattleHUDProps) {
   // Only ever set for the wild (enemy) participant — see
   // BattleParticipantDisplay.rarity's doc comment — so this is a no-op
   // (undefined) for the player HUD.
@@ -102,6 +113,8 @@ export function BattleHUD({ theme, participant, experience }: BattleHUDProps) {
           <PokemonXpBar experience={experience} />
         </div>
       ) : null}
+
+      {footer ? <div className="mt-2">{footer}</div> : null}
     </div>
   );
 }

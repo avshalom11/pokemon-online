@@ -2,12 +2,16 @@ import { SpriteImage } from "@/components/media/SpriteImage";
 import { getGymBadgeDefinition } from "@/features/gyms/data/gym-badges";
 import { getRegionalMedalDefinition } from "@/features/gyms/data/regional-medals";
 import type { GrantedGymReward } from "@/features/gyms/services/gym-reward.service";
-import { REGION_DISPLAY_NAMES_HE } from "@/features/gyms/data/gym-labels";
 import type { RegionId } from "@/shared/types/region";
 
 interface GymVictoryRewardDialogProps {
   regionId: RegionId;
   gymNumber: 1 | 2 | 3 | null;
+  // VICTORY DIALOG (later task, section 11) — the actual fixed trainer name
+  // (gym-trainer-names.ts), read straight off the battle view data; combined
+  // into this SAME dialog's own title rather than showing a second,
+  // overlapping "you won!" confirmation before this one.
+  trainerName: string;
   reward: GrantedGymReward;
   onConfirm: () => void;
 }
@@ -22,14 +26,23 @@ interface GymVictoryRewardDialogProps {
 // SpriteImage, which already falls back to the project's own "אין תמונה"
 // placeholder if the file doesn't exist on disk yet — never a broken-image
 // icon, and never a generated placeholder file.
-export function GymVictoryRewardDialog({ regionId, gymNumber, reward, onConfirm }: GymVictoryRewardDialogProps) {
+export function GymVictoryRewardDialog({ regionId, gymNumber, trainerName, reward, onConfirm }: GymVictoryRewardDialogProps) {
   const isChampion = reward.kind === "regional-champion";
   const badge = !isChampion && gymNumber ? getGymBadgeDefinition(regionId, gymNumber) : null;
   const medal = isChampion ? getRegionalMedalDefinition(regionId) : null;
 
-  const title = isChampion ? `ניצחת את מנהל מחוז ${REGION_DISPLAY_NAMES_HE[regionId]}!` : "ניצחת את מנהיג המכון!";
+  // VICTORY DIALOG COPY (later task, section 1) — the exact approved
+  // sentence, combined here with the reward result into ONE dialog for a
+  // Gym Leader/Regional Champion win — never a second, overlapping "you
+  // won!" confirmation shown before this one.
+  const title = `כל הכבוד! ניצחת את ${trainerName}. לא רבים מצליחים!`;
   const imageUrl = medal?.imageUrl ?? badge?.imageUrl ?? "";
   const imageAlt = medal?.displayName ?? badge?.displayName ?? "";
+  // BADGE/MEDAL EARNED STATE (later task, section 3/4) — the exact "עיטור
+  // התקבל" wording GymsContent's own region-overview list already uses for
+  // a completed Gym's badge, reused here rather than a second phrase for
+  // the same concept.
+  const earnedLabel = isChampion ? "מדליה אזורית התקבלה ✓" : "עיטור התקבל ✓";
 
   return (
     <div
@@ -49,6 +62,8 @@ export function GymVictoryRewardDialog({ regionId, gymNumber, reward, onConfirm 
             fallbackClassName="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
           />
         </div>
+
+        <p className="mt-2 text-sm font-semibold text-amber-400">{earnedLabel}</p>
 
         <dl className="mt-4 flex flex-col gap-1.5 text-sm text-slate-300">
           <div className="flex items-center justify-between">

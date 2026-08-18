@@ -1,4 +1,5 @@
 import type { RegionId } from "@/shared/types/region";
+import { getGymBadgeImageUrl } from "./gym-badge-images";
 import { REGION_GYMS } from "./gym-registry";
 
 // GYMS & LEAGUES PHASE 1 — 27 Gym Badge definitions (3 per region x 9
@@ -19,12 +20,11 @@ export interface GymBadgeDefinition {
   readonly regionId: RegionId;
   readonly gymNumber: 1 | 2 | 3;
   readonly displayName: string;
-  // Deterministic, not-yet-populated artwork path — mirrors this project's
-  // existing /images/<category>/... convention (e.g. /images/eggs/common.png,
-  // /images/chests/gold.png). Place the real file at this exact path once
-  // artwork exists; nothing else needs to change. One subfolder per region
-  // (9 folders x 3 files) rather than one flat 27-file folder, so a
-  // region's own badge set stays visually grouped on disk.
+  // GYM BADGES / MEDALS — SIMPLE NUMERIC IMAGE ARCHITECTURE (later task) —
+  // deterministically derived via getGymBadgeImageUrl (gym-badge-images.ts,
+  // the one source of truth for this path), never computed/hardcoded a
+  // second time here. Place the real file at this exact path once artwork
+  // exists; nothing else needs to change.
   readonly imageUrl: string;
 }
 
@@ -38,7 +38,7 @@ function buildBadgeDefinition(regionId: RegionId, gymNumber: 1 | 2 | 3): GymBadg
     regionId,
     gymNumber,
     displayName: `${displayRegionName} ${displayTypeName} Badge`,
-    imageUrl: `/images/gyms/badges/${regionId}/${gym.id}.png`,
+    imageUrl: getGymBadgeImageUrl(regionId, gymNumber),
   };
 }
 

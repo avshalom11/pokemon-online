@@ -40,6 +40,7 @@ export async function getProfileEditViewModel(userId: string, username: string):
     showPartyOnProfile: profile.showPartyOnProfile ?? true,
     showStatsOnProfile: profile.showStatsOnProfile ?? true,
     showAboutMeOnProfile: profile.showAboutMeOnProfile ?? true,
+    showGymAchievementsOnProfile: profile.showGymAchievementsOnProfile ?? true,
     partyPreview,
     contentBlocks: parseProfileContentBlocks(profile.profileContentBlocks),
   };

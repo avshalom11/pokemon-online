@@ -14,7 +14,7 @@ import { rollAndAwardEgg } from "@/features/eggs/services/egg-drop.service";
 import { progressActiveIncubations } from "@/features/eggs/services/incubation.service";
 import type { EggDropOutcome, IncubationProgressSummary } from "@/features/eggs/types/egg.types";
 import { markSpeciesSeen } from "@/features/pokedex/services/mark-species-seen.service";
-import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
+import { getPlayerParty, hydrateOwnedPokemonRows, PLAYER_PARTY_QUERY_ARGS } from "@/features/pokemon/services/player-pokemon";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getFirstUsableMember, hasUsableMember, isUsable } from "@/features/party/utils/party-rules";
 import { getEligibleParticipantIds, withParticipant, withParticipantFainted } from "@/features/pokemon-progression/pokemon-progression-calculations";
@@ -25,7 +25,7 @@ import { addPlayerExperience, getPlayerLevel } from "@/features/player-progressi
 import { resolveEffectiveWildLevelRange } from "@/features/player/services/wild-level-preference.service";
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { prisma } from "@/lib/db/prisma";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import type { FieldBattleSession, Prisma } from "@/lib/generated/prisma/client";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 import { toRegionId, type RegionId } from "@/shared/types/region";
 import { ALL_ZONE_IDS, type ZoneId } from "@/shared/types/zone";
@@ -381,6 +381,37 @@ export async function hasActiveBattleSession(playerId: string): Promise<boolean>
   return session !== null;
 }
 
+// FIELD BATTLE PERFORMANCE — the FieldBattleSession row and the player's
+// active party used to be two independent top-level Prisma calls
+// (previously `Promise.all([fieldBattleSession.findUnique, getPlayerParty])`
+// in battle-action.service.ts). Measured against this project's actual
+// remote Neon setup, running them concurrently was consistently SLOWER than
+// a single query, not faster: each concurrent top-level call appears to pay
+// its own connection-acquisition cost on this pooled/serverless setup, so
+// "parallel" here meant two connection round trips instead of one reused
+// connection. This reads both through PlayerProfile's own two relations
+// (`fieldBattleSession`, `pokemon`) in a SINGLE Prisma call instead — one
+// query, one connection, no JS-side race between two independent awaits.
+// Returns nulls/empty for a player with no row/party rather than throwing;
+// callers keep their own existing "no session"/"not owned" handling
+// unchanged (see executeBattleAction).
+export async function getActiveBattleSessionWithParty(
+  playerId: string
+): Promise<{ session: FieldBattleSession | null; party: OwnedPokemon[] }> {
+  const profile = await prisma.playerProfile.findUnique({
+    where: { id: playerId },
+    select: {
+      fieldBattleSession: true,
+      pokemon: PLAYER_PARTY_QUERY_ARGS,
+    },
+  });
+
+  return {
+    session: profile?.fieldBattleSession ?? null,
+    party: hydrateOwnedPokemonRows(profile?.pokemon ?? []),
+  };
+}
+
 // Re-derives max HP from the row's own species/level rather than trusting a
 // client-sent value — same rule syncPartyHpAction already follows for party
 // HP (features/battle/actions/sync-party-hp.action.ts).
@@ -422,6 +453,30 @@ export async function syncWildHp(
   const session = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
   if (!session || session.zoneId !== zoneId) return null;
 
+  return applyWildHpSync(playerId, zoneId, currentHp, session, randomSource);
+}
+
+// LATENCY AUDIT — the reward-claim half of syncWildHp above, split out so a
+// caller that has *already* loaded this exact session row this same request
+// (battle-action.service.ts — every ordinary attack reads the session once,
+// at the top of executeBattleAction, purely to validate the action) can
+// reuse it instead of syncWildHp re-querying the identical row a second
+// time. `session` must be the caller's own fresh read of this player's
+// FieldBattleSession — every field this function reads from it
+// (wildSpeciesId, wildLevel, wildDefeatRewardGranted, participants,
+// activePlayerPokemonId) is never mutated anywhere between
+// executeBattleAction's initial read and this call, so passing that same
+// object through is exactly as correct as re-fetching it here would be.
+// syncWildHp itself is untouched for every other caller (tests,
+// sync-wild-hp.action.ts) — it still fetches its own session, then simply
+// delegates here.
+export async function applyWildHpSync(
+  playerId: string,
+  zoneId: ZoneId,
+  currentHp: number,
+  session: FieldBattleSession,
+  randomSource?: () => number
+): Promise<BattleVictoryReward | null> {
   const species = getSpeciesById(session.wildSpeciesId);
   if (!species) return null;
 

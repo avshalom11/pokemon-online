@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { REGION_LABELS } from "@/shared/types/region-labels";
 import { toRegionId } from "@/shared/types/region";
 import { parseProfileContentBlocks } from "./parse-profile-content";
+import { getProfileAchievementsView } from "./profile-achievements-view.service";
 import { getProfileTheme } from "../themes/profile-themes";
 import type { PublicPartyMemberView, PublicProfileView, PublicStatsView } from "../types/profile.types";
 
@@ -50,7 +51,9 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
   const showPartyOnProfile = profile.showPartyOnProfile ?? true;
   const showStatsOnProfile = profile.showStatsOnProfile ?? true;
   const showAboutMeOnProfile = profile.showAboutMeOnProfile ?? true;
+  const showGymAchievementsOnProfile = profile.showGymAchievementsOnProfile ?? true;
   const aboutMeValue = profile.aboutMe ?? "";
+  const isOwner = viewerUserId !== null && viewerUserId === user.id;
 
   let party: PublicPartyMemberView[] | null = null;
   if (showPartyOnProfile) {
@@ -81,6 +84,12 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
 
   const aboutMe = showAboutMeOnProfile && aboutMeValue.trim() !== "" ? aboutMeValue : null;
 
+  // PROFILE ACHIEVEMENTS — the privacy decision (owner, or setting ON) is
+  // made once, server-side, right here; getProfileAchievementsView never
+  // even fetches badge/medal rows when it isn't allowed to (see that
+  // function's own doc comment).
+  const achievements = await getProfileAchievementsView(profile.id, { isOwner, showGymAchievementsOnProfile });
+
   return {
     username: user.username,
     displayName: profile.displayName,
@@ -90,9 +99,10 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
     avatarDexNumber: profile.avatarDexNumber ?? null,
     themeId: theme.id,
     aboutMe,
-    isOwner: viewerUserId !== null && viewerUserId === user.id,
+    isOwner,
     party,
     stats,
+    achievements,
     contentBlocks: parseProfileContentBlocks(profile.profileContentBlocks),
   };
 }

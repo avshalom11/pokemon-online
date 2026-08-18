@@ -40,8 +40,9 @@ import {
   wildAppearedMessage,
 } from "@/features/battle/utils/battle-messages";
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
+import { playAttackHitSound } from "@/features/battle/utils/battle-attack-effect";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
-import { HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
+import { ATTACK_EFFECT_DURATION_MS, HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
 import { EvolutionBranchChoiceDialog } from "@/features/evolution/components/EvolutionBranchChoiceDialog";
 import { EvolutionPromptDialog } from "@/features/evolution/components/EvolutionPromptDialog";
 import { acceptEvolutionAction, chooseEvolutionBranchAction, rejectEvolutionAction } from "@/features/evolution/actions/evolution.actions";
@@ -360,14 +361,24 @@ export function BattleContent({
 
   const [enemyHit, setEnemyHit] = useState(false);
   const [playerHit, setPlayerHit] = useState(false);
+  // Universal fast player-attack lunge (see app/globals.css's
+  // battle-attack-lunge and features/battle/utils/battle-attack-effect.ts
+  // for the accompanying sound) — set the instant a player attack is
+  // actually accepted/executed by the server (see handleAttack's success
+  // branch below), never on a disabled/failed click. Same short-timeout
+  // idiom as enemyHit/playerHit above, just its own state/ref/duration so
+  // swapping in a type-specific effect later never has to touch those.
+  const [playerAttacking, setPlayerAttacking] = useState(false);
   const enemyHitTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerHitTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playerAttackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xpToastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
     () => () => {
       if (enemyHitTimeout.current) clearTimeout(enemyHitTimeout.current);
       if (playerHitTimeout.current) clearTimeout(playerHitTimeout.current);
+      if (playerAttackTimeout.current) clearTimeout(playerAttackTimeout.current);
       if (xpToastTimeout.current) clearTimeout(xpToastTimeout.current);
     },
     []
@@ -409,6 +420,18 @@ export function BattleContent({
     setHit(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setHit(false), HIT_FLASH_DURATION_MS);
+  }
+
+  // The one trigger site for the universal player-attack effect — plays the
+  // shared hit sound immediately and flags the player sprite's lunge for
+  // ATTACK_EFFECT_DURATION_MS. Called from exactly one place (handleAttack's
+  // success branch) so it only ever fires once the server has actually
+  // accepted/executed the attack, never on a disabled or rejected click.
+  function triggerPlayerAttack() {
+    playAttackHitSound();
+    setPlayerAttacking(true);
+    if (playerAttackTimeout.current) clearTimeout(playerAttackTimeout.current);
+    playerAttackTimeout.current = setTimeout(() => setPlayerAttacking(false), ATTACK_EFFECT_DURATION_MS);
   }
 
   // Shown for both a wild defeat and a successful capture (see handleAttack
@@ -712,6 +735,14 @@ export function BattleContent({
   function handleAttack(moveId: string) {
     if (phase !== "playerTurn") return;
 
+    // Fired the instant a valid click is accepted — deliberately BEFORE the
+    // server round-trip below, so the lunge/sound feel immediate instead of
+    // waiting on network latency. This is purely cosmetic (see
+    // triggerPlayerAttack's own doc comment): it never implies success,
+    // never touches HP/wild state, and if the request below fails, the
+    // short effect just finishes on its own with no fake damage applied.
+    triggerPlayerAttack();
+
     // Locks input immediately (same convention every other action handler
     // uses) and shows the player's own attack line right away.
     setPhase("enemyTurn");
@@ -734,6 +765,10 @@ export function BattleContent({
       setPartyStatusMap((prev) => ({ ...prev, [activeId]: result.playerStatus }));
       setPlayerVolatile(result.playerVolatile);
       setEnemyVolatile(result.enemyVolatile);
+      // Player-attack lunge/sound already fired at click time (see
+      // handleAttack's own triggerPlayerAttack call above, before this
+      // transition started) — only the enemy's own hit-flash reaction is
+      // triggered here, once the server confirms the attack actually landed.
       triggerHit("enemy");
 
       // Lethal hit: no outcome message is ever shown here — no "fainted",
@@ -1212,6 +1247,7 @@ export function BattleContent({
         onMenuAction={handleMenuAction}
         enemyHit={enemyHit}
         playerHit={playerHit}
+        playerAttacking={playerAttacking}
       />
 
       <XpToast message={xpToastMessage} />

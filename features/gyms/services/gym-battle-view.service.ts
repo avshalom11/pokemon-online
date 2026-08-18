@@ -6,6 +6,7 @@ import { getBackSpritePath, getFrontSpritePath } from "@/features/pokemon/media/
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { resolveKnownMoveSlots, type BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { GYM_BATTLE_SLOT_LABELS_HE, REGION_DISPLAY_NAMES_HE, regionalChampionLabelHe } from "../data/gym-labels";
+import { getGymTrainerName, getRegionalChampionTrainerName } from "../data/gym-trainer-names";
 import { toRegionId, type RegionId } from "@/shared/types/region";
 import type { GymBattleSlotId } from "../types/gym.types";
 import {
@@ -42,12 +43,29 @@ export interface GymBattleViewData {
   readonly regionId: RegionId;
   readonly gymNumber: 1 | 2 | 3 | null;
   readonly contextLabel: string;
+  // FIXED TRAINER NAMES (later task, section 2) — the actual opponent's
+  // name, read from data (gym-trainer-names.ts), never invented inline in
+  // the UI. Difficulty/role (Easy/Medium/Leader/Champion) stays available
+  // separately via contextLabel above — this is the NAME, not a role label.
+  readonly trainerName: string;
   readonly npcTeamTotalCount: number;
   // Includes the currently-active NPC (matches gym-battle-action.service's
   // own npcTeamRemainingCount semantics after a turn — here, before any
   // turn has been taken this attempt/session read, it's simply team.length
   // - npcActiveIndex).
   readonly npcTeamRemainingCount: number;
+  // POKÉ BALL TEAM STATUS INDICATORS (later task, section 3) — one entry
+  // per NPC team member, in team order, true while still alive (not yet
+  // defeated). Derived purely from npcActiveIndex (every index before it is
+  // already defeated) plus the currently-active one's own real HP — no
+  // separate "lives" counter, never out of sync with the actual battle
+  // state.
+  readonly npcTeamAliveFlags: readonly boolean[];
+  // Same idea for the player's own selected participants, in the exact
+  // order they were selected at battle start — true while currentHp > 0 in
+  // the live battle-local HP map (which, after the HP persistence change,
+  // IS the real HP now).
+  readonly playerTeamAliveFlags: readonly boolean[];
   readonly npc: {
     readonly speciesId: string;
     readonly name: string;
@@ -103,15 +121,29 @@ export async function getGymBattleViewData(playerId: string, playerName: string)
 
   const knownMoves = await resolveKnownMoveSlots(activePokemon.id);
 
+  const regionId = toRegionId(session.regionId);
+  const trainerName =
+    session.battleSource === "regional-champion"
+      ? getRegionalChampionTrainerName(regionId)
+      : getGymTrainerName(regionId, session.gymNumber as 1 | 2 | 3, session.battleSlot as GymBattleSlotId);
+
+  const npcTeamAliveFlags = npcTeam.map((_, index) =>
+    index < session.npcActiveIndex ? false : index === session.npcActiveIndex ? session.npcCurrentHp > 0 : true
+  );
+  const playerTeamAliveFlags = participants.map((pokemon) => (playerBattleHp[pokemon.id] ?? 0) > 0);
+
   return {
     status: "ready",
     data: {
       battleSource: session.battleSource as "gym" | "regional-champion",
-      regionId: toRegionId(session.regionId),
+      regionId,
       gymNumber: session.gymNumber as 1 | 2 | 3 | null,
       contextLabel: contextLabelFor(session.battleSource, session.regionId, session.gymNumber, session.battleSlot),
+      trainerName,
       npcTeamTotalCount: npcTeam.length,
       npcTeamRemainingCount: npcTeam.length - session.npcActiveIndex,
+      npcTeamAliveFlags,
+      playerTeamAliveFlags,
       npc: {
         speciesId: npcSpecies.id,
         name: npcSpecies.name,

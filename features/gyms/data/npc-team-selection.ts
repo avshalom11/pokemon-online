@@ -78,8 +78,19 @@ function lowestDexNumber(candidates: readonly PokemonSpecies[]): PokemonSpecies 
 // genuinely has none) — the caller (the generator script) is the one
 // place that decides whether an unfillable slot is a hard error, never
 // this pure function silently guessing a substitute.
-export function selectNpcTeam(pool: readonly PokemonSpecies[], slotRequests: readonly NpcTeamSlotRequest[]): (NpcTeamMember | null)[] {
-  const used = new Set<string>();
+// GYM TEAM VARIETY (later task) — `initiallyUsed` lets a caller seed the
+// dedup set with species already picked elsewhere (the generator script
+// uses this to also avoid repeating a species already given to an EARLIER
+// battle slot within the SAME Gym — Easy's picks seed Medium's `used` set,
+// Easy+Medium seed Leader's). Optional and defaults to empty so every
+// existing call site (Regional Champion selection, which has no
+// cross-team dedup requirement) is unaffected.
+export function selectNpcTeam(
+  pool: readonly PokemonSpecies[],
+  slotRequests: readonly NpcTeamSlotRequest[],
+  initiallyUsed: ReadonlySet<string> = new Set()
+): (NpcTeamMember | null)[] {
+  const used = new Set(initiallyUsed);
   const results: (NpcTeamMember | null)[] = [];
 
   for (const request of slotRequests) {

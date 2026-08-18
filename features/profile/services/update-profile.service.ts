@@ -59,6 +59,7 @@ export async function updateProfile(
       showPartyOnProfile: input.showPartyOnProfile,
       showStatsOnProfile: input.showStatsOnProfile,
       showAboutMeOnProfile: input.showAboutMeOnProfile,
+      showGymAchievementsOnProfile: input.showGymAchievementsOnProfile,
       // Already fully validated by updateProfileSchema's own
       // profileContentBlocksSchema (max block count, max text lengths,
       // allowed font/color/alignment/image ids) before this function is

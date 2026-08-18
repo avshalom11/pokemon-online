@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { PokemonType } from "@/shared/types/pokemon";
-import type { RegionId } from "@/shared/types/region";
+import { toRegionId, type RegionId } from "@/shared/types/region";
 import { MIN_GYM_PLAYER_LEVEL } from "../config/gym-access-rules.config";
 import { getGymBadgeDefinition } from "../data/gym-badges";
 import { getGymRewardDefinition, getRegionalChampionRewardDefinition, type GymRewardDefinition, type RegionalChampionRewardDefinition } from "../data/gym-reward-registry";
@@ -11,8 +11,10 @@ import { getRegionalMedalDefinition } from "../data/regional-medals";
 import { getGymDefinition } from "../data/gym-registry";
 import type { GymBattleSlotId } from "../types/gym.types";
 import { getPlayerLevel } from "@/features/player-progression/progression-service";
+import { prisma } from "@/lib/db/prisma";
 import { getRegionGymProgress, isRegionGymSequenceUnlocked } from "./gym-progression.service";
 import { getNpcBattleSession, type StartNpcBattleTarget } from "./gym-battle-session.service";
+import type { NpcBattleSession } from "@/lib/generated/prisma/client";
 
 // GYMS & LEAGUES PHASE 4 — the ONE server-side assembler for the /gyms
 // page (section 5/7/8/9 of this Phase's spec). Composes Phase 1's own
@@ -182,17 +184,51 @@ async function buildRegionOverview(
   };
 }
 
+// Shared by getPlayerGymJourney and getPlayerCurrentRegionGymOverview so
+// there is exactly one place an NpcBattleSession row is turned into a
+// StartNpcBattleTarget.
+function resolveActiveTarget(activeSession: NpcBattleSession | null): StartNpcBattleTarget | null {
+  if (!activeSession) return null;
+  return activeSession.battleSource === "gym"
+    ? { source: "gym", regionId: activeSession.regionId as RegionId, gymNumber: activeSession.gymNumber as 1 | 2 | 3, battleSlot: activeSession.battleSlot as GymBattleSlotId }
+    : { source: "regional-champion", regionId: activeSession.regionId as RegionId };
+}
+
 // The full 9-region Gym journey, always in REGION_GYM_SEQUENCE order (never
 // hidden/filtered — this Phase's own spec, section 7, requires future
 // regions be shown locked rather than omitted so the player can see the
-// whole progression path).
+// whole progression path). Still used as the general-purpose "every
+// region's Gym data" read; the /gyms page itself now reads
+// getPlayerCurrentRegionGymOverview below instead (region-scoped UI).
 export async function getPlayerGymJourney(playerId: string): Promise<RegionGymOverviewView[]> {
   const [playerLevel, activeSession] = await Promise.all([getPlayerLevel(playerId), getNpcBattleSession(playerId)]);
-  const activeTarget: StartNpcBattleTarget | null = activeSession
-    ? activeSession.battleSource === "gym"
-      ? { source: "gym", regionId: activeSession.regionId as RegionId, gymNumber: activeSession.gymNumber as 1 | 2 | 3, battleSlot: activeSession.battleSlot as GymBattleSlotId }
-      : { source: "regional-champion", regionId: activeSession.regionId as RegionId }
-    : null;
+  const activeTarget = resolveActiveTarget(activeSession);
 
   return Promise.all(REGION_GYM_SEQUENCE.map((regionId) => buildRegionOverview(playerId, playerLevel, regionId, activeTarget)));
+}
+
+// GYMS — REGION-SCOPED UI. The /gyms page's own data source (section 1 of
+// this task's spec): only the player's CURRENT active region's Gym data,
+// never the whole 9-region journey. "Current region" is always
+// PlayerProfile.regionId — the same authoritative, server-side field
+// World/Map already treat as the player's current region — read fresh here,
+// never trusted from a client-supplied value. Delegates to the exact same
+// buildRegionOverview every unlock/lock-reason rule already goes through
+// (getPlayerGymJourney's own per-region builder, unmodified) — a region a
+// player is currently "in" but hasn't unlocked yet (e.g. sequentially ahead
+// of their own progress) still renders, correctly locked, exactly like
+// every other not-yet-reached region already does in the full journey; this
+// only changes how many of those 9 possible results get returned, never
+// the unlock rule itself.
+export async function getPlayerCurrentRegionGymOverview(playerId: string): Promise<RegionGymOverviewView> {
+  const [profile, playerLevel, activeSession] = await Promise.all([
+    prisma.playerProfile.findUniqueOrThrow({ where: { id: playerId }, select: { regionId: true } }),
+    getPlayerLevel(playerId),
+    getNpcBattleSession(playerId),
+  ]);
+
+  const regionId = toRegionId(profile.regionId);
+  const activeTarget = resolveActiveTarget(activeSession);
+
+  return buildRegionOverview(playerId, playerLevel, regionId, activeTarget);
 }

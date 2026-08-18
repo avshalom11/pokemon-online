@@ -113,6 +113,15 @@ test("Legendary slots never downgrade rarity: every Gym Leader's Legendary membe
 test("Type preference is maximized: the large majority of slots with a type preference matched that type exactly", () => {
   const withTypePreference = GYM_NPC_TEAMS.flatMap((t) => t.members).filter((m) => m.fallbackTier !== "no-type-preference");
   const matchingType = withTypePreference.filter((m) => m.fallbackTier === "exact-rarity-matching-type");
-  // Real measured result: 284 of 351 type-constrained slots matched exactly — documented in this Phase's report, asserted here as a floor so a future regeneration can't silently regress it.
-  assert.ok(matchingType.length >= 280, `only ${matchingType.length} of ${withTypePreference.length} type-constrained slots matched the Gym's type`);
+  // GYM BATTLES — TEAM VARIETY (later task, section 1) intentionally lowered
+  // this floor from the original 284/351: the data was regenerated with a
+  // per-Gym cross-slot species-uniqueness constraint (Easy/Medium/Leader
+  // never repeat a species within the same Gym, achieved with ZERO forced
+  // repeats — see npc-team-selection.ts/generate-gym-npc-teams.ts), which
+  // removes some already-used, exact-type-matching candidates from later
+  // slots and forces more fallback-tier picks. Species uniqueness is this
+  // task's own explicit, higher-priority requirement; this floor is simply
+  // the new measured result (219 of 351) documented as a floor so a future
+  // regeneration can't silently regress it further.
+  assert.ok(matchingType.length >= 219, `only ${matchingType.length} of ${withTypePreference.length} type-constrained slots matched the Gym's type`);
 });

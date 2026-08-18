@@ -8,9 +8,15 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
+async function selectPartyFor(playerId: string, target: Parameters<typeof startNpcBattle>[1]): Promise<string[]> {
+  const options = await getGymBattlePartyOptions(playerId, target);
+  if (options.status !== "ok") return [];
+  return options.options.filter((o) => !o.fainted).slice(0, options.requiredCount).map((o) => o.id);
+}
+
 import { getXpRequiredForNextLevel } from "@/features/player-progression/progression-calculations";
 import { executeGymBattleAction } from "@/features/gyms/services/gym-battle-action.service";
-import { startNpcBattle } from "@/features/gyms/services/gym-battle-session.service";
+import { startNpcBattle, getGymBattlePartyOptions } from "@/features/gyms/services/gym-battle-session.service";
 import { markGymBattleCompleted, markRegionalChampionDefeated } from "@/features/gyms/services/gym-progression.service";
 import { calculateGymRewardXp } from "@/features/gyms/services/gym-reward.service";
 import { chestInventoryItemId } from "@/features/chests/services/chest-ownership.service";
@@ -58,7 +64,7 @@ async function winAllEasyMediumForLeader(regionId: string, gymNumber: 1 | 2 | 3)
 test("Easy victory gives no numeric reward — coins/experience untouched", async () => {
   seedOverwhelmingPlayer();
   const before = getPlayerProfileRow(PLAYER_ID)!;
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(started.status, "started");
 
   let final;
@@ -77,7 +83,7 @@ test("Medium victory gives no numeric reward", async () => {
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "easy");
   });
   const before = getPlayerProfileRow(PLAYER_ID)!;
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "medium" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "medium" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "medium" }));
   assert.equal(started.status, "started");
 
   let final;
@@ -96,7 +102,7 @@ test("Gym Leader victory gives Badge + exact Money + correct XP amount", async (
   const before = getPlayerProfileRow(PLAYER_ID)!;
   const expectedXp = calculateGymRewardXp(before.level, 10); // Kanto Gym 1: money 500, xp 10%
 
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }));
   assert.equal(started.status, "started");
 
   let final;
@@ -125,7 +131,7 @@ test("Regional Champion victory gives Medal + exact Money + XP + Chests", async 
   const before = getPlayerProfileRow(PLAYER_ID)!;
   const expectedXp = calculateGymRewardXp(before.level, 40); // Kanto champion: money 2000, xp 40%, silver x1
 
-  const started = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }, await selectPartyFor(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }));
   assert.equal(started.status, "started");
 
   let final;
@@ -165,7 +171,7 @@ test("markRegionalChampionDefeated returns firstDefeat=true only once for the sa
 test("completion and reward stay atomic: a duplicate/replayed winning action call cannot grant a second reward", async () => {
   seedOverwhelmingPlayer();
   await winAllEasyMediumForLeader("kanto", 1);
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }));
   assert.equal(started.status, "started");
 
   for (let i = 0; i < 6; i++) await executeGymBattleAction(PLAYER_ID, "scratch", MAX_ROLL);

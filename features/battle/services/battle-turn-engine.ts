@@ -139,6 +139,101 @@ function effectiveSpeed(battler: DamageBattler): number {
 // caller passes a moveId that isn't a real Move Registry entry at all (both
 // callers already validate this before invoking the engine; this is a
 // defense-in-depth guard, not a normal path).
+// VOLUNTARY SWITCH / BAG ITEM — SOLO ENEMY STRIKE (Gym Battle UX task,
+// section 5/15). A switch or a Bag-item use is not really "the player's
+// move" — there is no second moveId to hand resolveBattleTurn's normal
+// two-sided contract, and this engine has no "pass" pseudo-move. Rather
+// than force one in (or duplicate resolveBattleTurn's own internal turn
+// order/status/multi-hit machinery here), this is a small, deliberately
+// SIMPLIFIED, additive, one-sided resolution: the enemy's already-chosen
+// move (selected upstream by the caller's own difficulty-aware AI, exactly
+// like resolveBattleTurn expects) lands a single hit against the player's
+// (already switched-in, if applicable) defender. Reuses the exact same
+// damage/effect primitives resolveBattleTurn itself uses — never a second
+// damage formula.
+//
+// Deliberate scope limits, so this stays genuinely small and low-risk
+// rather than re-implementing the full engine a second time: no multi-hit
+// expansion (only the first hit lands), no Protect/volatile-effect
+// handling, no residual/end-of-turn status damage this "turn". Ordinary
+// NPC move pools are attack (with an optional status chance) moves, so this
+// covers the overwhelming majority of real Gym opponents correctly; a
+// multi-hit or purely-volatile NPC move simply behaves as a single plain
+// hit here. Never called by Field Battle or League PvP — purely additive,
+// zero risk to either.
+export interface SoloStrikeDefender {
+  readonly pokemonId: string;
+  readonly baseStats: PokemonBaseStats;
+  readonly level: number;
+  readonly types: readonly PokemonType[];
+  readonly status: MajorStatus | null;
+  readonly currentHp: number;
+}
+
+export interface SoloStrikeResult {
+  readonly updatedDefenderHp: number;
+  readonly defenderFainted: boolean;
+  readonly damageDealt: number;
+  readonly appliedStatus: MajorStatus | null;
+  readonly appliedStatusTurnsRemaining: number | null;
+  readonly events: BattleEvent[];
+}
+
+export function resolveSoloEnemyStrike(enemy: TurnBattlerInput, defender: SoloStrikeDefender, randomSource?: () => number): SoloStrikeResult {
+  const moveLookup = getMoveById(enemy.moveId);
+  if (!moveLookup) throw new UnknownMoveError(enemy.moveId);
+  const move: Move = moveLookup;
+
+  const attacker: DamageBattler = { baseStats: enemy.baseStats, level: enemy.level, types: enemy.types, stages: enemy.stages, status: enemy.status };
+  const target: DamageBattler = { baseStats: defender.baseStats, level: defender.level, types: defender.types, stages: {}, status: defender.status };
+
+  const result = resolveAttackDamage(
+    move,
+    attacker,
+    target,
+    rollDamageRandomFactor(randomSource),
+    rollAccuracyCheck(randomSource),
+    rollCriticalHit(randomSource)
+  );
+
+  const damageDealt = result.kind === "damage" ? result.damage : 0;
+  const updatedDefenderHp = Math.max(0, defender.currentHp - damageDealt);
+  const defenderFainted = updatedDefenderHp <= 0;
+
+  const events = buildAttackEvents({
+    actor: "enemy",
+    attackerPokemonId: enemy.pokemonId,
+    defenderPokemonId: defender.pokemonId,
+    moveId: enemy.moveId,
+    result,
+    remainingDefenderHp: updatedDefenderHp,
+  });
+
+  let appliedStatus: MajorStatus | null = defender.status;
+  let appliedStatusTurnsRemaining: number | null = null;
+
+  if (!defenderFainted && move.effect.kind === "status" && isMajorStatus(move.effect.status)) {
+    const effectResult = resolveMoveEffects({
+      effect: move.effect,
+      effectTargetActor: "player",
+      hit: result.kind !== "miss",
+      immuneToTarget: result.kind === "damage" && result.effectiveness === "none",
+      effectTargetFainted: false,
+      effectTargetStages: {},
+      effectTargetCurrentStatus: defender.status,
+      effectTargetTypes: defender.types,
+      effectChanceRoll: () => (randomSource ? randomSource() : Math.random()),
+      sleepDurationRoll: () => (randomSource ? randomSource() : Math.random()),
+    });
+    if (effectResult.appliedStatus) {
+      appliedStatus = effectResult.appliedStatus.status;
+      appliedStatusTurnsRemaining = effectResult.appliedStatus.turnsRemaining;
+    }
+  }
+
+  return { updatedDefenderHp, defenderFainted, damageDealt, appliedStatus, appliedStatusTurnsRemaining, events };
+}
+
 export function resolveBattleTurn(player: TurnBattlerInput, enemy: TurnBattlerInput, randomSource?: () => number): TurnResolutionResult {
   const playerMoveLookup = getMoveById(player.moveId);
   if (!playerMoveLookup) throw new UnknownMoveError(player.moveId);

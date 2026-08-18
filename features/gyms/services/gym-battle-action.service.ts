@@ -16,12 +16,16 @@ import { GYM_BATTLE_SLOT_DIFFICULTY, REGIONAL_CHAMPION_DIFFICULTY } from "../dat
 import {
   getNpcBattleSession,
   getParticipatingParty,
+  guardedSessionDelete,
+  guardedSessionUpdate,
   parseNpcBattleHpMap,
   parseNpcBattleStatStages,
   parseNpcBattleStatusMap,
   parseNpcBattleVolatileState,
   parseNpcTeam,
+  StaleNpcBattleSessionError,
   statusFor,
+  syncParticipantToRealPokemon,
   type NpcBattleParticipantStatus,
 } from "./gym-battle-session.service";
 import { selectNpcMoveForDifficulty } from "./gym-npc-ai";
@@ -30,15 +34,25 @@ import { grantGymLeaderReward, grantRegionalChampionReward, type GrantedGymRewar
 import type { GymBattleSlotId, GymDifficulty } from "../types/gym.types";
 import { toRegionId } from "@/shared/types/region";
 
-// GYMS & LEAGUES PHASE 3 — turn-by-turn combat resolution for an
-// in-progress NPC battle. Reuses the exact same shared engine
-// (resolveBattleTurn) Field Battle uses — see that function's own doc
-// comment. This file's own job is entirely about HOW an NPC battle is
+// GYMS & LEAGUES PHASE 3, HP PERSISTENCE (later task) — turn-by-turn combat
+// resolution for an in-progress NPC battle. Reuses the exact same shared
+// engine (resolveBattleTurn) Field Battle uses — see that function's own
+// doc comment. This file's own job is entirely about HOW an NPC battle is
 // different from a wild encounter: a fixed multi-Pokémon roster fought
-// sequentially, battle-local player HP/status (never PlayerPokemon.
-// currentHp/.status), difficulty-aware NPC move selection, and completion
+// sequentially, difficulty-aware NPC move selection, and completion
 // (Badge/Medal) marked exactly once on a clean final victory — never any
 // XP/currency/Egg/Chest reward of any kind (Field Battle isolation).
+//
+// HP/STATUS RULE CHANGE (later task, section 8 — explicitly overrides the
+// ORIGINAL "battle-local only, PlayerPokemon.currentHp never touched" rule
+// this comment used to describe): the session's own playerBattleHp/
+// playerBattleStatus are still the values the turn engine reads/writes
+// turn-to-turn (resolveBattleTurn needs a plain synchronous number in, a
+// plain number out — it has no idea PlayerPokemon exists), but after EVERY
+// turn that changes them, the SAME new value is also written to the real
+// PlayerPokemon.currentHp/.status/.statusTurnsRemaining, atomically, via
+// syncParticipantToRealPokemon (gym-battle-session.service.ts). Gym battle
+// damage is real damage now.
 
 export interface GymBattleActionSuccess {
   readonly status: "success";
@@ -85,7 +99,14 @@ export type GymBattleActionResult =
   | { status: "no-session" }
   | { status: "not-owned" }
   | { status: "invalid-active-pokemon" }
-  | { status: "invalid-move"; moveId: string };
+  | { status: "invalid-move"; moveId: string }
+  // TURN SAFETY / RACE GUARD (GYM BATTLE POLISH task, section 2) — this
+  // attack's turnResult was computed off a session snapshot that another
+  // action (Bag item, voluntary switch, or a racing duplicate attack)
+  // already mutated in the meantime; nothing was written. The client
+  // simply refetches the current, authoritative view instead of trusting
+  // this stale result.
+  | { status: "stale-action" };
 
 function difficultyForSession(session: NpcBattleSession): GymDifficulty {
   if (session.battleSource === "regional-champion") return REGIONAL_CHAMPION_DIFFICULTY;
@@ -227,67 +248,112 @@ export async function executeGymBattleAction(playerId: string, moveId: string, r
 
   let reward: GrantedGymReward | undefined;
 
-  if (victoryCompleted) {
-    // WIN COMPLETION (section 11) + REWARD GRANTING (Phase 4, section 17) —
-    // completion marking, reward granting, and deleting the now-finished
-    // session all happen inside the SAME transaction, so a crash/race can
-    // never leave completion recorded without its reward (or vice versa).
-    // markGymBattleCompleted/markRegionalChampionDefeated's own return
-    // value (firstCompletion/firstDefeat) is the exactly-once gate: a
-    // racing/retried duplicate victory request for an already-completed
-    // battle grants nothing a second time, protected at the DB unique-
-    // constraint level (see gym-progression.service.ts), never solely by
-    // "the battle can't be replayed" at the session layer above.
-    const regionId = toRegionId(session.regionId);
-    reward = await prisma.$transaction(async (tx) => {
-      let grantedReward: GrantedGymReward | undefined;
+  // TURN SAFETY / RACE GUARD (GYM BATTLE POLISH task, section 2) — every
+  // branch below's FIRST session write is a guardedSessionUpdate/
+  // guardedSessionDelete keyed off `session.updatedAt`, the value read at
+  // the very top of this function, BEFORE turnResult was computed. If a
+  // Bag item, voluntary switch, or a racing duplicate attack request
+  // already committed its own write in between, that guard throws
+  // StaleNpcBattleSessionError, rolling the whole transaction back (no
+  // completion/reward/HP-sync of any kind lands) — caught here and
+  // reported as a distinct "stale-action" result rather than silently
+  // overwriting newer state with this now-stale turnResult.
+  try {
+    if (victoryCompleted) {
+      // WIN COMPLETION (section 11) + REWARD GRANTING (Phase 4, section 17) —
+      // completion marking, reward granting, and deleting the now-finished
+      // session all happen inside the SAME transaction, so a crash/race can
+      // never leave completion recorded without its reward (or vice versa).
+      // markGymBattleCompleted/markRegionalChampionDefeated's own return
+      // value (firstCompletion/firstDefeat) is the exactly-once gate: a
+      // racing/retried duplicate victory request for an already-completed
+      // battle grants nothing a second time, protected at the DB unique-
+      // constraint level (see gym-progression.service.ts), never solely by
+      // "the battle can't be replayed" at the session layer above.
+      const regionId = toRegionId(session.regionId);
+      reward = await prisma.$transaction(async (tx) => {
+        let grantedReward: GrantedGymReward | undefined;
 
-      if (session.battleSource === "regional-champion") {
-        const firstDefeat = await markRegionalChampionDefeated(tx, playerId, regionId);
-        if (firstDefeat) {
-          grantedReward = await grantRegionalChampionReward(tx, playerId, regionId);
+        if (session.battleSource === "regional-champion") {
+          const firstDefeat = await markRegionalChampionDefeated(tx, playerId, regionId);
+          if (firstDefeat) {
+            grantedReward = await grantRegionalChampionReward(tx, playerId, regionId);
+          }
+        } else {
+          const gymNumber = session.gymNumber as 1 | 2 | 3;
+          const battleSlot = session.battleSlot as GymBattleSlotId;
+          const firstCompletion = await markGymBattleCompleted(tx, playerId, regionId, gymNumber, battleSlot);
+          // GYM REWARD RULE (section 12) — Easy/Medium have no numeric reward;
+          // only a Gym Leader victory ever grants one.
+          if (firstCompletion && battleSlot === "leader") {
+            grantedReward = await grantGymLeaderReward(tx, playerId, regionId, gymNumber);
+          }
         }
-      } else {
-        const gymNumber = session.gymNumber as 1 | 2 | 3;
-        const battleSlot = session.battleSlot as GymBattleSlotId;
-        const firstCompletion = await markGymBattleCompleted(tx, playerId, regionId, gymNumber, battleSlot);
-        // GYM REWARD RULE (section 12) — Easy/Medium have no numeric reward;
-        // only a Gym Leader victory ever grants one.
-        if (firstCompletion && battleSlot === "leader") {
-          grantedReward = await grantGymLeaderReward(tx, playerId, regionId, gymNumber);
-        }
-      }
 
-      await tx.npcBattleSession.deleteMany({ where: { playerId } });
-      return grantedReward;
-    });
-  } else if (winner === "npc") {
-    // LOSS (section 12) — no penalty, no completion row, no progression
-    // reset. The session is simply removed; a fresh startNpcBattle call
-    // for the same target starts over (Easy/Medium/Leader already
-    // completed earlier stay completed — that's Phase 1's own permanent
-    // completion state, untouched by this).
-    await prisma.npcBattleSession.deleteMany({ where: { playerId } });
-  } else {
-    // Battle continues — persist the new battle-local state. Stat stages/
-    // volatile for the player side are only ever the ACTIVE Pokémon's own
-    // (reset on switch, exactly like Field Battle) — never mutated here
-    // for a fainted Pokémon awaiting replacement.
-    await prisma.npcBattleSession.updateMany({
-      where: { playerId },
-      data: {
-        npcActiveIndex: nextNpcActiveIndex,
-        npcCurrentHp: nextNpcCurrentHp,
-        npcStatus: nextNpcStatus,
-        npcStatusTurnsRemaining: nextNpcStatusTurnsRemaining,
-        npcStatStages: nextNpcStages,
-        npcVolatileState: nextNpcVolatile as unknown as Prisma.InputJsonValue,
-        playerBattleHp: nextPlayerBattleHp as unknown as Prisma.InputJsonValue,
-        playerBattleStatus: nextPlayerStatusMap as unknown as Prisma.InputJsonValue,
-        playerStatStages: turnResult.player.stages as unknown as Prisma.InputJsonValue,
-        playerVolatileState: turnResult.player.volatile as unknown as Prisma.InputJsonValue,
-      },
-    });
+        // HP PERSISTENCE (later task, section 9) — the winning Pokémon's
+        // final HP/status, atomically alongside completion/reward.
+        await syncParticipantToRealPokemon(tx, activePokemon.id, {
+          currentHp: turnResult.player.updatedHp,
+          status: turnResult.player.status,
+          statusTurnsRemaining: turnResult.player.statusTurnsRemaining,
+        });
+
+        await guardedSessionDelete(tx, playerId, session.updatedAt);
+        return grantedReward;
+      });
+    } else if (winner === "npc") {
+      // LOSS (section 12) — no penalty, no completion row, no progression
+      // reset. The session is simply removed; a fresh startNpcBattle call
+      // for the same target starts over (Easy/Medium/Leader already
+      // completed earlier stay completed — that's Phase 1's own permanent
+      // completion state, untouched by this).
+      //
+      // HP PERSISTENCE (later task, section 9) — the fainted Pokémon's final
+      // (0) HP/status persists too, atomically alongside session deletion —
+      // never a heal-by-losing exploit.
+      await prisma.$transaction(async (tx) => {
+        await syncParticipantToRealPokemon(tx, activePokemon.id, {
+          currentHp: turnResult.player.updatedHp,
+          status: turnResult.player.status,
+          statusTurnsRemaining: turnResult.player.statusTurnsRemaining,
+        });
+        await guardedSessionDelete(tx, playerId, session.updatedAt);
+      });
+    } else {
+      // Battle continues — persist the new battle-local state. Stat stages/
+      // volatile for the player side are only ever the ACTIVE Pokémon's own
+      // (reset on switch, exactly like Field Battle) — never mutated here
+      // for a fainted Pokémon awaiting replacement.
+      //
+      // HP PERSISTENCE (later task, section 9) — this turn's real HP/status
+      // change persists to the real PlayerPokemon row in the SAME
+      // transaction as the session's own battle-local update, so a refresh/
+      // re-entry, a later abandon, or the browser closing mid-battle can
+      // never lose or roll back an already-applied hit — only the ONE
+      // participant who was active this turn is ever touched.
+      await prisma.$transaction(async (tx) => {
+        await guardedSessionUpdate(tx, playerId, session.updatedAt, {
+          npcActiveIndex: nextNpcActiveIndex,
+          npcCurrentHp: nextNpcCurrentHp,
+          npcStatus: nextNpcStatus,
+          npcStatusTurnsRemaining: nextNpcStatusTurnsRemaining,
+          npcStatStages: nextNpcStages,
+          npcVolatileState: nextNpcVolatile as unknown as Prisma.InputJsonValue,
+          playerBattleHp: nextPlayerBattleHp as unknown as Prisma.InputJsonValue,
+          playerBattleStatus: nextPlayerStatusMap as unknown as Prisma.InputJsonValue,
+          playerStatStages: turnResult.player.stages as unknown as Prisma.InputJsonValue,
+          playerVolatileState: turnResult.player.volatile as unknown as Prisma.InputJsonValue,
+        });
+        await syncParticipantToRealPokemon(tx, activePokemon.id, {
+          currentHp: turnResult.player.updatedHp,
+          status: turnResult.player.status,
+          statusTurnsRemaining: turnResult.player.statusTurnsRemaining,
+        });
+      });
+    }
+  } catch (error) {
+    if (error instanceof StaleNpcBattleSessionError) return { status: "stale-action" };
+    throw error;
   }
 
   return {

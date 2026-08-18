@@ -35,6 +35,7 @@ export const updateProfileSchema = z.object({
   showPartyOnProfile: z.boolean(),
   showStatsOnProfile: z.boolean(),
   showAboutMeOnProfile: z.boolean(),
+  showGymAchievementsOnProfile: z.boolean(),
   contentBlocks: profileContentBlocksSchema,
 });
 

@@ -34,6 +34,7 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
   const [showPartyOnProfile, setShowPartyOnProfile] = useState(data.showPartyOnProfile);
   const [showStatsOnProfile, setShowStatsOnProfile] = useState(data.showStatsOnProfile);
   const [showAboutMeOnProfile, setShowAboutMeOnProfile] = useState(data.showAboutMeOnProfile);
+  const [showGymAchievementsOnProfile, setShowGymAchievementsOnProfile] = useState(data.showGymAchievementsOnProfile);
   const [contentBlocks, setContentBlocks] = useState<ProfileContentBlock[]>(data.contentBlocks ?? []);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
         showPartyOnProfile,
         showStatsOnProfile,
         showAboutMeOnProfile,
+        showGymAchievementsOnProfile,
         contentBlocks,
       });
 
@@ -149,6 +151,12 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
               <ToggleRow label="הצג שישייה בפרופיל" checked={showPartyOnProfile} onChange={setShowPartyOnProfile} />
               <ToggleRow label="הצג סטטיסטיקות בפרופיל" checked={showStatsOnProfile} onChange={setShowStatsOnProfile} />
               <ToggleRow label="הצג אודות בפרופיל" checked={showAboutMeOnProfile} onChange={setShowAboutMeOnProfile} />
+              <ToggleRow
+                label="הצג תגים ומדליות בפרופיל"
+                checked={showGymAchievementsOnProfile}
+                onChange={setShowGymAchievementsOnProfile}
+                helperText="כאשר האפשרות פעילה, משתמשים אחרים יוכלו לראות את תגי המכונים ומדליות המחוז שהשגת."
+              />
             </div>
           </Field>
 
@@ -222,12 +230,28 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+  helperText,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  // PROFILE ACHIEVEMENTS (later task) — optional, so every existing
+  // ToggleRow call site keeps rendering exactly as before; only the new
+  // achievements toggle passes one.
+  helperText?: string;
+}) {
   return (
-    <label className="flex cursor-pointer items-center justify-between rounded-lg bg-slate-950/40 px-3 py-2 text-sm text-slate-200">
-      {label}
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4" />
-    </label>
+    <div className="rounded-lg bg-slate-950/40 px-3 py-2">
+      <label className="flex cursor-pointer items-center justify-between text-sm text-slate-200">
+        {label}
+        <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4" />
+      </label>
+      {helperText ? <p className="mt-1 text-[11px] text-slate-500">{helperText}</p> : null}
+    </div>
   );
 }
 

@@ -7,8 +7,14 @@
 import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
+async function selectPartyFor(playerId: string, target: Parameters<typeof startNpcBattle>[1]): Promise<string[]> {
+  const options = await getGymBattlePartyOptions(playerId, target);
+  if (options.status !== "ok") return [];
+  return options.options.filter((o) => !o.fainted).slice(0, options.requiredCount).map((o) => o.id);
+}
+
 import { executeGymBattleAction } from "@/features/gyms/services/gym-battle-action.service";
-import { startNpcBattle, switchNpcBattleActivePokemon } from "@/features/gyms/services/gym-battle-session.service";
+import { startNpcBattle, switchNpcBattleActivePokemon, getGymBattlePartyOptions } from "@/features/gyms/services/gym-battle-session.service";
 import { getRegionGymProgress, hasBadge, hasRegionalMedal } from "@/features/gyms/services/gym-progression.service";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -45,7 +51,7 @@ function seedOverwhelmingPlayer() {
 }
 
 async function startEasy() {
-  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const result = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(result.status, "started");
   return result;
 }
@@ -124,7 +130,7 @@ test("Gym Leader victory marks Leader completed AND awards the Badge", async () 
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "easy");
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 1, "medium");
   });
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "leader" }));
   assert.equal(started.status, "started");
 
   // Leader has 6 NPCs.
@@ -147,7 +153,7 @@ test("Regional Champion victory marks Champion defeated AND awards the Regional 
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 2, "leader");
     await markGymBattleCompleted(tx, PLAYER_ID, "kanto", 3, "leader");
   });
-  const started = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }, await selectPartyFor(PLAYER_ID, { source: "regional-champion", regionId: "kanto" }));
   assert.equal(started.status, "started");
 
   let final;
@@ -183,7 +189,7 @@ test("a player who loses (all participating Pokémon fainted) marks no completio
   seedPlayerPokemon({ id: "p1", playerId: PLAYER_ID, speciesId: "charmander", level: 5, currentHp: 100, partySlot: 1 });
   seedKnownMove({ playerPokemonId: "p1", moveId: "growl", slot: 1 });
 
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(started.status, "started");
   if (started.status !== "started") return;
 
@@ -208,7 +214,7 @@ test("forced replacement: a fainted active participant can be switched, and the 
   seedPlayerPokemon({ id: "p2", playerId: PLAYER_ID, speciesId: "squirtle", level: 100, currentHp: 100, partySlot: 2 });
   seedKnownMove({ playerPokemonId: "p2", moveId: "scratch", slot: 1 });
 
-  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" });
+  const started = await startNpcBattle(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }, await selectPartyFor(PLAYER_ID, { source: "gym", regionId: "kanto", gymNumber: 1, battleSlot: "easy" }));
   assert.equal(started.status, "started");
   await prisma.npcBattleSession.updateMany({ where: { playerId: PLAYER_ID }, data: { playerBattleHp: { p1: 1, p2: 100 } } });
 

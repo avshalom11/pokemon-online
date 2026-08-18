@@ -16,3 +16,13 @@ export function __setSession(session: FakeSession | null) {
 export async function getCurrentSession(): Promise<FakeSession | null> {
   return currentSession;
 }
+
+// GYM BATTLE RESULT DIALOG FIX (later task) — mirrors the real
+// getCurrentSessionFast (lib/auth/auth-session.ts): a lighter session
+// check with the exact same underlying session as getCurrentSession
+// above, needed so gym-battle.actions.ts (which uses this for its hot,
+// repeat-call turn-action paths) can be imported and exercised end-to-end
+// under this fake, not just its own underlying service layer.
+export async function getCurrentSessionFast(): Promise<FakeSession | null> {
+  return currentSession;
+}

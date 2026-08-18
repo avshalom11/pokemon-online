@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { EditProfileModal } from "./EditProfileModal";
 import { ProfileAboutMe } from "./ProfileAboutMe";
-import { ProfileBadgesSection } from "./ProfileBadgesSection";
+import { ProfileAchievementsSection } from "./ProfileAchievementsSection";
 import { ProfileContentBlocksSection } from "./ProfileContentBlocksSection";
 import { ProfileHeader } from "./ProfileHeader";
 import { ProfilePartySection } from "./ProfilePartySection";
@@ -67,7 +67,7 @@ export function ProfileContent({ view, editData }: ProfileContentProps) {
         <ProfileAboutMe aboutMe={view.aboutMe} />
         <ProfilePartySection party={view.party} />
         <ProfileStatsSection stats={view.stats} />
-        <ProfileBadgesSection />
+        <ProfileAchievementsSection achievements={view.achievements} />
         <ProfileContentBlocksSection blocks={view.contentBlocks} />
       </div>
 
