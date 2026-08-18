@@ -41,9 +41,29 @@ test("Home is listed under the WORLD category (never a new category), using the 
   assert.equal(home?.label, "מסך ראשי");
 });
 
-test("Home is the first item in the world category, alongside World/Map", () => {
+test("Home is the first item in the world category, alongside World/Map/Gyms/Leagues", () => {
   const world = SIDEBAR_CATEGORIES.find((category) => category.id === "world");
-  assert.deepEqual(world?.items.map((item) => item.id), ["home", "world", "map"]);
+  assert.deepEqual(world?.items.map((item) => item.id), ["home", "world", "map", "gyms", "leagues"]);
+});
+
+// GYMS & LEAGUES PHASE 4 — section 34's own "sidebar Gym link data exists"
+// requirement.
+test("Gyms is listed under the WORLD category, right after World/Map, using the real /gyms route", () => {
+  const world = SIDEBAR_CATEGORIES.find((category) => category.id === "world");
+  const gyms = world?.items.find((item) => item.id === "gyms");
+  assert.ok(gyms, "a gyms item must exist under world");
+  assert.equal(gyms?.href, "/gyms");
+  assert.equal(gyms?.label, "מכונים");
+});
+
+// GYMS & LEAGUES PHASE 5 — section 30's own "sidebar League link exists"
+// requirement.
+test("Leagues is listed under the WORLD category, right after Gyms, using the real /leagues route", () => {
+  const world = SIDEBAR_CATEGORIES.find((category) => category.id === "world");
+  const leagues = world?.items.find((item) => item.id === "leagues");
+  assert.ok(leagues, "a leagues item must exist under world");
+  assert.equal(leagues?.href, "/leagues");
+  assert.equal(leagues?.label, "ליגות");
 });
 
 test("no new sidebar category was added for Home either", () => {

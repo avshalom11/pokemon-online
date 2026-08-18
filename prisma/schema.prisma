@@ -132,16 +132,25 @@ model PlayerProfile {
   // FieldBattleSession.participants) already follow.
   profileContentBlocks Json @default("[]")
 
-  pokemon                PlayerPokemon[]
-  fieldBattleSession     FieldBattleSession?
-  notifications          Notification[]
-  dailyFieldBattleCounts DailyFieldBattleCount[]
-  inventoryItems         PlayerInventoryItem[]
-  seenSpecies            PlayerSeenSpecies[]
-  ownedEggs              PlayerOwnedEgg[]
-  incubators             PlayerIncubator[]
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
+  pokemon                  PlayerPokemon[]
+  fieldBattleSession       FieldBattleSession?
+  notifications            Notification[]
+  dailyFieldBattleCounts   DailyFieldBattleCount[]
+  inventoryItems           PlayerInventoryItem[]
+  seenSpecies              PlayerSeenSpecies[]
+  ownedEggs                PlayerOwnedEgg[]
+  incubators               PlayerIncubator[]
+  // GYMS & LEAGUES PHASE 1 — see each model's own doc comment below.
+  gymBattleProgress        PlayerGymBattleProgress[]
+  gymBadges                PlayerGymBadge[]
+  regionalChampionProgress PlayerRegionalChampionProgress[]
+  regionalMedals           PlayerRegionalMedal[]
+  // GYMS & LEAGUES PHASE 3
+  npcBattleSession         NpcBattleSession?
+  // GYMS & LEAGUES PHASE 5
+  leagueTournamentParticipants LeagueTournamentParticipant[]
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
 
   @@map("player_profile")
 }
@@ -769,6 +778,431 @@ model PlayerEggIncubation {
   startedAt DateTime @default(now())
 
   @@map("player_egg_incubation")
+}
+
+// GYMS & LEAGUES PHASE 1 — Data & Progression Foundation. Normalized
+// progression, deliberately NOT 27 hardcoded boolean columns on
+// PlayerProfile (e.g. kantoGym1Done) — one row per (player, region,
+// gymNumber, battleSlot) instead, the same "generic model keyed by player +
+// progression target" shape PlayerSeenSpecies already established.
+//
+// Row existence IS the fact, same idiom as PlayerSeenSpecies: no boolean
+// "isDone" column, completedAt is set once at insert and this row is never
+// updated or deleted afterward — a battle already won can never be
+// replayed, and this table is the one source of truth every unlock/
+// completion check (features/gyms/services/gym-progression.service.ts)
+// reads. `regionId`/`battleSlot` are plain Strings (not Prisma enums),
+// validated at the app layer against RegionId (shared/types/region.ts) and
+// GymBattleSlotId (features/gyms/types/gym.types.ts) — same no-enum
+// precedent as FieldBattleSession.zoneId elsewhere in this file. Phase 2/3
+// (actual battle execution) is the only thing that ever creates a row here;
+// this Phase only defines the shape and read/write primitives.
+model PlayerGymBattleProgress {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  regionId   String
+  gymNumber  Int
+  battleSlot String
+
+  completedAt DateTime @default(now())
+
+  @@unique([playerId, regionId, gymNumber, battleSlot])
+  @@index([playerId])
+  @@map("player_gym_battle_progress")
+}
+
+// One row per Gym Badge actually earned — a separate fact from
+// PlayerGymBattleProgress's own leader-battle-slot row (which only tracks
+// "this specific battle was won," the input to unlock logic) so a future
+// Badge Case screen, league-eligibility query, or Phase 4 reward-claim
+// guard never has to interpret battle-slot rows to answer "does this
+// player hold this badge" — it just checks this table directly. Awarded
+// exactly once, atomically alongside the matching leader-battle-slot row,
+// by markGymBattleCompleted (gym-progression.service.ts) — never earned,
+// revoked, sold, or traded any other way. Same "row existence is the fact"
+// idiom as PlayerSeenSpecies/PlayerGymBattleProgress above.
+model PlayerGymBadge {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  regionId  String
+  gymNumber Int
+
+  awardedAt DateTime @default(now())
+
+  @@unique([playerId, regionId, gymNumber])
+  @@index([playerId])
+  @@map("player_gym_badge")
+}
+
+// One row per Regional Champion battle actually won — same "row existence
+// is the fact, permanent, never replayed" idiom as
+// PlayerGymBattleProgress above, just region-scoped instead of
+// region+gymNumber-scoped (a Regional Champion is one battle per region,
+// not per gym).
+model PlayerRegionalChampionProgress {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  regionId String
+
+  completedAt DateTime @default(now())
+
+  @@unique([playerId, regionId])
+  @@index([playerId])
+  @@map("player_regional_champion_progress")
+}
+
+// One row per Regional Medal actually earned — same relationship to
+// PlayerRegionalChampionProgress as PlayerGymBadge has to
+// PlayerGymBattleProgress above (a separate achievement fact, not derived
+// ad hoc from the battle-completion row at read time). Awarded exactly
+// once, atomically alongside the matching champion-progress row, by
+// markRegionalChampionDefeated (gym-progression.service.ts).
+model PlayerRegionalMedal {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  regionId String
+
+  awardedAt DateTime @default(now())
+
+  @@unique([playerId, regionId])
+  @@index([playerId])
+  @@map("player_regional_medal")
+}
+
+// GYMS & LEAGUES PHASE 3 — Gym Battle Engine. A separate session model from
+// FieldBattleSession on purpose: an NPC battle has a genuinely different
+// shape (a fixed multi-Pokémon roster fought sequentially, no reward/
+// promotion/one-ahead-buffer concepts at all) — force-fitting it into
+// FieldBattleSession's wild-only fields (wildSpeciesId/wildCurrentHp/
+// nextWildSpeciesId/wildDefeatRewardGranted/participants) would mix
+// wild-only assumptions into a system that must never trigger wild
+// rewards/Egg drops/Chest drops/daily-count/incubation progress (see this
+// Phase's own Field Battle isolation rule). The actual battle MECHANICS
+// (damage/status/turn-order/move-effects) are never duplicated — both this
+// session type and FieldBattleSession are driven by the exact same shared
+// engine, features/battle/services/battle-turn-engine.ts.
+//
+// BATTLE-LOCAL HP/STATUS ONLY — this is the key isolation property: unlike
+// Field Battle (which writes PlayerPokemon.currentHp/.status directly,
+// since a wild encounter's damage is meant to persist), a Gym/Regional
+// battle NEVER reads or writes PlayerPokemon.currentHp/.status at all.
+// Every participating Pokémon's HP/status/stat-stages/volatile for THIS
+// attempt lives entirely in playerBattleHp/playerBattleStatus/
+// playerStatStages/playerVolatileState below, keyed by playerPokemonId.
+// This is what makes "every Gym/Regional battle is independent" (approved
+// design) trivially true: a real Pokémon's permanent HP is never touched,
+// so nothing here can ever leak into — or be corrupted by — Field Battle,
+// Pokémon Center healing, or a different Gym attempt.
+model NpcBattleSession {
+  id       String        @id @default(cuid())
+  playerId String        @unique
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // "gym" | "regional-champion" — validated at the app layer against
+  // NpcBattleSource (features/gyms/types/npc-battle.types.ts), same
+  // no-Prisma-enum precedent as FieldBattleSession.zoneId.
+  battleSource String
+  regionId     String
+  // Only set when battleSource === "gym"; null for a Regional Champion
+  // battle (no gym number/battle slot).
+  gymNumber  Int?
+  battleSlot String?
+
+  // The fixed NPC roster for THIS attempt, frozen at battle start — Phase
+  // 2's own fixed species, each given a level resolved ONCE via
+  // resolveNpcTeamLevels (Phase 2) and never rerolled turn-to-turn. Array
+  // of { speciesId: string; level: number }, in fight order.
+  npcTeam                 Json
+  npcActiveIndex          Int     @default(0)
+  npcCurrentHp            Int
+  npcStatus               String?
+  npcStatusTurnsRemaining Int?
+  npcStatStages           Json    @default("{}")
+  npcVolatileState        Json    @default("{}")
+
+  // The player's participating roster for THIS attempt — the first N real
+  // PlayerPokemon ids (N = this battle format's own max party size),
+  // snapshotted at start in existing party-slot order. Never mutates the
+  // real party itself.
+  playerPokemonIds      Json
+  activePlayerPokemonId String
+  // Record<playerPokemonId, currentHp> — see this model's own "BATTLE-LOCAL
+  // HP ONLY" doc comment above. Every participant starts at their own full
+  // HP (calculated from species+level) the instant this session is created.
+  playerBattleHp      Json
+  playerBattleStatus  Json @default("{}")
+  playerStatStages    Json @default("{}")
+  playerVolatileState Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("npc_battle_session")
+}
+
+// GYMS & LEAGUES PHASE 5 — one persistent instance of a weekly League
+// tournament occurrence. `leagueId` is "league-1" | "league-2" | "league-3"
+// (Phase 1's own RegionalLeagueId — validated at the app layer, same
+// no-Prisma-enum precedent as NpcBattleSession.battleSource); the Champions
+// League never gets an instance of this model in this Phase (section 16 —
+// no manual registration, no tournament creation until qualifiers exist).
+// `weekKey` is the Asia/Jerusalem calendar date (YYYY-MM-DD, same format as
+// getJerusalemDateKey) of that occurrence's own Thursday — the stable
+// dedupe key that makes "the same weekly tournament must not be created
+// twice" a plain DB-level unique constraint rather than app-level
+// read-then-write logic.
+model LeagueTournament {
+  id       String @id @default(cuid())
+  leagueId String
+  weekKey  String
+
+  registrationClosesAt DateTime
+  round1StartsAt       DateTime
+
+  // "registration-open" | "registration-closed" | "generated" |
+  // "in-progress" | "completed" — plain string, validated at the app layer
+  // (features/leagues/types/tournament.types.ts), same convention as every
+  // other status-ish column in this schema.
+  status String @default("registration-open")
+
+  // GYMS & LEAGUES PHASE 8 — the exactly-once reward-grant guard (section
+  // 22). Deliberately NOT derived from `status === "completed"`: multiple
+  // processes can race around completion itself, so this is its own
+  // separate null-then-set-once column, updated via the same guarded-
+  // updateMany CAS idiom every other exactly-once primitive in this
+  // project already uses (`updateMany({ where: { rewardsGrantedAt: null },
+  // data: { rewardsGrantedAt: now } })`) — never read/write raced against
+  // `status`.
+  rewardsGrantedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants LeagueTournamentParticipant[]
+  matches      LeagueTournamentMatch[]
+  placements   LeagueTournamentPlacement[]
+
+  @@unique([leagueId, weekKey])
+  @@map("league_tournament")
+}
+
+// One row per tournament participant — a real registered player OR a
+// computer filler generated at Round-1-pairing time for an odd real-player
+// count (section 8/9). `playerId` is null exactly for a computer row;
+// Postgres treats each NULL as distinct under a composite unique index, so
+// @@unique([tournamentId, playerId]) enforces "at most one registration per
+// real player per tournament" while placing no limit on how many computer
+// rows may ever exist (application logic — not this constraint — is what
+// keeps that to exactly one per round, per this Phase's own pairing rule).
+// Deliberately stores NO mutable copy of Gym eligibility — eligibility is
+// always re-checked live from real Gym progression at registration time
+// (league-eligibility.service.ts), never cached here.
+model LeagueTournamentParticipant {
+  id           String            @id @default(cuid())
+  tournamentId String
+  tournament   LeagueTournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  playerId String?
+  player   PlayerProfile? @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // "player" | "computer" — validated at the app layer.
+  participantType String
+
+  registeredAt DateTime @default(now())
+
+  matchesAsParticipantA LeagueTournamentMatch[] @relation("LeagueMatchParticipantA")
+  matchesAsParticipantB LeagueTournamentMatch[] @relation("LeagueMatchParticipantB")
+  matchesWon            LeagueTournamentMatch[] @relation("LeagueMatchWinner")
+
+  @@unique([tournamentId, playerId])
+  @@index([tournamentId])
+  @@map("league_tournament_participant")
+}
+
+// The minimum persistent shape for one Round-N pairing (section 7) — pure
+// foundation only: no PvP battle-room/session exists yet, and nothing in
+// this Phase ever sets `winnerParticipantId` outside of a test. `slot` is
+// this match's 0-based order within its own round (tournamentId,
+// roundNumber), so a round's bracket can always be reconstructed in a
+// stable, deterministic order.
+model LeagueTournamentMatch {
+  id           String           @id @default(cuid())
+  tournamentId String
+  tournament   LeagueTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  roundNumber Int
+  slot        Int
+  scheduledAt DateTime
+
+  participantAId String
+  participantA   LeagueTournamentParticipant @relation("LeagueMatchParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantBId String
+  participantB   LeagueTournamentParticipant @relation("LeagueMatchParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+
+  winnerParticipantId String?
+  winner               LeagueTournamentParticipant? @relation("LeagueMatchWinner", fields: [winnerParticipantId], references: [id])
+
+  // "scheduled" | "in-progress" | "completed" — validated at the app layer.
+  status           String  @default("scheduled")
+  // Denormalized for a cheap "is either side a computer filler" read
+  // without joining participantA/participantB — set once at generation
+  // time, never recomputed.
+  involvesComputer Boolean @default(false)
+
+  // GYMS & LEAGUES PHASE 7 — how this match's winner was actually decided:
+  // "normal-battle" | "opponent-no-show" | "random-no-show" |
+  // "timeout-living-pokemon" | "timeout-player-level" | "timeout-first-entry" |
+  // "timeout-deterministic-fallback" (features/leagues/utils/league-tiebreak.ts
+  // owns the last four). Null only before the match has a winner. Set
+  // exactly once, atomically alongside winnerParticipantId — never
+  // recomputed afterward (a completed match is immutable).
+  resolutionReason String?
+
+  battleSession LeagueBattleSession?
+
+  @@unique([tournamentId, roundNumber, slot])
+  @@index([tournamentId, roundNumber])
+  @@map("league_tournament_match")
+}
+
+// GYMS & LEAGUES PHASE 7 — the authoritative 1st/2nd/3rd place record for a
+// completed League tournament (section 22). A separate, minimal model
+// rather than nullable columns on LeagueTournament itself — cleaner for a
+// variable number of places (a 2-real-player tournament legitimately has
+// no 3rd place at all, section 23) and makes future Champions League
+// qualification queries trivial ("League I's most recent completed
+// tournament's place=1 row"). `participantId` is always a REAL player's
+// own LeagueTournamentParticipant id — a computer can never occupy a row
+// here (enforced at the app layer: placement derivation only ever
+// considers participantType "player" candidates). `playerId` is
+// denormalized from that participant purely so a future reward/Champions-
+// League query never needs an extra join. Immutable once written — the
+// unique constraint below is what makes "write each place exactly once"
+// a plain DB guarantee (same create-then-catch-P2002 idiom every other
+// exactly-once primitive in this project already uses).
+model LeagueTournamentPlacement {
+  id           String           @id @default(cuid())
+  tournamentId String
+  tournament   LeagueTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  // 1, 2, or 3.
+  place Int
+
+  participantId String
+  playerId      String
+
+  createdAt DateTime @default(now())
+
+  @@unique([tournamentId, place])
+  @@map("league_tournament_placement")
+}
+
+// GYMS & LEAGUES PHASE 6 — the authoritative, battle-local PvP session for
+// exactly one LeagueTournamentMatch (1:1 — tournamentMatchId is @unique,
+// which is what makes "at most one active League battle session per
+// match" a plain DB guarantee, never app-level read-then-write logic; the
+// row is created once at first-join and persists through completion —
+// leaving the match page never deletes it, per this Phase's own "no
+// automatic completion solely from client unmount" rule).
+//
+// Deliberately a SEPARATE model from both FieldBattleSession and
+// NpcBattleSession: PvP has two independently-owned real (or one real +
+// one computer) sides, neither of which can supply the other's move the
+// way Field Battle's own wild AI or Gym's own NPC AI can — force-fitting
+// this into either existing session shape would mean inventing fields
+// neither wild encounters nor fixed NPC rosters ever needed. The actual
+// battle MATH is never duplicated though — this session's own
+// battle-action service resolves every turn through the exact same shared
+// engine (features/battle/services/battle-turn-engine.ts) Field Battle and
+// Gym Battle already use.
+//
+// BATTLE-LOCAL STATE ONLY — same isolation property NpcBattleSession
+// already established: PlayerPokemon.currentHp/.status is never read or
+// written here. Every participating Pokémon's HP/status/stages/volatile
+// for THIS match lives entirely in the participantA*/participantB* columns
+// below, snapshotted once at that side's own join time and never touching
+// the real party.
+//
+// SIMULTANEOUS-SUBMISSION TURN MODEL — unlike Field/Gym Battle (one HTTP
+// request supplies both the player's move AND immediately picks/resolves
+// the opponent's), two real humans can't supply each other's move in the
+// same request. Each side's own pending move for the CURRENT turnNumber is
+// stored independently (participantA/BPendingMoveId); the turn is only
+// actually resolved (via resolveBattleTurn, exactly once) the moment BOTH
+// sides have a pending move recorded for that same turnNumber — see
+// league-battle-action.service.ts's own doc comment for the exact atomic
+// guard. For a computer-filler opponent, its "pending move" is selected
+// immediately in the same request the real player submits theirs, so play
+// always resolves synchronously for that case — no waiting.
+model LeagueBattleSession {
+  id                String               @id @default(cuid())
+  tournamentMatchId String               @unique
+  tournamentMatch   LeagueTournamentMatch @relation(fields: [tournamentMatchId], references: [id], onDelete: Cascade)
+
+  // Copied from the match at session-creation time (never re-derived from
+  // a client) — plain strings, not enforced FKs, same convention as
+  // NpcBattleSession's own regionId/battleSlot columns; every read is
+  // still cross-checked against the real LeagueTournamentMatch row by the
+  // service layer, never trusted from this session alone.
+  participantAId String
+  participantBId String
+
+  // Side A — null/empty until participant A actually joins (section 7).
+  // Once joined: participantAPokemon is this side's own frozen roster
+  // snapshot (up to 6, LeagueBattlePokemonSnapshot[]); participantABattleHp
+  // is Record<slotId, currentHp>; participantAStatusMap is
+  // Record<slotId, {status, turnsRemaining}> (persists per-Pokémon across a
+  // switch); participantAStatStages/participantAVolatileState apply only
+  // to whichever slot is currently active (reset on switch, same rule
+  // NpcBattleSession already follows).
+  participantAJoinedAt      DateTime?
+  participantAPokemon       Json?
+  participantAActiveSlotId  String?
+  participantABattleHp      Json?
+  participantAStatusMap     Json    @default("{}")
+  participantAStatStages    Json    @default("{}")
+  participantAVolatileState Json    @default("{}")
+  // This side's own submitted move for the CURRENT turnNumber — cleared
+  // back to null the instant a turn actually resolves.
+  participantAPendingMoveId String?
+
+  // Side B — exact mirror of Side A above.
+  participantBJoinedAt      DateTime?
+  participantBPokemon       Json?
+  participantBActiveSlotId  String?
+  participantBBattleHp      Json?
+  participantBStatusMap     Json    @default("{}")
+  participantBStatStages    Json    @default("{}")
+  participantBVolatileState Json    @default("{}")
+  participantBPendingMoveId String?
+
+  // Increments by exactly 1 each time a turn actually resolves — also the
+  // optimistic-concurrency guard every turn-resolution write is gated on
+  // (an updateMany whose WHERE clause includes the turnNumber it read),
+  // so two racing "both sides just submitted" resolutions can never both
+  // apply (see league-battle-action.service.ts).
+  turnNumber Int @default(1)
+
+  // "waiting-for-players" | "in-progress" | "completed" — validated at the
+  // app layer. Becomes "in-progress" the moment both sides have joined;
+  // "completed" exactly once, atomically alongside winnerParticipantId and
+  // the matching LeagueTournamentMatch's own completion (section 14).
+  status              String  @default("waiting-for-players")
+  winnerParticipantId String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@map("league_battle_session")
 }
 
 model Session {

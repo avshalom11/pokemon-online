@@ -15,9 +15,14 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // product), and never a new acquisition-source concept — this is the same
 // closed EggAcquisitionSource union every other egg-owning surface
 // (Hatchery/Inventory's own SOURCE_LABELS maps) already reads.
-export type EggAcquisitionSource = "battle" | "shop" | "chest";
+//
+// GYMS & LEAGUES PHASE 8 — "league" added for a League Placement/
+// Participation Reward egg (features/leagues/services/league-reward.service.ts).
+// Same reasoning as "chest": never reuses "shop" or "battle" for a reward
+// that was never purchased or dropped from a wild encounter.
+export type EggAcquisitionSource = "battle" | "shop" | "chest" | "league";
 
-export const EGG_ACQUISITION_SOURCES: readonly EggAcquisitionSource[] = ["battle", "shop", "chest"];
+export const EGG_ACQUISITION_SOURCES: readonly EggAcquisitionSource[] = ["battle", "shop", "chest", "league"];
 
 // EGGS PHASE 2 — the battle-response shape for "did this victory drop an
 // egg". Deliberately minimal/generic per this phase's own scope (no visual

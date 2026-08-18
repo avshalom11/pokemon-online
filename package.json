@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --conditions=react-server --experimental-strip-types --import ./test/support/register.mjs --test \"**/*.test.ts\"",
-    "validate:map-regions": "node scripts/validate-map-regions.mjs"
+    "validate:map-regions": "node scripts/validate-map-regions.mjs",
+    "generate:gym-npc-teams": "node --conditions=react-server --experimental-strip-types --import ./test/support/register.mjs scripts/generate-gym-npc-teams.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.0",

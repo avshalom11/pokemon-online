@@ -39,6 +39,20 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       { id: "home", label: "מסך ראשי", icon: "🏠", href: "/home" },
       { id: "world", label: "עולם", icon: "🌍", href: "/world" },
       { id: "map", label: "מפה", icon: "🗺️", href: "/map" },
+      // GYMS & LEAGUES PHASE 4 — placed right after World/Map, per this
+      // Phase's own nav spec. Inherits the exact same battle-lock behavior
+      // every other sidebar item already gets from GameSidebar's own
+      // isActiveBattle check (now seeded from BOTH Field Battle and NPC
+      // battle sessions — see app/(game)/layout.tsx) — no Gym-specific
+      // navigation-lock logic added.
+      { id: "gyms", label: "מכונים", icon: "🏟️", href: "/gyms" },
+      // GYMS & LEAGUES PHASE 5 — placed right after Gyms, the natural
+      // progression: World -> Map -> Gyms -> Leagues. Inherits the same
+      // generic battle-lock behavior every other sidebar item already gets
+      // from GameSidebar's own isActiveBattle check — no League-specific
+      // navigation-lock logic added (this Phase implements no PvP battle
+      // screen yet anyway).
+      { id: "leagues", label: "ליגות", icon: "🏆", href: "/leagues" },
     ],
   },
   {

@@ -8,7 +8,11 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
+  // NEON CONNECTION POOLING — the CLI (migrate/introspect/studio) uses
+  // DIRECT_URL, not the pooled DATABASE_URL the running app connects with
+  // (lib/db/prisma.ts): Prisma Migrate's advisory locks and DDL statements
+  // are not guaranteed safe through a PgBouncer transaction-mode pooler.
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DIRECT_URL"],
   },
 });

@@ -5,6 +5,8 @@ import { GameHeader } from "@/components/layout/GameHeader";
 import { GameSidebar } from "@/components/layout/GameSidebar";
 import { ActiveBattleProvider } from "@/features/battle-session/context/active-battle-context";
 import { hasActiveBattleSession } from "@/features/battle-session/services/battle-session.service";
+import { hasActiveNpcBattleSession } from "@/features/gyms/services/gym-battle-session.service";
+import { hasActiveLeagueBattleSession } from "@/features/leagues/services/league-battle-session.service";
 import { getNotificationBellData } from "@/features/notifications/services/notification-service";
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
 import { DailyBattleCountProvider } from "@/features/player/context/daily-battle-count-context";
@@ -45,11 +47,23 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // one DB round trip — needed here only to get the PlayerProfile id
   // getNotificationBellData is scoped by.
   const profile = await getPlayerProfile(session.user.id);
-  const [player, notifications, activeBattle] = await Promise.all([
+  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle] = await Promise.all([
     getPlayerHeaderData(session.user.id, session.user.username ?? null),
     getNotificationBellData(profile.id),
     hasActiveBattleSession(profile.id),
+    // GYMS & LEAGUES PHASE 4 — a hard refresh mid-Gym-battle must lock
+    // navigation exactly like a hard refresh mid-Field-Battle already does;
+    // GymBattleContent's own mount/unmount keeps this correct for
+    // client-side navigation the rest of the time (same split
+    // ActiveBattleProvider's own doc comment already documents for Field
+    // Battle).
+    hasActiveNpcBattleSession(profile.id),
+    // GYMS & LEAGUES PHASE 6 — same reasoning, for a hard refresh mid-
+    // League-PvP-match; LeagueMatchContent's own mount/unmount keeps this
+    // correct for client-side navigation otherwise.
+    hasActiveLeagueBattleSession(profile.id),
   ]);
+  const activeBattle = hasFieldBattle || hasNpcBattle || hasLeagueBattle;
 
   return (
     <PlayerProgressionProvider initial={player.progress}>

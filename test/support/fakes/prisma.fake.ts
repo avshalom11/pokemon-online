@@ -50,6 +50,12 @@ interface PlayerPendingMoveLearningRow {
 
 interface PlayerProfileRow {
   id: string;
+  // GYMS & LEAGUES PHASE 9 — mirrors PlayerProfile.displayName
+  // (prisma/schema.prisma), needed by getPlayerProfilesByIds' own bulk
+  // display-name resolution (League bracket/achievement/current-champion
+  // UI). Every existing test that never explicitly seeds this keeps working
+  // unchanged via the same "<id>-name" deterministic fallback.
+  displayName: string;
   level: number;
   experience: number;
   coins: number;
@@ -149,6 +155,140 @@ interface FieldBattleSessionRow {
   playerVolatileState: unknown;
 }
 
+// GYMS & LEAGUES PHASE 3
+interface NpcBattleSessionRow {
+  id: string;
+  playerId: string;
+  battleSource: string;
+  regionId: string;
+  gymNumber: number | null;
+  battleSlot: string | null;
+  npcTeam: unknown;
+  npcActiveIndex: number;
+  npcCurrentHp: number;
+  npcStatus: string | null;
+  npcStatusTurnsRemaining: number | null;
+  npcStatStages: unknown;
+  npcVolatileState: unknown;
+  playerPokemonIds: unknown;
+  activePlayerPokemonId: string;
+  playerBattleHp: unknown;
+  playerBattleStatus: unknown;
+  playerStatStages: unknown;
+  playerVolatileState: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// GYMS & LEAGUES PHASE 1
+interface PlayerGymBattleProgressRow {
+  id: string;
+  playerId: string;
+  regionId: string;
+  gymNumber: number;
+  battleSlot: string;
+  completedAt: Date;
+}
+
+interface PlayerGymBadgeRow {
+  id: string;
+  playerId: string;
+  regionId: string;
+  gymNumber: number;
+  awardedAt: Date;
+}
+
+interface PlayerRegionalChampionProgressRow {
+  id: string;
+  playerId: string;
+  regionId: string;
+  completedAt: Date;
+}
+
+interface PlayerRegionalMedalRow {
+  id: string;
+  playerId: string;
+  regionId: string;
+  awardedAt: Date;
+}
+
+// GYMS & LEAGUES PHASE 5
+interface LeagueTournamentRow {
+  id: string;
+  leagueId: string;
+  weekKey: string;
+  registrationClosesAt: Date;
+  round1StartsAt: Date;
+  status: string;
+  // GYMS & LEAGUES PHASE 8
+  rewardsGrantedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LeagueTournamentParticipantRow {
+  id: string;
+  tournamentId: string;
+  playerId: string | null;
+  participantType: string;
+  registeredAt: Date;
+}
+
+interface LeagueTournamentMatchRow {
+  id: string;
+  tournamentId: string;
+  roundNumber: number;
+  slot: number;
+  scheduledAt: Date;
+  participantAId: string;
+  participantBId: string;
+  winnerParticipantId: string | null;
+  status: string;
+  involvesComputer: boolean;
+  // GYMS & LEAGUES PHASE 7
+  resolutionReason: string | null;
+}
+
+// GYMS & LEAGUES PHASE 7
+interface LeagueTournamentPlacementRow {
+  id: string;
+  tournamentId: string;
+  place: number;
+  participantId: string;
+  playerId: string;
+  createdAt: Date;
+}
+
+// GYMS & LEAGUES PHASE 6
+interface LeagueBattleSessionRow {
+  id: string;
+  tournamentMatchId: string;
+  participantAId: string;
+  participantBId: string;
+  participantAJoinedAt: Date | null;
+  participantAPokemon: unknown;
+  participantAActiveSlotId: string | null;
+  participantABattleHp: unknown;
+  participantAStatusMap: unknown;
+  participantAStatStages: unknown;
+  participantAVolatileState: unknown;
+  participantAPendingMoveId: string | null;
+  participantBJoinedAt: Date | null;
+  participantBPokemon: unknown;
+  participantBActiveSlotId: string | null;
+  participantBBattleHp: unknown;
+  participantBStatusMap: unknown;
+  participantBStatStages: unknown;
+  participantBVolatileState: unknown;
+  participantBPendingMoveId: string | null;
+  turnNumber: number;
+  status: string;
+  winnerParticipantId: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  updatedAt: Date;
+}
+
 let pokemons = new Map<string, PlayerPokemonRow>();
 let knownMoves = new Map<string, PlayerKnownMoveRow>();
 let pending = new Map<string, PlayerPendingMoveLearningRow>();
@@ -161,6 +301,19 @@ let seenSpecies = new Map<string, PlayerSeenSpeciesRow>();
 let ownedEggs = new Map<string, PlayerOwnedEggRow>();
 let incubators = new Map<string, PlayerIncubatorRow>();
 let eggIncubations = new Map<string, PlayerEggIncubationRow>();
+// GYMS & LEAGUES PHASE 3
+let npcBattleSessions = new Map<string, NpcBattleSessionRow>();
+// GYMS & LEAGUES PHASE 1
+let gymBattleProgress = new Map<string, PlayerGymBattleProgressRow>();
+let gymBadges = new Map<string, PlayerGymBadgeRow>();
+let regionalChampionProgress = new Map<string, PlayerRegionalChampionProgressRow>();
+let regionalMedals = new Map<string, PlayerRegionalMedalRow>();
+// GYMS & LEAGUES PHASE 5
+let leagueTournaments = new Map<string, LeagueTournamentRow>();
+let leagueTournamentParticipants = new Map<string, LeagueTournamentParticipantRow>();
+let leagueTournamentMatches = new Map<string, LeagueTournamentMatchRow>();
+let leagueBattleSessions = new Map<string, LeagueBattleSessionRow>();
+let leagueTournamentPlacements = new Map<string, LeagueTournamentPlacementRow>();
 let idCounter = 0;
 let playerPokemonUpdateCallCount = 0;
 
@@ -191,6 +344,43 @@ function seenSpeciesKey(playerId: string, speciesId: string): string {
   return `${playerId}::${speciesId}`;
 }
 
+// GYMS & LEAGUES PHASE 1 — key helpers mirroring the exact @@unique
+// constraints on each new model (prisma/schema.prisma).
+function gymBattleProgressKey(playerId: string, regionId: string, gymNumber: number, battleSlot: string): string {
+  return `${playerId}::${regionId}::${gymNumber}::${battleSlot}`;
+}
+
+function gymBadgeKey(playerId: string, regionId: string, gymNumber: number): string {
+  return `${playerId}::${regionId}::${gymNumber}`;
+}
+
+function regionalChampionOrMedalKey(playerId: string, regionId: string): string {
+  return `${playerId}::${regionId}`;
+}
+
+// GYMS & LEAGUES PHASE 5 — shared by leagueTournament.findUnique/
+// findUniqueOrThrow, mirroring the real @@unique([leagueId, weekKey])
+// constraint alongside plain id lookup.
+function findLeagueTournament(where: { id?: string; leagueId_weekKey?: { leagueId: string; weekKey: string } }): LeagueTournamentRow | undefined {
+  if (where.id) return leagueTournaments.get(where.id);
+  if (where.leagueId_weekKey) {
+    const { leagueId, weekKey } = where.leagueId_weekKey;
+    return [...leagueTournaments.values()].find((row) => row.leagueId === leagueId && row.weekKey === weekKey);
+  }
+  return undefined;
+}
+
+// GYMS & LEAGUES PHASE 6 — mirrors the real @@unique([tournamentMatchId])
+// constraint alongside plain id lookup, same shape as findLeagueTournament
+// above.
+function findLeagueBattleSession(where: { id?: string; tournamentMatchId?: string }): LeagueBattleSessionRow | undefined {
+  if (where.id) return leagueBattleSessions.get(where.id);
+  if (where.tournamentMatchId) {
+    return [...leagueBattleSessions.values()].find((row) => row.tournamentMatchId === where.tournamentMatchId);
+  }
+  return undefined;
+}
+
 // INVENTORY SELL — the incubator side of the same "activeIncubation: null"
 // relation-null filter playerOwnedEgg's own findMany/deleteMany already
 // resolve by hand: true when some PlayerEggIncubation row currently
@@ -214,6 +404,16 @@ function cloneState() {
     ownedEggs: new Map([...ownedEggs].map(([id, row]) => [id, { ...row }])),
     incubators: new Map([...incubators].map(([id, row]) => [id, { ...row }])),
     eggIncubations: new Map([...eggIncubations].map(([id, row]) => [id, { ...row }])),
+    npcBattleSessions: new Map([...npcBattleSessions].map(([id, row]) => [id, { ...row }])),
+    gymBattleProgress: new Map([...gymBattleProgress].map(([id, row]) => [id, { ...row }])),
+    gymBadges: new Map([...gymBadges].map(([id, row]) => [id, { ...row }])),
+    regionalChampionProgress: new Map([...regionalChampionProgress].map(([id, row]) => [id, { ...row }])),
+    regionalMedals: new Map([...regionalMedals].map(([id, row]) => [id, { ...row }])),
+    leagueTournaments: new Map([...leagueTournaments].map(([id, row]) => [id, { ...row }])),
+    leagueTournamentParticipants: new Map([...leagueTournamentParticipants].map(([id, row]) => [id, { ...row }])),
+    leagueTournamentMatches: new Map([...leagueTournamentMatches].map(([id, row]) => [id, { ...row }])),
+    leagueBattleSessions: new Map([...leagueBattleSessions].map(([id, row]) => [id, { ...row }])),
+    leagueTournamentPlacements: new Map([...leagueTournamentPlacements].map(([id, row]) => [id, { ...row }])),
   };
 }
 
@@ -230,6 +430,16 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   ownedEggs = snapshot.ownedEggs;
   incubators = snapshot.incubators;
   eggIncubations = snapshot.eggIncubations;
+  npcBattleSessions = snapshot.npcBattleSessions;
+  gymBattleProgress = snapshot.gymBattleProgress;
+  gymBadges = snapshot.gymBadges;
+  regionalChampionProgress = snapshot.regionalChampionProgress;
+  regionalMedals = snapshot.regionalMedals;
+  leagueTournaments = snapshot.leagueTournaments;
+  leagueTournamentParticipants = snapshot.leagueTournamentParticipants;
+  leagueTournamentMatches = snapshot.leagueTournamentMatches;
+  leagueBattleSessions = snapshot.leagueBattleSessions;
+  leagueTournamentPlacements = snapshot.leagueTournamentPlacements;
 }
 
 export function resetFakeDb() {
@@ -245,6 +455,16 @@ export function resetFakeDb() {
   ownedEggs = new Map();
   incubators = new Map();
   eggIncubations = new Map();
+  npcBattleSessions = new Map();
+  gymBattleProgress = new Map();
+  gymBadges = new Map();
+  regionalChampionProgress = new Map();
+  regionalMedals = new Map();
+  leagueTournaments = new Map();
+  leagueTournamentParticipants = new Map();
+  leagueTournamentMatches = new Map();
+  leagueBattleSessions = new Map();
+  leagueTournamentPlacements = new Map();
   idCounter = 0;
   playerPokemonUpdateCallCount = 0;
 }
@@ -319,6 +539,7 @@ export function seedPendingMove(row: {
 
 export function seedPlayerProfile(row: {
   id: string;
+  displayName?: string;
   level?: number;
   experience?: number;
   coins?: number;
@@ -328,6 +549,7 @@ export function seedPlayerProfile(row: {
 }) {
   const full: PlayerProfileRow = {
     id: row.id,
+    displayName: row.displayName ?? `${row.id}-name`,
     level: row.level ?? 1,
     experience: row.experience ?? 0,
     coins: row.coins ?? 500,
@@ -484,6 +706,14 @@ export function getOwnedEggRow(id: string) {
   return row ? { ...row } : undefined;
 }
 
+// GYMS & LEAGUES PHASE 8 — every egg row a player owns, regardless of
+// source/incubation state (unlike listOwnedEggs' own "not currently
+// incubating" filter) — used by League reward tests to assert exact
+// rarity/quantity/source.
+export function getOwnedEggRowsForPlayer(playerId: string) {
+  return [...ownedEggs.values()].filter((row) => row.playerId === playerId).map((row) => ({ ...row }));
+}
+
 // Keyed by plain id (not incubatorKey's playerId+permanentSlot composite)
 // so a test can freely seed several independent incubators for the same
 // player, including duplicates of the same type and/or more than one row
@@ -521,6 +751,10 @@ function matchesValue(actual: unknown, expected: unknown): boolean {
     if ("not" in operators) return actual !== operators.not;
     if ("gte" in operators) return (actual as number) >= (operators.gte as number);
     if ("gt" in operators) return (actual as number) > (operators.gt as number);
+    // GYMS & LEAGUES PHASE 9 — mirrors real Prisma's `{ field: { in: [...] }
+    // }` filter (getPlayerProfilesByIds' own bulk id lookup, lib/auth/
+    // player-profile.ts).
+    if ("in" in operators) return (operators.in as unknown[]).includes(actual);
   }
   return actual === expected;
 }
@@ -667,6 +901,12 @@ const client = {
       applyNumericOperators(row as unknown as Record<string, unknown>, data);
       return { ...row };
     },
+    // GYMS & LEAGUES PHASE 9 — bulk lookup for getPlayerProfilesByIds
+    // (lib/auth/player-profile.ts), used by League bracket/achievement/
+    // current-champion display-name resolution.
+    async findMany({ where }: { where: Record<string, unknown> }) {
+      return [...profiles.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
     // Mirrors currency-reward.service.ts's spendCurrency: the precondition
     // (sufficient balance) is encoded directly in `where` via `{ gte }`
     // (matchesValue above), so a call against an insufficient balance
@@ -757,6 +997,476 @@ const client = {
     },
     async findMany({ where }: { where: Record<string, unknown> }) {
       return [...seenSpecies.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+  },
+  // GYMS & LEAGUES PHASE 3 — mirrors fieldBattleSession's own fake shape
+  // (single row per playerId, plain create/findUnique/updateMany/deleteMany
+  // — no upsert, since a session is only ever created once per attempt).
+  npcBattleSession: {
+    async create({ data }: { data: Record<string, unknown> }) {
+      const full: NpcBattleSessionRow = {
+        id: nextId("npc_battle"),
+        playerId: data.playerId as string,
+        battleSource: data.battleSource as string,
+        regionId: data.regionId as string,
+        gymNumber: (data.gymNumber as number | null | undefined) ?? null,
+        battleSlot: (data.battleSlot as string | null | undefined) ?? null,
+        npcTeam: data.npcTeam,
+        npcActiveIndex: (data.npcActiveIndex as number | undefined) ?? 0,
+        npcCurrentHp: data.npcCurrentHp as number,
+        npcStatus: (data.npcStatus as string | null | undefined) ?? null,
+        npcStatusTurnsRemaining: (data.npcStatusTurnsRemaining as number | null | undefined) ?? null,
+        npcStatStages: data.npcStatStages ?? {},
+        npcVolatileState: data.npcVolatileState ?? {},
+        playerPokemonIds: data.playerPokemonIds,
+        activePlayerPokemonId: data.activePlayerPokemonId as string,
+        playerBattleHp: data.playerBattleHp,
+        playerBattleStatus: data.playerBattleStatus ?? {},
+        playerStatStages: data.playerStatStages ?? {},
+        playerVolatileState: data.playerVolatileState ?? {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      npcBattleSessions.set(full.playerId, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { playerId: string } }) {
+      const row = npcBattleSessions.get(where.playerId);
+      return row ? { ...row } : null;
+    },
+    async updateMany({ where, data }: { where: { playerId: string }; data: Record<string, unknown> }) {
+      const row = npcBattleSessions.get(where.playerId);
+      if (!row) return { count: 0 };
+      Object.assign(row, data, { updatedAt: new Date() });
+      return { count: 1 };
+    },
+    async deleteMany({ where }: { where: { playerId: string } }) {
+      const existed = npcBattleSessions.delete(where.playerId);
+      return { count: existed ? 1 : 0 };
+    },
+  },
+  // GYMS & LEAGUES PHASE 1 fakes — same idempotent-upsert idiom as
+  // playerSeenSpecies above: create on first call, a no-op "return the
+  // existing row unchanged" on every call after, proving
+  // markGymBattleCompleted/markRegionalChampionDefeated's own idempotency
+  // without a real unique-constraint violation to catch it.
+  playerGymBattleProgress: {
+    // GYMS & LEAGUES PHASE 4 — mirrors real Postgres unique-constraint
+    // behavior for markGymBattleCompleted's new create-then-catch idiom:
+    // throws a P2002-shaped error (same code Prisma's real client surfaces)
+    // when the (playerId, regionId, gymNumber, battleSlot) key already
+    // exists, rather than silently overwriting.
+    async create({ data }: { data: { playerId: string; regionId: string; gymNumber: number; battleSlot: string } }) {
+      const key = gymBattleProgressKey(data.playerId, data.regionId, data.gymNumber, data.battleSlot);
+      if (gymBattleProgress.has(key)) {
+        throw Object.assign(new Error("Unique constraint failed on playerGymBattleProgress"), { code: "P2002" });
+      }
+      const full: PlayerGymBattleProgressRow = { id: nextId("gym_progress"), completedAt: new Date(), ...data };
+      gymBattleProgress.set(key, full);
+      return { ...full };
+    },
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { playerId_regionId_gymNumber_battleSlot: { playerId: string; regionId: string; gymNumber: number; battleSlot: string } };
+      create: { playerId: string; regionId: string; gymNumber: number; battleSlot: string };
+      update: Record<string, unknown>;
+    }) {
+      const { playerId, regionId, gymNumber, battleSlot } = where.playerId_regionId_gymNumber_battleSlot;
+      const key = gymBattleProgressKey(playerId, regionId, gymNumber, battleSlot);
+      const existing = gymBattleProgress.get(key);
+      if (existing) return { ...existing };
+      const full: PlayerGymBattleProgressRow = { id: nextId("gym_progress"), completedAt: new Date(), ...create };
+      gymBattleProgress.set(key, full);
+      return { ...full };
+    },
+    async findUnique({
+      where,
+    }: {
+      where: { playerId_regionId_gymNumber_battleSlot: { playerId: string; regionId: string; gymNumber: number; battleSlot: string } };
+    }) {
+      const { playerId, regionId, gymNumber, battleSlot } = where.playerId_regionId_gymNumber_battleSlot;
+      const row = gymBattleProgress.get(gymBattleProgressKey(playerId, regionId, gymNumber, battleSlot));
+      return row ? { ...row } : null;
+    },
+    async findMany({ where }: { where: Record<string, unknown> }) {
+      return [...gymBattleProgress.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+    async count({ where }: { where: Record<string, unknown> }) {
+      return [...gymBattleProgress.values()].filter((row) => matches(row, where)).length;
+    },
+  },
+  playerGymBadge: {
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { playerId_regionId_gymNumber: { playerId: string; regionId: string; gymNumber: number } };
+      create: { playerId: string; regionId: string; gymNumber: number };
+      update: Record<string, unknown>;
+    }) {
+      const { playerId, regionId, gymNumber } = where.playerId_regionId_gymNumber;
+      const key = gymBadgeKey(playerId, regionId, gymNumber);
+      const existing = gymBadges.get(key);
+      if (existing) return { ...existing };
+      const full: PlayerGymBadgeRow = { id: nextId("gym_badge"), awardedAt: new Date(), ...create };
+      gymBadges.set(key, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { playerId_regionId_gymNumber: { playerId: string; regionId: string; gymNumber: number } } }) {
+      const { playerId, regionId, gymNumber } = where.playerId_regionId_gymNumber;
+      const row = gymBadges.get(gymBadgeKey(playerId, regionId, gymNumber));
+      return row ? { ...row } : null;
+    },
+    async findMany({ where }: { where: Record<string, unknown> }) {
+      return [...gymBadges.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+  },
+  playerRegionalChampionProgress: {
+    // Same real-unique-constraint mirror as playerGymBattleProgress.create
+    // above, keyed on (playerId, regionId) — used by
+    // markRegionalChampionDefeated's create-then-catch idiom.
+    async create({ data }: { data: { playerId: string; regionId: string } }) {
+      const key = regionalChampionOrMedalKey(data.playerId, data.regionId);
+      if (regionalChampionProgress.has(key)) {
+        throw Object.assign(new Error("Unique constraint failed on playerRegionalChampionProgress"), { code: "P2002" });
+      }
+      const full: PlayerRegionalChampionProgressRow = { id: nextId("champion_progress"), completedAt: new Date(), ...data };
+      regionalChampionProgress.set(key, full);
+      return { ...full };
+    },
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { playerId_regionId: { playerId: string; regionId: string } };
+      create: { playerId: string; regionId: string };
+      update: Record<string, unknown>;
+    }) {
+      const key = regionalChampionOrMedalKey(where.playerId_regionId.playerId, where.playerId_regionId.regionId);
+      const existing = regionalChampionProgress.get(key);
+      if (existing) return { ...existing };
+      const full: PlayerRegionalChampionProgressRow = { id: nextId("champion_progress"), completedAt: new Date(), ...create };
+      regionalChampionProgress.set(key, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { playerId_regionId: { playerId: string; regionId: string } } }) {
+      const row = regionalChampionProgress.get(regionalChampionOrMedalKey(where.playerId_regionId.playerId, where.playerId_regionId.regionId));
+      return row ? { ...row } : null;
+    },
+  },
+  playerRegionalMedal: {
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { playerId_regionId: { playerId: string; regionId: string } };
+      create: { playerId: string; regionId: string };
+      update: Record<string, unknown>;
+    }) {
+      const key = regionalChampionOrMedalKey(where.playerId_regionId.playerId, where.playerId_regionId.regionId);
+      const existing = regionalMedals.get(key);
+      if (existing) return { ...existing };
+      const full: PlayerRegionalMedalRow = { id: nextId("medal"), awardedAt: new Date(), ...create };
+      regionalMedals.set(key, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { playerId_regionId: { playerId: string; regionId: string } } }) {
+      const row = regionalMedals.get(regionalChampionOrMedalKey(where.playerId_regionId.playerId, where.playerId_regionId.regionId));
+      return row ? { ...row } : null;
+    },
+  },
+  // GYMS & LEAGUES PHASE 5 fakes.
+  leagueTournament: {
+    async create({
+      data,
+    }: {
+      data: { leagueId: string; weekKey: string; registrationClosesAt: Date; round1StartsAt: Date; status?: string };
+    }) {
+      const duplicate = [...leagueTournaments.values()].some((row) => row.leagueId === data.leagueId && row.weekKey === data.weekKey);
+      if (duplicate) {
+        throw Object.assign(new Error("Unique constraint failed on league_tournament"), { code: "P2002" });
+      }
+      const id = nextId("league_tournament");
+      const full: LeagueTournamentRow = {
+        id,
+        leagueId: data.leagueId,
+        weekKey: data.weekKey,
+        registrationClosesAt: data.registrationClosesAt,
+        round1StartsAt: data.round1StartsAt,
+        status: data.status ?? "registration-open",
+        rewardsGrantedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      leagueTournaments.set(id, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { id?: string; leagueId_weekKey?: { leagueId: string; weekKey: string } } }) {
+      const row = findLeagueTournament(where);
+      return row ? { ...row } : null;
+    },
+    async findUniqueOrThrow({ where }: { where: { id?: string; leagueId_weekKey?: { leagueId: string; weekKey: string } } }) {
+      const row = findLeagueTournament(where);
+      if (!row) throw new Error("fake prisma: leagueTournament not found");
+      return { ...row };
+    },
+    async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
+      const row = leagueTournaments.get(where.id);
+      if (!row) throw new Error("fake prisma: leagueTournament not found for update");
+      Object.assign(row, data, { updatedAt: new Date() });
+      return { ...row };
+    },
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of leagueTournaments.values()) {
+        if (matches(row, where)) {
+          Object.assign(row, data, { updatedAt: new Date() });
+          count += 1;
+        }
+      }
+      return { count };
+    },
+    // GYMS & LEAGUES PHASE 8 — used by league-achievement.service.ts's own
+    // "every completed tournament for this League" read.
+    async findMany({ where }: { where?: Record<string, unknown> }) {
+      return [...leagueTournaments.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+  },
+  leagueTournamentParticipant: {
+    async create({ data }: { data: { tournamentId: string; playerId?: string | null; participantType: string } }) {
+      const playerId = data.playerId ?? null;
+      if (playerId !== null) {
+        const duplicate = [...leagueTournamentParticipants.values()].some(
+          (row) => row.tournamentId === data.tournamentId && row.playerId === playerId
+        );
+        if (duplicate) {
+          throw Object.assign(new Error("Unique constraint failed on league_tournament_participant"), { code: "P2002" });
+        }
+      }
+      const id = nextId("league_participant");
+      const full: LeagueTournamentParticipantRow = {
+        id,
+        tournamentId: data.tournamentId,
+        playerId,
+        participantType: data.participantType,
+        registeredAt: new Date(),
+      };
+      leagueTournamentParticipants.set(id, full);
+      return { ...full };
+    },
+    async findUnique({
+      where,
+    }: {
+      where: { id?: string; tournamentId_playerId?: { tournamentId: string; playerId: string } };
+    }) {
+      if (where.id) {
+        const row = leagueTournamentParticipants.get(where.id);
+        return row ? { ...row } : null;
+      }
+      if (where.tournamentId_playerId) {
+        const { tournamentId, playerId } = where.tournamentId_playerId;
+        const row = [...leagueTournamentParticipants.values()].find((r) => r.tournamentId === tournamentId && r.playerId === playerId);
+        return row ? { ...row } : null;
+      }
+      return null;
+    },
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where?: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc">;
+    }) {
+      const rows = [...leagueTournamentParticipants.values()].filter((row) => matches(row, where));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+  },
+  leagueTournamentMatch: {
+    async create({
+      data,
+    }: {
+      data: {
+        tournamentId: string;
+        roundNumber: number;
+        slot: number;
+        scheduledAt: Date;
+        participantAId: string;
+        participantBId: string;
+        status?: string;
+        involvesComputer?: boolean;
+      };
+    }) {
+      // LEAGUE ROUND-1 GENERATION LIFECYCLE FIX — mirrors the real schema's
+      // @@unique([tournamentId, roundNumber, slot]) (prisma/schema.prisma),
+      // previously unenforced by this fake. Needed so a genuine race
+      // between two concurrent generateRound1ForTournament calls (now
+      // reachable in production via ensureRound1GeneratedForActiveTournament)
+      // is caught the same way real Postgres would catch it — the second
+      // writer's create throws P2002 instead of silently persisting a
+      // duplicate match row.
+      const duplicate = [...leagueTournamentMatches.values()].some(
+        (row) => row.tournamentId === data.tournamentId && row.roundNumber === data.roundNumber && row.slot === data.slot
+      );
+      if (duplicate) {
+        throw Object.assign(new Error("Unique constraint failed on league_tournament_match"), { code: "P2002" });
+      }
+      const id = nextId("league_match");
+      const full: LeagueTournamentMatchRow = {
+        id,
+        tournamentId: data.tournamentId,
+        roundNumber: data.roundNumber,
+        slot: data.slot,
+        scheduledAt: data.scheduledAt,
+        participantAId: data.participantAId,
+        participantBId: data.participantBId,
+        winnerParticipantId: null,
+        status: data.status ?? "scheduled",
+        involvesComputer: data.involvesComputer ?? false,
+        resolutionReason: null,
+      };
+      leagueTournamentMatches.set(id, full);
+      return { ...full };
+    },
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where?: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc">;
+    }) {
+      const rows = [...leagueTournamentMatches.values()].filter((row) => matches(row, where));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = leagueTournamentMatches.get(where.id);
+      return row ? { ...row } : null;
+    },
+    // GYMS & LEAGUES PHASE 7 — used by advanceCompletedLeagueRound's own
+    // cheap "does the next round already exist" idempotency check.
+    async findFirst({ where }: { where?: Record<string, unknown> }) {
+      const row = [...leagueTournamentMatches.values()].find((candidate) => matches(candidate, where));
+      return row ? { ...row } : null;
+    },
+    // GYMS & LEAGUES PHASE 6 — used by league-battle-action.service.ts's
+    // own exactly-once match-completion write; `matches` already supports
+    // the `{ status: { not: "completed" } }` shape via matchesValue's
+    // "not" operator.
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of leagueTournamentMatches.values()) {
+        if (matches(row, where)) {
+          Object.assign(row, data);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  // GYMS & LEAGUES PHASE 7 fakes.
+  leagueTournamentPlacement: {
+    async create({
+      data,
+    }: {
+      data: { tournamentId: string; place: number; participantId: string; playerId: string };
+    }) {
+      const duplicate = [...leagueTournamentPlacements.values()].some(
+        (row) => row.tournamentId === data.tournamentId && row.place === data.place
+      );
+      if (duplicate) {
+        throw Object.assign(new Error("Unique constraint failed on league_tournament_placement"), { code: "P2002" });
+      }
+      const id = nextId("league_placement");
+      const full: LeagueTournamentPlacementRow = {
+        id,
+        tournamentId: data.tournamentId,
+        place: data.place,
+        participantId: data.participantId,
+        playerId: data.playerId,
+        createdAt: new Date(),
+      };
+      leagueTournamentPlacements.set(id, full);
+      return { ...full };
+    },
+    async findMany({ where, orderBy }: { where?: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc"> }) {
+      const rows = [...leagueTournamentPlacements.values()].filter((row) => matches(row, where));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+  },
+  // GYMS & LEAGUES PHASE 6 fakes.
+  leagueBattleSession: {
+    async create({
+      data,
+    }: {
+      data: { tournamentMatchId: string; participantAId: string; participantBId: string };
+    }) {
+      const duplicate = [...leagueBattleSessions.values()].some((row) => row.tournamentMatchId === data.tournamentMatchId);
+      if (duplicate) {
+        throw Object.assign(new Error("Unique constraint failed on league_battle_session"), { code: "P2002" });
+      }
+      const id = nextId("league_battle_session");
+      const now = new Date();
+      const full: LeagueBattleSessionRow = {
+        id,
+        tournamentMatchId: data.tournamentMatchId,
+        participantAId: data.participantAId,
+        participantBId: data.participantBId,
+        participantAJoinedAt: null,
+        participantAPokemon: null,
+        participantAActiveSlotId: null,
+        participantABattleHp: null,
+        participantAStatusMap: {},
+        participantAStatStages: {},
+        participantAVolatileState: {},
+        participantAPendingMoveId: null,
+        participantBJoinedAt: null,
+        participantBPokemon: null,
+        participantBActiveSlotId: null,
+        participantBBattleHp: null,
+        participantBStatusMap: {},
+        participantBStatStages: {},
+        participantBVolatileState: {},
+        participantBPendingMoveId: null,
+        turnNumber: 1,
+        status: "waiting-for-players",
+        winnerParticipantId: null,
+        startedAt: now,
+        completedAt: null,
+        updatedAt: now,
+      };
+      leagueBattleSessions.set(id, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { id?: string; tournamentMatchId?: string } }) {
+      const row = findLeagueBattleSession(where);
+      return row ? { ...row } : null;
+    },
+    async findUniqueOrThrow({ where }: { where: { id?: string; tournamentMatchId?: string } }) {
+      const row = findLeagueBattleSession(where);
+      if (!row) throw new Error("fake prisma: leagueBattleSession not found");
+      return { ...row };
+    },
+    async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
+      const row = leagueBattleSessions.get(where.id);
+      if (!row) throw new Error("fake prisma: leagueBattleSession not found for update");
+      applyNumericOperators(row as unknown as Record<string, unknown>, data);
+      row.updatedAt = new Date();
+      return { ...row };
+    },
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of leagueBattleSessions.values()) {
+        if (matches(row, where)) {
+          applyNumericOperators(row as unknown as Record<string, unknown>, data);
+          row.updatedAt = new Date();
+          count += 1;
+        }
+      }
+      return { count };
+    },
+    async findMany({ where }: { where?: Record<string, unknown> }) {
+      return [...leagueBattleSessions.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
     },
   },
   // EGGS PHASE 1 fakes — see the row interfaces' own doc comment above for
@@ -1197,5 +1907,63 @@ const client = {
     }
   },
 };
+
+// GYMS & LEAGUES PHASE 1 — read-only accessors for test assertions, same
+// style as getFieldBattleSessionRow/getPlayerProfileRow above.
+export function getGymBattleProgressRow(playerId: string, regionId: string, gymNumber: number, battleSlot: string) {
+  const row = gymBattleProgress.get(gymBattleProgressKey(playerId, regionId, gymNumber, battleSlot));
+  return row ? { ...row } : undefined;
+}
+
+export function getGymBadgeRow(playerId: string, regionId: string, gymNumber: number) {
+  const row = gymBadges.get(gymBadgeKey(playerId, regionId, gymNumber));
+  return row ? { ...row } : undefined;
+}
+
+export function getRegionalChampionProgressRow(playerId: string, regionId: string) {
+  const row = regionalChampionProgress.get(regionalChampionOrMedalKey(playerId, regionId));
+  return row ? { ...row } : undefined;
+}
+
+export function getRegionalMedalRow(playerId: string, regionId: string) {
+  const row = regionalMedals.get(regionalChampionOrMedalKey(playerId, regionId));
+  return row ? { ...row } : undefined;
+}
+
+// GYMS & LEAGUES PHASE 3
+export function getNpcBattleSessionRow(playerId: string) {
+  const row = npcBattleSessions.get(playerId);
+  return row ? { ...row } : undefined;
+}
+
+// GYMS & LEAGUES PHASE 5
+export function getLeagueTournamentRow(leagueId: string, weekKey: string) {
+  const row = [...leagueTournaments.values()].find((candidate) => candidate.leagueId === leagueId && candidate.weekKey === weekKey);
+  return row ? { ...row } : undefined;
+}
+
+export function getLeagueTournamentParticipantRows(tournamentId: string) {
+  return [...leagueTournamentParticipants.values()].filter((row) => row.tournamentId === tournamentId).map((row) => ({ ...row }));
+}
+
+export function getLeagueTournamentMatchRows(tournamentId: string, roundNumber?: number) {
+  return [...leagueTournamentMatches.values()]
+    .filter((row) => row.tournamentId === tournamentId && (roundNumber === undefined || row.roundNumber === roundNumber))
+    .map((row) => ({ ...row }));
+}
+
+// GYMS & LEAGUES PHASE 6
+export function getLeagueBattleSessionRow(tournamentMatchId: string) {
+  const row = [...leagueBattleSessions.values()].find((candidate) => candidate.tournamentMatchId === tournamentMatchId);
+  return row ? { ...row } : undefined;
+}
+
+// GYMS & LEAGUES PHASE 7
+export function getLeagueTournamentPlacementRows(tournamentId: string) {
+  return [...leagueTournamentPlacements.values()]
+    .filter((row) => row.tournamentId === tournamentId)
+    .sort((a, b) => a.place - b.place)
+    .map((row) => ({ ...row }));
+}
 
 export const prisma = client;

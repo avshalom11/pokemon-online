@@ -41,3 +41,17 @@ export async function ensurePlayerProfile(userId: string, displayName: string) {
 export const getPlayerProfile = cache(async (userId: string) => {
   return prisma.playerProfile.findUniqueOrThrow({ where: { userId } });
 });
+
+// GYMS & LEAGUES PHASE 9 — bulk PlayerProfile.id -> displayName resolution
+// (section 24). Gym/League features key everything by PlayerProfile.id
+// ("playerId" throughout those features), never by the auth User.id
+// getPlayerProfile above resolves — this is the one place a batch of those
+// ids gets turned into safe display names for the UI (current champions,
+// bracket match cards, achievement history), so no caller ever exposes a
+// raw playerId or reaches into User/email itself.
+export async function getPlayerProfilesByIds(playerIds: readonly string[]): Promise<Map<string, string>> {
+  if (playerIds.length === 0) return new Map();
+  const uniqueIds = [...new Set(playerIds)];
+  const rows = await prisma.playerProfile.findMany({ where: { id: { in: uniqueIds } }, select: { id: true, displayName: true } });
+  return new Map(rows.map((row) => [row.id, row.displayName]));
+}

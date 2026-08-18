@@ -18,6 +18,13 @@ const STATIC_NAVIGATION_ITEMS = [
   // (features/navigation/data/sidebar-menu.ts), so the two menus never
   // drift into disagreeing iconography for the same destination.
   { title: "מדגרה", icon: "🥚", href: "/hatchery" },
+  // GYMS & LEAGUES PHASE 9 — small nav shortcuts only (section 26): the
+  // sidebar already links to both (features/navigation/data/sidebar-menu.ts,
+  // Phase 4/5), same icons reused here so the two menus never disagree, same
+  // "small addition to the existing static list" precedent Hatchery above
+  // already established — no redesign, no champion showcase on Home itself.
+  { title: "מכונים", icon: "🏟️", href: "/gyms" },
+  { title: "ליגות", icon: "🏆", href: "/leagues" },
   { title: "תיק ציוד", icon: "🎒", href: "/inventory" },
   { title: "פוקדקס", icon: "📖", href: "/pokedex" },
   { title: "חנות", icon: "🛒", href: "/shop" },
