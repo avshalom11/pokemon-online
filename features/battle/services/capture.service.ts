@@ -131,6 +131,7 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
       experience: getTotalXpRequiredForPokemonLevel(session.wildLevel),
       currentHp: session.wildCurrentHp,
       isStarter: false,
+      source: "capture",
     });
 
     // Same transaction, same race guard as the delete/create above — the

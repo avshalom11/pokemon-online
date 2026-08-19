@@ -116,6 +116,7 @@ export async function hatchIncubation(
       experience: getTotalXpRequiredForPokemonLevel(level),
       currentHp,
       isStarter: false,
+      source: "egg",
     });
 
     return {

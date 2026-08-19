@@ -214,9 +214,32 @@ export function BattleContent({
   // hasActiveBattleSession the layout already seeds from) and only then
   // releases the lock — so the sidebar always reflects the actual session,
   // never merely whether this component happens to be mounted.
+  //
+  // FIELD BATTLE STUCK — that server re-check is itself a Server Action,
+  // and every Server Action response carries a fresh RSC render of
+  // whatever route the browser still considers current (Next's own
+  // automatic "revalidate current route" behavior, not something this app
+  // controls per call). Reproduced live: while still nominally on
+  // /battle?zone=... during the escape/party-defeat exit (the URL hasn't
+  // visually flipped to /map yet), this re-check's own response re-ran
+  // BattlePage's getOrStartBattle — which, finding no session (escape/
+  // party-defeat had just deleted it), happily created a BRAND NEW one.
+  // The player landed on /map with the sidebar silently re-locked by a
+  // phantom encounter they never asked for and could never see. For
+  // escape/party-defeat specifically we already have definitive proof the
+  // delete was attempted (confirmedEndedRef, set alongside
+  // endSessionPromiseRef below) — no need to re-verify with another
+  // server round trip that risks landing in that exact window. Every OTHER
+  // unmount reason (browser Back, a direct URL change, any path that never
+  // set this ref) still gets the original, essential server re-check.
+  const confirmedEndedRef = useRef(false);
   useEffect(() => {
     setActiveBattle(true);
     return () => {
+      if (confirmedEndedRef.current) {
+        setActiveBattle(false);
+        return;
+      }
       getActiveBattleStatusAction().then(setActiveBattle);
     };
   }, [setActiveBattle]);
@@ -375,6 +398,26 @@ export function BattleContent({
   const playerHitTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerAttackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xpToastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // SIDEBAR STUCK IN ACTIVE-BATTLE MODE — STALE-STATE FIX. Escape and a full
+  // party defeat are the two exits that must delete the FieldBattleSession
+  // themselves (endBattleSessionAction — capture already does this
+  // atomically as part of its own transaction, see that action's own doc
+  // comment). Both used to fire that delete WITHOUT awaiting it before
+  // handleReturnToMap's router.replace navigated away — unmounting this
+  // component, which re-verifies the session via getActiveBattleStatusAction
+  // (active-battle-context.tsx's own documented safety net). Two independent,
+  // unawaited server round trips have no ordering guarantee: the re-check
+  // could resolve BEFORE the delete had actually committed, find the
+  // session "still there", and re-lock the sidebar even though the player
+  // had genuinely just fled/lost — stranding them on another page with no
+  // battle screen mounted and no way to clear the lock. This ref lets
+  // handleReturnToMap wait for that exact delete to settle (success or
+  // failure — see its own use of `.finally`, never `.then`, so a rare
+  // failed delete still lets the player leave rather than trapping them)
+  // before it ever navigates, which guarantees the unmount's re-check only
+  // ever runs after the deletion has already committed.
+  const endSessionPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(
     () => () => {
@@ -676,11 +719,59 @@ export function BattleContent({
   // still in flight the moment the player left. Never awaited, so it can
   // never delay leaving the battle screen.
   function handleReturnToMap() {
-    startSessionSyncTransition(async () => {
-      const progress = await getPlayerProgressAction();
-      if (progress) applyProgress(progress);
-    });
-    router.replace("/map");
+    // FIELD BATTLE STUCK — every Server Action response carries a fresh
+    // RSC render of whatever route is still current (Next's own automatic
+    // "revalidate current route on action response" behavior — not
+    // something this app controls per-call). While the browser still
+    // considers /battle current, ANY server action landing here — even
+    // one as unrelated as the progress re-fetch below — re-runs
+    // BattlePage's own getOrStartBattle, which happily creates a BRAND
+    // NEW FieldBattleSession the instant it sees none exists. Reproduced:
+    // firing this progress re-fetch in parallel with (not sequenced
+    // after) escape/party-defeat's own endBattleSessionAction let it land
+    // in the split-second the old session was gone but /battle was still
+    // "current" — silently starting a phantom encounter that kept the
+    // sidebar locked on /map with no battle screen ever visible for it.
+    // Sequencing this behind the same pendingEndSession wait as the
+    // navigation below (never firing it while /battle is still current)
+    // closes that window; capture's own call to this function never had a
+    // pendingEndSession to begin with (its session-ending is already
+    // atomic server-side), so this changes nothing for that path.
+    function proceed() {
+      // Still racy even sequenced after the delete: this fetch and
+      // router.replace below both fire the instant the delete settles,
+      // so this request can itself still land while /battle is nominally
+      // current, re-triggering the exact same phantom-session creation
+      // its own response would carry. escape/party-defeat (confirmedEndedRef)
+      // never grant a reward in the first place (see this call's own doc
+      // comment above — "the rare case where the very last reward call was
+      // still in flight" only ever applies to capture), so skipping it
+      // there removes the last stray request without losing anything a
+      // flee/defeat exit actually needed. Capture never sets
+      // confirmedEndedRef (its own session-ending is already atomic), so
+      // this is unchanged for that path.
+      if (!confirmedEndedRef.current) {
+        startSessionSyncTransition(async () => {
+          const progress = await getPlayerProgressAction();
+          if (progress) applyProgress(progress);
+        });
+      }
+      router.replace("/map");
+    }
+
+    // See endSessionPromiseRef's own doc comment — if escape or a full
+    // party defeat just fired endBattleSessionAction, wait for it to
+    // settle before navigating, so this component only ever unmounts (and
+    // triggers its unmount re-check) once that deletion has committed.
+    // `.finally` (not `.then`) so a rare failed delete still lets the
+    // player leave normally rather than trapping them on this screen.
+    const pendingEndSession = endSessionPromiseRef.current;
+    endSessionPromiseRef.current = null;
+    if (pendingEndSession) {
+      pendingEndSession.finally(proceed);
+    } else {
+      proceed();
+    }
   }
 
   // Shared by: a normal attack's counter-hit, a failed capture's
@@ -725,8 +816,9 @@ export function BattleContent({
     );
 
     if (nextPhase === "partyDefeated") {
+      confirmedEndedRef.current = true;
       startSessionSyncTransition(() => {
-        endBattleSessionAction();
+        endSessionPromiseRef.current = endBattleSessionAction();
       });
     }
   }
@@ -774,7 +866,22 @@ export function BattleContent({
     setMessage(attackMessage(playerDisplayName, wildState.pokemon.name));
 
     startBattleActionTransition(async () => {
-      const result = await executeBattleActionAction(zoneId, "attack", moveId);
+      // FIELD BATTLE STUCK — STALE-STATE FIX. A thrown/rejected request
+      // (a dropped connection, a dev-server restart mid-request, ...) must
+      // never leave `phase` stuck on "enemyTurn" forever — every action
+      // handler in this component guards on `phase !== "playerTurn"` at
+      // its own top, so a permanently-stuck phase means EVERY future
+      // action (attack, capture, switch, bag, run) silently no-ops with no
+      // recovery path short of a full reload. Same recovery as an explicit
+      // non-success status below — never trust the client's own belief
+      // that the request actually landed.
+      let result: Awaited<ReturnType<typeof executeBattleActionAction>>;
+      try {
+        result = await executeBattleActionAction(zoneId, "attack", moveId);
+      } catch {
+        setPhase("playerTurn");
+        return;
+      }
 
       if (result.status !== "success") {
         // The server rejected the action (stale phase, a race, an already-
@@ -910,7 +1017,16 @@ export function BattleContent({
     setMessage(throwPokeballMessage(playerName, wildState.pokemon.name));
 
     startCaptureTransition(async () => {
-      const result = await attemptCaptureAction(ballItemId);
+      // See handleAttack's identical try/catch for why this must never
+      // leave `phase` stuck on "capturing" forever after a thrown/rejected
+      // request.
+      let result: Awaited<ReturnType<typeof attemptCaptureAction>>;
+      try {
+        result = await attemptCaptureAction(ballItemId);
+      } catch {
+        setPhase("playerTurn");
+        return;
+      }
 
       if (result.status === "captured") {
         applyInventoryConsumption(ballItemId, result.remainingQuantity, true);
@@ -973,7 +1089,17 @@ export function BattleContent({
     setMessage(medicineUseMessage(playerName, itemView?.item.name ?? "", targetName));
 
     startUseItemTransition(async () => {
-      const result = await applyMedicineItemAction(itemId, playerPokemonId);
+      // See handleAttack's identical try/catch for why this must never
+      // leave `phase` stuck on "enemyTurn" forever after a thrown/rejected
+      // request.
+      let result: Awaited<ReturnType<typeof applyMedicineItemAction>>;
+      try {
+        result = await applyMedicineItemAction(itemId, playerPokemonId);
+      } catch {
+        setIsBagOpen(false);
+        setPhase("playerTurn");
+        return;
+      }
 
       if (result.status !== "success") {
         // Nothing changed server-side — close the Bag and recover
@@ -1167,13 +1293,14 @@ export function BattleContent({
   function handleEscape() {
     setPhase("escaped");
     setMessage(escapeMessage());
+    confirmedEndedRef.current = true;
     startSessionSyncTransition(() => {
-      endBattleSessionAction();
+      endSessionPromiseRef.current = endBattleSessionAction();
     });
 
-    // No artificial pause here — handleReturnToMap's own router.replace is
-    // real (non-instant) navigation, so the "escaped" message above still
-    // gets a genuine, if brief, on-screen moment while Map's route loads.
+    // handleReturnToMap now waits for the delete above to settle before its
+    // own router.replace navigates — still real, non-instant navigation, so
+    // the "escaped" message above still gets a genuine on-screen moment.
     handleReturnToMap();
   }
 
@@ -1293,10 +1420,10 @@ export function BattleContent({
         <PartySelector party={livePartyList} activePokemonId={activeId} mode="forced" onSelect={handleForcedReplacementSelect} />
       ) : null}
 
-      {phase === "captured" || phase === "partyDefeated" ? (
+      {phase === "captured" || phase === "partyDefeated" || phase === "escaped" ? (
         <BattleResultOverlay
-          variant={phase === "captured" ? "captured" : "lost"}
-          title={phase === "captured" ? "נתפס בהצלחה!" : "הצוות הובס"}
+          variant={phase === "captured" ? "captured" : phase === "partyDefeated" ? "lost" : "escaped"}
+          title={phase === "captured" ? "נתפס בהצלחה!" : phase === "partyDefeated" ? "הצוות הובס" : "ברחת מהקרב"}
           message={message}
           onReturnToMap={handleReturnToMap}
         />

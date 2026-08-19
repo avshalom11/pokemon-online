@@ -27,6 +27,7 @@ interface PlayerPokemonRow {
   pendingEvolutionSpeciesId: string | null;
   pendingEvolutionBranch: boolean;
   evolutionPermanentlyBlocked: boolean;
+  source: string | null;
 }
 
 interface PlayerKnownMoveRow {
@@ -326,6 +327,15 @@ let leagueBattleSessions = new Map<string, LeagueBattleSessionRow>();
 let leagueTournamentPlacements = new Map<string, LeagueTournamentPlacementRow>();
 let idCounter = 0;
 let playerPokemonUpdateCallCount = 0;
+// MOVE-LEARNING OPTIMIZATION — same "prove a call did/didn't happen"
+// purpose as playerPokemonUpdateCallCount above: applyLevelUpMoveLearning
+// (features/move-learning/move-learning-service.ts) reads this table via
+// loadKnownMoveSet as its own first real DB step, so counting calls here
+// is the most direct way to prove the no-level-up skip in
+// applyPokemonXpGrant (pokemon-progression-service.ts) actually avoids the
+// query entirely, not just happens to return the same empty result a real
+// query against unseeded data also would.
+let playerKnownMoveFindManyCallCount = 0;
 
 function nextId(prefix: string): string {
   idCounter += 1;
@@ -477,6 +487,7 @@ export function resetFakeDb() {
   leagueTournamentPlacements = new Map();
   idCounter = 0;
   playerPokemonUpdateCallCount = 0;
+  playerKnownMoveFindManyCallCount = 0;
 }
 
 export function seedPlayerPokemon(row: {
@@ -495,6 +506,7 @@ export function seedPlayerPokemon(row: {
   pendingEvolutionSpeciesId?: string | null;
   pendingEvolutionBranch?: boolean;
   evolutionPermanentlyBlocked?: boolean;
+  source?: string | null;
 }) {
   const full: PlayerPokemonRow = {
     id: row.id,
@@ -512,6 +524,7 @@ export function seedPlayerPokemon(row: {
     pendingEvolutionSpeciesId: row.pendingEvolutionSpeciesId ?? null,
     pendingEvolutionBranch: row.pendingEvolutionBranch ?? false,
     evolutionPermanentlyBlocked: row.evolutionPermanentlyBlocked ?? false,
+    source: row.source ?? null,
   };
   pokemons.set(row.id, full);
   return full;
@@ -683,6 +696,10 @@ export function getPlayerPokemonUpdateCallCount() {
   return playerPokemonUpdateCallCount;
 }
 
+export function getPlayerKnownMoveFindManyCallCount() {
+  return playerKnownMoveFindManyCallCount;
+}
+
 export function getInventoryItemRow(playerId: string, itemId: string) {
   const row = inventoryItems.get(inventoryItemKey(playerId, itemId));
   return row ? { ...row } : undefined;
@@ -836,6 +853,7 @@ const client = {
         currentHp: number;
         isStarter: boolean;
         partySlot?: number | null;
+        source?: string | null;
       };
     }) {
       const id = nextId("pokemon");
@@ -855,6 +873,7 @@ const client = {
         pendingEvolutionSpeciesId: null,
         pendingEvolutionBranch: false,
         evolutionPermanentlyBlocked: false,
+        source: data.source ?? null,
       };
       pokemons.set(id, full);
       return { ...full };
@@ -867,8 +886,21 @@ const client = {
       if (!row) throw new Error(`fake prisma: playerPokemon ${where.id} not found`);
       return { ...row };
     },
-    async findFirst({ where }: { where: Record<string, unknown> }) {
-      return [...pokemons.values()].find((row) => matches(row, where)) ?? null;
+    // HOME — SIGNIFICANT CAPTURES TODAY — mirrors real Prisma's
+    // `findFirst({ where, orderBy })`: significant-captures.service.ts
+    // relies on orderBy: { createdAt: "desc" } to resolve "the latest
+    // qualifying capture" in one query, so this fake must apply it too
+    // rather than returning insertion order.
+    async findFirst({
+      where,
+      orderBy,
+    }: {
+      where: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+    }) {
+      const rows = [...pokemons.values()].filter((row) => matches(row, where));
+      const sorted = applyOrderBy(rows, orderBy);
+      return sorted[0] ? { ...sorted[0] } : null;
     },
     async findMany({
       where,
@@ -1788,9 +1820,19 @@ const client = {
     // (battle-session.service.ts) only ever sets the wild*/nextWild*/
     // activePlayerPokemonId/participants fields, exactly like a fresh
     // session in production.
+    // FIELD BATTLE STUCK — playerId is this model's own unique key
+    // (@id in the real schema), so a second create() for a player who
+    // already has a row must fail with the same P2002 code real Postgres
+    // would raise — getOrStartBattle's own try/catch (battle-session.
+    // service.ts) depends on this to prove its concurrent-request recovery
+    // rather than crashing.
     async create({ data }: { data: Record<string, unknown> }) {
+      const playerId = data.playerId as string;
+      if (sessions.has(playerId)) {
+        throw Object.assign(new Error("Unique constraint failed on the fields: (`playerId`)"), { code: "P2002" });
+      }
       const full: FieldBattleSessionRow = {
-        playerId: data.playerId as string,
+        playerId,
         zoneId: data.zoneId as string,
         wildSpeciesId: data.wildSpeciesId as string,
         wildLevel: data.wildLevel as number,
@@ -1816,6 +1858,11 @@ const client = {
     async findUnique({ where }: { where: { playerId: string } }) {
       const row = sessions.get(where.playerId);
       return row ? { ...row } : null;
+    },
+    async findUniqueOrThrow({ where }: { where: { playerId: string } }) {
+      const row = sessions.get(where.playerId);
+      if (!row) throw new Error(`fake prisma: fieldBattleSession ${where.playerId} not found`);
+      return { ...row };
     },
     async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
       let count = 0;
@@ -1913,6 +1960,7 @@ const client = {
       where: Record<string, unknown>;
       orderBy?: Record<string, "asc" | "desc">;
     }) {
+      playerKnownMoveFindManyCallCount += 1;
       const rows = [...knownMoves.values()].filter((row) => matches(row, where));
       return applyOrderBy(rows, orderBy).map((row) => ({ moveId: row.moveId, slot: row.slot }));
     },

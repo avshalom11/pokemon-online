@@ -240,6 +240,16 @@ model PlayerPokemon {
   // evolutionary stages once it *does* evolve, are never affected by
   // another instance's block.
   evolutionPermanentlyBlocked Boolean       @default(false)
+  // HOME — SIGNIFICANT CAPTURES TODAY — a plain, nullable acquisition-tag
+  // string, same precedent as PlayerOwnedEgg.source above: validated at the
+  // app layer against PlayerPokemonAcquisitionSource (features/pokemon/
+  // services/create-owned-pokemon.service.ts — "capture" | "starter" |
+  // "egg") rather than a Prisma enum. Nullable because rows created before
+  // this column existed have no reliable source to backfill — those rows
+  // are correctly treated as "not a known capture" by anything reading
+  // this field (features/home/services/significant-captures.service.ts),
+  // never guessed from createdAt alone.
+  source                      String?
   createdAt                   DateTime      @default(now())
   updatedAt                   DateTime      @updatedAt
 

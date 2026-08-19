@@ -33,13 +33,26 @@ export const BASE_POKEMON_XP_MULTIPLIER = 10;
 //
 // Multiplier = 1 + (wildLevel - finisherLevel) * LEVEL_DIFFERENCE_MULTIPLIER_STEP,
 // clamped to [MIN_LEVEL_MULTIPLIER, MAX_LEVEL_MULTIPLIER]. 0.05 (5% per
-// level of difference) means a moderate ±5-level gap nudges the reward by
-// ±25% (still clearly "higher"/"lower", not extreme), while a large ±20+
-// level gap already saturates at the floor/ceiling — smooth and gradual
-// for realistic level gaps, but never able to make farming trivially weak
-// Pokémon efficient (floor) or completely break progression against very
-// strong ones (ceiling).
-export const MIN_LEVEL_MULTIPLIER = 0.5;
+// level of difference) keeps realistic gaps smooth and gradual:
+// -5 levels -> ~75%, -10 levels -> ~50% — matching the intended "clearly
+// less, never punishing" feel for a moderately under-leveled kill.
+//
+// XP BALANCE (2026-08-19) — MIN_LEVEL_MULTIPLIER was 0.5, which flattened
+// every gap of -10 levels or more to the exact same 50% floor: a level-57
+// Pokémon one-shotting a level-17 wild (a -40 gap, a completely trivial
+// fight in practice) still earned half the nominal per-level pool, which
+// played out as far too much XP for stomping something that far below it
+// (real playtest: a level 57 Mewtwo got ~110 XP off a level ~17 wild).
+// Lowered to 0.15 so a very large gap (roughly -20 and beyond) settles
+// into a small-but-never-zero reward — a level 57 vs. level 17 fight
+// (base 170) now lands at ~26 XP, not ~85-110 — while leaving the -5/-10
+// gap behavior (still governed by the unchanged STEP below, not this
+// floor) exactly as it already was. Still a real, nonzero floor per the
+// project's own "never able to make farming trivially weak Pokémon
+// efficient" rule above — just a smaller one. MAX_LEVEL_MULTIPLIER
+// (fighting *above* your level) is untouched; nothing suggested that side
+// needed retuning.
+export const MIN_LEVEL_MULTIPLIER = 0.15;
 export const MAX_LEVEL_MULTIPLIER = 2.0;
 export const LEVEL_DIFFERENCE_MULTIPLIER_STEP = 0.05;
 

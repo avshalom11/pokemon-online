@@ -12,13 +12,13 @@ import type { CurrencyRewardRange } from "@/features/currency/types/currency.typ
 // currency — see prisma/schema.prisma's own PlayerProfile.gold comment).
 export const FIELD_BATTLE_CURRENCY_REWARD_CONFIG: Record<"money" | "gold", CurrencyRewardRange> = {
   money: {
-    dropChance: 0.20,
+    dropChance: 0.12,
     minAmount: 1,
-    maxAmount: 80,
+    maxAmount: 50,
   },
   gold: {
-    dropChance: 0.05,
+    dropChance: 0.02,
     minAmount: 1,
-    maxAmount: 15,
+    maxAmount: 10,
   },
 };

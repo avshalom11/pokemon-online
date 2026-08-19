@@ -4,6 +4,7 @@ import { getTodayBattleCount } from "@/features/daily-battles/services/daily-bat
 import { getFirstPendingEvolutionBranchView, getFirstPendingEvolutionView } from "@/features/evolution/queries/evolution-queries";
 import type { PendingEvolutionBranchView, PendingEvolutionView } from "@/features/evolution/types/evolution.types";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
+import { getSignificantCapturesToday, type SignificantCapturesToday } from "@/features/home/services/significant-captures.service";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
@@ -36,6 +37,11 @@ export interface HomeViewData {
   // different owned Pokémon could theoretically each have one pending at
   // once; PendingEvolutionGate only ever surfaces the first one it's given.
   pendingEvolutionBranch: PendingEvolutionBranchView | null;
+
+  // HOME — SIGNIFICANT CAPTURES TODAY — a site-wide (not per-player) feed:
+  // the latest Very Rare/Legendary capture from ANY player today
+  // (Asia/Jerusalem). See significant-captures.service.ts.
+  significantCaptures: SignificantCapturesToday;
 }
 
 // Single aggregator for everything app/(game)/home/page.tsx needs, so the
@@ -47,12 +53,13 @@ export interface HomeViewData {
 // so they're not duplicated here.
 export async function getHomeViewData(userId: string): Promise<HomeViewData> {
   const profile = await getPlayerProfile(userId);
-  const [party, stats, dailyBattleCount, pendingEvolution, pendingEvolutionBranch] = await Promise.all([
+  const [party, stats, dailyBattleCount, pendingEvolution, pendingEvolutionBranch, significantCaptures] = await Promise.all([
     getPlayerParty(profile.id),
     getOwnedPokemonStats(profile.id),
     getTodayBattleCount(profile.id),
     getFirstPendingEvolutionView(profile.id),
     getFirstPendingEvolutionBranchView(profile.id),
+    getSignificantCapturesToday(),
   ]);
 
   const dexSize = POKEMON_DATA.length;
@@ -67,5 +74,6 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
     dailyBattleCount,
     pendingEvolution,
     pendingEvolutionBranch,
+    significantCaptures,
   };
 }

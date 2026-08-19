@@ -3,6 +3,7 @@ import { DailyBattleCounter } from "./DailyBattleCounter";
 import { NavigationGrid } from "./NavigationGrid";
 import { NewsPanel } from "./NewsPanel";
 import { RefreshHomeOnMount } from "./RefreshHomeOnMount";
+import { SignificantCapturesCard } from "./SignificantCapturesCard";
 import { StatisticsPanel } from "./StatisticsPanel";
 import { PendingEvolutionGate } from "@/features/evolution/components/PendingEvolutionGate";
 import { PartySection } from "@/features/pokemon/components/PartySection";
@@ -39,6 +40,8 @@ export function HomeContent({ data, username }: HomeContentProps) {
         <PartySection party={data.party} />
 
         <NavigationGrid username={username} />
+
+        <SignificantCapturesCard data={data.significantCaptures} />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <AchievementsPanel />

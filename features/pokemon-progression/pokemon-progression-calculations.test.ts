@@ -103,6 +103,45 @@ test("the multiplier clamps at MAX_LEVEL_MULTIPLIER for a far stronger wild", ()
   assert.equal(getLevelDifferenceXpMultiplier(5, 50), MAX_LEVEL_MULTIPLIER);
 });
 
+// --- XP BALANCE (later task) — level-difference multiplier retuning -----
+// getLevelDifferenceXpMultiplier(recipientLevel, defeatedWildLevel) is the
+// "clear level-difference multiplier" the ticket asked for — it already
+// existed (this whole block above); this task only retuned
+// MIN_LEVEL_MULTIPLIER (0.5 -> 0.15), never LEVEL_DIFFERENCE_MULTIPLIER_STEP,
+// so every test below reads STEP-driven behavior (roughly same-level, -5,
+// -10) exactly as it always computed, and only the deep-floor cases
+// (-20+) actually exercise the retuned constant.
+
+test("XP BALANCE: an enemy roughly the same level gives ~100% multiplier", () => {
+  assert.equal(getLevelDifferenceXpMultiplier(40, 40), 1);
+  assert.equal(getLevelDifferenceXpMultiplier(40, 41), 1.05, "one level higher is still 'roughly' the same, just a small nudge");
+});
+
+test("XP BALANCE: an enemy 5 levels lower reduces the multiplier to ~75%", () => {
+  assert.equal(getLevelDifferenceXpMultiplier(40, 35), 0.75);
+});
+
+test("XP BALANCE: an enemy 10 levels lower reduces the multiplier further, to ~50%", () => {
+  assert.equal(getLevelDifferenceXpMultiplier(40, 30), 0.5);
+});
+
+test("XP BALANCE: an enemy 20+ levels lower hits the reasonable (nonzero) minimum multiplier, never zero", () => {
+  assert.equal(getLevelDifferenceXpMultiplier(40, 20), MIN_LEVEL_MULTIPLIER);
+  assert.equal(getLevelDifferenceXpMultiplier(80, 20), MIN_LEVEL_MULTIPLIER, "an even larger gap must still floor at the same reasonable minimum, never lower");
+  assert.ok(MIN_LEVEL_MULTIPLIER > 0, "the minimum multiplier itself must never be zero");
+});
+
+test("XP BALANCE: a stronger (higher-level) enemy is never penalized — it gets normal or bonus XP, never reduced", () => {
+  const sameLevel = getLevelDifferenceXpMultiplier(30, 30);
+  const strongerEnemy = getLevelDifferenceXpMultiplier(30, 40);
+  assert.ok(strongerEnemy >= sameLevel, "a higher-level enemy must never yield a smaller multiplier than an equal-level one");
+});
+
+test("XP BALANCE: real playtest scenario — a level 57 Pokemon defeating a level 17 wild lands at roughly 20-30 XP, not ~110", () => {
+  const xp = calculateBaseBattlePokemonXp(17, 57);
+  assert.ok(xp >= 20 && xp <= 30, `expected roughly 20-30 XP for a level 57 vs. level 17 fight, got ${xp}`);
+});
+
 // --- Base battle XP -----------------------------------------------------
 
 test("base battle XP is defeatedWildLevel * BASE_POKEMON_XP_MULTIPLIER, scaled by the level-difference multiplier", () => {
@@ -127,7 +166,11 @@ test("verification scenario: level 25 defeats level 25 -> normal XP", () => {
 });
 
 test("verification scenario: level 50 defeats level 5 -> strong XP reduction (floor)", () => {
-  assert.equal(calculateBaseBattlePokemonXp(5, 50), 25);
+  // XP BALANCE (later task) — MIN_LEVEL_MULTIPLIER was lowered from 0.5 to
+  // 0.15 so a very lopsided kill earns a small-but-nonzero reward instead
+  // of the old flat 50% floor; base 50 * 0.15 = 7.5, rounds to 8. See
+  // pokemon-progression-config.ts's own doc comment on MIN_LEVEL_MULTIPLIER.
+  assert.equal(calculateBaseBattlePokemonXp(5, 50), 8);
 });
 
 test("verification scenario: level 5 defeats level 50 -> maximum XP bonus (capped)", () => {

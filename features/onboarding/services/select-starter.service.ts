@@ -60,6 +60,7 @@ export async function selectStarterPokemon(userId: string, speciesId: string): P
       // New players always have an empty party, so slot 1 (the battle
       // starter) is guaranteed free here.
       partySlot: 1,
+      source: "starter",
     });
 
     return { status: "created" };

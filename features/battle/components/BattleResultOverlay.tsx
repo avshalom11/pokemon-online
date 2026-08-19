@@ -1,5 +1,5 @@
 interface BattleResultOverlayProps {
-  variant: "won" | "lost" | "captured";
+  variant: "won" | "lost" | "captured" | "escaped";
   title: string;
   message: string;
   onReturnToMap: () => void;
@@ -9,13 +9,14 @@ const VARIANT_STYLES: Record<BattleResultOverlayProps["variant"], { icon: string
   won: { icon: "🏆", accent: "#4ade80" },
   captured: { icon: "✨", accent: "#818cf8" },
   lost: { icon: "💫", accent: "#f87171" },
+  escaped: { icon: "🏃", accent: "#94a3b8" },
 };
 
 // Centered modal (same overlay idiom already established by
 // PokemonDetailsPanel/ConfirmStarterDialog), shown for every battle-ending
-// state (victory, defeat, capture). Scoped to the battle panel itself
-// (absolute inset-0, not fixed inset-0) — BattleContent renders this as a
-// sibling inside BattleWindow's panel, so the dim/blur only covers the
+// state (victory, defeat, capture, escape). Scoped to the battle panel
+// itself (absolute inset-0, not fixed inset-0) — BattleContent renders this
+// as a sibling inside BattleWindow's panel, so the dim/blur only covers the
 // game window, not the whole page behind it, matching the "floating game
 // window" framing. Its opaque backdrop is what "disables further attack
 // and capture actions" — the panels underneath are still technically
@@ -23,6 +24,14 @@ const VARIANT_STYLES: Record<BattleResultOverlayProps["variant"], { icon: string
 // disabled state once this is showing. The single button here is the only
 // way out, and always returns to /map via router.replace (see
 // BattleContent), never leaving a finished battle in browser history.
+//
+// FIELD BATTLE STUCK — escape used to have no overlay at all: it relied
+// entirely on handleEscape's automatic router.replace("/map") succeeding,
+// with zero manual retry if that navigation ever failed to commit (a real,
+// reproduced dev-environment failure mode — HMR/network interruptions can
+// silently strand a pending client-side transition). The "escaped" variant
+// gives the player the exact same always-available manual fallback
+// captured/lost already had, so a stuck escape is never a dead end.
 export function BattleResultOverlay({ variant, title, message, onReturnToMap }: BattleResultOverlayProps) {
   const { icon, accent } = VARIANT_STYLES[variant];
 

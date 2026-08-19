@@ -260,6 +260,14 @@ function restoreFromRow(row: PersistedSessionRow, party: OwnedPokemon[]): Restor
   };
 }
 
+// Same local helper (and P2002 meaning) as gym-progression.service.ts's own
+// isUniqueConstraintViolation, league-battle-session.service.ts, etc. — a
+// concurrent/duplicate request already inserted the row this one just tried
+// to create.
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
+}
+
 // The single entry point for "the player is opening the battle screen for
 // this zone" — restores an existing session for that zone if one exists,
 // redirects to the player's real session if it's for a different zone,
@@ -327,25 +335,59 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
   // only after the first defeat.
   const nextWild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
 
-  await prisma.fieldBattleSession.create({
-    data: {
-      playerId,
-      zoneId: requestedZoneId,
-      wildSpeciesId: wild.pokemon.id,
-      wildLevel: wild.level,
-      wildCurrentHp: wild.currentHealth,
-      wildMaxHp: wild.maximumHealth,
-      nextWildSpeciesId: nextWild.pokemon.id,
-      nextWildLevel: nextWild.level,
-      nextWildCurrentHp: nextWild.currentHealth,
-      nextWildMaxHp: nextWild.maximumHealth,
-      activePlayerPokemonId: activePokemon.id,
-      // The starting active Pokémon is a participant in this first
-      // encounter from the moment the session exists — see
-      // BattleParticipantRecord's own doc comment.
-      participants: serializeParticipants([{ playerPokemonId: activePokemon.id, fainted: false, order: 0 }]),
-    },
-  });
+  try {
+    await prisma.fieldBattleSession.create({
+      data: {
+        playerId,
+        zoneId: requestedZoneId,
+        wildSpeciesId: wild.pokemon.id,
+        wildLevel: wild.level,
+        wildCurrentHp: wild.currentHealth,
+        wildMaxHp: wild.maximumHealth,
+        nextWildSpeciesId: nextWild.pokemon.id,
+        nextWildLevel: nextWild.level,
+        nextWildCurrentHp: nextWild.currentHealth,
+        nextWildMaxHp: nextWild.maximumHealth,
+        activePlayerPokemonId: activePokemon.id,
+        // The starting active Pokémon is a participant in this first
+        // encounter from the moment the session exists — see
+        // BattleParticipantRecord's own doc comment.
+        participants: serializeParticipants([{ playerPokemonId: activePokemon.id, fainted: false, order: 0 }]),
+      },
+    });
+  } catch (error) {
+    // FIELD BATTLE STUCK — a genuine, reproduced race: playerId is
+    // FieldBattleSession's own unique key (@id), so a concurrent/duplicate
+    // request for this same player (e.g. a client-side navigation racing
+    // its own in-flight flee/defeat cleanup — see BattleContent's
+    // handleEscape) can lose this create() to another request that won the
+    // race and already inserted a row. Previously this crashed the whole
+    // page with an uncaught PrismaClientKnownRequestError, stranding the
+    // player on a frozen error screen. Same create-then-catch-P2002 idiom
+    // already established elsewhere in this codebase (gym-progression.
+    // service.ts's markGymBattleCompleted, league-battle-session.service.ts,
+    // ...) — the loser just resumes whatever the winner actually created,
+    // exactly like the "existing session" branch above already does,
+    // instead of treating a benign race as a fatal error.
+    if (!isUniqueConstraintViolation(error)) throw error;
+
+    const winner = await prisma.fieldBattleSession.findUniqueOrThrow({ where: { playerId } });
+    if (winner.zoneId !== requestedZoneId) {
+      return { status: "redirect", zoneId: winner.zoneId as ZoneId };
+    }
+
+    const restored = restoreFromRow(winner, party);
+    if (restored) {
+      return { status: "ready", battle: restored };
+    }
+
+    // Vanishingly unlikely (the winner just created this row moments ago),
+    // but never worth crashing over — same "discard and let the caller
+    // retry" recovery the "existing" branch above already uses for a
+    // stale/invalid row.
+    await prisma.fieldBattleSession.deleteMany({ where: { playerId } });
+    return { status: "no-usable-party" };
+  }
 
   // Pokédex — this is the wild the player actually sees on this fresh
   // session's very first render; the pre-generated nextWild is never

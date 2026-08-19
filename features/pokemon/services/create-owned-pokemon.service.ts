@@ -3,6 +3,17 @@ import "server-only";
 import { getStartingKnownMoves } from "@/engine/known-moves";
 import type { Prisma, PlayerPokemon } from "@/lib/generated/prisma/client";
 
+// HOME — SIGNIFICANT CAPTURES TODAY — the closed set of ways a PlayerPokemon
+// row can come into existence, same "closed union, one place it's declared"
+// precedent as EggAcquisitionSource (features/eggs/types/egg.types.ts).
+// Required (never optional) on CreateOwnedPokemonParams below so a future
+// fourth creation path can't silently forget to stamp it — anything reading
+// PlayerPokemon.source (e.g. significant-captures.service.ts's "count ONLY
+// actual captures") depends on every caller being honest about this.
+export type PlayerPokemonAcquisitionSource = "capture" | "starter" | "egg";
+
+export const PLAYER_POKEMON_ACQUISITION_SOURCES: readonly PlayerPokemonAcquisitionSource[] = ["capture", "starter", "egg"];
+
 export interface CreateOwnedPokemonParams {
   playerId: string;
   speciesId: string;
@@ -11,6 +22,7 @@ export interface CreateOwnedPokemonParams {
   currentHp: number;
   isStarter: boolean;
   partySlot?: number | null;
+  source: PlayerPokemonAcquisitionSource;
 }
 
 export interface CreateOwnedPokemonResult {
@@ -44,6 +56,7 @@ export async function createOwnedPokemon(
       currentHp: params.currentHp,
       isStarter: params.isStarter,
       partySlot: params.partySlot ?? null,
+      source: params.source,
     },
   });
 

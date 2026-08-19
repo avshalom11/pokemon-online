@@ -6,6 +6,7 @@ import { applyLevelUpToCurrentHp, calculatePokemonHpStat } from "@/engine/battle
 import { tryCreatePendingEvolution } from "@/features/evolution/services/evolution-progress.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { applyLevelUpMoveLearning } from "@/features/move-learning/move-learning-service";
+import type { MoveLearningApplyResult } from "@/engine/move-learning";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 // The only place PlayerPokemon.level/experience are ever written. Always
@@ -65,18 +66,43 @@ export async function applyPokemonXpGrant(
     data: { level: progress.level, experience: progress.totalXp, currentHp: newCurrentHp },
   });
 
-  // Same transaction as the level/XP/HP update above — a Known Move or
-  // Pending Move Learning row this call creates commits or rolls back
-  // together with this Pokémon's new level, never separately. Called
-  // unconditionally (even when previousLevel === progress.level): the
-  // planner treats an empty level interval as an ordinary no-op and
-  // performs no writes, so this stays correct without a separate
-  // "did we actually level up" branch here. A non-"success" result here
-  // means genuinely malformed persisted state (every structural
-  // precondition — the Pokémon existing, oldLevel <= newLevel — already
-  // holds by construction at this point in the transaction), so it's
-  // surfaced loudly rather than silently discarded.
-  const moveLearningResult = await applyLevelUpMoveLearning(tx, playerPokemonId, pokemon.speciesId, previousLevel, progress.level);
+  // MOVE-LEARNING OPTIMIZATION — same transaction as the level/XP/HP
+  // update above — a Known Move or Pending Move Learning row this call
+  // creates commits or rolls back together with this Pokémon's new level,
+  // never separately. Previously called unconditionally (even when
+  // previousLevel === progress.level): the planner treats an empty level
+  // interval as an ordinary no-op and performs no writes, but reaching
+  // that no-op still cost 3 DB round trips every single time (an
+  // ownership lookup + a Known-Move-set read + a pending-move read) for a
+  // result that was always empty. Skipped entirely now when no level was
+  // actually gained — the synthetic "success" result below is exactly
+  // what planLevelUpMoveLearning itself already returns for an empty
+  // (oldLevel === newLevel) interval: no detected/learned/pending moves,
+  // same oldLevel/newLevel echoed back. finalKnownMoveIds is empty here
+  // rather than the Pokémon's real current move set — safe because
+  // nothing anywhere reads PokemonLevelUpResult.moveLearning.
+  // finalKnownMoveIds; the one real consumer of that field
+  // (applyLevelUpMoveLearning's own automatic-learn branch, above/inside
+  // the real call below) never runs on this no-level-up path since there's
+  // nothing to learn. Move-learning rules, learnsets, and level-up
+  // behavior are completely unchanged — this only decides *whether* to
+  // ask the planner, never changes what it would have answered.
+  const moveLearningResult: MoveLearningApplyResult =
+    progress.level > previousLevel
+      ? await applyLevelUpMoveLearning(tx, playerPokemonId, pokemon.speciesId, previousLevel, progress.level)
+      : {
+          status: "success",
+          plan: {
+            oldLevel: previousLevel,
+            newLevel: progress.level,
+            detectedMoves: [],
+            automaticallyLearnedMoveIds: [],
+            pendingMoves: [],
+            alreadyKnownMoveIds: [],
+            alreadyPendingMoveIds: [],
+            finalKnownMoveIds: [],
+          },
+        };
 
   if (moveLearningResult.status !== "success") {
     throw new Error(`applyLevelUpMoveLearning failed unexpectedly: ${JSON.stringify(moveLearningResult)}`);
