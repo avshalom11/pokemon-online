@@ -11,6 +11,7 @@ import { getNotificationBellData } from "@/features/notifications/services/notif
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
 import { DailyBattleCountProvider } from "@/features/player/context/daily-battle-count-context";
 import { PlayerProgressionProvider } from "@/features/player/context/player-progression-context";
+import { SoundSettingsProvider } from "@/features/player/context/sound-settings-context";
 import { getPlayerHeaderData } from "@/features/player/services/player-header-data.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -66,14 +67,16 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const activeBattle = hasFieldBattle || hasNpcBattle || hasLeagueBattle;
 
   return (
-    <PlayerProgressionProvider initial={player.progress}>
-      <DailyBattleCountProvider initial={player.dailyBattleCount}>
-        <ActiveBattleProvider initial={activeBattle}>
-          <GameHeader player={player} notifications={notifications} />
-          <GameSidebar username={player.username} />
-          {children}
-        </ActiveBattleProvider>
-      </DailyBattleCountProvider>
-    </PlayerProgressionProvider>
+    <SoundSettingsProvider initial={profile.soundEnabled ?? true}>
+      <PlayerProgressionProvider initial={player.progress}>
+        <DailyBattleCountProvider initial={player.dailyBattleCount}>
+          <ActiveBattleProvider initial={activeBattle}>
+            <GameHeader player={player} notifications={notifications} />
+            <GameSidebar username={player.username} />
+            {children}
+          </ActiveBattleProvider>
+        </DailyBattleCountProvider>
+      </PlayerProgressionProvider>
+    </SoundSettingsProvider>
   );
 }

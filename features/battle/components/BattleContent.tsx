@@ -41,6 +41,8 @@ import {
 } from "@/features/battle/utils/battle-messages";
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { playAttackHitSound } from "@/features/battle/utils/battle-attack-effect";
+import { playDefeatSound, playVictorySound } from "@/features/battle/utils/battle-result-sound";
+import { FIELD_BATTLE_MUSIC_PATH } from "@/features/battle/utils/battle-music";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
 import { ATTACK_EFFECT_DURATION_MS, HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
 import { EvolutionBranchChoiceDialog } from "@/features/evolution/components/EvolutionBranchChoiceDialog";
@@ -383,6 +385,29 @@ export function BattleContent({
     },
     []
   );
+
+  // BATTLE RESULT SOUNDS (later task) — "captured" (BattleResultOverlay's
+  // own positive "captured" variant) and "partyDefeated" (its "lost"
+  // variant) are Field Battle's only two terminal result states — a plain
+  // wild KO with no capture has no persistent result screen at all (the
+  // next encounter starts immediately), so there is no "win" moment to
+  // hang a sound on beyond this. `phase` can reach "partyDefeated" from
+  // several different call sites (handleAttack directly, or via
+  // resolveCounterAttackAgainstActive's own nextPhase, shared by the
+  // switch/failed-capture/medicine paths) — a ref-guarded effect keyed on
+  // `phase` itself (rather than a sound call at every one of those sites)
+  // is what guarantees exactly-once playback regardless of how many paths
+  // can reach it, and never replays on a later, unrelated re-render.
+  const playedResultSoundRef = useRef<"captured" | "partyDefeated" | null>(null);
+  useEffect(() => {
+    if (phase === "captured" && playedResultSoundRef.current !== "captured") {
+      playedResultSoundRef.current = "captured";
+      playVictorySound();
+    } else if (phase === "partyDefeated" && playedResultSoundRef.current !== "partyDefeated") {
+      playedResultSoundRef.current = "partyDefeated";
+      playDefeatSound();
+    }
+  }, [phase]);
 
   // Warms the browser's image cache for every sprite this zone could ever
   // roll, once, at idle time — so that whenever a new wild Pokémon is
@@ -1211,6 +1236,8 @@ export function BattleContent({
     <BattleWindow
       backgroundClassName={rarityPresentation.windowBackgroundClass}
       banner={<RarityWarningBanner rarity={wildState.pokemon.rarity} />}
+      musicActive={phase !== "captured" && phase !== "partyDefeated"}
+      musicTrack={FIELD_BATTLE_MUSIC_PATH}
     >
       <BattleScene
         theme={theme}

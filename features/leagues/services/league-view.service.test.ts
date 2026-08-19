@@ -8,7 +8,9 @@ import { getLeaguesOverview } from "./league-view.service.ts";
 import { resetFakeDb, seedPlayerProfile } from "../../../test/support/fakes/prisma.fake.ts";
 
 const PLAYER_ID = "owner-1";
-const NOW = new Date("2026-01-05T08:00:00Z"); // Monday — registration open
+// LEAGUE CYCLE ALIGNMENT FIX (later task) — League I's own week under the
+// current cycle anchor (league-cycle.ts's CYCLE_ANCHOR_WEEK_KEY = "2026-08-06").
+const NOW = new Date("2026-08-03T08:00:00Z"); // Monday — registration open
 
 beforeEach(() => {
   resetFakeDb();
@@ -61,7 +63,7 @@ test("only League I reports activeThisWeek during League I's own week", async ()
 });
 
 test("during Champions League week, no regional League reports activeThisWeek, and Champions League itself does", async () => {
-  const championsWeekNow = new Date("2026-01-26T08:00:00Z"); // resolves to Champions League week
+  const championsWeekNow = new Date("2026-08-24T08:00:00Z"); // resolves to Champions League week
   const overview = await getLeaguesOverview(PLAYER_ID, championsWeekNow);
   for (const league of overview.regionalLeagues) {
     assert.equal(league.activeThisWeek, false, `${league.leagueId} must not be active during Champions week`);
@@ -76,7 +78,7 @@ test("cycle.weekIndexInCycle/activeLeagueId track the same 4-week rotation isLea
   const league1Week = await getLeaguesOverview(PLAYER_ID, NOW);
   assert.deepEqual(league1Week.cycle, { activeLeagueId: "league-1", weekIndexInCycle: 0 });
 
-  const championsWeekNow = new Date("2026-01-26T08:00:00Z");
+  const championsWeekNow = new Date("2026-08-24T08:00:00Z");
   const championsWeek = await getLeaguesOverview(PLAYER_ID, championsWeekNow);
   assert.deepEqual(championsWeek.cycle, { activeLeagueId: "champions-league", weekIndexInCycle: 3 });
 });

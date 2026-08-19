@@ -20,7 +20,11 @@ import {
   getLeagueTournamentMatchRows,
 } from "../../../test/support/fakes/prisma.fake.ts";
 
-const NOW = new Date("2026-01-05T08:00:00Z"); // Monday — registration open
+// LEAGUE CYCLE ALIGNMENT FIX (later task) — NOW must resolve to League I's
+// own week under the current cycle anchor (league-cycle.ts's
+// CYCLE_ANCHOR_WEEK_KEY = "2026-08-06"); 2026-08-03 is the Monday whose
+// upcoming Thursday is that anchor week.
+const NOW = new Date("2026-08-03T08:00:00Z"); // Monday — registration open
 
 beforeEach(() => {
   resetFakeDb();
@@ -51,7 +55,7 @@ test("an eligible player can register while registration is open", async () => {
 });
 
 // GYMS & LEAGUES PHASE 8 — the 4-week rotation gate (section 1/2). NOW
-// (2026-01-05, resolving to Thursday 2026-01-08) is League I's own week.
+// (2026-08-03, resolving to Thursday 2026-08-06) is League I's own week.
 test("during League I's week, League II registration is rejected as league-not-active-this-week", async () => {
   await makeEligiblePlayer("p2", ["sinnoh", "unova", "kalos"]);
   const result = await registerForLeague("p2", "league-2", NOW);
@@ -65,7 +69,7 @@ test("during League I's week, League III registration is rejected as league-not-
 });
 
 test("during Champions League week, no regional League accepts registration at all", async () => {
-  const championsWeekNow = new Date("2026-01-26T08:00:00Z"); // resolves to Thursday 2026-01-29 (Champions week)
+  const championsWeekNow = new Date("2026-08-24T08:00:00Z"); // resolves to Thursday 2026-08-27 (Champions week)
   await makeEligiblePlayer("p4", ["kanto", "johto", "hoenn"]);
   const result = await registerForLeague("p4", "league-1", championsWeekNow);
   assert.deepEqual(result, { status: "league-not-active-this-week" });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { updateProfile, type UpdateProfileResult } from "@/features/profile/services/update-profile.service";
+import { updateSoundEnabled } from "@/features/profile/services/update-sound-enabled.service";
 import { updateProfileSchema } from "@/features/profile/validation/profile.schema";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -39,4 +40,23 @@ export async function updateProfileAction(input: unknown): Promise<UpdateProfile
   }
 
   return result;
+}
+
+export type UpdateSoundEnabledActionResult = { status: "success" } | { status: "error" };
+
+// MOVE SOUND TO TOP TOOLBAR (later task) — the toolbar sound control's own
+// thin Server Action, same shape/ownership rule as updateProfileAction
+// above (resolve session, resolve the acting profile from
+// session.user.id — never a client-supplied id — delegate to the
+// service). Deliberately not routed through updateProfileAction/
+// updateProfileSchema: this toggles exactly one field and needs none of
+// that action's username/content-block handling.
+export async function updateSoundEnabledAction(soundEnabled: boolean): Promise<UpdateSoundEnabledActionResult> {
+  const session = await getCurrentSession();
+  if (!session) return { status: "error" };
+
+  const profile = await getPlayerProfile(session.user.id);
+  await updateSoundEnabled(profile.id, soundEnabled);
+
+  return { status: "success" };
 }

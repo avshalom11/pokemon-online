@@ -33,9 +33,20 @@ export function GymVictoryRewardDialog({ regionId, gymNumber, trainerName, rewar
 
   // VICTORY DIALOG COPY (later task, section 1) — the exact approved
   // sentence, combined here with the reward result into ONE dialog for a
-  // Gym Leader/Regional Champion win — never a second, overlapping "you
-  // won!" confirmation shown before this one.
-  const title = `כל הכבוד! ניצחת את ${trainerName}. לא רבים מצליחים!`;
+  // Gym Leader win — never a second, overlapping "you won!" confirmation
+  // shown before this one. Left completely unmodified for Leader by the
+  // Champion intro/victory polish task below — only the isChampion branch
+  // is new.
+  const leaderTitle = `כל הכבוד! ניצחת את ${trainerName}. לא רבים מצליחים!`;
+  // REGIONAL CHAMPION — INTRO + VICTORY DIALOG POLISH (later task) — its own
+  // approved congratulatory line (first-person, in the Champion's own
+  // "voice", explicitly naming the Regional Medal) rather than reusing the
+  // generic Leader sentence — the Champion's own name is still shown
+  // separately just above it (same "name label above the polished line"
+  // shape GymChampionIntroDialog's own pre-battle intro already uses), so
+  // this never loses the "which Champion" context the generic sentence used
+  // to carry via interpolation.
+  const championTitle = "כל הכבוד! הוכחת שאתה ראוי למדליית המחוז. מעטים מצליחים להגיע עד כאן ולנצח אותי.";
   const imageUrl = medal?.imageUrl ?? badge?.imageUrl ?? "";
   const imageAlt = medal?.displayName ?? badge?.displayName ?? "";
   // BADGE/MEDAL EARNED STATE (later task, section 3/4) — the exact "עיטור
@@ -52,14 +63,29 @@ export function GymVictoryRewardDialog({ regionId, gymNumber, trainerName, rewar
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
     >
       <div className="w-full max-w-sm rounded-2xl border border-amber-400/30 bg-slate-900 p-6 text-center shadow-2xl">
-        <h2 className="text-lg font-bold text-slate-100">{title}</h2>
+        {isChampion ? (
+          <>
+            <p className="text-sm font-semibold text-amber-300">{trainerName}</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-100">{championTitle}</h2>
+          </>
+        ) : (
+          <h2 className="text-lg font-bold text-slate-100">{leaderTitle}</h2>
+        )}
 
         <div className="mt-4 flex justify-center">
           <SpriteImage
             src={imageUrl}
             alt={imageAlt}
-            className="h-24 w-24 object-contain"
-            fallbackClassName="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
+            // MEDAL IMAGE SIZE (later task) — the Medal is shown slightly
+            // larger than a Badge here (Badge sizing/24 is untouched); still
+            // a fixed, responsive-friendly size that fits this same
+            // max-w-sm dialog cleanly.
+            className={isChampion ? "h-28 w-28 object-contain" : "h-24 w-24 object-contain"}
+            fallbackClassName={
+              isChampion
+                ? "flex h-28 w-28 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
+                : "flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
+            }
           />
         </div>
 

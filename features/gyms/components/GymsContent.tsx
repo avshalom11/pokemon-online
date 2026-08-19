@@ -18,10 +18,11 @@ import {
   regionStatusLabelHe,
 } from "@/features/gyms/data/gym-labels";
 import { getGymCharacterImageUrl, getRegionalChampionCharacterImageUrl } from "@/features/gyms/data/gym-trainer-images";
-import { getGymTrainerName } from "@/features/gyms/data/gym-trainer-names";
+import { getGymTrainerName, getRegionalChampionTrainerName } from "@/features/gyms/data/gym-trainer-names";
 import type { RegionGymOverviewView, RegionGymView } from "@/features/gyms/services/gym-overview-view.service";
 import type { GymPartySelectionOption, StartNpcBattleTarget } from "@/features/gyms/services/gym-battle-session.service";
 import type { GymBattleSlotId } from "@/features/gyms/types/gym.types";
+import { GymChampionIntroDialog } from "./GymChampionIntroDialog";
 import { GymIntroDialog } from "./GymIntroDialog";
 import { GymPartySelectionModal } from "./GymPartySelectionModal";
 
@@ -44,6 +45,14 @@ interface EasyIntroTarget {
   readonly gymNumber: 1 | 2 | 3;
 }
 
+// REGIONAL CHAMPION INTRO (later task) — scoped to Regional Champion ONLY,
+// the same "one route, gated by which state gets set" pattern
+// EasyIntroTarget above already establishes for the Easy Trainer. Just the
+// regionId: the champion target itself is fully derived from it
+// ({ source: "regional-champion", regionId }), same as ChampionRow's own
+// onStart already builds today.
+type ChampionIntroRegionId = RegionGymOverviewView["regionId"];
+
 // GYMS & LEAGUES PHASE 4/9, REGION-SCOPED UI, PARTY SELECTION (later tasks)
 // — the /gyms page body: the player's own CURRENT region's Gym content only
 // — 3 Gyms + a Regional Champion, never the other 8 regions. "Start" now
@@ -58,6 +67,7 @@ export function GymsContent({ region }: GymsContentProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [easyIntroTarget, setEasyIntroTarget] = useState<EasyIntroTarget | null>(null);
+  const [championIntroRegionId, setChampionIntroRegionId] = useState<ChampionIntroRegionId | null>(null);
 
   // GYM INTRO DIALOG — EASY TRAINER ONLY (later task, section 5/6/8) — the
   // ONE routing point that decides whether a battle-slot click needs the
@@ -80,6 +90,19 @@ export function GymsContent({ region }: GymsContentProps) {
     if (!easyIntroTarget) return;
     const target: StartNpcBattleTarget = { source: "gym", regionId: easyIntroTarget.regionId, gymNumber: easyIntroTarget.gymNumber, battleSlot: "easy" };
     setEasyIntroTarget(null);
+    openSelection(target);
+  }
+
+  // REGIONAL CHAMPION INTRO (later task) — the Champion row's onStart now
+  // opens this blocking intro FIRST, mirroring confirmEasyIntro above: no
+  // battle session (nor even the read-only party-selection call) happens
+  // until the player explicitly clicks the intro's own אישור. Canceling
+  // just clears the state — openSelection is never called, so nothing is
+  // created, exactly like closing the Easy intro today.
+  function confirmChampionIntro() {
+    if (!championIntroRegionId) return;
+    const target: StartNpcBattleTarget = { source: "regional-champion", regionId: championIntroRegionId };
+    setChampionIntroRegionId(null);
     openSelection(target);
   }
 
@@ -162,7 +185,7 @@ export function GymsContent({ region }: GymsContentProps) {
             />
           ))}
 
-          <ChampionRow region={region} isPending={isPending} onStart={() => openSelection({ source: "regional-champion", regionId: region.regionId })} />
+          <ChampionRow region={region} isPending={isPending} onStart={() => setChampionIntroRegionId(region.regionId)} />
         </div>
       </div>
 
@@ -173,6 +196,16 @@ export function GymsContent({ region }: GymsContentProps) {
           isPending={isPending}
           onConfirm={confirmEasyIntro}
           onCancel={() => setEasyIntroTarget(null)}
+        />
+      ) : null}
+
+      {championIntroRegionId ? (
+        <GymChampionIntroDialog
+          championName={getRegionalChampionTrainerName(championIntroRegionId)}
+          characterImageUrl={getRegionalChampionCharacterImageUrl(championIntroRegionId)}
+          isPending={isPending}
+          onConfirm={confirmChampionIntro}
+          onCancel={() => setChampionIntroRegionId(null)}
         />
       ) : null}
 

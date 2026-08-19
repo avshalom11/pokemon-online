@@ -70,6 +70,11 @@ interface PlayerProfileRow {
   // that never explicitly seeds this keeps behaving as if the setting is
   // ON, same convention selectedWildLevelBracketIndex above established.
   showGymAchievementsOnProfile: boolean;
+  // BATTLE RESULT SOUNDS + GLOBAL SOUND TOGGLE (later task) — mirrors
+  // PlayerProfile.soundEnabled's own @default(true); every existing test
+  // that never explicitly seeds this keeps behaving as if sound is ON,
+  // same convention showGymAchievementsOnProfile above established.
+  soundEnabled: boolean;
 }
 
 interface DailyFieldBattleCountRow {
@@ -552,6 +557,7 @@ export function seedPlayerProfile(row: {
   regionId?: string;
   selectedWildLevelBracketIndex?: number | null;
   showGymAchievementsOnProfile?: boolean;
+  soundEnabled?: boolean;
 }) {
   const full: PlayerProfileRow = {
     id: row.id,
@@ -572,6 +578,8 @@ export function seedPlayerProfile(row: {
     // Matches PlayerProfile.showGymAchievementsOnProfile's own
     // @default(true).
     showGymAchievementsOnProfile: row.showGymAchievementsOnProfile ?? true,
+    // Matches PlayerProfile.soundEnabled's own @default(true).
+    soundEnabled: row.soundEnabled ?? true,
   };
   profiles.set(row.id, full);
   return full;
@@ -1341,6 +1349,20 @@ const client = {
     }) {
       const rows = [...leagueTournamentParticipants.values()].filter((row) => matches(row, where));
       return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    // LEAGUE REGISTRATION — CANCEL (later task) — cancelLeagueRegistration's
+    // own deleteMany({ where: { tournamentId, playerId, participantType } }),
+    // same "filter + delete matching keys, return the count" shape every
+    // other deleteMany in this fake already uses.
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [key, row] of leagueTournamentParticipants) {
+        if (matches(row, where)) {
+          leagueTournamentParticipants.delete(key);
+          count += 1;
+        }
+      }
+      return { count };
     },
   },
   leagueTournamentMatch: {

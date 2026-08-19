@@ -13,14 +13,25 @@ import { getCurrentLeagueTournamentOccurrenceWindow, getLeagueTournamentWeekKey 
 // (jerusalem-schedule.ts); this file only adds "which League does THIS
 // Thursday belong to".
 //
-// ONE anchor constant, never scattered hardcoded dates: 2026-01-08 is a
-// real Jerusalem Thursday (verified) — the same week every existing Phase
-// 5-7 registration test already implicitly treats as "League I's week" —
-// and is defined here as cycle position 0 (League I's week). Every other
+// ONE anchor constant, never scattered hardcoded dates. Every other
 // Thursday's own position is computed purely as a whole-week offset from
 // this single anchor, modulo 4 — so correcting/moving the anchor later is
-// always a one-line change, never a search-and-replace.
-const CYCLE_ANCHOR_WEEK_KEY = "2026-01-08";
+// always a one-line change, never a search-and-replace (exactly what this
+// task's own fix is: only this one line changed, no second scheduling
+// system, no week-of-month system).
+//
+// LEAGUE CYCLE ALIGNMENT FIX (later task) — 2026-08-06 is a real Jerusalem
+// Thursday (verified) and is the CORRECT, approved cycle position 0 (League
+// I's week) for the cycle currently in progress as of 2026-08-19:
+//   2026-08-06 League I -> 2026-08-13 League II -> 2026-08-20 League III ->
+//   2026-08-27 Champions League -> 2026-09-03 League I (NEW cycle).
+// The previous anchor (2026-01-08) put the SAME real-world week 2 whole
+// weeks out of phase with this required alignment (verified: it resolved
+// 2026-08-06 to League III instead of League I) — this is the one
+// necessary correction; every downstream cycleKey/weekKey/Champions
+// same-cycle-qualifier computation below is already purely anchor-relative
+// and needed no other change.
+const CYCLE_ANCHOR_WEEK_KEY = "2026-08-06";
 
 // Cycle order (section 1): League I -> League II -> League III -> Champions
 // League, then repeats. Also doubles as each League's own 0-based OFFSET

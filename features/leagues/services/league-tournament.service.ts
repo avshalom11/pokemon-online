@@ -124,6 +124,120 @@ export async function registerForLeague(playerId: string, leagueId: LeagueId, no
   }
 }
 
+// LEAGUE LEGACY REGISTRATION — CANCEL BUTTON FIX (later task) — finds a
+// player's own STILL-LIVE registration for `leagueId`, regardless of WHICH
+// week's LeagueTournament it lives on. getCurrentTournamentForLeague above
+// is deliberately week-scoped (it only ever looks at THIS WEEK's own
+// (leagueId, weekKey) row) — correct for "is a NEW registration open right
+// now", but wrong for "does this player already have an existing
+// registration": a player who registered for League I before the
+// active-week-only rule existed (or simply during League I's own past
+// week) still has a real LeagueTournamentParticipant row sitting on that
+// OLD week's tournament, which this week's lookup can never find once the
+// cycle has moved on to League II/III. Scoped to every status except
+// "completed" — registration-open/registration-closed/generated are all
+// still a genuine, currently-relevant registration (the UI's own "נרשמת
+// לליגה" should keep showing even after Round 1 is generated; only the
+// separate CANCELLABILITY of it narrows further, via
+// isTournamentStillCancellable below). At most one such row should exist
+// per (player, League) at a time in practice; sorted by createdAt so a
+// genuinely anomalous multiple-row case still resolves deterministically
+// to the most recent one rather than arbitrarily.
+export async function getPendingRegisteredTournamentForLeague(playerId: string, leagueId: RegionalLeagueId): Promise<LeagueTournament | null> {
+  const participantRows = await prisma.leagueTournamentParticipant.findMany({ where: { playerId, participantType: "player" } });
+  if (participantRows.length === 0) return null;
+
+  const tournamentIds = participantRows.map((row) => row.tournamentId);
+  const tournaments = await prisma.leagueTournament.findMany({
+    where: { leagueId, id: { in: tournamentIds }, status: { not: "completed" } },
+  });
+
+  const sorted = [...tournaments].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return sorted[0] ?? null;
+}
+
+// Read-only view of whether `tournament` (the player's own pending
+// registration, if any) could actually be cancelled right now — the SAME
+// two rules cancelLeagueRegistration itself enforces, mirrored here so the
+// UI can decide button visibility without ever needing to know about
+// "this week's active League" for an existing (possibly stale) registration.
+// Never trusted as the real authorization — cancelLeagueRegistration
+// re-validates both checks itself regardless, same "display flag is a
+// hint, the server re-derives everything" convention this codebase already
+// follows everywhere else.
+export function isTournamentStillCancellable(tournament: LeagueTournament, now: Date): boolean {
+  if (tournament.status !== "registration-open") return false;
+  return isLeagueRegistrationOpen({ registrationClosesAt: tournament.registrationClosesAt, round1StartsAt: tournament.round1StartsAt }, now);
+}
+
+export type CancelLeagueRegistrationResult =
+  | { status: "cancelled" }
+  // IDEMPOTENT (section "cancellation should be idempotent/safe if already
+  // unregistered") — no tournament exists yet for this League's current
+  // week, or one exists but this player never registered (or already
+  // cancelled) — either way, a safe no-op, never an error.
+  | { status: "not-registered" }
+  | { status: "registration-closed" }
+  // Round 1 already generated for this tournament — cancelling now would
+  // leave a bracket referencing a participant who quietly vanished mid-
+  // tournament, so this is rejected once the tournament has moved past
+  // "registration-open", exactly the same status transition
+  // generateRound1ForTournament itself performs.
+  | { status: "round1-already-generated" }
+  | { status: "champions-league-not-cancellable" }
+  | { status: "invalid-league" };
+
+// CANCEL REGISTRATION — playerId always comes from the authenticated
+// session (see cancelLeagueRegistrationAction), so this can structurally
+// only ever remove the CALLING player's own participant row — never
+// another player's, and never the tournament row itself (only
+// LeagueTournamentParticipant.deleteMany, scoped to tournamentId+playerId,
+// is ever touched). Reuses the exact SAME LeagueTournamentParticipant
+// table registerForLeague writes to — no second/duplicate registration
+// table. Never touches Gym progression or League eligibility in any way.
+//
+// LEAGUE LEGACY REGISTRATION — CANCEL BUTTON FIX (later task) — looks up
+// the player's own PENDING registration via getPendingRegisteredTournamentForLeague
+// (any week, never "this week only") rather than getCurrentTournamentForLeague
+// (this-week-only) — a registration from a week whose League is no longer
+// this cycle's active one must still be cancellable. The deadline/status
+// checks below are against THAT tournament's own stored
+// registrationClosesAt/status (isTournamentStillCancellable), never a
+// freshly-recomputed "this week's" window — correct regardless of which
+// week the registration actually lives on.
+export async function cancelLeagueRegistration(playerId: string, leagueId: LeagueId, now: Date = new Date()): Promise<CancelLeagueRegistrationResult> {
+  if (leagueId === CHAMPIONS_LEAGUE.id) {
+    return { status: "champions-league-not-cancellable" };
+  }
+
+  const league = REGIONAL_LEAGUES.find((candidate) => candidate.id === leagueId);
+  if (!league) {
+    return { status: "invalid-league" };
+  }
+
+  const tournament = await getPendingRegisteredTournamentForLeague(playerId, league.id);
+  if (!tournament) {
+    return { status: "not-registered" };
+  }
+
+  // "Allowed only while registration is still open" — checked BEFORE the
+  // idempotent not-registered case below so a genuine after-close cancel
+  // attempt is always rejected, never silently treated as a no-op.
+  if (!isLeagueRegistrationOpen({ registrationClosesAt: tournament.registrationClosesAt, round1StartsAt: tournament.round1StartsAt }, now)) {
+    return { status: "registration-closed" };
+  }
+
+  if (tournament.status !== "registration-open") {
+    return { status: "round1-already-generated" };
+  }
+
+  const deleted = await prisma.leagueTournamentParticipant.deleteMany({
+    where: { tournamentId: tournament.id, playerId, participantType: "player" },
+  });
+
+  return { status: deleted.count > 0 ? "cancelled" : "not-registered" };
+}
+
 export async function isPlayerRegistered(tournamentId: string, playerId: string): Promise<boolean> {
   const row = await prisma.leagueTournamentParticipant.findUnique({
     where: { tournamentId_playerId: { tournamentId, playerId } },

@@ -4,7 +4,7 @@ import { CHAMPIONS_LEAGUE, REGIONAL_LEAGUES } from "../data/league-registry";
 import type { LeagueId, RegionalLeagueId } from "../types/league.types";
 import { getCurrentLeagueChampion } from "./league-achievement.service";
 import { getLeagueEligibility } from "./league-eligibility.service";
-import { getCurrentTournamentForLeague, isPlayerRegistered } from "./league-tournament.service";
+import { getCurrentTournamentForLeague, getPendingRegisteredTournamentForLeague, isTournamentStillCancellable } from "./league-tournament.service";
 import { resolveChampionsQualifiers } from "./champions-league.service";
 import { getCurrentLeagueTournamentOccurrenceWindow, isLeagueRegistrationOpen } from "../utils/jerusalem-schedule";
 import { getCurrentLeagueCycle, getCycleWeekIndex, getWeekKeyForLeagueInCycle, isLeagueActiveThisWeek } from "../utils/league-cycle";
@@ -34,7 +34,21 @@ export interface RegionalLeagueView {
   readonly activeThisWeek: boolean;
   readonly registrationOpen: boolean;
   readonly registrationClosesAt: Date;
+  // True whenever the player has ANY still-live registration for this
+  // League (registration-open/registration-closed/generated), regardless
+  // of which week it was made in — LEAGUE LEGACY REGISTRATION FIX (later
+  // task): this used to only ever check THIS WEEK's own tournament, which
+  // made a still-pending registration from an earlier, now-inactive week
+  // invisible once the cycle moved on.
   readonly registered: boolean;
+  // LEAGUE LEGACY REGISTRATION — CANCEL BUTTON FIX (later task) — whether
+  // the player's own existing registration (if any) can actually be
+  // cancelled right now — the tournament's own real deadline/status, NEVER
+  // gated on activeThisWeek/registrationOpen (a registration from an
+  // inactive League must still be cancellable). A read-only hint for the
+  // UI; cancelLeagueRegistration re-validates both underlying checks
+  // itself regardless.
+  readonly canCancelRegistration: boolean;
   // This cycle's own tournament, if one exists yet.
   readonly completed: boolean;
   readonly currentChampionPlayerId: string | null;
@@ -81,12 +95,12 @@ export async function getLeaguesOverview(playerId: string, now: Date = new Date(
   const regionalLeagues = await Promise.all(
     REGIONAL_LEAGUES.map(async (league): Promise<RegionalLeagueView> => {
       const activeThisWeek = isLeagueActiveThisWeek(league.id, cycle.weekKey);
-      const [eligibility, tournament, currentChampion] = await Promise.all([
+      const [eligibility, tournament, pendingRegistration, currentChampion] = await Promise.all([
         getLeagueEligibility(playerId, league),
         getCurrentTournamentForLeague(league.id, now),
+        getPendingRegisteredTournamentForLeague(playerId, league.id),
         getCurrentLeagueChampion(league.id),
       ]);
-      const registered = tournament ? await isPlayerRegistered(tournament.id, playerId) : false;
 
       return {
         leagueId: league.id,
@@ -98,11 +112,15 @@ export async function getLeaguesOverview(playerId: string, now: Date = new Date(
         requiredRegionalChampionCount: league.requiredRegionalChampionCount,
         activeThisWeek,
         // REGIONAL LEAGUE ACTIVE-WEEK REGISTRATION (Phase 8, section 2) —
-        // registration is only ever open when BOTH the plain Thursday-18:30
-        // window applies AND this is this League's own week.
+        // NEW registration is only ever open when BOTH the plain
+        // Thursday-18:30 window applies AND this is this League's own
+        // week. Deliberately unrelated to `registered`/
+        // `canCancelRegistration` below — an EXISTING registration must
+        // stay visible/cancellable even once this is false.
         registrationOpen: activeThisWeek && withinRegistrationWindow,
         registrationClosesAt: window.registrationClosesAt,
-        registered,
+        registered: pendingRegistration !== null,
+        canCancelRegistration: pendingRegistration !== null && isTournamentStillCancellable(pendingRegistration, now),
         completed: tournament?.status === "completed",
         currentChampionPlayerId: currentChampion?.playerId ?? null,
       };

@@ -41,8 +41,17 @@ export interface BattleThemeArena {
   playerPlatform: BattleArenaPoint;
 }
 
+// GYM BATTLE BACKGROUNDS (later task) — Gym/Regional Champion battles are
+// never a Field Battle zone (no wild encounter, no ZoneId of their own —
+// see gym-battle-view.service.ts's own battleSource), so BattleTheme.id
+// accepts these two additional, non-zone ids alongside every real ZoneId.
+// Never read by BattleScene/BattleBackground themselves (grep-confirmed —
+// this field exists purely for the theme object's own identity/debugging),
+// so widening it here needed no change to either of those files.
+export type GymBattleThemeId = "gym" | "gym-leader";
+
 export interface BattleTheme {
-  id: ZoneId;
+  id: ZoneId | GymBattleThemeId;
   name: string;
   /** Path under /public to this location's battle background image. */
   backgroundImage: string;

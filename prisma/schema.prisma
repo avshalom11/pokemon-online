@@ -123,6 +123,15 @@ model PlayerProfile {
   // Same "default true, coalesced with `?? true` on every read for a stale
   // Prisma Client" convention as the three toggles above.
   showGymAchievementsOnProfile Boolean @default(true)
+  // BATTLE RESULT SOUNDS + GLOBAL SOUND TOGGLE (later task) — one global
+  // on/off switch for every game sound (battle-theme music, attack SFX,
+  // victory/defeat SFX) — a personal preference, not a privacy toggle
+  // (never gates what OTHER viewers see, unlike the show*OnProfile fields
+  // above). Same "default true, coalesced with `?? true` on every read for
+  // a stale Prisma Client" convention. See features/battle/utils/
+  // game-audio-settings.ts for the one shared helper every sound-playing
+  // primitive reads this through.
+  soundEnabled Boolean @default(true)
 
   // The owner's structured public showcase content — an ARRAY of
   // ProfileContentBlock (features/profile/types/profile-content.types.ts),

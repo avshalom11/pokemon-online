@@ -1,4 +1,8 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
+
+import { useBattleMusic } from "@/features/battle/utils/battle-music";
 
 interface BattleWindowProps {
   children: ReactNode;
@@ -11,6 +15,25 @@ interface BattleWindowProps {
    * Omitted (the common/rare case) reserves no extra space, so the panel's
    * position is unchanged from before this prop existed. */
   banner?: ReactNode;
+  /** BATTLE BACKGROUND MUSIC (later task) — set to false while a victory/
+   * defeat result overlay is showing on top of an otherwise still-mounted
+   * BattleWindow (e.g. Field Battle's captured/partyDefeated overlay,
+   * Gym's defeat overlay) — the music pauses without needing this whole
+   * component to unmount. Omitted (the common case, still actively
+   * fighting) plays/keeps playing, looped, at a low background volume —
+   * see useBattleMusic. A battle screen that unmounts BattleWindow
+   * entirely for its result (Gym's own victory branch, League PvP's
+   * completed screen) already stops the music via this hook's own cleanup,
+   * with no need to ever pass this prop. */
+  musicActive?: boolean;
+  /** FIELD BATTLE MUSIC (later task) — which track useBattleMusic plays,
+   * forwarded straight through unmodified. Omitted (Gym/Regional
+   * Champion/League PvP — the common case) keeps the existing shared
+   * battle-theme.mp3 exactly as before this prop existed; Field Battle is
+   * the only caller that passes FIELD_BATTLE_MUSIC_PATH
+   * (features/battle/utils/battle-music.ts). The playback mechanism itself
+   * is unaffected either way — only which file useBattleMusic loads. */
+  musicTrack?: string;
 }
 
 // The battle screen's own page shell — deliberately not the shared
@@ -46,7 +69,9 @@ const PANEL_STYLE: CSSProperties = {
   aspectRatio: "3 / 2",
 };
 
-export function BattleWindow({ children, backgroundClassName, banner }: BattleWindowProps) {
+export function BattleWindow({ children, backgroundClassName, banner, musicActive = true, musicTrack }: BattleWindowProps) {
+  useBattleMusic(musicActive, musicTrack);
+
   return (
     <div
       className={`relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pb-4 pt-[calc(var(--app-header-height)+1rem)] sm:px-8 sm:pb-8 sm:pt-[calc(var(--app-header-height)+2rem)] ${backgroundClassName ?? "bg-slate-950"}`}

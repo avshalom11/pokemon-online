@@ -34,7 +34,8 @@ export function GymIntroDialog({ trainerName, characterImageUrl, isPending, onCo
           />
         </div>
         <p className="mt-3 text-sm font-semibold text-indigo-300">{trainerName}</p>
-        <p className="mt-2 text-base font-bold text-slate-100">נראה אם אתה באמת מוכן. תצליח לעבור את הלוחמים שלי?</p>
+        <p className="mt-2 text-base font-bold text-slate-100">נראה אם אתה באמת מוכן.</p>
+        <p className="text-base font-bold text-slate-100">תצליח לעבור את הלוחמים שלי?</p>
 
         <div className="mt-6 flex items-center justify-between gap-2">
           <button

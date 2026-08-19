@@ -26,8 +26,9 @@ import {
   getLeagueTournamentParticipantRows,
 } from "../../../test/support/fakes/prisma.fake.ts";
 
-// League I's own week (same anchor every existing Phase 5-8 League test uses).
-const NOW = new Date("2026-01-05T08:00:00Z"); // Monday — registration open, resolves to Thursday 2026-01-08 (League I)
+// LEAGUE CYCLE ALIGNMENT FIX (later task) — League I's own week under the
+// current cycle anchor (league-cycle.ts's CYCLE_ANCHOR_WEEK_KEY = "2026-08-06").
+const NOW = new Date("2026-08-03T08:00:00Z"); // Monday — registration open, resolves to Thursday 2026-08-06 (League I)
 const WINDOW = getCurrentLeagueTournamentOccurrenceWindow(NOW);
 const AFTER_CLOSE = new Date(WINDOW.registrationClosesAt.getTime() + 60_000);
 
@@ -193,7 +194,7 @@ test("a League that isn't this week's active one is never generated — no tourn
 // condition directly.
 test("the page-level guard never invokes generation during a Champions League week", async () => {
   const { getCurrentLeagueCycle } = await import("../utils/league-cycle.ts");
-  const championsWeekNow = new Date("2026-01-26T08:00:00Z");
+  const championsWeekNow = new Date("2026-08-24T08:00:00Z");
   const cycle = getCurrentLeagueCycle(championsWeekNow);
   assert.equal(cycle.activeLeagueId, "champions-league", "sanity check: this date really is a Champions League week");
   // The exact guard app/(game)/leagues/page.tsx uses before calling

@@ -13,13 +13,16 @@ import {
 } from "./league-cycle.ts";
 import { getCurrentLeagueTournamentOccurrenceWindow, getLeagueTournamentWeekKey } from "./jerusalem-schedule.ts";
 
-// The anchor week (League I's own week 0) — verified elsewhere to be a
-// real Jerusalem Thursday.
-const WEEK_1_LEAGUE_I = "2026-01-08";
-const WEEK_2_LEAGUE_II = "2026-01-15";
-const WEEK_3_LEAGUE_III = "2026-01-22";
-const WEEK_4_CHAMPIONS = "2026-01-29";
-const WEEK_5_LEAGUE_I_AGAIN = "2026-02-05";
+// LEAGUE CYCLE ALIGNMENT FIX (later task) — the anchor week (League I's own
+// week 0) is now 2026-08-06 (verified elsewhere to be a real Jerusalem
+// Thursday) — the exact week the correct real-world alignment requires:
+// League I 2026-08-06 -> League II 2026-08-13 -> League III 2026-08-20 ->
+// Champions 2026-08-27 -> NEW cycle's League I 2026-09-03.
+const WEEK_1_LEAGUE_I = "2026-08-06";
+const WEEK_2_LEAGUE_II = "2026-08-13";
+const WEEK_3_LEAGUE_III = "2026-08-20";
+const WEEK_4_CHAMPIONS = "2026-08-27";
+const WEEK_5_LEAGUE_I_AGAIN = "2026-09-03";
 
 test("week 1 -> League I", () => {
   assert.equal(getLeagueForCycleWeek(WEEK_1_LEAGUE_I), "league-1");
@@ -73,7 +76,7 @@ test("getWeekKeyForLeagueInCycle inverts getCycleKey for every League in the sam
 });
 
 test("getCurrentLeagueCycle reuses the existing Jerusalem occurrence-window resolver, never a second schedule system", () => {
-  const now = new Date("2026-01-05T08:00:00Z"); // a Monday whose upcoming Thursday (Jan 8) is League I's own week
+  const now = new Date("2026-08-03T08:00:00Z"); // a Monday whose upcoming Thursday (Aug 6) is League I's own week
   const window = getCurrentLeagueTournamentOccurrenceWindow(now);
   const expectedWeekKey = getLeagueTournamentWeekKey(window.registrationClosesAt);
 

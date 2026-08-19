@@ -15,30 +15,32 @@ test("exactly 9 Regional Medal definitions exist, one per region", () => {
   );
 });
 
-// GYM BADGES / MEDALS — SIMPLE NUMERIC IMAGE ARCHITECTURE (later task) —
-// one shared flat folder, 1.png..9.png in region-progression order, via
-// the one deterministic getRegionalMedalImageUrl helper.
-test("each medal's image path follows /images/gyms/medals/<n>.png, n derived from getRegionalMedalImageUrl", () => {
+// REGIONAL MEDAL IMAGE PATH — FOCUSED FIX (later task) — Badges and Medals
+// share ONE flat folder on disk (public/images/gyms/badges/), 4 numbered
+// slots per region (3 Gym Badges + that region's own Medal as the 4th
+// slot) — never a separate medals/ folder, via the one deterministic
+// getRegionalMedalImageUrl helper.
+test("each medal's image path follows /images/gyms/badges/<n>.png (the SAME shared folder Gym Badges use), n derived from getRegionalMedalImageUrl", () => {
   for (const medal of REGIONAL_MEDAL_DEFINITIONS) {
     assert.equal(medal.id, `${medal.regionId}-medal`);
     assert.equal(medal.imageUrl, getRegionalMedalImageUrl(medal.regionId));
-    assert.match(medal.imageUrl, /^\/images\/gyms\/medals\/\d+\.png$/);
+    assert.match(medal.imageUrl, /^\/images\/gyms\/badges\/\d+\.png$/);
   }
 });
 
-test("medal numbering runs 1-9 in region-progression order (Kanto=1 ... Paldea=9)", () => {
-  assert.equal(getRegionalMedalImageUrl("kanto"), "/images/gyms/medals/1.png");
-  assert.equal(getRegionalMedalImageUrl("johto"), "/images/gyms/medals/2.png");
-  assert.equal(getRegionalMedalImageUrl("hoenn"), "/images/gyms/medals/3.png");
-  assert.equal(getRegionalMedalImageUrl("sinnoh"), "/images/gyms/medals/4.png");
-  assert.equal(getRegionalMedalImageUrl("unova"), "/images/gyms/medals/5.png");
-  assert.equal(getRegionalMedalImageUrl("kalos"), "/images/gyms/medals/6.png");
-  assert.equal(getRegionalMedalImageUrl("alola"), "/images/gyms/medals/7.png");
-  assert.equal(getRegionalMedalImageUrl("galar"), "/images/gyms/medals/8.png");
-  assert.equal(getRegionalMedalImageUrl("paldea"), "/images/gyms/medals/9.png");
+test("medal numbering is the 4th slot in each region's own 4-slot block (Kanto=4, Johto=8, ... Paldea=36)", () => {
+  assert.equal(getRegionalMedalImageUrl("kanto"), "/images/gyms/badges/4.png");
+  assert.equal(getRegionalMedalImageUrl("johto"), "/images/gyms/badges/8.png");
+  assert.equal(getRegionalMedalImageUrl("hoenn"), "/images/gyms/badges/12.png");
+  assert.equal(getRegionalMedalImageUrl("sinnoh"), "/images/gyms/badges/16.png");
+  assert.equal(getRegionalMedalImageUrl("unova"), "/images/gyms/badges/20.png");
+  assert.equal(getRegionalMedalImageUrl("kalos"), "/images/gyms/badges/24.png");
+  assert.equal(getRegionalMedalImageUrl("alola"), "/images/gyms/badges/28.png");
+  assert.equal(getRegionalMedalImageUrl("galar"), "/images/gyms/badges/32.png");
+  assert.equal(getRegionalMedalImageUrl("paldea"), "/images/gyms/badges/36.png");
 
   const allNumbers = REGIONAL_MEDAL_DEFINITIONS.map((m) => Number(m.imageUrl.match(/(\d+)\.png$/)![1])).sort((a, b) => a - b);
-  assert.deepEqual(allNumbers, [1, 2, 3, 4, 5, 6, 7, 8, 9], "medal numbers must be exactly 1..9, each used once");
+  assert.deepEqual(allNumbers, [4, 8, 12, 16, 20, 24, 28, 32, 36], "medal numbers must be exactly the 4th slot of each region's own 4-slot block, each used once");
 });
 
 test("getRegionalMedalDefinition returns the matching catalog entry", () => {

@@ -132,6 +132,62 @@ export const GHOST_THEME: BattleTheme = {
   },
 };
 
+// GYM BATTLE BACKGROUNDS (later task) — Gym Easy/Medium/Leader battles
+// (every battleSlot under source "gym") all share this one background;
+// Regional Champion (source "regional-champion") gets its own, separate
+// GYM_LEADER_THEME below — see getGymBattleTheme, the one selection rule
+// both GymBattleContent and this pair of themes exist for. Arena platform
+// positions read directly off the actual artwork (both images share the
+// same two-circle composition/camera framing, so the two themes' arena
+// values are intentionally identical here — unlike the Field Battle zone
+// themes above, which vary a little image to image).
+export const GYM_THEME: BattleTheme = {
+  id: "gym",
+  name: "מכון פוקימון",
+  backgroundImage: "/battle-backgrounds/pokemon_gym.png",
+  arena: {
+    playerPlatform: { xPercent: 33, yPercent: 68 },
+    wildPlatform: { xPercent: 74, yPercent: 52 },
+  },
+  colors: {
+    panelAccent: "#38bdf8",
+  },
+  particles: [{ shape: "spark", color: "#facc15", count: 6 }],
+  lighting: {
+    glowColor: "#60a5fa",
+    ambientOpacity: 0.14,
+  },
+};
+
+export const GYM_LEADER_THEME: BattleTheme = {
+  id: "gym-leader",
+  name: "מנהל מחוז",
+  backgroundImage: "/battle-backgrounds/pokemon_gym_leader.png",
+  arena: {
+    playerPlatform: { xPercent: 33, yPercent: 68 },
+    wildPlatform: { xPercent: 74, yPercent: 52 },
+  },
+  colors: {
+    panelAccent: "#facc15",
+  },
+  particles: [{ shape: "spark", color: "#fbbf24", count: 8 }],
+  lighting: {
+    glowColor: "#facc15",
+    ambientOpacity: 0.16,
+  },
+};
+
+// The ONE Gym background-selection rule (never duplicated per battle
+// screen) — keyed purely on battleSource (GymBattleViewData.battleSource,
+// gym-battle-view.service.ts): every battleSlot (easy/medium/leader) under
+// "gym" shares GYM_THEME; "regional-champion" always gets GYM_LEADER_THEME.
+// GymBattleContent is the one caller — Field Battle keeps using
+// getBattleTheme(zoneId) above, League PvP keeps its own existing
+// getBattleTheme() call, both completely untouched by this.
+export function getGymBattleTheme(battleSource: "gym" | "regional-champion"): BattleTheme {
+  return battleSource === "regional-champion" ? GYM_LEADER_THEME : GYM_THEME;
+}
+
 // One entry per zone. BattleScene and BattleBackground never change when a
 // new theme is added here — only this registry grows.
 export const BATTLE_THEMES: Partial<Record<ZoneId, BattleTheme>> = {

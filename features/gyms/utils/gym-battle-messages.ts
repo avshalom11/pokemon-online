@@ -10,6 +10,11 @@ export function npcSentOutMessage(npcName: string): string {
   return `היריב שלח את ${npcName}!`;
 }
 
+// GYM BATTLE COPY + ITEM EFFECT DISPLAY (later task) — Easy/Medium victory
+// copy only (the ONE caller, GymEasyMediumVictoryNotice in
+// GymBattleContent.tsx); Gym Leader/Regional Champion victories never call
+// this — their own copy lives entirely in GymVictoryRewardDialog.tsx and is
+// untouched by this change.
 export function npcTeamDefeatedMessage(): string {
-  return "ניצחת את כל היריבים!";
+  return "ניצחת את כל הפוקימונים של היריב!";
 }

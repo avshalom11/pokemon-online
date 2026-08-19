@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+
 import { SpriteImage } from "@/components/media/SpriteImage";
+import { AchievementPreviewModal } from "./AchievementPreviewModal";
 import type { ProfileAchievementsView, PublicBadgeView, PublicRegionalMedalView } from "../types/profile.types";
 
 interface ProfileAchievementsSectionProps {
@@ -19,6 +24,15 @@ interface ProfileAchievementsSectionProps {
 // regional-medals.ts) — never recreated or hardcoded here, so there is
 // exactly one place Badge/Medal names/artwork are defined.
 export function ProfileAchievementsSection({ achievements }: ProfileAchievementsSectionProps) {
+  // CLICK-TO-ENLARGE (later task) — a single piece of state, shared by
+  // every Badge/Medal item below (never one useState per item): only ever
+  // set by clicking an item ALREADY rendered from `achievements` (itself
+  // already privacy-filtered server-side, see profile-achievements-view.
+  // service.ts) — so a hidden achievement's item is never even in the DOM
+  // for a non-owner viewer to click, and this component never needs its
+  // own separate privacy check.
+  const [previewItem, setPreviewItem] = useState<AchievementDisplayItem | null>(null);
+
   return (
     <section dir="rtl" className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
       <h2 className="mb-3 text-xs font-semibold tracking-wide text-slate-400 uppercase">הישגים</h2>
@@ -45,15 +59,19 @@ export function ProfileAchievementsSection({ achievements }: ProfileAchievements
           ) : (
             <div className="flex flex-col gap-4">
               {achievements.badges.length > 0 ? (
-                <AchievementGroup title="תגי מכון" items={achievements.badges.map(badgeToDisplayItem)} />
+                <AchievementGroup title="תגי מכון" items={achievements.badges.map(badgeToDisplayItem)} onSelect={setPreviewItem} />
               ) : null}
               {achievements.regionalMedals.length > 0 ? (
-                <AchievementGroup title="מדליות מחוז" items={achievements.regionalMedals.map(medalToDisplayItem)} />
+                <AchievementGroup title="מדליות מחוז" items={achievements.regionalMedals.map(medalToDisplayItem)} onSelect={setPreviewItem} />
               ) : null}
             </div>
           )}
         </>
       )}
+
+      {previewItem ? (
+        <AchievementPreviewModal imageUrl={previewItem.imageUrl} name={previewItem.name} kind={previewItem.kind} onClose={() => setPreviewItem(null)} />
+      ) : null}
     </section>
   );
 }
@@ -62,23 +80,43 @@ interface AchievementDisplayItem {
   key: string;
   imageUrl: string;
   name: string;
+  // MEDAL IMAGE SIZE (later task) — the ONLY reason this field exists: so
+  // AchievementPreviewModal can show a Regional Medal slightly larger than
+  // a Gym Badge. Never used for anything else (no separate image
+  // lookup/mapping — imageUrl is still always read straight off the view
+  // model, unchanged).
+  kind: "badge" | "medal";
 }
 
 function badgeToDisplayItem(badge: PublicBadgeView): AchievementDisplayItem {
-  return { key: `${badge.regionId}-${badge.gymNumber}`, imageUrl: badge.imageUrl, name: badge.displayName };
+  return { key: `${badge.regionId}-${badge.gymNumber}`, imageUrl: badge.imageUrl, name: badge.displayName, kind: "badge" };
 }
 
 function medalToDisplayItem(medal: PublicRegionalMedalView): AchievementDisplayItem {
-  return { key: medal.regionId, imageUrl: medal.imageUrl, name: medal.displayName };
+  return { key: medal.regionId, imageUrl: medal.imageUrl, name: medal.displayName, kind: "medal" };
 }
 
-function AchievementGroup({ title, items }: { title: string; items: AchievementDisplayItem[] }) {
+function AchievementGroup({
+  title,
+  items,
+  onSelect,
+}: {
+  title: string;
+  items: AchievementDisplayItem[];
+  onSelect: (item: AchievementDisplayItem) => void;
+}) {
   return (
     <div>
       <h3 className="mb-2 text-[11px] font-semibold tracking-wide text-slate-500">{title}</h3>
       <div className="flex flex-wrap gap-2">
         {items.map((item) => (
-          <div key={item.key} className="flex w-16 flex-col items-center gap-1 text-center" title={item.name}>
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onSelect(item)}
+            title={item.name}
+            className="flex w-16 flex-col items-center gap-1 rounded-lg text-center transition-colors hover:bg-white/5"
+          >
             <SpriteImage
               src={item.imageUrl}
               alt={item.name}
@@ -86,7 +124,7 @@ function AchievementGroup({ title, items }: { title: string; items: AchievementD
               fallbackClassName="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
             />
             <span className="line-clamp-2 text-[10px] leading-tight text-slate-400">{item.name}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

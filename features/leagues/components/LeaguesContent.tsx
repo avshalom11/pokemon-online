@@ -6,7 +6,9 @@ import { BackButton } from "@/components/layout/BackButton";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { getChestDefinition } from "@/features/chests/data/chest-definitions";
 import { getEggDefinition } from "@/features/eggs/data/egg-definitions";
-import { registerForLeagueAction } from "@/features/leagues/actions/register-for-league.action";
+import { cancelLeagueRegistrationAction, registerForLeagueAction } from "@/features/leagues/actions/register-for-league.action";
+import { HowLeaguesWorkDialog } from "./HowLeaguesWorkDialog";
+import { CYCLE_WEEK_LABELS } from "@/features/leagues/data/league-cycle-labels";
 import { leagueMatchStatusLabelHe } from "@/features/leagues/data/league-match-labels";
 import { getLeaguePlacementRewardDefinition, getLeagueParticipationRewardDefinition } from "@/features/leagues/data/league-reward-registry";
 import type { LeaguePlayerAchievement } from "@/features/leagues/services/league-achievement.service";
@@ -24,7 +26,6 @@ interface LeaguesContentProps {
 const CHAMPIONS_LEAGUE_NOTICE = "ההעפלה לליגת האלופים מתבצעת לפי תוצאות הליגות האזוריות — מקום 1 בכל ליגה אזורית, ומקום 2 בליגה III";
 const DUPLICATE_QUALIFIER_MESSAGE = "לא ניתן ליצור כרגע את ליגת האלופים עקב כפילות בין המעפילים.";
 
-const CYCLE_WEEK_LABELS = ["ליגה I", "ליגה II", "ליגה III", "ליגת האלופים"];
 
 function registrationDeadlineHe(closesAt: Date): string {
   return new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", weekday: "long", hour: "2-digit", minute: "2-digit" }).format(closesAt);
@@ -47,6 +48,24 @@ function registerResultMessageHe(status: string): string {
   }
 }
 
+// LEAGUE REGISTRATION — CANCEL (later task) — every non-"cancelled" status
+// cancelLeagueRegistrationAction can return; "not-registered" is the
+// idempotent no-op case and is deliberately never shown as an error (the
+// UI treats it the same as a successful cancel — the end state is
+// identical: unregistered).
+function cancelResultMessageHe(status: string): string {
+  switch (status) {
+    case "registration-closed":
+      return "לא ניתן לבטל הרשמה — ההרשמה כבר נסגרה";
+    case "round1-already-generated":
+      return "לא ניתן לבטל הרשמה — הסיבוב הראשון כבר נוצר";
+    case "champions-league-not-cancellable":
+      return "לא ניתן לבטל הרשמה ידנית לליגת האלופים";
+    default:
+      return "לא ניתן לבטל את ההרשמה כרגע";
+  }
+}
+
 // GYMS & LEAGUES PHASE 9 — the /leagues page body (sections 11-26). Every
 // number/label below is read straight off Phase 5/8's own view services
 // (league-view.service.ts) and Phase 9's own new bracket-view/reward-
@@ -56,6 +75,13 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
   const [isPending, startTransition] = useTransition();
   const [statusByLeague, setStatusByLeague] = useState<Record<string, { registered: boolean; message: string | null }>>({});
   const [expandedLeagueId, setExpandedLeagueId] = useState<LeagueId | null>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  // LEAGUE REGISTRATION — CANCEL (later task) — which regional League's
+  // "האם אתה בטוח שברצונך לבטל..." confirmation is currently open, gated
+  // exactly like GymsContent's own easy-intro/champion-intro state: nothing
+  // ever calls cancelLeagueRegistrationAction except this dialog's own
+  // explicit confirm click below.
+  const [cancelConfirmLeagueId, setCancelConfirmLeagueId] = useState<LeagueId | null>(null);
 
   function handleRegister(leagueId: LeagueId) {
     if (isPending) return;
@@ -69,6 +95,20 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
     });
   }
 
+  function confirmCancelRegistration() {
+    const leagueId = cancelConfirmLeagueId;
+    if (!leagueId || isPending) return;
+    setCancelConfirmLeagueId(null);
+    startTransition(async () => {
+      const result = await cancelLeagueRegistrationAction(leagueId);
+      if (result.status === "cancelled" || result.status === "not-registered") {
+        setStatusByLeague((current) => ({ ...current, [leagueId]: { registered: false, message: null } }));
+      } else {
+        setStatusByLeague((current) => ({ ...current, [leagueId]: { registered: true, message: cancelResultMessageHe(result.status) } }));
+      }
+    });
+  }
+
   function toggleExpanded(leagueId: LeagueId) {
     setExpandedLeagueId((current) => (current === leagueId ? null : leagueId));
   }
@@ -78,9 +118,18 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
       <div className="relative mx-auto flex max-w-4xl flex-col gap-4 p-4 sm:p-6 lg:p-8">
         <BackButton />
 
-        <div>
-          <h1 className="text-lg font-bold text-slate-100">ליגות</h1>
-          <p className="mt-1 text-sm text-slate-400">שלוש ליגות אזוריות וליגת אלופים אחת — מחזור בן 4 שבועות</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-bold text-slate-100">ליגות</h1>
+            <p className="mt-1 text-sm text-slate-400">שלוש ליגות אזוריות וליגת אלופים אחת — מחזור בן 4 שבועות</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsHelpOpen(true)}
+            className="shrink-0 rounded-lg border border-indigo-400/30 bg-indigo-950/30 px-3 py-1.5 text-xs font-semibold text-indigo-200 transition-colors hover:bg-indigo-950/60"
+          >
+            איך הליגות עובדות?
+          </button>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-slate-900/50 p-3 text-xs text-slate-300">
@@ -96,6 +145,7 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
               isPending={isPending}
               override={statusByLeague[league.leagueId]}
               onRegister={() => handleRegister(league.leagueId)}
+              onRequestCancel={() => setCancelConfirmLeagueId(league.leagueId)}
               championName={league.currentChampionPlayerId ? championDisplayNames[league.currentChampionPlayerId] ?? null : null}
               bracket={brackets[league.leagueId]}
               isExpanded={expandedLeagueId === league.leagueId}
@@ -114,6 +164,45 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
 
         <AchievementHistory achievements={achievements} />
       </div>
+
+      {isHelpOpen ? <HowLeaguesWorkDialog cycle={overview.cycle} onClose={() => setIsHelpOpen(false)} /> : null}
+
+      {cancelConfirmLeagueId ? (
+        <CancelRegistrationConfirmDialog isPending={isPending} onConfirm={confirmCancelRegistration} onCancel={() => setCancelConfirmLeagueId(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+// LEAGUE REGISTRATION — CANCEL (later task) — the blocking "are you sure"
+// step; nothing calls cancelLeagueRegistrationAction except this dialog's
+// own onConfirm, mirroring the project's established GymChampionIntroDialog/
+// EditProfileModal "backdrop click OR explicit button, one אישור/ביטול
+// pair" convention.
+function CancelRegistrationConfirmDialog({ isPending, onConfirm, onCancel }: { isPending: boolean; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div dir="rtl" role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={onCancel}>
+      <div onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-6 text-center shadow-2xl">
+        <h2 className="text-base font-bold text-slate-100">האם אתה בטוח שברצונך לבטל את ההרשמה לליגה?</h2>
+        <div className="mt-6 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="rounded-lg border border-white/10 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-700 disabled:opacity-50"
+          >
+            חזרה
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+          >
+            ביטול הרשמה
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -123,15 +212,25 @@ interface RegionalLeagueCardProps {
   isPending: boolean;
   override?: { registered: boolean; message: string | null };
   onRegister: () => void;
+  onRequestCancel: () => void;
   championName: string | null;
   bracket: LeagueTournamentBracketView | null;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-function RegionalLeagueCard({ league, isPending, override, onRegister, championName, bracket, isExpanded, onToggle }: RegionalLeagueCardProps) {
+function RegionalLeagueCard({ league, isPending, override, onRegister, onRequestCancel, championName, bracket, isExpanded, onToggle }: RegionalLeagueCardProps) {
   const registered = override?.registered ?? league.registered;
   const canRegister = league.eligible && league.registrationOpen && !registered;
+  // LEAGUE LEGACY REGISTRATION — CANCEL BUTTON FIX (later task) — cancel
+  // visibility is now driven ENTIRELY by the server-computed
+  // canCancelRegistration (the real tournament's own deadline/status),
+  // never by activeThisWeek/registrationOpen — an existing registration
+  // for a League that is no longer this week's active one (e.g. registered
+  // during League I's own week, current week is now League III) must still
+  // show "ביטול הרשמה", exactly as long as its own registration window
+  // hasn't closed and Round 1 hasn't been generated for it.
+  const canCancel = override ? override.registered : league.canCancelRegistration;
 
   return (
     <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
@@ -163,6 +262,15 @@ function RegionalLeagueCard({ league, isPending, override, onRegister, championN
             className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
           >
             הרשמה לליגה
+          </button>
+        ) : canCancel ? (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onRequestCancel}
+            className="rounded-md border border-red-400/40 bg-red-950/30 px-3 py-1 text-xs font-semibold text-red-300 transition-colors hover:bg-red-950/60 disabled:opacity-50"
+          >
+            ביטול הרשמה
           </button>
         ) : null}
       </div>

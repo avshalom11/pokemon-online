@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ExperienceBar } from "@/components/battle/ExperienceBar";
 import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
+import { SoundToggle } from "@/components/layout/SoundToggle";
 import type { NotificationBellData } from "@/features/notifications/types";
 import { useDailyBattleCount } from "@/features/player/context/daily-battle-count-context";
 import { usePlayerProgression } from "@/features/player/context/player-progression-context";
@@ -89,6 +90,8 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
           />
           <ResourcePill icon={<CurrencyIcon type="money" />} label={player.coins.toLocaleString("he-IL")} title="מטבעות" />
           <ResourcePill icon={<CurrencyIcon type="gold" />} label={player.gold.toLocaleString("he-IL")} title="זהב" />
+
+          <SoundToggle />
 
           <NotificationBell initial={notifications} />
           <IconButton title="הגדרות">

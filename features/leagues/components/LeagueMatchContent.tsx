@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { BattleScene } from "@/components/battle/BattleScene";
@@ -10,6 +10,7 @@ import { useActiveBattle } from "@/features/battle-session/context/active-battle
 import { BattleWindow } from "@/features/battle/components/BattleWindow";
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { attackMessage, forcedReplacementMessage } from "@/features/battle/utils/battle-messages";
+import { playDefeatSound, playVictorySound } from "@/features/battle/utils/battle-result-sound";
 import {
   getLeagueBattleViewDataAction,
   submitLeagueBattleActionAction,
@@ -71,6 +72,24 @@ export function LeagueMatchContent({ matchId, initialData }: LeagueMatchContentP
     }, 3000);
     return () => clearInterval(interval);
   }, [data.status, data.opponent.joined, needsReplacement, matchId]);
+
+  // BATTLE RESULT SOUNDS (later task) — ref-guarded so this plays exactly
+  // once: `data` refreshes repeatedly via the polling effect above even
+  // after the match is "completed" is first observed (a stray poll tick,
+  // or this component simply re-rendering for an unrelated reason), so a
+  // plain "if completed, play" without the ref guard would replay on every
+  // one of those. Placed BEFORE every early return below (Rules of Hooks).
+  const playedResultSoundRef = useRef<"self" | "opponent" | null>(null);
+  useEffect(() => {
+    if (data.status !== "completed" || data.winnerSide === null) return;
+    if (playedResultSoundRef.current === data.winnerSide) return;
+    playedResultSoundRef.current = data.winnerSide;
+    if (data.winnerSide === "self") {
+      playVictorySound();
+    } else {
+      playDefeatSound();
+    }
+  }, [data.status, data.winnerSide]);
 
   function handleAttack(moveId: string) {
     if (isPending || needsReplacement || data.status === "completed") return;

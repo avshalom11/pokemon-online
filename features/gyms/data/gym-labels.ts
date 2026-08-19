@@ -1,6 +1,7 @@
 import { POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
 import type { PokemonType } from "@/shared/types/pokemon";
 import type { RegionId } from "@/shared/types/region";
+import type { ShopItem } from "@/features/shop/types/shop.types";
 import { GYM_BATTLE_FORMATS } from "./gym-registry";
 import type { GymBattleSlotId } from "../types/gym.types";
 import type { RegionStatus } from "../services/gym-overview-view.service";
@@ -39,10 +40,15 @@ export const REGION_DISPLAY_NAMES_HE: Record<RegionId, string> = {
   paldea: "פלדאה",
 };
 
+// GYM BATTLE COPY + ITEM EFFECT DISPLAY (later task) — the approved
+// role labels, replacing the earlier "מתאמן קל"/"מתאמן בינוני"/"מנהיג
+// המכון" wording. Display text only — GymBattleSlotId itself
+// ("easy"/"medium"/"leader") is untouched, so nothing that branches on the
+// internal id (unlock rules, battle format, reward gating) is affected.
 export const GYM_BATTLE_SLOT_LABELS_HE: Record<GymBattleSlotId, string> = {
-  easy: "מתאמן קל",
-  medium: "מתאמן בינוני",
-  leader: "מנהיג המכון",
+  easy: "חניך מתחיל",
+  medium: "חניך מתקדם",
+  leader: "מאמן המכון",
 };
 
 export function regionalChampionLabelHe(regionId: RegionId): string {
@@ -139,6 +145,24 @@ export function gymBagItemErrorMessageHe(status: GymBagItemErrorStatus): string 
     case "stale-action":
       return "הפעולה לא בוצעה — נסה שוב";
   }
+}
+
+// GYM BATTLE COPY + ITEM EFFECT DISPLAY (later task, section 4) — the
+// Bag panel's own "what does this item actually do" label, derived
+// EXCLUSIVELY from the item's own real catalog fields
+// (medicineEffectKind/healPercent — features/shop/data/shop-items.ts,
+// the SAME single source of truth use-medicine.service.ts/
+// gym-battle-item.service.ts actually apply the effect from) — never a
+// hardcoded percentage table here. Both fields are always set together for
+// every Medicine item currently in the catalog (see shop-items.ts), and
+// every one of them is percent-of-max-HP-based (healPercent, a 0..1
+// fraction) — there is no fixed-HP-amount item to special-case today; if
+// one is ever added without a healPercent, this returns null and the
+// caller simply omits the effect line rather than showing a wrong number.
+export function gymBagItemEffectLabelHe(item: Pick<ShopItem, "medicineEffectKind" | "healPercent">): string | null {
+  if (!item.medicineEffectKind || item.healPercent === undefined) return null;
+  const percent = Math.round(item.healPercent * 100);
+  return item.medicineEffectKind === "revive" ? `החייאה: ${percent}% חיים` : `ריפוי: ${percent}%`;
 }
 
 // Every non-success startNpcBattle status, worded for a toast/inline error

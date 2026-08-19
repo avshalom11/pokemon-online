@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { BattleScene } from "@/components/battle/BattleScene";
@@ -10,6 +10,7 @@ import { useActiveBattle } from "@/features/battle-session/context/active-battle
 import { BattleWindow } from "@/features/battle/components/BattleWindow";
 import { buildAttackSlots } from "@/features/battle/utils/battle-attack-slots";
 import { playAttackHitSound } from "@/features/battle/utils/battle-attack-effect";
+import { playDefeatSound, playSmallVictorySound, playVictorySound } from "@/features/battle/utils/battle-result-sound";
 import { attackMessage, faintedMessage, forcedReplacementMessage, partyDefeatedMessage } from "@/features/battle/utils/battle-messages";
 import type { BattleEvent } from "@/features/battle/events/battle-event.types";
 import { decideAttackSoundsForTurn } from "@/features/gyms/utils/gym-attack-sound";
@@ -27,7 +28,7 @@ import type { GymBattleViewData } from "@/features/gyms/services/gym-battle-view
 import type { GrantedGymReward } from "@/features/gyms/services/gym-reward.service";
 import { npcSentOutMessage, npcTeamDefeatedMessage } from "@/features/gyms/utils/gym-battle-messages";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
-import { getBattleTheme } from "@/lib/battle/battleThemes";
+import { getGymBattleTheme } from "@/lib/battle/battleThemes";
 import type { BattleMenuAction } from "@/shared/types/battle-ui";
 import { GymBagPanel } from "./GymBagPanel";
 import { GymVictoryRewardDialog } from "./GymVictoryRewardDialog";
@@ -107,6 +108,45 @@ export function GymBattleContent({ initialData }: GymBattleContentProps) {
     setActiveBattle(true);
     return () => setActiveBattle(false);
   }, [setActiveBattle]);
+
+  // BATTLE RESULT SOUNDS (later task) — a ref-guarded effect keyed on
+  // `outcome` (never a sound call at the outcome-setting call site itself)
+  // so this plays exactly once regardless of re-renders — the SAME
+  // component keeps re-rendering while the victory/defeat dialog is shown
+  // (bag/switch state, pending transitions, ...), and `outcome` itself is a
+  // one-way ratchet (GymBattleContent's own doc comment on confirmVictory)
+  // that never resets, so a plain "if outcome, play" without the ref guard
+  // would replay on every one of those unrelated re-renders. Placed BEFORE
+  // the victory early-return below (Rules of Hooks — every hook must run
+  // unconditionally).
+  //
+  // GYM VICTORY SOUND — LEADER/CHAMPION ONLY, GYM SMALL VICTORY SOUND
+  // (later tasks) — which victory sound plays is entirely decided by
+  // `outcome.reward`, the EXACT SAME authoritative signal the render logic
+  // just below (the victory early-return) already uses to pick
+  // GymVictoryRewardDialog (Leader/Champion — awards a real Badge/Medal +
+  // money/XP -> playVictorySound) over GymEasyMediumVictoryNotice (Easy/
+  // Medium — "no numeric reward" is this project's own established rule,
+  // gym-reward.service.ts's section 12 -> playSmallVictorySound) — never a
+  // second/duplicated check, never inferred from trainerName or any UI
+  // copy. The two are mutually exclusive by construction (one if/else
+  // branch, one ref value per victory), so they can never both fire for
+  // the same result. Defeat sound is completely unaffected — it never
+  // depended on reward and still fires for every loss regardless of
+  // battle slot.
+  const playedResultSoundRef = useRef<"victory" | "small-victory" | "defeat" | null>(null);
+  useEffect(() => {
+    if (outcome?.kind === "victory" && outcome.reward !== null && playedResultSoundRef.current !== "victory") {
+      playedResultSoundRef.current = "victory";
+      playVictorySound();
+    } else if (outcome?.kind === "victory" && outcome.reward === null && playedResultSoundRef.current !== "small-victory") {
+      playedResultSoundRef.current = "small-victory";
+      playSmallVictorySound();
+    } else if (outcome?.kind === "defeat" && playedResultSoundRef.current !== "defeat") {
+      playedResultSoundRef.current = "defeat";
+      playDefeatSound();
+    }
+  }, [outcome]);
 
   function handleAttack(moveId: string) {
     if (isPending || needsReplacement || outcome) return;
@@ -394,7 +434,7 @@ export function GymBattleContent({ initialData }: GymBattleContentProps) {
     );
   }
 
-  const theme = getBattleTheme();
+  const theme = getGymBattleTheme(data.battleSource);
   const attacks = buildAttackSlots([...data.knownMoves]);
 
   // TURN SAFETY (later task, section 15) — Attack/Bag/voluntary-Switch are
@@ -412,7 +452,7 @@ export function GymBattleContent({ initialData }: GymBattleContentProps) {
   const actionsLocked = Boolean(needsReplacement || outcome || voluntarySwitchOpen || bagOpen || showAbandonConfirm);
 
   return (
-    <BattleWindow>
+    <BattleWindow musicActive={outcome === null}>
       <BattleScene
         theme={theme}
         enemy={{

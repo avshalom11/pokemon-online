@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { HealthBar } from "@/components/battle/HealthBar";
 import { SpriteImage } from "@/components/media/SpriteImage";
-import { gymBagItemErrorMessageHe } from "@/features/gyms/data/gym-labels";
+import { gymBagItemEffectLabelHe, gymBagItemErrorMessageHe } from "@/features/gyms/data/gym-labels";
 import type { GymBattleViewData } from "@/features/gyms/services/gym-battle-view.service";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 
@@ -98,6 +98,9 @@ export function GymBagPanel({ items, participants, pending, errorStatus, onUseIt
                   </span>
                 </div>
                 <span className="text-sm font-semibold text-slate-100">{view.item.name}</span>
+                {gymBagItemEffectLabelHe(view.item) ? (
+                  <span className="text-[11px] font-medium text-emerald-400">{gymBagItemEffectLabelHe(view.item)}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -140,7 +143,10 @@ function TargetPicker({ item, participants, pending, onBack, onSelect }: TargetP
           className="h-10 w-10 shrink-0 object-contain"
           fallbackClassName="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500"
         />
-        <p className="truncate text-sm font-semibold text-slate-100">{item.item.name}</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-100">{item.item.name}</p>
+          {gymBagItemEffectLabelHe(item.item) ? <p className="text-[11px] font-medium text-emerald-400">{gymBagItemEffectLabelHe(item.item)}</p> : null}
+        </div>
       </div>
 
       <p className="mb-2 text-xs text-slate-500">{isRevive ? "בחר פוקימון שהתעלף" : "בחר פוקימון לריפוי"}</p>

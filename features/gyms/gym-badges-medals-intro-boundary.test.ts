@@ -11,7 +11,15 @@ import { test } from "node:test";
 
 const gymsContentSrc = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8");
 const gymIntroDialogSrc = fs.readFileSync("features/gyms/components/GymIntroDialog.tsx", "utf8");
+const gymChampionIntroDialogSrc = fs.readFileSync("features/gyms/components/GymChampionIntroDialog.tsx", "utf8");
 const gymVictoryRewardDialogSrc = fs.readFileSync("features/gyms/components/GymVictoryRewardDialog.tsx", "utf8");
+
+test("MEDAL IMAGE SIZE: the victory dialog shows the Regional Medal image slightly larger than a Gym Badge (h-28 w-28 vs the unchanged h-24 w-24), never affecting dialog text/logic/rewards", () => {
+  assert.ok(
+    gymVictoryRewardDialogSrc.includes('isChampion ? "h-28 w-28 object-contain" : "h-24 w-24 object-contain"'),
+    "only the Champion (Medal) branch may be enlarged, Leader (Badge) stays h-24 w-24"
+  );
+});
 
 test("5: the Leader/Champion victory dialog shows the Badge image via the badge catalog's own imageUrl (the new numeric helper)", () => {
   assert.ok(gymVictoryRewardDialogSrc.includes("getGymBadgeDefinition"), "must read the badge catalog, never a hardcoded path");
@@ -39,21 +47,42 @@ test("8/9/10: clicking Easy routes through the intro dialog FIRST, never openSel
   assert.ok(gymsContentSrc.includes('battleSlot: "easy" };\n    setEasyIntroTarget(null);\n    openSelection(target);'), "confirming the intro must proceed into the existing openSelection flow, only after clearing the intro state");
 });
 
-test("11/12/13: Medium, Gym Leader, and Regional Champion never open the intro dialog — they call openSelection directly, unchanged", () => {
+test("11/12: Medium and Gym Leader never open ANY intro dialog — they call openSelection directly, unchanged", () => {
   // handleGymStart's non-easy path falls through to openSelection
   // directly, for medium AND leader alike (both reach this same "gym"
   // target branch since only "easy" gets the early return above).
-  assert.ok(gymsContentSrc.includes('openSelection({ source: "gym", regionId, gymNumber, battleSlot });'), "Medium/Leader must fall through to the existing openSelection call, never the intro dialog");
-
-  // The Regional Champion's own onStart prop is unchanged — it still
-  // calls openSelection directly, never handleGymStart/the intro dialog.
-  assert.ok(gymsContentSrc.includes('onStart={() => openSelection({ source: "regional-champion", regionId: region.regionId })}'), "the Champion row must keep calling openSelection directly, bypassing the intro dialog entirely");
+  assert.ok(gymsContentSrc.includes('openSelection({ source: "gym", regionId, gymNumber, battleSlot });'), "Medium/Leader must fall through to the existing openSelection call, never any intro dialog");
 
   // GymIntroDialog itself is only ever mounted from ONE piece of state
   // (easyIntroTarget), which only the Easy branch above ever sets — so
   // it structurally cannot appear for Medium/Leader/Champion.
   const introRenderCount = gymsContentSrc.split("<GymIntroDialog").length - 1;
   assert.equal(introRenderCount, 1, "GymIntroDialog must be mounted from exactly one place, gated only by easyIntroTarget");
+});
+
+// REGIONAL CHAMPION — INTRO + VICTORY DIALOG POLISH (later task) — this
+// supersedes this file's own former "13" assertion (the Champion row used
+// to call openSelection directly, bypassing any intro entirely). That is
+// now deliberately no longer true: the Champion row opens its OWN dedicated
+// intro dialog (GymChampionIntroDialog, never GymIntroDialog — the two stay
+// completely separate components/states) first, exactly like Easy already
+// does for Gym battles, and only proceeds into openSelection after the
+// player's own explicit אישור there.
+test("13 (superseded): Regional Champion now opens its own dedicated intro dialog first — never openSelection directly, never GymIntroDialog", () => {
+  assert.ok(!gymsContentSrc.includes('onStart={() => openSelection({ source: "regional-champion", regionId: region.regionId })}'), "the Champion row must no longer call openSelection directly — it must go through its own intro first");
+  assert.ok(gymsContentSrc.includes("onStart={() => setChampionIntroRegionId(region.regionId)}"), "the Champion row's onStart must open the Champion-only intro state");
+
+  assert.ok(gymsContentSrc.includes("function confirmChampionIntro() {"), "there must be a dedicated confirm handler for the Champion intro");
+  assert.ok(
+    gymsContentSrc.includes('source: "regional-champion", regionId: championIntroRegionId };\n    setChampionIntroRegionId(null);\n    openSelection(target);'),
+    "confirming the Champion intro must proceed into the existing openSelection flow, only after clearing the intro state — no battle session before this"
+  );
+
+  // GymChampionIntroDialog is mounted from exactly one place, gated only by
+  // championIntroRegionId — never reachable from Easy/Medium/Leader.
+  const championIntroRenderCount = gymsContentSrc.split("<GymChampionIntroDialog").length - 1;
+  assert.equal(championIntroRenderCount, 1, "GymChampionIntroDialog must be mounted from exactly one place, gated only by championIntroRegionId");
+  assert.ok(gymsContentSrc.includes("import { GymChampionIntroDialog }"), "GymChampionIntroDialog must be its own imported component, never a parameterized reuse of GymIntroDialog");
 });
 
 test("14: the intro dialog shows the correct Gym LEADER name (not the Easy trainer's own name)", () => {
@@ -75,4 +104,46 @@ test("16: missing Badge/Medal/trainer images stay safe — every image in the vi
   assert.ok(gymVictoryRewardDialogSrc.includes("fallbackClassName="), "the victory dialog's image must have a safe fallback for a not-yet-added file");
   assert.ok(gymIntroDialogSrc.includes("import { SpriteImage }"), "the intro dialog must render its character image through SpriteImage");
   assert.ok(gymIntroDialogSrc.includes("fallbackClassName="), "the intro dialog's image must have a safe fallback for a not-yet-added file");
+  assert.ok(gymChampionIntroDialogSrc.includes("import { SpriteImage }"), "the Champion intro dialog must render its character image through SpriteImage");
+  assert.ok(gymChampionIntroDialogSrc.includes("fallbackClassName="), "the Champion intro dialog's image must have a safe fallback for a not-yet-added file");
+});
+
+// REGIONAL CHAMPION — INTRO + VICTORY DIALOG POLISH (later task) — the
+// Champion intro's own image/name, reusing the exact same helpers
+// GymsContent's own ChampionRow card already reads (gym-trainer-images.ts /
+// gym-trainer-names.ts) — no new image map, no new name table.
+test("17: the Champion intro dialog shows the correct Regional Champion character image, reusing the existing helper (no new image map)", () => {
+  assert.ok(
+    gymsContentSrc.includes("characterImageUrl={getRegionalChampionCharacterImageUrl(championIntroRegionId)}"),
+    "the Champion intro dialog must reuse getRegionalChampionCharacterImageUrl — the same helper ChampionRow's own card image already uses — never a second image map"
+  );
+});
+
+test("18: the Champion intro dialog shows the correct Regional Champion name", () => {
+  assert.ok(
+    gymsContentSrc.includes("championName={getRegionalChampionTrainerName(championIntroRegionId)}"),
+    "the Champion intro dialog must use the fixed Regional Champion name (gym-trainer-names.ts), never a Gym trainer's own name"
+  );
+});
+
+test("19: the Champion intro dialog uses one polished, approved challenging line — not the Easy Trainer's own copy", () => {
+  assert.ok(
+    gymChampionIntroDialogSrc.includes(
+      "עברת דרך ארוכה כדי להגיע עד אליי... אבל אל תטעה לחשוב שזה אומר שאתה מסוגל לנצח אותי."
+    ),
+    "the Champion intro must show its own approved challenging line"
+  );
+  assert.ok(!gymChampionIntroDialogSrc.includes("נראה אם אתה באמת מוכן"), "the Champion intro must never reuse the Easy Trainer's own copy");
+});
+
+test("20: the Regional Champion victory dialog uses its own approved congratulatory line naming the Regional Medal, distinct from the Leader's generic sentence, and still shows the Champion's own name for context", () => {
+  assert.ok(
+    gymVictoryRewardDialogSrc.includes("כל הכבוד! הוכחת שאתה ראוי למדליית המחוז. מעטים מצליחים להגיע עד כאן ולנצח אותי."),
+    "the Champion victory copy must be the approved congratulatory sentence"
+  );
+  assert.ok(gymVictoryRewardDialogSrc.includes("{trainerName}"), "the Champion's own name must still be rendered for context, even though the new sentence doesn't interpolate it inline");
+  // The Leader's own sentence must be completely untouched by this task —
+  // both approved sentences must coexist as two distinct, non-overlapping
+  // branches (isChampion ? ... : ...), never one replacing the other.
+  assert.ok(gymVictoryRewardDialogSrc.includes("כל הכבוד! ניצחת את ${trainerName}. לא רבים מצליחים!"), "the Leader's own approved sentence must stay completely unmodified");
 });
