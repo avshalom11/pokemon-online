@@ -1434,6 +1434,16 @@ export function BattleContent({
           items={liveInventoryItems}
           selectedBallItemId={selectedBallItemId}
           party={livePartyList}
+          // Same currentHp/maxHp/rarity triple capture.service.ts's own
+          // real capture attempt rolls against (session.wildCurrentHp/
+          // wildMaxHp/species.rarity) — read live off wildState so every
+          // HP change this component already tracks re-renders the Bag's
+          // displayed percentages automatically, with no separate refresh.
+          wildCaptureState={{
+            currentHp: wildState.currentHealth,
+            maxHp: wildState.maximumHealth,
+            rarity: wildState.pokemon.rarity,
+          }}
           onSelectBall={handleSelectBall}
           onSelectMedicineTarget={handleSelectMedicineTarget}
           onClose={() => setIsBagOpen(false)}

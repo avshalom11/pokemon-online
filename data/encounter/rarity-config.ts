@@ -15,8 +15,8 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // the same relative order as the game's own rarity ladder. Tune freely;
 // nothing else needs to change when these numbers change.
 export const RARITY_ENCOUNTER_PROBABILITIES: Record<PokemonRarity, number> = {
-  common: 89.8,
-  rare: 10,
-  "very-rare": 0.12,
-  legendary: 0.08,
+  common: 79,
+  rare: 20,
+  "very-rare": 0.6,
+  legendary: 0.4,
 };

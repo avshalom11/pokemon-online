@@ -30,8 +30,11 @@ export interface CaptureChanceParams {
   rarity: PokemonRarity;
 }
 
-// Exact chance is intentionally never surfaced to the player — callers
-// should only ever branch on rollCapture's boolean result.
+// The exact 0-1 probability. capture.service.ts's own server-side attempt
+// only ever branches on rollCapture's boolean result below — but the Field
+// Battle Bag's live percent display (lib/battle/ballCaptureDisplay.ts) reads
+// this same function directly, so the number shown to the player can never
+// drift from the number a real throw is actually rolled against.
 export function calculateCaptureChance({ currentHp, maxHp, rarity }: CaptureChanceParams, ballId: CaptureBallId): number {
   const bracket = getHpBracket(currentHp, maxHp);
   return CAPTURE_RATE_TABLE[rarity][bracket][ballId];

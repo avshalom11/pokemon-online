@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { PartySlot } from "@/features/pokemon/components/PartySlot";
+import { getBallCapturePercent } from "@/lib/battle/ballCaptureDisplay";
+import type { CaptureChanceParams } from "@/engine/battle/capture";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
@@ -31,6 +33,15 @@ interface BattleBagPanelProps {
   items: InventoryItemView[];
   selectedBallItemId: string | null;
   party: OwnedPokemon[];
+  // The live wild Pokémon's currentHp/maxHp/rarity — the exact same inputs
+  // capture.service.ts's own real capture attempt rolls against (see that
+  // file's rollCapture call). Passed straight through to
+  // getBallCapturePercent (lib/battle/ballCaptureDisplay.ts) for every
+  // owned Poké Ball, so the percent shown here can never disagree with what
+  // throwing that ball right now would actually do. BattleContent re-renders
+  // this panel with fresh values any time wildState's HP changes, so the
+  // displayed percentages update live with no separate refresh step.
+  wildCaptureState: CaptureChanceParams;
   onSelectBall: (itemId: string) => void;
   onSelectMedicineTarget: (itemId: string, playerPokemonId: string) => void;
   onClose: () => void;
@@ -65,6 +76,7 @@ export function BattleBagPanel({
   items,
   selectedBallItemId,
   party,
+  wildCaptureState,
   onSelectBall,
   onSelectMedicineTarget,
   onClose,
@@ -144,6 +156,10 @@ export function BattleBagPanel({
                       view={view}
                       isSelected={category === "poke-balls" && view.item.id === selectedBallItemId}
                       disabled={pending}
+                      // Only ever computed for the Poké Ball tab — Medicine
+                      // items have no capture chance, so this stays null
+                      // (and BagItemCard renders nothing extra) there.
+                      capturePercent={category === "poke-balls" ? getBallCapturePercent(view.item.id, wildCaptureState) : null}
                       onSelect={() =>
                         category === "poke-balls" ? onSelectBall(view.item.id) : setPickingMedicineItemId(view.item.id)
                       }
@@ -191,11 +207,17 @@ function BagItemCard({
   view,
   isSelected,
   disabled,
+  capturePercent = null,
   onSelect,
 }: {
   view: InventoryItemView;
   isSelected: boolean;
   disabled?: boolean;
+  // Live capture-chance percent for this ball right now (see
+  // getBallCapturePercent, lib/battle/ballCaptureDisplay.ts) — null for
+  // Medicine items and for anything that isn't a real capture ball, in
+  // which case no percentage badge renders at all.
+  capturePercent?: number | null;
   onSelect: () => void;
 }) {
   const { item, quantity } = view;
@@ -226,6 +248,11 @@ function BagItemCard({
       </div>
 
       <span className="text-sm font-semibold text-slate-100">{item.name}</span>
+      {capturePercent !== null ? (
+        <span dir="ltr" className="text-xs font-bold text-emerald-300">
+          {capturePercent}%
+        </span>
+      ) : null}
       <span className="text-[11px] leading-snug text-slate-400">{item.description}</span>
     </button>
   );
