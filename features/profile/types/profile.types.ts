@@ -1,5 +1,6 @@
 import type { ProfileThemeId } from "../themes/profile-themes";
 import type { ProfileContentBlock } from "./profile-content.types";
+import type { FriendshipStatus } from "@/features/friends/types";
 import type { RegionId } from "@/shared/types/region";
 
 // A single displayed party member on the PUBLIC profile — deliberately NOT
@@ -91,6 +92,14 @@ export interface ProfileAchievementsView {
 // the Edit Profile button renders at all).
 export interface PublicProfileView {
   username: string;
+  // FRIENDS PHASE 1 — the profile owner's own PlayerProfile id, needed by
+  // AddFriendButton to address a friend request at the right player.
+  // Exposing a PlayerProfile id to the client is an already-established
+  // safe pattern in this codebase (see lib/auth/player-profile.ts's own
+  // getPlayerProfilesByIds doc comment: "Gym/League features key
+  // everything by PlayerProfile.id ... never by the auth User.id") — never
+  // the raw auth User.id, and never anything sensitive.
+  playerId: string;
   displayName: string;
   trainerLevel: number;
   regionId: RegionId;
@@ -102,6 +111,17 @@ export interface PublicProfileView {
   // "nothing shown".
   aboutMe: string | null;
   isOwner: boolean;
+  // FRIENDS PHASE 1 — the VIEWER's own relationship to this profile,
+  // computed server-side (public-profile-view.service.ts) from the one
+  // Friendship table — drives which state AddFriendButton renders (never
+  // guessed/re-derived client-side).
+  friendshipStatus: FriendshipStatus;
+  // Non-null exactly when friendshipStatus is "pending-incoming" — the
+  // underlying Friendship row's own id, letting AddFriendButton
+  // accept/decline right from this profile via the existing
+  // respondToFriendRequestAction (never a second accept/decline
+  // implementation).
+  incomingFriendRequestId: string | null;
   // null when the owner has hidden their party (showPartyOnProfile is
   // false) — the UI shows the "party hidden" message in that case, never
   // an empty array (which would instead mean "this player owns no

@@ -11,6 +11,18 @@
      it's the only place that needs to change if the header's height ever
      does. Keep lib/layout/gameLayout.ts's APP_HEADER_HEIGHT_PX in sync. */
   --app-header-height: 64px;
+
+  /* Height of the collapsed GLOBAL CHAT bar (features/chat/components/
+     GlobalChatBar.tsx's own h-11) — every full-screen game surface that
+     needs guaranteed clearance above the chat bar (GameScreen.tsx,
+     BattleWindow.tsx) reserves space via this one variable, same
+     "single source of truth" convention --app-header-height already
+     establishes above. Only the COLLAPSED bar's height is reserved
+     site-wide; the expanded panel is a taller overlay a player opens
+     on demand and can re-minimize any time (including mid-battle), so it
+     deliberately does NOT reflow the page underneath it. Keep
+     lib/layout/gameLayout.ts's APP_CHAT_BAR_HEIGHT_PX in sync. */
+  --app-chat-bar-height: 44px;
 }
 
 /* Below the sm: breakpoint (640px, matching every other responsive class in

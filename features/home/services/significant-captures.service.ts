@@ -1,26 +1,30 @@
 import "server-only";
 
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
-import { getJerusalemDateKey } from "@/features/daily-battles/services/daily-battle-count.service";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
-import { getPlayerProfilesByIds } from "@/lib/auth/player-profile";
+import { getPlayerIdentitiesByIds } from "@/lib/auth/player-profile";
 import { prisma } from "@/lib/db/prisma";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 
 export interface SignificantCaptureView {
   speciesName: string;
   playerDisplayName: string;
+  // CLICKABLE USERNAMES — null whenever a real username couldn't be
+  // resolved (see lib/auth/player-profile.ts's getPlayerIdentitiesByIds) —
+  // components/social/PlayerNameLink.tsx renders plain, non-clickable text
+  // in that case.
+  playerUsername: string | null;
   // Pre-formatted "DD/MM/YYYY · HH:MM" (Asia/Jerusalem wall-clock) — see
   // formatCaptureTimestamp below. Home is a server component (per this
   // project's own "pages display data" rule, home-data.service.ts's doc
   // comment), so formatting here avoids a second, client-side timezone
-  // computation that could disagree with the server's own "today" check.
+  // computation.
   capturedAtLabel: string;
   spriteUrl: string;
 }
 
-export interface SignificantCapturesToday {
+export interface SignificantCaptures {
   veryRare: SignificantCaptureView | null;
   legendary: SignificantCaptureView | null;
 }
@@ -61,12 +65,12 @@ function formatCaptureTimestamp(date: Date): string {
 
 // The latest capture (source === "capture" — never an Egg/starter/other
 // acquisition, see PlayerPokemonAcquisitionSource) of the given rarity,
-// ANY player, restricted to today's Asia/Jerusalem calendar date. Ordered
-// by createdAt desc + findFirst: since rows are strictly time-ordered, the
-// single most recent qualifying row IS "today's latest" whenever one
-// exists — if even that most recent row predates today, nothing today
-// qualifies (never falls back to yesterday's capture).
-async function getLatestQualifyingCaptureToday(rarity: PokemonRarity, now: Date): Promise<SignificantCaptureView | null> {
+// across ALL time, from ANY player. Never reset or hidden at a day
+// boundary — a slot keeps showing its most recent qualifying capture until
+// a NEWER capture of the SAME rarity replaces it. Ordered by createdAt desc
+// + findFirst: since rows are strictly time-ordered, the single most recent
+// qualifying row IS the latest whenever one exists.
+async function getLatestQualifyingCapture(rarity: PokemonRarity): Promise<SignificantCaptureView | null> {
   const speciesIds = getSpeciesIdsForRarity(rarity);
   if (speciesIds.length === 0) return null;
 
@@ -75,33 +79,32 @@ async function getLatestQualifyingCaptureToday(rarity: PokemonRarity, now: Date)
     orderBy: { createdAt: "desc" },
   });
   if (!row) return null;
-  if (getJerusalemDateKey(row.createdAt) !== getJerusalemDateKey(now)) return null;
 
   const species = getSpeciesById(row.speciesId);
   if (!species) return null;
 
-  const profiles = await getPlayerProfilesByIds([row.playerId]);
-  const playerDisplayName = profiles.get(row.playerId) ?? "שחקן";
+  const identities = await getPlayerIdentitiesByIds([row.playerId]);
+  const identity = identities.get(row.playerId);
 
   return {
     speciesName: species.name,
-    playerDisplayName,
+    playerDisplayName: identity?.displayName ?? "שחקן",
+    playerUsername: identity?.username ?? null,
     capturedAtLabel: formatCaptureTimestamp(row.createdAt),
     spriteUrl: getFrontSpritePath(species),
   };
 }
 
 // The Home page's own read (features/home/services/home-data.service.ts) —
-// today's latest Very Rare and Legendary captures, each independently null
-// when nobody has caught one yet today. `now` defaults to the real current
-// instant (same "optional now, real Date by default" precedent as
-// getJerusalemDateKey/getCurrentLeagueTournamentOccurrenceWindow) — tests
-// pass a fixed instant to deterministically exercise the Asia/Jerusalem day
-// boundary.
-export async function getSignificantCapturesToday(now: Date = new Date()): Promise<SignificantCapturesToday> {
+// the latest Very Rare and Legendary captures across all time, each
+// independently null only when nobody has ever caught one of that rarity.
+// Not daily-reset: Very Rare and Legendary each keep displaying their last
+// qualifying capture — no matter how old — until a newer capture of that
+// SAME rarity comes in; the two slots update independently of each other.
+export async function getSignificantCaptures(): Promise<SignificantCaptures> {
   const [veryRare, legendary] = await Promise.all([
-    getLatestQualifyingCaptureToday("very-rare", now),
-    getLatestQualifyingCaptureToday("legendary", now),
+    getLatestQualifyingCapture("very-rare"),
+    getLatestQualifyingCapture("legendary"),
   ]);
   return { veryRare, legendary };
 }

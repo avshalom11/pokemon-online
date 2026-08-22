@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useActiveBattle } from "@/features/battle-session/context/active-battle-context";
 import { buildSidebarCategories, type SidebarMenuItem } from "@/features/navigation/data/sidebar-menu";
+import { PlayerSearchModal } from "@/features/player-search/components/PlayerSearchModal";
 
 const OPEN_STORAGE_KEY = "game-sidebar-open";
 
@@ -45,6 +46,11 @@ export function GameSidebar({ username }: GameSidebarProps) {
 
   const [isOpen, setIsOpen] = useState(false);
   const [hasHydrated, setHasHydrated] = useState(false);
+  // PLAYER SEARCH — the sidebar's own action-item state (see
+  // sidebar-menu.ts's hasAction doc comment). Not persisted — always
+  // starts closed on a fresh mount, same as every other modal in this
+  // codebase.
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(
     () => new Set(categories.map((category) => category.id))
   );
@@ -116,7 +122,15 @@ export function GameSidebar({ username }: GameSidebarProps) {
                   <ul className="flex flex-col gap-1 px-2 pb-2">
                     {category.items.map((item) => (
                       <li key={item.id}>
-                        <SidebarMenuItemLink item={item} isBattleLocked={isActiveBattle} onNavigate={() => setIsOpen(false)} />
+                        <SidebarMenuItemLink
+                          item={item}
+                          isBattleLocked={isActiveBattle}
+                          onNavigate={() => setIsOpen(false)}
+                          onAction={(id) => {
+                            if (id === "player-search") setIsSearchOpen(true);
+                            setIsOpen(false);
+                          }}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -126,6 +140,8 @@ export function GameSidebar({ username }: GameSidebarProps) {
           })}
         </nav>
       </aside>
+
+      {isSearchOpen ? <PlayerSearchModal onClose={() => setIsSearchOpen(false)} /> : null}
     </div>
   );
 }
@@ -134,14 +150,42 @@ interface SidebarMenuItemLinkProps {
   item: SidebarMenuItem;
   isBattleLocked: boolean;
   onNavigate: () => void;
+  // PLAYER SEARCH — called (with the item's own id) instead of navigating,
+  // for the one kind of item that opens a client-side action/modal rather
+  // than a route (item.hasAction — see sidebar-menu.ts's own doc comment).
+  onAction: (itemId: string) => void;
 }
 
-// One row. Three states: a real, clickable Link; battle-locked (a real
-// route, but navigation is disallowed right now); or no route yet (Profile
-// with no known username) — the latter two render identically inert but
-// carry different tooltips so the reason is never ambiguous.
-function SidebarMenuItemLink({ item, isBattleLocked, onNavigate }: SidebarMenuItemLinkProps) {
+// One row. Four states: a real, clickable Link; an action button (opens a
+// modal in place, e.g. Player Search); battle-locked (a real route/action,
+// but disallowed right now — the EXACT SAME isBattleLocked check every
+// state shares, never a second lock system); or no route yet (Profile with
+// no known username) — the last two render identically inert but carry
+// different tooltips so the reason is never ambiguous.
+function SidebarMenuItemLink({ item, isBattleLocked, onNavigate, onAction }: SidebarMenuItemLinkProps) {
   const baseClassName = "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors";
+
+  if (item.hasAction) {
+    if (isBattleLocked) {
+      return (
+        <div aria-disabled="true" title={BATTLE_LOCKED_TITLE} className={`${baseClassName} cursor-not-allowed text-slate-600`}>
+          <span aria-hidden="true">{item.icon}</span>
+          {item.label}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => onAction(item.id)}
+        className={`${baseClassName} w-full text-right text-slate-200 hover:bg-white/10 hover:text-white`}
+      >
+        <span aria-hidden="true">{item.icon}</span>
+        {item.label}
+      </button>
+    );
+  }
 
   if (!item.href) {
     return (

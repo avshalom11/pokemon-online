@@ -29,6 +29,22 @@
 // CHEST_OPENED: created by features/chests/services/chest-open.service.ts
 // on every successful chest opening — one notification per opening
 // (summarizing the chest type), never one per individual reward granted.
+//
+// FRIEND_REQUEST_RECEIVED: created by features/friends/services/
+// friendship.service.ts's sendFriendRequest, for the ADDRESSEE only,
+// exactly once per new pending request (never for the auto-accept path —
+// see that function's own doc comment for why a mutual double-send
+// resolves as an acceptance instead of a second request).
+//
+// PRIVATE_MESSAGE_RECEIVED: created by features/friends/services/
+// private-chat.service.ts's sendPrivateMessage, for the RECIPIENT only.
+// Carries `{ conversationId, senderPlayerId }` in `metadata` — the one
+// thing sendPrivateMessage uses to avoid re-notifying for a conversation
+// that already has an unread notification pending (see that function's
+// own doc comment for the exact, deliberately simple dedup rule, and its
+// documented limitation: this is NOT live "is the recipient currently
+// looking at this chat" presence detection, which this project's polling-
+// only architecture has no reliable way to determine).
 export type NotificationType =
   | "PLAYER_LEVEL_UP"
   | "CURRENCY_MONEY_REWARD"
@@ -36,7 +52,9 @@ export type NotificationType =
   | "SHOP_PURCHASE"
   | "SHOP_SELL"
   | "POKEMON_EVOLVED"
-  | "CHEST_OPENED";
+  | "CHEST_OPENED"
+  | "FRIEND_REQUEST_RECEIVED"
+  | "PRIVATE_MESSAGE_RECEIVED";
 
 export interface NotificationSummary {
   id: string;
@@ -44,6 +62,17 @@ export interface NotificationSummary {
   message: string;
   isRead: boolean;
   createdAt: string;
+  // FRIENDS QUICK ACTIONS — the same structured data createNotification's
+  // own `metadata` param already persists (notification-service.ts),
+  // passed straight through to the client. Only two shapes exist today:
+  // FRIEND_REQUEST_RECEIVED carries `{ requestId, requesterPlayerId }`
+  // (NotificationBell.tsx's own inline אשר/לא מאשר buttons — reuses
+  // respondToFriendRequestAction, never a second accept/decline
+  // implementation); PRIVATE_MESSAGE_RECEIVED carries `{ conversationId,
+  // senderPlayerId, senderDisplayName }` (PrivateMessagePopupWatcher.tsx's
+  // own new-message toast). null for every other notification type, which
+  // never needs to be actionable from the bell itself.
+  metadata: Record<string, unknown> | null;
 }
 
 export interface NotificationBellData {

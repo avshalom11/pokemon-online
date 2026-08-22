@@ -8,7 +8,12 @@ export type PartyMutationResult =
   | { status: "ok" }
   | { status: "not-owned" }
   | { status: "not-in-party" }
-  | { status: "would-leave-no-usable" };
+  | { status: "would-leave-no-usable" }
+  // POKÉMON DAYCARE — PHASE 1. A Pokémon currently deposited in the
+  // Daycare (features/daycare) can never re-enter the active party — see
+  // assignToPartySlot's own doc comment for why this check lives here
+  // rather than only at deposit time.
+  | { status: "in-daycare" };
 
 // Every mutation here re-validates ownership server-side against `playerId`
 // (the caller's own profile id, resolved from the session — never a
@@ -20,6 +25,21 @@ export type PartyMutationResult =
 // occupies that slot — "add/replace" from the party-editing UI. Moving a
 // Pokémon that already has a slot vacates its old slot implicitly, since a
 // single row only ever holds one partySlot value.
+//
+// POKÉMON DAYCARE — PHASE 1 — the one place this rule needs enforcing
+// beyond deposit time itself: depositToDaycare (features/daycare/services/
+// daycare.service.ts) already refuses to deposit a Pokémon that's
+// currently in the party, but without a check HERE too, a player could
+// still separately re-assign an already-deposited Pokémon back into an
+// active party slot afterward — this is the one other entry point that
+// can put a Pokémon INTO the party (swapPartySlots only ever rearranges
+// existing occupants), so this is the one other place that must refuse a
+// Daycare'd Pokémon to keep "cannot be used in party/battle while
+// deposited" true everywhere, not just at the moment of deposit. A direct
+// row-existence check (not a features/daycare import) — same "check the
+// other feature's own table directly rather than depend on its service"
+// precedent release-pokemon.service.ts already establishes for its own
+// battle-session check.
 export async function assignToPartySlot(
   playerId: string,
   playerPokemonId: string,
@@ -29,6 +49,11 @@ export async function assignToPartySlot(
 
   if (!pokemon || pokemon.playerId !== playerId) {
     return { status: "not-owned" };
+  }
+
+  const daycareStay = await prisma.playerDaycareStay.findUnique({ where: { playerPokemonId } });
+  if (daycareStay) {
+    return { status: "in-daycare" };
   }
 
   await prisma.$transaction([

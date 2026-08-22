@@ -55,3 +55,31 @@ export async function getPlayerProfilesByIds(playerIds: readonly string[]): Prom
   const rows = await prisma.playerProfile.findMany({ where: { id: { in: uniqueIds } }, select: { id: true, displayName: true } });
   return new Map(rows.map((row) => [row.id, row.displayName]));
 }
+
+export interface PlayerIdentity {
+  displayName: string;
+  // null only for the (never expected in practice) case where the
+  // relation somehow doesn't resolve to a username — every real
+  // registered player has one. Callers must treat this as "no safe link
+  // target", never fall back to any other identifier.
+  username: string | null;
+}
+
+// CLICKABLE USERNAMES — bulk PlayerProfile.id -> {displayName, username}
+// resolution, for every UI surface that shows another player's name and
+// needs to link it to their public profile (/profile/[username] — the
+// route is keyed by username, not PlayerProfile.id). A superset of
+// getPlayerProfilesByIds above (same bulk-by-id shape, same callers'
+// existing pattern) — kept as a SEPARATE function rather than changing
+// that one's return shape, since dozens of existing call sites (Global
+// Chat, Leagues, Gyms, ...) only ever need displayName and would have to
+// be touched for no reason if its signature changed.
+export async function getPlayerIdentitiesByIds(playerIds: readonly string[]): Promise<Map<string, PlayerIdentity>> {
+  if (playerIds.length === 0) return new Map();
+  const uniqueIds = [...new Set(playerIds)];
+  const rows = await prisma.playerProfile.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true, displayName: true, user: { select: { username: true } } },
+  });
+  return new Map(rows.map((row) => [row.id, { displayName: row.displayName, username: row.user?.username ?? null }]));
+}

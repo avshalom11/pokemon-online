@@ -10,6 +10,12 @@
 // ever changes.
 export const APP_HEADER_HEIGHT_PX = 64;
 
+// GLOBAL CHAT — the collapsed chat bar's height (features/chat/components/
+// GlobalChatBar.tsx). The actual value lives in the --app-chat-bar-height
+// CSS custom property in app/globals.css; this constant documents it and
+// must be kept in sync if that value ever changes.
+export const APP_CHAT_BAR_HEIGHT_PX = 44;
+
 // The centered content container's target width and cap, matching what
 // GameScreen renders (w-[85%] max-w-[1400px] in Tailwind terms). Kept here
 // purely as documentation for anything that needs the numbers outside CSS.

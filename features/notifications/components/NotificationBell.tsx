@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/features/notifications/actions/notification.actions";
 import type { NotificationBellData, NotificationSummary } from "@/features/notifications/types";
+import { useFriendsData } from "@/features/friends/context/friends-data-context";
 
 interface NotificationBellProps {
   initial: NotificationBellData;
@@ -23,6 +24,11 @@ export function NotificationBell({ initial }: NotificationBellProps) {
   const [notifications, setNotifications] = useState(initial.recent);
   const [unreadCount, setUnreadCount] = useState(initial.unreadCount);
   const [, startTransition] = useTransition();
+  // FRIENDS QUICK ACTIONS — the SAME shared respondToRequest every other
+  // accept/decline surface uses (friends-data-context.tsx) — never a
+  // second friendship implementation here.
+  const { respondToRequest } = useFriendsData();
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   // Re-sync local state when fresh server data arrives (e.g. a
   // battle-triggered level-up, flowed in via Next's existing Server Action
@@ -48,7 +54,10 @@ export function NotificationBell({ initial }: NotificationBellProps) {
   // repeatedly toggling the panel — open, close, open again — only ever
   // marks-as-read on each fresh *open*, never on close, and each of those
   // opens is its own single click, never a repeated request while the panel
-  // merely stays open.
+  // merely stays open. FRIEND_REQUEST_RECEIVED notifications staying
+  // "read" the instant the panel opens is fine — their accept/decline
+  // buttons below are gated on the request still being pending, not on
+  // isRead, so marking read never hides the action.
   function handleToggle() {
     const next = !isOpen;
     setIsOpen(next);
@@ -90,6 +99,36 @@ export function NotificationBell({ initial }: NotificationBellProps) {
     });
   }
 
+  // FRIENDS QUICK ACTIONS — accept/decline right inside the notification,
+  // never leaving the panel. `requestId` comes from the notification's own
+  // metadata (friendship.service.ts's sendFriendRequest is what stamps it
+  // there) — only the recipient ever SEES this notification in the first
+  // place (getNotificationBellData is always scoped to the caller's own
+  // playerId), and respondToRequest's own respondToFriendRequestAction
+  // re-verifies server-side that the caller is really this request's
+  // addressee, so there's no separate authorization check needed here.
+  // Removes the notification from the list on success (or on a
+  // "not-found" — already resolved elsewhere, e.g. accepted from the
+  // Profile page — since there's nothing actionable left to show either
+  // way) and persists the read-state so a later reload doesn't resurrect a
+  // resolved request with dead buttons.
+  async function handleRespondToFriendRequest(notification: NotificationSummary, action: "accept" | "decline") {
+    const requestId = notification.metadata?.requestId;
+    if (typeof requestId !== "string") return;
+
+    setRespondingId(notification.id);
+    await respondToRequest(requestId, action);
+    setRespondingId(null);
+
+    setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+    setUnreadCount((prev) => (notification.isRead ? prev : Math.max(0, prev - 1)));
+    if (!notification.isRead) {
+      startTransition(() => {
+        markNotificationReadAction(notification.id);
+      });
+    }
+  }
+
   return (
     <div className="relative">
       <button
@@ -123,26 +162,62 @@ export function NotificationBell({ initial }: NotificationBellProps) {
                 <p className="px-3 py-6 text-center text-sm text-slate-500">אין התראות חדשות</p>
               ) : (
                 <ul>
-                  {notifications.map((notification) => (
-                    <li key={notification.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleMarkRead(notification)}
-                        className={`w-full border-b border-white/5 px-3 py-2.5 text-start text-sm transition-colors last:border-b-0 hover:bg-white/5 ${
+                  {notifications.map((notification) =>
+                    notification.type === "FRIEND_REQUEST_RECEIVED" && typeof notification.metadata?.requestId === "string" ? (
+                      <li
+                        key={notification.id}
+                        className={`border-b border-white/5 px-3 py-2.5 text-sm last:border-b-0 ${
                           notification.isRead ? "text-slate-400" : "text-slate-100"
                         }`}
                       >
-                        <span className="flex items-start gap-2">
+                        <div className="flex items-start gap-2">
                           {!notification.isRead ? (
                             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
                           ) : (
                             <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />
                           )}
-                          {notification.message}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                          <span className="flex-1">{notification.message}</span>
+                        </div>
+                        <div className="mt-2 flex gap-2 ps-3.5">
+                          <button
+                            type="button"
+                            disabled={respondingId === notification.id}
+                            onClick={() => handleRespondToFriendRequest(notification, "accept")}
+                            className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            אשר חברות
+                          </button>
+                          <button
+                            type="button"
+                            disabled={respondingId === notification.id}
+                            onClick={() => handleRespondToFriendRequest(notification, "decline")}
+                            className="rounded-lg border border-white/10 bg-slate-800/70 px-3 py-1 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            לא מאשר
+                          </button>
+                        </div>
+                      </li>
+                    ) : (
+                      <li key={notification.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkRead(notification)}
+                          className={`w-full border-b border-white/5 px-3 py-2.5 text-start text-sm transition-colors last:border-b-0 hover:bg-white/5 ${
+                            notification.isRead ? "text-slate-400" : "text-slate-100"
+                          }`}
+                        >
+                          <span className="flex items-start gap-2">
+                            {!notification.isRead ? (
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+                            ) : (
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />
+                            )}
+                            {notification.message}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  )}
                 </ul>
               )}
             </div>

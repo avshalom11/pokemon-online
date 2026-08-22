@@ -11,6 +11,7 @@ import { ProfileHeader } from "./ProfileHeader";
 import { ProfilePartySection } from "./ProfilePartySection";
 import { ProfileStatsSection } from "./ProfileStatsSection";
 import { BackButton } from "@/components/layout/BackButton";
+import { ProfileFriendsSection } from "@/features/friends/components/ProfileFriendsSection";
 import { getProfileTheme } from "../themes/profile-themes";
 import type { ProfileEditViewModel, PublicProfileView } from "../types/profile.types";
 
@@ -23,9 +24,12 @@ interface ProfileContentProps {
 
 // Page composition root for /profile/[username] — the SAME component for
 // every visitor, owner included; only `view.isOwner` (via editData being
-// non-null) changes whether the Edit Profile button/modal ever mount at
-// all. The page's own theme background (features/profile/themes) is the
-// only per-profile visual customization applied here.
+// non-null) changes whether the Edit Profile button/modal — and now the
+// חברים section, which reads from the shared FriendsDataProvider
+// (features/friends/context/friends-data-context.tsx) rather than a prop,
+// since it only ever renders for the owner viewing their OWN data anyway —
+// ever mount at all. The page's own theme background (features/profile/
+// themes) is the only per-profile visual customization applied here.
 export function ProfileContent({ view, editData }: ProfileContentProps) {
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -68,6 +72,7 @@ export function ProfileContent({ view, editData }: ProfileContentProps) {
         <ProfilePartySection party={view.party} />
         <ProfileStatsSection stats={view.stats} />
         <ProfileAchievementsSection achievements={view.achievements} />
+        {view.isOwner ? <ProfileFriendsSection /> : null}
         <ProfileContentBlocksSection blocks={view.contentBlocks} />
       </div>
 

@@ -5,10 +5,21 @@ import { GameHeader } from "@/components/layout/GameHeader";
 import { GameSidebar } from "@/components/layout/GameSidebar";
 import { ActiveBattleProvider } from "@/features/battle-session/context/active-battle-context";
 import { hasActiveBattleSession } from "@/features/battle-session/services/battle-session.service";
+import { GlobalChatBar } from "@/features/chat/components/GlobalChatBar";
+import { getRecentGlobalChatMessages } from "@/features/chat/services/global-chat.service";
+import { FloatingPrivateChatWindow } from "@/features/friends/components/FloatingPrivateChatWindow";
+import { FriendsBar } from "@/features/friends/components/FriendsBar";
+import { FriendshipSyncWatcher } from "@/features/friends/components/FriendshipSyncWatcher";
+import { PrivateMessagePopupWatcher } from "@/features/friends/components/PrivateMessagePopupWatcher";
+import { SocialDock } from "@/features/friends/components/SocialDock";
+import { FriendsDataProvider } from "@/features/friends/context/friends-data-context";
+import { PrivateChatWindowProvider } from "@/features/friends/context/private-chat-window-context";
+import { getFriendsAndRequests } from "@/features/friends/services/friendship.service";
 import { hasActiveNpcBattleSession } from "@/features/gyms/services/gym-battle-session.service";
 import { hasActiveLeagueBattleSession } from "@/features/leagues/services/league-battle-session.service";
 import { getNotificationBellData } from "@/features/notifications/services/notification-service";
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
+import { PresenceHeartbeat } from "@/features/presence/components/PresenceHeartbeat";
 import { DailyBattleCountProvider } from "@/features/player/context/daily-battle-count-context";
 import { PlayerProgressionProvider } from "@/features/player/context/player-progression-context";
 import { SoundSettingsProvider } from "@/features/player/context/sound-settings-context";
@@ -48,7 +59,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // one DB round trip — needed here only to get the PlayerProfile id
   // getNotificationBellData is scoped by.
   const profile = await getPlayerProfile(session.user.id);
-  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle] = await Promise.all([
+  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle, globalChatMessages, friendsData] = await Promise.all([
     getPlayerHeaderData(session.user.id, session.user.username ?? null),
     getNotificationBellData(profile.id),
     hasActiveBattleSession(profile.id),
@@ -63,6 +74,20 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     // League-PvP-match; LeagueMatchContent's own mount/unmount keeps this
     // correct for client-side navigation otherwise.
     hasActiveLeagueBattleSession(profile.id),
+    // GLOBAL CHAT — seeds GlobalChatBar's first paint with the real latest
+    // messages, exactly like every other panel here; the bar's own polling
+    // (features/chat/actions/global-chat.actions.ts) keeps it live after
+    // that without ever needing this layout to re-render.
+    getRecentGlobalChatMessages(),
+    // FRIENDS QUICK ACTIONS — seeds FriendsDataProvider's first paint with
+    // the real current friends/incoming-requests, the one shared source
+    // every friends-UI surface (the notification bell's own inline
+    // accept/decline, the bottom-right Friends bar, Profile's own חברים
+    // section, another player's public profile) reads from and mutates
+    // through from here on — see friends-data-context.tsx's own doc
+    // comment for why this replaces what used to be a separate fetch on
+    // the profile page itself.
+    getFriendsAndRequests(profile.id),
   ]);
   const activeBattle = hasFieldBattle || hasNpcBattle || hasLeagueBattle;
 
@@ -71,9 +96,36 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
       <PlayerProgressionProvider initial={player.progress}>
         <DailyBattleCountProvider initial={player.dailyBattleCount}>
           <ActiveBattleProvider initial={activeBattle}>
-            <GameHeader player={player} notifications={notifications} />
-            <GameSidebar username={player.username} />
-            {children}
+            {/* FRIENDS + PRIVATE CHAT UX — mounted once here (never inside
+                {children}), so the floating chat window's own state
+                (which conversation is active, minimized or expanded)
+                survives every client-side navigation for the lifetime of
+                this layout — same pattern ActiveBattleProvider itself
+                already establishes. FriendsDataProvider wraps GameHeader
+                too (not just {children}) since the notification bell's own
+                inline accept/decline needs it as well. */}
+            <FriendsDataProvider initial={friendsData}>
+              <PrivateChatWindowProvider>
+                <GameHeader player={player} notifications={notifications} />
+                <GameSidebar username={player.username} />
+                {children}
+                <GlobalChatBar
+                  initialMessages={globalChatMessages}
+                  currentPlayerDisplayName={player.displayName}
+                  currentPlayerUsername={session.user.username ?? null}
+                />
+                <SocialDock>
+                  <FloatingPrivateChatWindow
+                    currentPlayerDisplayName={player.displayName}
+                    currentPlayerUsername={session.user.username ?? null}
+                  />
+                  <FriendsBar />
+                </SocialDock>
+                <FriendshipSyncWatcher />
+                <PrivateMessagePopupWatcher />
+                <PresenceHeartbeat />
+              </PrivateChatWindowProvider>
+            </FriendsDataProvider>
           </ActiveBattleProvider>
         </DailyBattleCountProvider>
       </PlayerProgressionProvider>

@@ -4,9 +4,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 
+import { markOffline } from "@/features/presence/services/presence.service";
 import type { AuthActionState } from "@/lib/auth/auth-action-state";
 import { auth } from "@/lib/auth/auth";
 import { getLoginErrorMessage, getRegistrationErrorMessage } from "@/lib/auth/auth-errors";
+import { getCurrentSession } from "@/lib/auth/auth-session";
+import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { loginSchema, registerSchema } from "@/lib/auth/validation";
 
 export async function registerAction(
@@ -91,7 +94,27 @@ export async function loginAction(
   redirect("/home");
 }
 
+// ONLINE PRESENCE — IMMEDIATE OFFLINE ON LOGOUT. Resolved BEFORE
+// auth.api.signOut invalidates the session below — the player marked
+// offline is always this request's own real session, never a
+// client-supplied id. Wrapped in one try/catch around the whole
+// resolve-then-write so a presence failure (a missing/unresolvable
+// session, a DB error) can never trap the user logged in: the sign-out
+// and redirect below always run regardless. Closing the browser or
+// losing connection without hitting this button entirely bypasses this —
+// that path still relies purely on the existing heartbeat timeout
+// (PRESENCE_ONLINE_WINDOW_MS), completely unchanged by this addition.
 export async function logoutAction() {
+  try {
+    const session = await getCurrentSession();
+    if (session) {
+      const profile = await getPlayerProfile(session.user.id);
+      await markOffline(profile.id);
+    }
+  } catch {
+    // Deliberately swallowed — see doc comment above.
+  }
+
   await auth.api.signOut({ headers: await headers() });
   redirect("/");
 }

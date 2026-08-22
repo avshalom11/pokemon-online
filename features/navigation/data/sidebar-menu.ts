@@ -6,6 +6,14 @@ export interface SidebarMenuItem {
   // this static table can't hold on its own — see buildSidebarCategories
   // below. Every other item is a plain, always-resolvable existing route.
   href?: string;
+  // PLAYER SEARCH — true for the one item (today: "player-search") that
+  // isn't a route at all but a client-side action (opens a modal/panel in
+  // place) — GameSidebar.tsx renders it as a button instead of a Link, but
+  // still gates it behind the exact same battle-lock check every real link
+  // already gets (never a second lock system). Distinct from a plain
+  // missing `href` (Profile's own "not resolved yet" state above), which
+  // still renders the inert "coming soon" treatment, never this button.
+  hasAction?: boolean;
 }
 
 export interface SidebarCategory {
@@ -68,6 +76,13 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       // gets from GameSidebar's own generic isActiveBattle check — no
       // Hatchery-specific logic added.
       { id: "hatchery", label: "מדגרה", icon: "🥚", href: "/hatchery" },
+      // POKÉMON DAYCARE — PHASE 1 — placed right after Hatchery, the
+      // natural grouping: both are "deposit something, wait, come back to
+      // collect" services. Inherits the exact same battle-lock behavior
+      // every other item here already gets from GameSidebar's own generic
+      // isActiveBattle check — no Daycare-specific navigation-lock logic
+      // added.
+      { id: "daycare", label: "מעון פוקימונים", icon: "🏡", href: "/daycare" },
     ],
   },
   {
@@ -79,6 +94,10 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       // player's own username, not static data).
       { id: "profile", label: "פרופיל", icon: "🧑" },
       { id: "team", label: "הפוקימונים שלי", icon: "🐾", href: "/my-pokemon" },
+      // PLAYER SEARCH — opens a compact search panel in place
+      // (features/player-search/components/PlayerSearchModal.tsx) rather
+      // than navigating anywhere; see hasAction's own doc comment above.
+      { id: "player-search", label: "חיפוש שחקנים", icon: "🔍", hasAction: true },
     ],
   },
 ];

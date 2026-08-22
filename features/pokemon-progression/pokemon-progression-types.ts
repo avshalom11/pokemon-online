@@ -126,9 +126,15 @@ export interface PokemonLevelUpResult {
   pendingEvolutionBranch: boolean;
 }
 
-// Where a Pokémon-XP grant originated — only "wildBattleVictory" exists
-// yet, but every grant path threads a reason through
-// (applyPokemonXpGrant/grantBattlePokemonXp) so trainer battles, raids,
-// quests, events, and items can each add their own reason later without
-// changing the grant function's signature again.
-export type PokemonXpSource = "wildBattleVictory";
+// Where a Pokémon-XP grant originated — every grant path threads a reason
+// through (applyPokemonXpGrant/grantBattlePokemonXp) so trainer battles,
+// raids, quests, events, and items can each add their own reason later
+// without changing the grant function's signature again.
+//
+// "daycare" — POKÉMON DAYCARE PHASE 1 (features/daycare/services/
+// daycare.service.ts's collectFromDaycare) — the ONLY non-battle source
+// today: earned Daycare levels are applied as a plain XP delta (the exact
+// total XP required to reach the earned target level, computed via
+// getTotalXpRequiredForPokemonLevel), reusing this same grant function
+// rather than a second, duplicated level-up code path.
+export type PokemonXpSource = "wildBattleVictory" | "daycare";

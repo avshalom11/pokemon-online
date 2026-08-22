@@ -15,13 +15,21 @@ const RECENT_NOTIFICATIONS_LIMIT = 10;
 // addPlayerExperience, its only caller today) — a notification is always a
 // side effect of some other atomic write (an XP grant, in the future
 // perhaps an item pickup), never a standalone mutation of its own.
+//
+// `metadata` is optional and unused by every caller before FRIENDS +
+// PRIVATE CHAT — features/friends/services/private-chat.service.ts's
+// sendPrivateMessage is the first to pass one (`{ conversationId,
+// senderPlayerId }`), so it can later recognize "there's already an unread
+// notification for this exact conversation" and skip creating a duplicate.
+// Every existing caller omits it, unchanged.
 export async function createNotification(
   tx: Prisma.TransactionClient,
   playerId: string,
   type: NotificationType,
-  message: string
+  message: string,
+  metadata?: Prisma.InputJsonValue
 ): Promise<void> {
-  await tx.notification.create({ data: { playerId, type, message } });
+  await tx.notification.create({ data: { playerId, type, message, metadata } });
 }
 
 // The one place PLAYER_LEVEL_UP notifications are created — called from
@@ -84,6 +92,7 @@ function toSummary(row: {
   message: string;
   isRead: boolean;
   createdAt: Date;
+  metadata?: unknown;
 }): NotificationSummary {
   return {
     id: row.id,
@@ -91,5 +100,6 @@ function toSummary(row: {
     message: row.message,
     isRead: row.isRead,
     createdAt: row.createdAt.toISOString(),
+    metadata: row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : null,
   };
 }

@@ -74,7 +74,12 @@ export function BattleWindow({ children, backgroundClassName, banner, musicActiv
 
   return (
     <div
-      className={`relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pb-4 pt-[calc(var(--app-header-height)+1rem)] sm:px-8 sm:pb-8 sm:pt-[calc(var(--app-header-height)+2rem)] ${backgroundClassName ?? "bg-slate-950"}`}
+      // GLOBAL CHAT — pb- adds var(--app-chat-bar-height) on top of the
+      // existing bottom padding, so the collapsed chat bar (fixed at the
+      // very bottom of the viewport, see GameScreen.tsx's own doc comment
+      // for why only the collapsed height is reserved) never sits on top of
+      // this centered panel's own bottom edge/controls.
+      className={`relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pb-[calc(1rem+var(--app-chat-bar-height))] pt-[calc(var(--app-header-height)+1rem)] sm:px-8 sm:pb-[calc(2rem+var(--app-chat-bar-height))] sm:pt-[calc(var(--app-header-height)+2rem)] ${backgroundClassName ?? "bg-slate-950"}`}
     >
       <div
         className="pointer-events-none absolute inset-0"

@@ -1,9 +1,11 @@
 import "server-only";
 
+import { getFriendshipRelation } from "@/features/friends/services/friendship.service";
 import { getPokedexCounts } from "@/features/pokedex/services/pokedex-view.service";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getPlayerProgress } from "@/features/player-progression/progression-calculations";
 import { prisma } from "@/lib/db/prisma";
+import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { REGION_LABELS } from "@/shared/types/region-labels";
 import { toRegionId } from "@/shared/types/region";
 import { parseProfileContentBlocks } from "./parse-profile-content";
@@ -55,6 +57,16 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
   const aboutMeValue = profile.aboutMe ?? "";
   const isOwner = viewerUserId !== null && viewerUserId === user.id;
 
+  // FRIENDS PHASE 1 — resolved once here, never re-derived client-side.
+  // Owner viewing their own profile is always "self" without an extra
+  // query; any other authenticated viewer needs their own PlayerProfile id
+  // resolved (getPlayerProfile is cache()-wrapped, so this costs nothing
+  // extra when the caller — app/(game)/profile/[username]/page.tsx — has
+  // already resolved the same viewer's profile elsewhere in the request).
+  const friendshipRelation = isOwner
+    ? { status: "self" as const, requestId: null }
+    : await getFriendshipRelation(viewerUserId ? (await getPlayerProfile(viewerUserId)).id : null, profile.id);
+
   let party: PublicPartyMemberView[] | null = null;
   if (showPartyOnProfile) {
     const realParty = await getPlayerParty(profile.id);
@@ -92,6 +104,7 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
 
   return {
     username: user.username,
+    playerId: profile.id,
     displayName: profile.displayName,
     trainerLevel: progress.level,
     regionId,
@@ -100,6 +113,8 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
     themeId: theme.id,
     aboutMe,
     isOwner,
+    friendshipStatus: friendshipRelation.status,
+    incomingFriendRequestId: friendshipRelation.requestId,
     party,
     stats,
     achievements,

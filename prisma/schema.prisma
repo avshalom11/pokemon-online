@@ -79,7 +79,7 @@ model PlayerProfile {
   // shared/types/region.ts); the column exists so the game never has to
   // hardcode the Hebrew region label in UI code, and so more regions can
   // be added later without a schema change.
-  regionId             String  @default("kanto")
+  regionId                      String  @default("kanto")
   // MAP — SELECTABLE WILD LEVEL RANGE. An index into the fixed, ordered
   // WILD_LEVEL_BRACKETS array (engine/player-level-scaling/
   // wild-level-brackets.config.ts) — the SAME single source of truth field
@@ -101,28 +101,28 @@ model PlayerProfile {
   // validation layer (150 chars), trimmed before storage. Empty string
   // (never null) means "no bio set" — see showAboutMeOnProfile below for
   // the separate visibility toggle.
-  aboutMe              String  @default("")
+  aboutMe                       String  @default("")
   // One of the small curated set of Pokémon front-sprite avatars
   // (features/profile/themes/profile-avatars.ts) — null means "no avatar
   // chosen", which the UI renders as the existing initial-letter fallback.
   // Deliberately a dex number (validated against a fixed allow-list), never
   // a raw image URL, so an arbitrary/external image can never be injected.
-  avatarDexNumber      Int?
+  avatarDexNumber               Int?
   // One of the fixed theme ids (features/profile/themes/profile-themes.ts)
   // — a lookup key into a server-defined style map, never free-form CSS/
   // class names from the client.
-  profileThemeId       String  @default("default")
+  profileThemeId                String  @default("default")
   // Privacy toggles for the public profile's optional sections — see
   // public-profile-view.service.ts for exactly what each one gates.
-  showPartyOnProfile   Boolean @default(true)
-  showStatsOnProfile   Boolean @default(true)
-  showAboutMeOnProfile Boolean @default(true)
+  showPartyOnProfile            Boolean @default(true)
+  showStatsOnProfile            Boolean @default(true)
+  showAboutMeOnProfile          Boolean @default(true)
   // PROFILE ACHIEVEMENTS (later task) — gates BOTH earned Gym Badges AND
   // Regional Medals as a single setting (never 36 individual switches, and
   // no separate Badge/Medal toggle yet — see this feature's own spec).
   // Same "default true, coalesced with `?? true` on every read for a stale
   // Prisma Client" convention as the three toggles above.
-  showGymAchievementsOnProfile Boolean @default(true)
+  showGymAchievementsOnProfile  Boolean @default(true)
   // BATTLE RESULT SOUNDS + GLOBAL SOUND TOGGLE (later task) — one global
   // on/off switch for every game sound (battle-theme music, attack SFX,
   // victory/defeat SFX) — a personal preference, not a privacy toggle
@@ -131,7 +131,18 @@ model PlayerProfile {
   // a stale Prisma Client" convention. See features/battle/utils/
   // game-audio-settings.ts for the one shared helper every sound-playing
   // primitive reads this through.
-  soundEnabled Boolean @default(true)
+  soundEnabled                  Boolean @default(true)
+
+  // ONLINE PRESENCE — the last time this player's client sent a heartbeat
+  // while the authenticated game layout was mounted (features/presence).
+  // null means "never seen" (treated as offline, same as a heartbeat far in
+  // the past) — same "nullable, no @default column" convention
+  // avatarDexNumber above already establishes. Never exposed to any client
+  // as a raw timestamp: every caller goes through presence.service.ts's
+  // isOnline/getOnlinePlayerIdSet/getOnlinePlayerCount, which only ever
+  // return a derived boolean or an aggregate count — this feature's own
+  // explicit privacy rule.
+  lastSeenAt                     DateTime?
 
   // The owner's structured public showcase content — an ARRAY of
   // ProfileContentBlock (features/profile/types/profile-content.types.ts),
@@ -147,27 +158,158 @@ model PlayerProfile {
   // FieldBattleSession.participants) already follow.
   profileContentBlocks Json @default("[]")
 
-  pokemon                  PlayerPokemon[]
-  fieldBattleSession       FieldBattleSession?
-  notifications            Notification[]
-  dailyFieldBattleCounts   DailyFieldBattleCount[]
-  inventoryItems           PlayerInventoryItem[]
-  seenSpecies              PlayerSeenSpecies[]
-  ownedEggs                PlayerOwnedEgg[]
-  incubators               PlayerIncubator[]
+  pokemon                      PlayerPokemon[]
+  fieldBattleSession           FieldBattleSession?
+  notifications                Notification[]
+  dailyFieldBattleCounts       DailyFieldBattleCount[]
+  inventoryItems               PlayerInventoryItem[]
+  seenSpecies                  PlayerSeenSpecies[]
+  ownedEggs                    PlayerOwnedEgg[]
+  incubators                   PlayerIncubator[]
   // GYMS & LEAGUES PHASE 1 — see each model's own doc comment below.
-  gymBattleProgress        PlayerGymBattleProgress[]
-  gymBadges                PlayerGymBadge[]
-  regionalChampionProgress PlayerRegionalChampionProgress[]
-  regionalMedals           PlayerRegionalMedal[]
+  gymBattleProgress            PlayerGymBattleProgress[]
+  gymBadges                    PlayerGymBadge[]
+  regionalChampionProgress     PlayerRegionalChampionProgress[]
+  regionalMedals               PlayerRegionalMedal[]
   // GYMS & LEAGUES PHASE 3
-  npcBattleSession         NpcBattleSession?
+  npcBattleSession             NpcBattleSession?
   // GYMS & LEAGUES PHASE 5
   leagueTournamentParticipants LeagueTournamentParticipant[]
-  createdAt                DateTime                          @default(now())
-  updatedAt                DateTime                          @updatedAt
+  // GLOBAL CHAT — every message this player has ever sent to the one
+  // site-wide chat (features/chat). See GlobalChatMessage below.
+  globalChatMessages           GlobalChatMessage[]
+  // FRIENDS PHASE 1 — see Friendship's own doc comment below for why a
+  // single relationship row can be "requester" from one player's side and
+  // "addressee" from the other's, and PrivateConversation's for the
+  // matching playerA/playerB split.
+  friendshipsRequested         Friendship[]                     @relation("FriendshipRequester")
+  friendshipsReceived          Friendship[]                     @relation("FriendshipAddressee")
+  privateConversationsAsA      PrivateConversation[]            @relation("PrivateConversationPlayerA")
+  privateConversationsAsB      PrivateConversation[]            @relation("PrivateConversationPlayerB")
+  privateMessagesSent          PrivateMessage[]
+  // POKÉMON DAYCARE — PHASE 2 (5 SLOTS). Every Pokémon this player
+  // currently has deposited, up to DAYCARE_MAX_SLOTS at once — an array
+  // since Phase 1's old @unique-per-player (at most one row) was removed;
+  // see PlayerDaycareStay's own doc comment below for how the slot cap is
+  // now enforced instead (service-layer, race-safely).
+  daycareStays                 PlayerDaycareStay[]
+  createdAt                    DateTime                         @default(now())
+  updatedAt                    DateTime                         @updatedAt
 
+  // ONLINE PRESENCE — the one index getOnlinePlayerCount's aggregate `{
+  // lastSeenAt: { gte: cutoff } }` count query (presence.service.ts) needs
+  // to stay cheap regardless of total player count.
+  @@index([lastSeenAt])
   @@map("player_profile")
+}
+
+// FRIENDS PHASE 1. One row per relationship between two players, at
+// whichever stage it's currently in — "pending" (a sent-but-not-yet-
+// answered request) or "accepted" (a confirmed friendship). Deliberately
+// ONE table serving both roles rather than a separate FriendRequest +
+// Friendship pair: an accepted row simply IS the friendship, so there is
+// no second record that could ever drift out of sync with it (same
+// "row existence/state is the fact" idiom PlayerGymBadge/PlayerSeenSpecies
+// already establish elsewhere in this file). A DECLINED request is not
+// stored at all — respondToFriendRequest (friendship.service.ts) deletes
+// the row outright, which is what lets the same pair send a fresh request
+// again later without needing a partial/filtered unique index (Prisma's
+// schema DSL can't declare one — same limitation PlayerPendingMoveLearning's
+// own doc comment documents elsewhere in this file); only two real
+// long-lived states ("pending", "accepted") ever need to be mutually
+// exclusive per pair, so a plain full-table unique constraint is enough.
+//
+// requesterId/addresseeId record WHO SENT the request (needed for the
+// notification and for "you cannot accept your own outgoing request"), but
+// once status is "accepted" this directional distinction is purely
+// historical — the friendship itself is symmetric (see
+// friendship.service.ts's getFriendsAndRequests, which reads "the other
+// side" from whichever of requester/addressee isn't the caller).
+//
+// friendPairKey is the canonical, order-independent key
+// (buildFriendPairKey: the two player ids sorted, joined by "::") that
+// makes "at most one relationship between any two players, ever, no matter
+// who sent it" a real database-level guarantee via the unique index below
+// — never merely an application-level check a race could slip past. A
+// concurrent double-send (both players requesting each other at the same
+// instant) collides on this constraint; the loser's insert fails with a
+// real P2002, which sendFriendRequest catches and resolves by re-reading
+// the row the winner just created (create-then-catch-P2002 — same
+// established idiom as e.g. PlayerGymBattleProgress.create elsewhere in
+// this file).
+model Friendship {
+  id          String        @id @default(cuid())
+  requesterId String
+  requester   PlayerProfile @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId String
+  addressee   PlayerProfile @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  friendPairKey String
+
+  // "pending" | "accepted" — validated at the app layer, same no-Prisma-enum
+  // precedent as every other status-ish column in this schema.
+  status String @default("pending")
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  @@unique([friendPairKey])
+  @@index([addresseeId, status])
+  @@index([requesterId, status])
+  @@map("friendship")
+}
+
+// FRIENDS PHASE 1 — PRIVATE CHAT. One row per confirmed-friend pair that
+// has ever opened a conversation — exactly one, regardless of who opened
+// it first, via the exact same canonical-pair-key uniqueness idiom
+// Friendship.friendPairKey above establishes (playerA/playerB are always
+// assigned in canonical sorted-id order at creation, so the same two
+// players always resolve to the same row). Never created for a
+// non-friend pair — private-chat.service.ts's getOrCreateConversation
+// re-verifies an accepted Friendship exists for this exact pair before
+// ever creating or returning one, so a conversation's mere existence is
+// itself proof the two players were confirmed friends at least once.
+model PrivateConversation {
+  id        String        @id @default(cuid())
+  playerAId String
+  playerA   PlayerProfile @relation("PrivateConversationPlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
+  playerBId String
+  playerB   PlayerProfile @relation("PrivateConversationPlayerB", fields: [playerBId], references: [id], onDelete: Cascade)
+
+  conversationPairKey String
+
+  createdAt DateTime @default(now())
+
+  messages PrivateMessage[]
+
+  @@unique([conversationPairKey])
+  @@map("private_conversation")
+}
+
+// FRIENDS PHASE 1 — PRIVATE CHAT. One message in one PrivateConversation.
+// Capped at PRIVATE_CHAT_MAX_MESSAGES (features/friends/config/
+// friends.config.ts) PER CONVERSATION — sendPrivateMessage
+// (private-chat.service.ts) deletes the oldest row(s) beyond that cap,
+// scoped to `conversationId`, on every insert — same architecture as
+// Global Chat's own GLOBAL_CHAT_MAX_MESSAGES cleanup
+// (global-chat.service.ts's sendGlobalChatMessage), just scoped per
+// conversation instead of globally, so trimming one conversation can never
+// touch another's messages. No `senderName` column, same "resolve the
+// display name live through the relation" precedent GlobalChatMessage
+// already establishes — never duplicated onto every row.
+model PrivateMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   PrivateConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         PlayerProfile       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("private_message")
 }
 
 // Ownership/progression records only — never static species data (name,
@@ -272,6 +414,10 @@ model PlayerPokemon {
   // domain rules. Not itself a Known Move until a future phase (4E)
   // resolves it.
   pendingMoveLearnings PlayerPendingMoveLearning[]
+
+  // POKÉMON DAYCARE — PHASE 1. Non-null exactly while this Pokémon is
+  // currently deposited — see PlayerDaycareStay's own doc comment below.
+  daycareStay PlayerDaycareStay?
 
   @@unique([playerId, partySlot])
   @@index([playerId])
@@ -938,8 +1084,8 @@ model NpcBattleSession {
   regionId     String
   // Only set when battleSource === "gym"; null for a Regional Champion
   // battle (no gym number/battle slot).
-  gymNumber  Int?
-  battleSlot String?
+  gymNumber    Int?
+  battleSlot   String?
 
   // The fixed NPC roster for THIS attempt, frozen at battle start — Phase
   // 2's own fixed species, each given a level resolved ONCE via
@@ -962,10 +1108,10 @@ model NpcBattleSession {
   // Record<playerPokemonId, currentHp> — see this model's own "BATTLE-LOCAL
   // HP ONLY" doc comment above. Every participant starts at their own full
   // HP (calculated from species+level) the instant this session is created.
-  playerBattleHp      Json
-  playerBattleStatus  Json @default("{}")
-  playerStatStages    Json @default("{}")
-  playerVolatileState Json @default("{}")
+  playerBattleHp        Json
+  playerBattleStatus    Json   @default("{}")
+  playerStatStages      Json   @default("{}")
+  playerVolatileState   Json   @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1031,9 +1177,9 @@ model LeagueTournament {
 // always re-checked live from real Gym progression at registration time
 // (league-eligibility.service.ts), never cached here.
 model LeagueTournamentParticipant {
-  id           String            @id @default(cuid())
+  id           String           @id @default(cuid())
   tournamentId String
-  tournament   LeagueTournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament   LeagueTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   playerId String?
   player   PlayerProfile? @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -1073,7 +1219,7 @@ model LeagueTournamentMatch {
   participantB   LeagueTournamentParticipant @relation("LeagueMatchParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
 
   winnerParticipantId String?
-  winner               LeagueTournamentParticipant? @relation("LeagueMatchWinner", fields: [winnerParticipantId], references: [id])
+  winner              LeagueTournamentParticipant? @relation("LeagueMatchWinner", fields: [winnerParticipantId], references: [id])
 
   // "scheduled" | "in-progress" | "completed" — validated at the app layer.
   status           String  @default("scheduled")
@@ -1168,8 +1314,8 @@ model LeagueTournamentPlacement {
 // immediately in the same request the real player submits theirs, so play
 // always resolves synchronously for that case — no waiting.
 model LeagueBattleSession {
-  id                String               @id @default(cuid())
-  tournamentMatchId String               @unique
+  id                String                @id @default(cuid())
+  tournamentMatchId String                @unique
   tournamentMatch   LeagueTournamentMatch @relation(fields: [tournamentMatchId], references: [id], onDelete: Cascade)
 
   // Copied from the match at session-creation time (never re-derived from
@@ -1192,9 +1338,9 @@ model LeagueBattleSession {
   participantAPokemon       Json?
   participantAActiveSlotId  String?
   participantABattleHp      Json?
-  participantAStatusMap     Json    @default("{}")
-  participantAStatStages    Json    @default("{}")
-  participantAVolatileState Json    @default("{}")
+  participantAStatusMap     Json      @default("{}")
+  participantAStatStages    Json      @default("{}")
+  participantAVolatileState Json      @default("{}")
   // This side's own submitted move for the CURRENT turnNumber — cleared
   // back to null the instant a turn actually resolves.
   participantAPendingMoveId String?
@@ -1204,9 +1350,9 @@ model LeagueBattleSession {
   participantBPokemon       Json?
   participantBActiveSlotId  String?
   participantBBattleHp      Json?
-  participantBStatusMap     Json    @default("{}")
-  participantBStatStages    Json    @default("{}")
-  participantBVolatileState Json    @default("{}")
+  participantBStatusMap     Json      @default("{}")
+  participantBStatStages    Json      @default("{}")
+  participantBVolatileState Json      @default("{}")
   participantBPendingMoveId String?
 
   // Increments by exactly 1 each time a turn actually resolves — also the
@@ -1228,6 +1374,98 @@ model LeagueBattleSession {
   updatedAt   DateTime  @updatedAt
 
   @@map("league_battle_session")
+}
+
+// GLOBAL CHAT — one site-wide chat every authenticated player shares (not
+// per-room, not per-player) — rendered as a persistent bottom bar across
+// the whole shared game layout (features/chat). `message` is the only
+// content column: the sender's display name is never duplicated here —
+// it's always resolved live through the `player` relation (same
+// "don't store what's reachable through an existing relation" precedent
+// PlayerKnownMove's own doc comment establishes elsewhere in this file),
+// so a later display-name change is instantly reflected on old messages
+// too. Capped at GLOBAL_CHAT_MAX_MESSAGES (features/chat/config/
+// global-chat.config.ts) — global-chat.service.ts's sendGlobalChatMessage
+// deletes the oldest row(s) beyond that cap on every insert, so this table
+// never grows without bound; there is deliberately no scheduled cleanup
+// job, since the insert path itself is the only place a new row is ever
+// added.
+model GlobalChatMessage {
+  id       String        @id @default(cuid())
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  message String
+
+  createdAt DateTime @default(now())
+
+  // Both the "latest N globally" read (getRecentGlobalChatMessages) and the
+  // cap-enforcement cleanup (sendGlobalChatMessage) order/filter by
+  // createdAt alone, never scoped to one player — a single non-unique index
+  // on just this column serves both.
+  @@index([createdAt])
+  @@map("global_chat_message")
+}
+
+// POKÉMON DAYCARE — PHASE 1. One row per Pokémon CURRENTLY deposited in
+// the Daycare — deliberately keyed by playerPokemonId itself as the
+// primary key (same shared-PK 1:1-relation shape PlayerEggIncubation
+// already establishes above for "one active thing per owned item"), so
+// "this Pokémon has an active stay" is a plain row-existence check, never
+// a second boolean/status column that could drift out of sync with row
+// presence — same "row existence IS the fact" idiom Friendship/
+// PlayerEggIncubation already establish elsewhere in this file. Pickup
+// (features/daycare/services/daycare.service.ts's collectFromDaycare)
+// DELETES this row outright once levels are applied, rather than marking
+// it "completed" and keeping a history table Phase 1 has no use for — a
+// completed stay leaves nothing worth remembering beyond what the
+// now-updated PlayerPokemon row itself already reflects (its new level).
+//
+// PHASE 2 — 5 SLOTS. playerId's own uniqueness (originally what made "at
+// most ONE active stay per player" a database-level guarantee for Phase
+// 1's single-slot scope) is REMOVED here — a player may now own up to
+// DAYCARE_MAX_SLOTS (features/daycare/config/daycare.config.ts) rows at
+// once, one per deposited Pokémon. That 5-slot ceiling is enforced by
+// depositToDaycare's own service-layer logic (features/daycare/services/
+// daycare.service.ts), race-safely: every deposit already has to spend the
+// deposit fee against this SAME player's PlayerProfile row, and Postgres's
+// own row-level lock on that UPDATE is what serializes two concurrent
+// deposit attempts for the same player, making the capacity re-count that
+// follows (inside that same transaction) safe against the exact
+// TOCTOU race a plain pre-check alone could not prevent — see that
+// function's own doc comment for the full reasoning. playerPokemonId
+// remains the primary key (never relaxed) — "one Pokémon cannot be in two
+// active stays at once" is still a hard, unconditional database guarantee
+// regardless of how many slots the surrounding player-level rule allows.
+// The plain @@index([playerId]) below is what keeps "all of this player's
+// active stays" (getDaycareViewData) and the capacity count itself cheap.
+//
+// depositedAt + startingLevel remain the ONLY two facts persisted per
+// stay — every derived value (earned levels, current effective level,
+// debt, time until next level) is deterministically recomputed at read
+// time from these two fields plus "now" (features/daycare/
+// daycare-calculations.ts's calculateDaycareProgress) — never a
+// continually-updated checkpoint counter that could double-count progress
+// across repeated reads/page refreshes. Each row's own depositedAt/
+// startingLevel is completely independent of every other row for the same
+// player, so every deposited Pokémon's progress/debt/countdown is
+// independent by construction — there is no shared state between stays to
+// accidentally couple them.
+model PlayerDaycareStay {
+  playerPokemonId String        @id
+  pokemon         PlayerPokemon @relation(fields: [playerPokemonId], references: [id], onDelete: Cascade)
+
+  playerId String
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  depositedAt   DateTime @default(now())
+  startingLevel Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([playerId])
+  @@map("player_daycare_stay")
 }
 
 model Session {

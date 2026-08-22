@@ -1,4 +1,5 @@
 import { SpriteImage } from "@/components/media/SpriteImage";
+import { AddFriendButton } from "@/features/friends/components/AddFriendButton";
 import { getAvatarImageUrl } from "../themes/profile-avatars";
 import type { PublicProfileView } from "../types/profile.types";
 
@@ -48,7 +49,14 @@ export function ProfileHeader({ view, onEditClick }: ProfileHeaderProps) {
           >
             ערוך פרופיל
           </button>
-        ) : null}
+        ) : (
+          <AddFriendButton
+            targetPlayerId={view.playerId}
+            targetDisplayName={view.displayName}
+            initialStatus={view.friendshipStatus}
+            incomingFriendRequestId={view.incomingFriendRequestId}
+          />
+        )}
       </div>
     </div>
   );

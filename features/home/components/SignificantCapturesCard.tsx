@@ -1,22 +1,23 @@
 import { PanelCard } from "./PanelCard";
 import { SpriteImage } from "@/components/media/SpriteImage";
-import type { SignificantCaptureView, SignificantCapturesToday } from "@/features/home/services/significant-captures.service";
+import { PlayerNameLink } from "@/components/social/PlayerNameLink";
+import type { SignificantCaptureView, SignificantCaptures } from "@/features/home/services/significant-captures.service";
 
 interface SignificantCapturesCardProps {
-  data: SignificantCapturesToday;
+  data: SignificantCaptures;
 }
 
 const VERY_RARE_EMPTY_LABEL = "עדיין לא נתפס היום פוקימון נדיר מאוד";
 const LEGENDARY_EMPTY_LABEL = "עדיין לא נתפס היום פוקימון אגדי";
 
-// HOME — SIGNIFICANT CAPTURES TODAY. One shared PanelCard shell split into
-// two mini-cards. Rendered under the ambient dir="rtl" HomeContent already
+// HOME — SIGNIFICANT CAPTURES. One shared PanelCard shell split into two
+// mini-cards. Rendered under the ambient dir="rtl" HomeContent already
 // sets — under RTL, the FIRST grid child lands in the rightmost column, so
 // veryRare (required: right side) is listed before legendary (left side)
 // below, never reordered with an explicit `order-*` class.
 export function SignificantCapturesCard({ data }: SignificantCapturesCardProps) {
   return (
-    <PanelCard title="תפיסות משמעותיות היום:">
+    <PanelCard title="תפיסות משמעותיות אחרונות:">
       <div className="grid grid-cols-2 gap-3">
         <CaptureHalf capture={data.veryRare} emptyLabel={VERY_RARE_EMPTY_LABEL} glowClassName={VERY_RARE_GLOW_CLASSNAME} />
         <CaptureHalf capture={data.legendary} emptyLabel={LEGENDARY_EMPTY_LABEL} glowClassName={LEGENDARY_GLOW_CLASSNAME} />
@@ -61,7 +62,7 @@ function CaptureHalf({
         fallbackClassName="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500 sm:h-24 sm:w-24"
       />
       <p className="text-sm font-semibold text-slate-100">{capture.speciesName}</p>
-      <p className="text-xs text-slate-400">{capture.playerDisplayName}</p>
+      <PlayerNameLink username={capture.playerUsername} displayName={capture.playerDisplayName} className="text-xs text-slate-400" />
       <p className="text-[11px] text-slate-500">{capture.capturedAtLabel}</p>
     </div>
   );

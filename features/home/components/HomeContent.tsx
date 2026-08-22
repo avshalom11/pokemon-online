@@ -2,9 +2,11 @@ import { AchievementsPanel } from "./AchievementsPanel";
 import { DailyBattleCounter } from "./DailyBattleCounter";
 import { NavigationGrid } from "./NavigationGrid";
 import { NewsPanel } from "./NewsPanel";
+import { OnlinePlayersCounter } from "./OnlinePlayersCounter";
 import { RefreshHomeOnMount } from "./RefreshHomeOnMount";
 import { SignificantCapturesCard } from "./SignificantCapturesCard";
 import { StatisticsPanel } from "./StatisticsPanel";
+import { HomeChatPanel } from "@/features/chat/components/HomeChatPanel";
 import { PendingEvolutionGate } from "@/features/evolution/components/PendingEvolutionGate";
 import { PartySection } from "@/features/pokemon/components/PartySection";
 import type { HomeViewData } from "@/features/home/services/home-data.service";
@@ -12,12 +14,17 @@ import type { HomeViewData } from "@/features/home/services/home-data.service";
 interface HomeContentProps {
   data: HomeViewData;
   username: string | null;
+  // GLOBAL CHAT — HOME EMBED. Passed separately from `data` — see
+  // app/(game)/home/page.tsx's own doc comment for why this isn't part of
+  // HomeViewData (a profile-level display field, deliberately kept out of
+  // that type).
+  currentPlayerDisplayName: string;
 }
 
 // The home hub's body, inside GameScreen's centered/rounded shell (same as
 // MapContent/BattleContent). Owns its own scroll + background atmosphere;
 // GameScreen just gives it a fixed-height container to fill.
-export function HomeContent({ data, username }: HomeContentProps) {
+export function HomeContent({ data, username, currentPlayerDisplayName }: HomeContentProps) {
   return (
     <div
       dir="rtl"
@@ -35,7 +42,10 @@ export function HomeContent({ data, username }: HomeContentProps) {
       <PendingEvolutionGate initialPending={data.pendingEvolution} initialPendingBranch={data.pendingEvolutionBranch} />
 
       <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-        <DailyBattleCounter count={data.dailyBattleCount} />
+        <div className="flex flex-wrap gap-3">
+          <DailyBattleCounter count={data.dailyBattleCount} />
+          <OnlinePlayersCounter initialCount={data.onlinePlayerCount} />
+        </div>
 
         <PartySection party={data.party} />
 
@@ -51,6 +61,12 @@ export function HomeContent({ data, username }: HomeContentProps) {
             dexCompletionPercent={data.stats.dexCompletionPercent}
           />
         </div>
+
+        <HomeChatPanel
+          initialMessages={data.globalChatMessages}
+          currentPlayerDisplayName={currentPlayerDisplayName}
+          currentPlayerUsername={username}
+        />
       </div>
     </div>
   );

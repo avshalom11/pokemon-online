@@ -76,6 +76,44 @@ interface PlayerProfileRow {
   // that never explicitly seeds this keeps behaving as if sound is ON,
   // same convention showGymAchievementsOnProfile above established.
   soundEnabled: boolean;
+  // PLAYER SEARCH — mirrors PlayerProfile.avatarDexNumber's own nullable,
+  // no-@default column; every existing test that never explicitly seeds
+  // this keeps behaving as if no avatar is set (null), same convention
+  // every other nullable column here already follows.
+  avatarDexNumber: number | null;
+  // PUBLIC PROFILE PRIVACY — mirrors PlayerProfile.showPartyOnProfile/
+  // showStatsOnProfile/showAboutMeOnProfile/aboutMe/profileThemeId's own
+  // real defaults (@default(true)/@default(true)/@default(true)/
+  // @default("")/@default("default")). Needed to test
+  // getPublicProfileView's privacy toggles now that user.findUnique's
+  // `playerProfile: true` selection (this fake) makes that function
+  // reachable under the fake DB at all — every existing test that never
+  // explicitly seeds these keeps behaving as fully visible/empty, same
+  // convention every other column here follows.
+  showPartyOnProfile: boolean;
+  showStatsOnProfile: boolean;
+  showAboutMeOnProfile: boolean;
+  aboutMe: string;
+  profileThemeId: string;
+  // ONLINE PRESENCE — mirrors PlayerProfile.lastSeenAt's own nullable,
+  // no-@default column; every existing test that never explicitly seeds
+  // this keeps behaving as "never seen" (offline), same convention every
+  // other nullable column here already follows.
+  lastSeenAt: Date | null;
+}
+
+// PLAYER SEARCH — mirrors prisma/schema.prisma's User model's own
+// `username` column exactly (the only field this fake needs — every other
+// User column — email, emailVerified, image, ... — is never read by any
+// service under test). Identity mapping with PlayerProfileRow: a User row
+// and its PlayerProfile share the SAME id, same "profile id == session
+// user id" convention test/support/fakes/player-profile.fake.ts's own doc
+// comment already establishes — so resolving one player's `user` relation
+// is just `users.get(profile.id)` / `profiles.get(user.id)`, no separate
+// foreign key needed in this fake.
+interface UserRow {
+  id: string;
+  username: string | null;
 }
 
 interface DailyFieldBattleCountRow {
@@ -134,6 +172,21 @@ interface PlayerEggIncubationRow {
   startedAt: Date;
 }
 
+// POKÉMON DAYCARE — PHASE 1 — mirrors prisma/schema.prisma's
+// PlayerDaycareStay exactly: keyed by playerPokemonId (its own real
+// primary key), with playerId carrying its own separate uniqueness
+// (enforced by this fake's create() below, same "second real unique
+// constraint checked by hand" precedent fieldBattleSession.create already
+// establishes for its own playerId @id).
+interface PlayerDaycareStayRow {
+  playerPokemonId: string;
+  playerId: string;
+  depositedAt: Date;
+  startingLevel: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface NotificationRow {
   id: string;
   playerId: string;
@@ -141,6 +194,44 @@ interface NotificationRow {
   message: string;
   isRead: boolean;
   metadata: unknown;
+  createdAt: Date;
+}
+
+// GLOBAL CHAT — mirrors prisma/schema.prisma's GlobalChatMessage exactly
+// (see that model's own doc comment).
+interface GlobalChatMessageRow {
+  id: string;
+  playerId: string;
+  message: string;
+  createdAt: Date;
+}
+
+// FRIENDS PHASE 1 — mirrors prisma/schema.prisma's Friendship/
+// PrivateConversation/PrivateMessage exactly (see each model's own doc
+// comment).
+interface FriendshipRow {
+  id: string;
+  requesterId: string;
+  addresseeId: string;
+  friendPairKey: string;
+  status: string;
+  createdAt: Date;
+  respondedAt: Date | null;
+}
+
+interface PrivateConversationRow {
+  id: string;
+  playerAId: string;
+  playerBId: string;
+  conversationPairKey: string;
+  createdAt: Date;
+}
+
+interface PrivateMessageRow {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  message: string;
   createdAt: Date;
 }
 
@@ -307,11 +398,20 @@ let profiles = new Map<string, PlayerProfileRow>();
 let sessions = new Map<string, FieldBattleSessionRow>();
 let dailyBattleCounts = new Map<string, DailyFieldBattleCountRow>();
 let notifications = new Map<string, NotificationRow>();
+// GLOBAL CHAT
+let globalChatMessages = new Map<string, GlobalChatMessageRow>();
+// PLAYER SEARCH
+let users = new Map<string, UserRow>();
+// FRIENDS PHASE 1
+let friendships = new Map<string, FriendshipRow>();
+let privateConversations = new Map<string, PrivateConversationRow>();
+let privateMessages = new Map<string, PrivateMessageRow>();
 let inventoryItems = new Map<string, PlayerInventoryItemRow>();
 let seenSpecies = new Map<string, PlayerSeenSpeciesRow>();
 let ownedEggs = new Map<string, PlayerOwnedEggRow>();
 let incubators = new Map<string, PlayerIncubatorRow>();
 let eggIncubations = new Map<string, PlayerEggIncubationRow>();
+let daycareStays = new Map<string, PlayerDaycareStayRow>();
 // GYMS & LEAGUES PHASE 3
 let npcBattleSessions = new Map<string, NpcBattleSessionRow>();
 // GYMS & LEAGUES PHASE 1
@@ -326,6 +426,10 @@ let leagueTournamentMatches = new Map<string, LeagueTournamentMatchRow>();
 let leagueBattleSessions = new Map<string, LeagueBattleSessionRow>();
 let leagueTournamentPlacements = new Map<string, LeagueTournamentPlacementRow>();
 let idCounter = 0;
+// POKÉMON DAYCARE — PHASE 2 (5 SLOTS + DEPOSIT FEE) — a simple async mutex
+// so concurrent $transaction calls never interleave their bodies (see
+// $transaction's own doc comment below for why this matters).
+let transactionQueue: Promise<void> = Promise.resolve();
 let playerPokemonUpdateCallCount = 0;
 // MOVE-LEARNING OPTIMIZATION — same "prove a call did/didn't happen"
 // purpose as playerPokemonUpdateCallCount above: applyLevelUpMoveLearning
@@ -419,11 +523,17 @@ function cloneState() {
     sessions: new Map([...sessions].map(([id, row]) => [id, { ...row }])),
     dailyBattleCounts: new Map([...dailyBattleCounts].map(([id, row]) => [id, { ...row }])),
     notifications: new Map([...notifications].map(([id, row]) => [id, { ...row }])),
+    globalChatMessages: new Map([...globalChatMessages].map(([id, row]) => [id, { ...row }])),
+    users: new Map([...users].map(([id, row]) => [id, { ...row }])),
+    friendships: new Map([...friendships].map(([id, row]) => [id, { ...row }])),
+    privateConversations: new Map([...privateConversations].map(([id, row]) => [id, { ...row }])),
+    privateMessages: new Map([...privateMessages].map(([id, row]) => [id, { ...row }])),
     inventoryItems: new Map([...inventoryItems].map(([id, row]) => [id, { ...row }])),
     seenSpecies: new Map([...seenSpecies].map(([id, row]) => [id, { ...row }])),
     ownedEggs: new Map([...ownedEggs].map(([id, row]) => [id, { ...row }])),
     incubators: new Map([...incubators].map(([id, row]) => [id, { ...row }])),
     eggIncubations: new Map([...eggIncubations].map(([id, row]) => [id, { ...row }])),
+    daycareStays: new Map([...daycareStays].map(([id, row]) => [id, { ...row }])),
     npcBattleSessions: new Map([...npcBattleSessions].map(([id, row]) => [id, { ...row }])),
     gymBattleProgress: new Map([...gymBattleProgress].map(([id, row]) => [id, { ...row }])),
     gymBadges: new Map([...gymBadges].map(([id, row]) => [id, { ...row }])),
@@ -445,11 +555,17 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   sessions = snapshot.sessions;
   dailyBattleCounts = snapshot.dailyBattleCounts;
   notifications = snapshot.notifications;
+  globalChatMessages = snapshot.globalChatMessages;
+  users = snapshot.users;
+  friendships = snapshot.friendships;
+  privateConversations = snapshot.privateConversations;
+  privateMessages = snapshot.privateMessages;
   inventoryItems = snapshot.inventoryItems;
   seenSpecies = snapshot.seenSpecies;
   ownedEggs = snapshot.ownedEggs;
   incubators = snapshot.incubators;
   eggIncubations = snapshot.eggIncubations;
+  daycareStays = snapshot.daycareStays;
   npcBattleSessions = snapshot.npcBattleSessions;
   gymBattleProgress = snapshot.gymBattleProgress;
   gymBadges = snapshot.gymBadges;
@@ -470,11 +586,17 @@ export function resetFakeDb() {
   sessions = new Map();
   dailyBattleCounts = new Map();
   notifications = new Map();
+  globalChatMessages = new Map();
+  users = new Map();
+  friendships = new Map();
+  privateConversations = new Map();
+  privateMessages = new Map();
   inventoryItems = new Map();
   seenSpecies = new Map();
   ownedEggs = new Map();
   incubators = new Map();
   eggIncubations = new Map();
+  daycareStays = new Map();
   npcBattleSessions = new Map();
   gymBattleProgress = new Map();
   gymBadges = new Map();
@@ -486,6 +608,7 @@ export function resetFakeDb() {
   leagueBattleSessions = new Map();
   leagueTournamentPlacements = new Map();
   idCounter = 0;
+  transactionQueue = Promise.resolve();
   playerPokemonUpdateCallCount = 0;
   playerKnownMoveFindManyCallCount = 0;
 }
@@ -571,6 +694,23 @@ export function seedPlayerProfile(row: {
   selectedWildLevelBracketIndex?: number | null;
   showGymAchievementsOnProfile?: boolean;
   soundEnabled?: boolean;
+  avatarDexNumber?: number | null;
+  showPartyOnProfile?: boolean;
+  showStatsOnProfile?: boolean;
+  showAboutMeOnProfile?: boolean;
+  aboutMe?: string;
+  profileThemeId?: string;
+  // ONLINE PRESENCE — optional convenience for tests that need a seeded
+  // player to start out already online, without a separate recordHeartbeat
+  // call.
+  lastSeenAt?: Date | null;
+  // PLAYER SEARCH — optional convenience: also creates/updates the
+  // matching fake User row (same id) with this username, so a test doesn't
+  // need a separate seedUser call just to make a seeded profile
+  // search-findable. Omitted (the common case for every other feature's
+  // tests) creates no User row at all, exactly like before this field
+  // existed.
+  username?: string;
 }) {
   const full: PlayerProfileRow = {
     id: row.id,
@@ -593,13 +733,154 @@ export function seedPlayerProfile(row: {
     showGymAchievementsOnProfile: row.showGymAchievementsOnProfile ?? true,
     // Matches PlayerProfile.soundEnabled's own @default(true).
     soundEnabled: row.soundEnabled ?? true,
+    avatarDexNumber: row.avatarDexNumber ?? null,
+    showPartyOnProfile: row.showPartyOnProfile ?? true,
+    showStatsOnProfile: row.showStatsOnProfile ?? true,
+    showAboutMeOnProfile: row.showAboutMeOnProfile ?? true,
+    aboutMe: row.aboutMe ?? "",
+    profileThemeId: row.profileThemeId ?? "default",
+    lastSeenAt: row.lastSeenAt ?? null,
   };
   profiles.set(row.id, full);
+  if (row.username !== undefined) {
+    users.set(row.id, { id: row.id, username: row.username });
+  }
   return full;
+}
+
+// PLAYER SEARCH — seeds a standalone fake User row (username only — see
+// UserRow's own doc comment). Prefer passing `username` directly to
+// seedPlayerProfile above for the common case of "one player, needs a
+// username"; this exists for tests that need a User row WITHOUT (or
+// before) its matching PlayerProfile, or that need to change just the
+// username in isolation.
+export function seedUser(row: { id: string; username: string | null }) {
+  const full: UserRow = { id: row.id, username: row.username };
+  users.set(row.id, full);
+  return full;
+}
+
+// GLOBAL CHAT — bypasses sendGlobalChatMessage's own validation/cooldown/cap
+// entirely (unlike calling the real service in a loop), so ordering/cap
+// tests can seed many rows with explicit, controlled createdAt values
+// without fighting the 1-per-second cooldown or waiting on real wall-clock
+// time between inserts.
+export function seedGlobalChatMessage(row: { id?: string; playerId: string; message?: string; createdAt?: Date }) {
+  const id = row.id ?? nextId("chat");
+  const full: GlobalChatMessageRow = {
+    id,
+    playerId: row.playerId,
+    message: row.message ?? "hello",
+    createdAt: row.createdAt ?? new Date(),
+  };
+  globalChatMessages.set(id, full);
+  return full;
+}
+
+export function getGlobalChatMessageRows() {
+  return [...globalChatMessages.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((row) => ({ ...row }));
+}
+
+export function getGlobalChatMessageCount() {
+  return globalChatMessages.size;
+}
+
+// FRIENDS PHASE 1 — bypasses sendFriendRequest's own validation/notification
+// entirely, so tests can seed a specific relationship state directly (e.g.
+// an already-accepted friendship, or a pending request from a specific
+// requester) without needing to route through the real flow first.
+export function seedFriendship(row: {
+  id?: string;
+  requesterId: string;
+  addresseeId: string;
+  status?: string;
+  createdAt?: Date;
+}) {
+  const id = row.id ?? nextId("friendship");
+  const full: FriendshipRow = {
+    id,
+    requesterId: row.requesterId,
+    addresseeId: row.addresseeId,
+    friendPairKey: [row.requesterId, row.addresseeId].sort().join("::"),
+    status: row.status ?? "pending",
+    createdAt: row.createdAt ?? new Date(),
+    respondedAt: null,
+  };
+  friendships.set(id, full);
+  return full;
+}
+
+export function getFriendshipRow(id: string) {
+  const row = friendships.get(id);
+  return row ? { ...row } : undefined;
+}
+
+export function getFriendshipRowsForPlayer(playerId: string) {
+  return [...friendships.values()].filter((row) => row.requesterId === playerId || row.addresseeId === playerId).map((row) => ({ ...row }));
+}
+
+export function seedPrivateConversation(row: { id?: string; playerAId: string; playerBId: string; createdAt?: Date }) {
+  const id = row.id ?? nextId("conversation");
+  const [playerAId, playerBId] = [row.playerAId, row.playerBId].sort();
+  const full: PrivateConversationRow = {
+    id,
+    playerAId,
+    playerBId,
+    conversationPairKey: [row.playerAId, row.playerBId].sort().join("::"),
+    createdAt: row.createdAt ?? new Date(),
+  };
+  privateConversations.set(id, full);
+  return full;
+}
+
+export function seedPrivateMessage(row: { id?: string; conversationId: string; senderId: string; message?: string; createdAt?: Date }) {
+  const id = row.id ?? nextId("private_message");
+  const full: PrivateMessageRow = {
+    id,
+    conversationId: row.conversationId,
+    senderId: row.senderId,
+    message: row.message ?? "hello",
+    createdAt: row.createdAt ?? new Date(),
+  };
+  privateMessages.set(id, full);
+  return full;
+}
+
+export function getPrivateMessageRows(conversationId: string) {
+  return [...privateMessages.values()]
+    .filter((row) => row.conversationId === conversationId)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((row) => ({ ...row }));
+}
+
+export function getPrivateMessageCount(conversationId: string) {
+  return [...privateMessages.values()].filter((row) => row.conversationId === conversationId).length;
 }
 
 export function getPlayerProfileRow(id: string) {
   const row = profiles.get(id);
+  return row ? { ...row } : undefined;
+}
+
+// POKÉMON DAYCARE — PHASE 1 test helpers — same "seed + read-only getter"
+// pair every other feature's fake support already provides (e.g.
+// seedFriendship/getFriendshipRow above).
+export function seedDaycareStay(row: { playerPokemonId: string; playerId: string; startingLevel: number; depositedAt?: Date }) {
+  const now = new Date();
+  const full: PlayerDaycareStayRow = {
+    playerPokemonId: row.playerPokemonId,
+    playerId: row.playerId,
+    startingLevel: row.startingLevel,
+    depositedAt: row.depositedAt ?? now,
+    createdAt: now,
+    updatedAt: now,
+  };
+  daycareStays.set(row.playerPokemonId, full);
+  return full;
+}
+
+export function getDaycareStayRow(playerPokemonId: string) {
+  const row = daycareStays.get(playerPokemonId);
   return row ? { ...row } : undefined;
 }
 
@@ -789,6 +1070,15 @@ function matchesValue(actual: unknown, expected: unknown): boolean {
     // }` filter (getPlayerProfilesByIds' own bulk id lookup, lib/auth/
     // player-profile.ts).
     if ("in" in operators) return (operators.in as unknown[]).includes(actual);
+    // PLAYER SEARCH — mirrors real Prisma's `{ field: { contains: "...",
+    // mode: "insensitive" } }` string filter (player-search.service.ts's
+    // searchPlayersByUsername, the only caller).
+    if ("contains" in operators) {
+      if (actual === null || actual === undefined) return false;
+      const haystack = String(actual);
+      const needle = String(operators.contains);
+      return operators.mode === "insensitive" ? haystack.toLowerCase().includes(needle.toLowerCase()) : haystack.includes(needle);
+    }
   }
   return actual === expected;
 }
@@ -833,6 +1123,41 @@ function applyOrderBy<T>(
     }
     return 0;
   });
+}
+
+// PLAYER SEARCH — shared by user.findUnique/findMany above: projects a fake
+// User row through a real-Prisma-shaped `select`, resolving the
+// `playerProfile` relation from the SAME `profiles` map every other fake
+// method here already uses (identity mapping: a User row and its
+// PlayerProfile share one id — see UserRow's own doc comment). `true`
+// returns the whole profile row (public-profile-view.service.ts's own
+// `playerProfile: true`); `{ select: {...} }` returns only the requested
+// fields (player-search.service.ts's own nested select).
+function projectUserRow(
+  row: UserRow,
+  select?: { id?: boolean; username?: boolean; playerProfile?: true | { select?: Record<string, boolean> } }
+) {
+  if (!select) return { ...row };
+
+  const result: Record<string, unknown> = {};
+  if (select.id) result.id = row.id;
+  if (select.username) result.username = row.username;
+  if (select.playerProfile) {
+    const profile = profiles.get(row.id);
+    if (!profile) {
+      result.playerProfile = null;
+    } else if (select.playerProfile === true) {
+      result.playerProfile = { ...profile };
+    } else {
+      const fieldSelect = select.playerProfile.select ?? {};
+      const projected: Record<string, unknown> = {};
+      for (const key of Object.keys(fieldSelect)) {
+        if (fieldSelect[key]) projected[key] = (profile as unknown as Record<string, unknown>)[key];
+      }
+      result.playerProfile = projected;
+    }
+  }
+  return result;
 }
 
 const client = {
@@ -915,6 +1240,12 @@ const client = {
       const sorted = applyOrderBy(rows, orderBy);
       return (take ? sorted.slice(0, take) : sorted).map((row) => ({ ...row }));
     },
+    // PUBLIC PROFILE — mirrors real Prisma's `count({ where })`, needed by
+    // getOwnedPokemonStats (features/pokemon/services/player-pokemon.ts),
+    // the first caller under a test context (public-profile-view.test.ts).
+    async count({ where }: { where: Record<string, unknown> }) {
+      return [...pokemons.values()].filter((row) => matches(row, where)).length;
+    },
     async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
       playerPokemonUpdateCallCount += 1;
       const row = pokemons.get(where.id);
@@ -990,6 +1321,14 @@ const client = {
     // current-champion display-name resolution.
     async findMany({ where }: { where: Record<string, unknown> }) {
       return [...profiles.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+    // ONLINE PRESENCE — mirrors presence.service.ts's getOnlinePlayerCount:
+    // a plain `{ lastSeenAt: { gte: cutoff } }` count, reusing matchesValue's
+    // existing `gte` operator support (which compares via JS's native `>=`,
+    // so it works on Date instances exactly like it already does on numbers
+    // elsewhere in this fake).
+    async count({ where }: { where: Record<string, unknown> }) {
+      return [...profiles.values()].filter((row) => matches(row, where)).length;
     },
     // Mirrors currency-reward.service.ts's spendCurrency: the precondition
     // (sufficient balance) is encoded directly in `where` via `{ gte }`
@@ -1813,6 +2152,71 @@ const client = {
       return { count };
     },
   },
+  // POKÉMON DAYCARE — PHASE 1 — mirrors PlayerDaycareStay exactly: keyed
+  // by playerPokemonId (its own real primary key), with playerId's
+  // separate real @unique enforced by hand here too, same "second unique
+  // constraint checked explicitly, throws the real P2002 shape" precedent
+  // fieldBattleSession.create below already establishes for its own
+  // playerId @id.
+  // PHASE 2 — 5 SLOTS. playerId is no longer unique (mirrors the real
+  // schema's own dropped @unique — see PlayerDaycareStay's own doc comment
+  // in prisma/schema.prisma) — only playerPokemonId's primary key is ever
+  // enforced by create() below now. count()/findMany() are what
+  // depositToDaycare/getDaycareViewData use to read "how many active
+  // stays does this player currently have."
+  playerDaycareStay: {
+    async create({ data }: { data: { playerPokemonId: string; playerId: string; startingLevel: number } }) {
+      if (daycareStays.has(data.playerPokemonId)) {
+        throw Object.assign(new Error("Unique constraint failed on the fields: (`playerPokemonId`)"), { code: "P2002" });
+      }
+      const now = new Date();
+      const full: PlayerDaycareStayRow = {
+        playerPokemonId: data.playerPokemonId,
+        playerId: data.playerId,
+        startingLevel: data.startingLevel,
+        depositedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      daycareStays.set(data.playerPokemonId, full);
+      return { ...full };
+    },
+    // `playerPokemonId` is this model's own only remaining primary key —
+    // every real call site now looks a stay up by it directly.
+    async findUnique({ where }: { where: { playerPokemonId: string } }) {
+      const row = daycareStays.get(where.playerPokemonId);
+      return row ? { ...row } : null;
+    },
+    // PHASE 2 — getDaycareViewData's own "every stay this player currently
+    // has" read, and depositToDaycare's own pre-check reuse this same
+    // generic where-filter support other findMany fakes already establish.
+    async findMany({ where, orderBy }: { where: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc"> }) {
+      const rows = [...daycareStays.values()].filter((row) => matches(row, where));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    // PHASE 2 — the 5-slot capacity guard (both depositToDaycare's fast
+    // pre-check and its real, race-relevant in-transaction re-count) reads
+    // through this.
+    async count({ where }: { where: Record<string, unknown> }) {
+      return [...daycareStays.values()].filter((row) => matches(row, where)).length;
+    },
+    // The exactly-once pickup guard (daycare.service.ts's
+    // collectFromDaycare) — matches a specific (playerId, playerPokemonId)
+    // pair, so a racing/duplicate pickup request for the same stay finds
+    // zero rows here and safely aborts before spending money or applying
+    // levels, same "CAS-guarded delete" precedent playerEggIncubation's
+    // own deleteMany above already establishes for hatch's race guard.
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [key, row] of daycareStays) {
+        if (matches(row, where)) {
+          daycareStays.delete(key);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
   fieldBattleSession: {
     // Mirrors seedFieldBattleSession's own defaulting for every field the
     // real Prisma schema fills in via @default(...) rather than requiring
@@ -1952,6 +2356,241 @@ const client = {
       return { count };
     },
   },
+  // GLOBAL CHAT — mirrors global-chat.service.ts's exact call shapes:
+  // create (send), findFirst orderBy desc (cooldown check), findMany
+  // orderBy/take (both the "latest N" read and the cap-cleanup's "N oldest"
+  // lookup), count (cap check), deleteMany with an `id: { in: [...] }`
+  // filter (cap cleanup) — matchesValue's existing "in" operator support
+  // (added for getPlayerProfilesByIds) already covers that last one.
+  globalChatMessage: {
+    async create({ data }: { data: { playerId: string; message: string } }) {
+      const id = nextId("chat");
+      const full: GlobalChatMessageRow = { id, playerId: data.playerId, message: data.message, createdAt: new Date() };
+      globalChatMessages.set(id, full);
+      return { ...full };
+    },
+    async findFirst({
+      where,
+      orderBy,
+    }: {
+      where: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+    }) {
+      const rows = [...globalChatMessages.values()].filter((row) => matches(row, where));
+      const sorted = applyOrderBy(rows, orderBy);
+      return sorted[0] ? { ...sorted[0] } : null;
+    },
+    async findMany({
+      where,
+      orderBy,
+      take,
+    }: {
+      where?: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+      take?: number;
+    }) {
+      const rows = [...globalChatMessages.values()].filter((row) => matches(row, where ?? {}));
+      const sorted = applyOrderBy(rows, orderBy);
+      return (take ? sorted.slice(0, take) : sorted).map((row) => ({ ...row }));
+    },
+    async count() {
+      return globalChatMessages.size;
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [id, row] of globalChatMessages) {
+        if (matches(row, where)) {
+          globalChatMessages.delete(id);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  // FRIENDS PHASE 1 — mirrors friendship.service.ts's exact call shapes:
+  // findUnique by either `id` or the canonical `friendPairKey` (the real
+  // unique index), create (throws a real P2002-shaped error on a
+  // colliding friendPairKey — same idiom as playerGymBattleProgress.create
+  // above, needed so sendFriendRequest's own create-then-catch race-safety
+  // path is exercisable under this fake), update, deleteMany, findMany.
+  // PLAYER SEARCH — mirrors public-profile-view.service.ts's and
+  // player-search.service.ts's exact call shapes: findUnique by `id` or
+  // `username`, findMany with a `username: { contains, mode }` filter +
+  // `take` (player-search.service.ts's own searchPlayersByUsername), and a
+  // `playerProfile` relation selection that's either `true` (return the
+  // whole row — public-profile-view.service.ts) or `{ select: {...} }` (a
+  // partial projection — player-search.service.ts) — see
+  // resolvePlayerProfileSelection below for the one shared resolver both
+  // paths use.
+  user: {
+    async findUnique({
+      where,
+      select,
+    }: {
+      where: { id?: string; username?: string | null };
+      select?: { id?: boolean; username?: boolean; playerProfile?: true | { select?: Record<string, boolean> } };
+    }) {
+      let row: UserRow | undefined;
+      if (where.id) row = users.get(where.id);
+      else if (where.username !== undefined) row = [...users.values()].find((candidate) => candidate.username === where.username);
+      if (!row) return null;
+      return projectUserRow(row, select);
+    },
+    async findMany({
+      where,
+      select,
+      take,
+    }: {
+      where?: Record<string, unknown>;
+      select?: { id?: boolean; username?: boolean; playerProfile?: true | { select?: Record<string, boolean> } };
+      take?: number;
+    }) {
+      const rows = [...users.values()].filter((row) => matches(row, where ?? {}));
+      const limited = take ? rows.slice(0, take) : rows;
+      return limited.map((row) => projectUserRow(row, select));
+    },
+  },
+  friendship: {
+    async findUnique({ where }: { where: { id?: string; friendPairKey?: string } }) {
+      if (where.id) {
+        const row = friendships.get(where.id);
+        return row ? { ...row } : null;
+      }
+      if (where.friendPairKey) {
+        const row = [...friendships.values()].find((candidate) => candidate.friendPairKey === where.friendPairKey);
+        return row ? { ...row } : null;
+      }
+      return null;
+    },
+    async create({
+      data,
+    }: {
+      data: { requesterId: string; addresseeId: string; friendPairKey: string; status?: string };
+    }) {
+      const duplicate = [...friendships.values()].some((row) => row.friendPairKey === data.friendPairKey);
+      if (duplicate) {
+        throw Object.assign(new Error("Unique constraint failed on friendship"), { code: "P2002" });
+      }
+      const id = nextId("friendship");
+      const full: FriendshipRow = {
+        id,
+        requesterId: data.requesterId,
+        addresseeId: data.addresseeId,
+        friendPairKey: data.friendPairKey,
+        status: data.status ?? "pending",
+        createdAt: new Date(),
+        respondedAt: null,
+      };
+      friendships.set(id, full);
+      return { ...full };
+    },
+    async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
+      const row = friendships.get(where.id);
+      if (!row) throw new Error(`fake prisma: friendship ${where.id} not found for update`);
+      Object.assign(row, data);
+      return { ...row };
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [id, row] of friendships) {
+        if (matches(row, where)) {
+          friendships.delete(id);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+    }) {
+      const rows = [...friendships.values()].filter((row) => matches(row, where));
+      return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+  },
+  // FRIENDS PHASE 1 — PRIVATE CHAT. Mirrors private-chat.service.ts's
+  // exact call shapes: findUnique by `id` or `conversationPairKey`, create
+  // (same real-unique-constraint-mirroring idiom as friendship.create
+  // above).
+  privateConversation: {
+    async findUnique({ where }: { where: { id?: string; conversationPairKey?: string } }) {
+      if (where.id) {
+        const row = privateConversations.get(where.id);
+        return row ? { ...row } : null;
+      }
+      if (where.conversationPairKey) {
+        const row = [...privateConversations.values()].find((candidate) => candidate.conversationPairKey === where.conversationPairKey);
+        return row ? { ...row } : null;
+      }
+      return null;
+    },
+    async create({ data }: { data: { playerAId: string; playerBId: string; conversationPairKey: string } }) {
+      const duplicate = [...privateConversations.values()].some((row) => row.conversationPairKey === data.conversationPairKey);
+      if (duplicate) {
+        throw Object.assign(new Error("Unique constraint failed on private_conversation"), { code: "P2002" });
+      }
+      const id = nextId("conversation");
+      const full: PrivateConversationRow = {
+        id,
+        playerAId: data.playerAId,
+        playerBId: data.playerBId,
+        conversationPairKey: data.conversationPairKey,
+        createdAt: new Date(),
+      };
+      privateConversations.set(id, full);
+      return { ...full };
+    },
+  },
+  // FRIENDS PHASE 1 — PRIVATE CHAT. Mirrors private-chat.service.ts's exact
+  // call shapes: create, findMany (orderBy/take — both the "latest N" read
+  // and the cap-cleanup's "N oldest" lookup, scoped by conversationId via
+  // `where`), count (scoped by conversationId), deleteMany with an
+  // `id: { in: [...] }` + `conversationId` filter (cap cleanup — never
+  // touches another conversation's rows, mirrored exactly by matches()'s
+  // existing generic where-filter support).
+  privateMessage: {
+    async create({ data }: { data: { conversationId: string; senderId: string; message: string } }) {
+      const id = nextId("private_message");
+      const full: PrivateMessageRow = {
+        id,
+        conversationId: data.conversationId,
+        senderId: data.senderId,
+        message: data.message,
+        createdAt: new Date(),
+      };
+      privateMessages.set(id, full);
+      return { ...full };
+    },
+    async findMany({
+      where,
+      orderBy,
+      take,
+    }: {
+      where?: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+      take?: number;
+    }) {
+      const rows = [...privateMessages.values()].filter((row) => matches(row, where ?? {}));
+      const sorted = applyOrderBy(rows, orderBy);
+      return (take ? sorted.slice(0, take) : sorted).map((row) => ({ ...row }));
+    },
+    async count({ where }: { where?: Record<string, unknown> }) {
+      return [...privateMessages.values()].filter((row) => matches(row, where ?? {})).length;
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [id, row] of privateMessages) {
+        if (matches(row, where)) {
+          privateMessages.delete(id);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
   playerKnownMove: {
     async findMany({
       where,
@@ -2026,14 +2665,46 @@ const client = {
   // self-referencing type on `client`'s own inferred type; callers rely on
   // the real Prisma.TransactionClient type instead (that's what production
   // code type-checks against — see move-learning-service.ts).
+  //
+  // POKÉMON DAYCARE — PHASE 2 (5 SLOTS + DEPOSIT FEE) — CONCURRENCY.
+  // Serialized via transactionQueue: each call waits for every
+  // previously-started $transaction to fully finish (commit OR roll back)
+  // before its OWN body starts running, and only then does it become the
+  // next thing everyone else waits on. This mirrors how a single real
+  // database connection processes one transaction at a time — real
+  // Postgres additionally allows independent transactions to run
+  // concurrently as long as they never lock the same row, but full
+  // serialization is a strictly SAFE, conservative approximation for a
+  // fake with no per-row locking of its own: it can never produce a false
+  // "this race is safe" result the way the previous unserialized version
+  // could (two `$transaction` bodies genuinely interleaving their
+  // individually-awaited steps, letting each one observe state from
+  // BEFORE the other's writes — exactly the gap that let two concurrent
+  // Daycare deposits both pass a "fewer than 5 stays" check at once).
+  // Every existing race test in this codebase (e.g. friendship.test.ts's
+  // "two players requesting each other at the same instant") already only
+  // depends on ONE of two racing writes winning a real unique constraint —
+  // serializing execution order can only ever make that MORE
+  // deterministic, never break it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async $transaction<T>(fn: (tx: any) => Promise<T>): Promise<T> {
-    const snapshot = cloneState();
+    const myTurn = transactionQueue;
+    let releaseNext!: () => void;
+    transactionQueue = new Promise<void>((resolve) => {
+      releaseNext = resolve;
+    });
+
+    await myTurn;
     try {
-      return await fn(client);
-    } catch (error) {
-      restoreState(snapshot);
-      throw error;
+      const snapshot = cloneState();
+      try {
+        return await fn(client);
+      } catch (error) {
+        restoreState(snapshot);
+        throw error;
+      }
+    } finally {
+      releaseNext();
     }
   },
 };
