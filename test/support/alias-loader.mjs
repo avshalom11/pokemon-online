@@ -26,6 +26,7 @@ const FAKES = {
   "@/lib/db/prisma": new URL("./fakes/prisma.fake.ts", import.meta.url).href,
   "@/lib/auth/auth-session": new URL("./fakes/auth-session.fake.ts", import.meta.url).href,
   "@/lib/auth/player-profile": new URL("./fakes/player-profile.fake.ts", import.meta.url).href,
+  "@/lib/email/send-email": new URL("./fakes/send-email.fake.ts", import.meta.url).href,
   "next/cache": new URL("./fakes/next-cache.fake.ts", import.meta.url).href,
 };
 

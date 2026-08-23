@@ -6,7 +6,7 @@ import type { LevelUpResult } from "@/features/player-progression/progression-ty
 import { getCurrentSession } from "@/lib/auth/auth-session";
 
 export type CaptureActionResult =
-  | { status: "captured"; pokemonName: string; xpResult: LevelUpResult; remainingQuantity: number }
+  | { status: "captured"; pokemonName: string; xpResult: LevelUpResult; remainingQuantity: number; addedToParty: boolean }
   | { status: "failed"; remainingQuantity: number }
   | { status: "no-balls" }
   | { status: "error" };
@@ -51,5 +51,6 @@ export async function attemptCaptureAction(ballItemId: string): Promise<CaptureA
     pokemonName: result.speciesName,
     xpResult: result.xpResult,
     remainingQuantity: result.remainingQuantity,
+    addedToParty: result.addedToParty,
   };
 }

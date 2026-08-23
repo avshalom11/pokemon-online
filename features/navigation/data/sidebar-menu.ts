@@ -45,7 +45,7 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       // from GameSidebar's own isActiveBattle check — no Home-specific
       // logic added.
       { id: "home", label: "מסך ראשי", icon: "🏠", href: "/home" },
-      { id: "world", label: "עולם", icon: "🌍", href: "/world" },
+      { id: "world", label: "מחוזות", icon: "🌍", href: "/world" },
       { id: "map", label: "מפה", icon: "🗺️", href: "/map" },
       // GYMS & LEAGUES PHASE 4 — placed right after World/Map, per this
       // Phase's own nav spec. Inherits the exact same battle-lock behavior

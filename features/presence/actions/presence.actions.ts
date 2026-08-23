@@ -23,8 +23,9 @@ export async function sendHeartbeatAction(): Promise<void> {
   await recordHeartbeat(profile.id);
 }
 
-// HOME ONLINE COUNT — re-callable client-side (OnlinePlayersCounter.tsx) so
-// the count can refresh without a full page reload. Requires an
+// HOME ONLINE COUNT — re-callable client-side (features/home/components/
+// OnlinePlayerCountStat.tsx) so the count can refresh without a full page
+// reload. Requires an
 // authenticated session like every other action here, but the number
 // itself is never player-specific — "do not count unauthenticated
 // visitors" is satisfied by getOnlinePlayerCount itself only ever counting

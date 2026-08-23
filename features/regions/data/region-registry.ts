@@ -7,17 +7,11 @@ import { PALDEA_MAP_CONFIG } from "@/data/maps/paldea-map-config";
 import { SINNOH_MAP_CONFIG } from "@/data/maps/sinnoh-map-config";
 import { UNOVA_MAP_CONFIG } from "@/data/maps/unova-map-config";
 import { WORLD_MAP_CONFIG } from "@/data/maps/world-map-config";
+import { getRegionStarterImagePath } from "@/features/regions/media/region-starter-media-paths";
 import type { RegionId } from "@/shared/types/region";
 import type { RegionDefinition } from "../types/region-registry.types";
 
 export const DEFAULT_REGION_ID: RegionId = "kanto";
-
-// Every region's World page card uses this same placeholder image for now
-// (see RegionDefinition.cardImageSrc) — one shared constant rather than
-// repeating the literal path in all 9 entries below, so a future
-// per-region card image is a one-line change per entry, not a
-// find-and-replace across the file.
-const DEFAULT_CARD_IMAGE_SRC = "/images/world-map.PNG";
 
 // The canonical Region Registry — see RegionDefinition's own doc comment.
 // A Record (not a plain array) so TypeScript enforces every RegionId has an
@@ -27,7 +21,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   kanto: {
     id: "kanto",
     englishName: "Kanto",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("kanto"),
     hasMap: true,
     // Kanto's own map image lives inside mapConfig.imageSrc
     // ("/images/kanto-map.png") rather than being repeated in
@@ -38,7 +32,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   johto: {
     id: "johto",
     englishName: "Johto",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("johto"),
     hasMap: true,
     // Johto now has real, clickable zones — see data/maps/johto-map-config.ts
     // for how these polygons were placed/corrected. Same as Kanto,
@@ -57,7 +51,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   hoenn: {
     id: "hoenn",
     englishName: "Hoenn",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("hoenn"),
     hasMap: true,
     // Hoenn now has real, clickable zones (data/maps/hoenn-map-config.ts,
     // manually placed via /dev/hoenn-map-editor against the real
@@ -82,7 +76,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   sinnoh: {
     id: "sinnoh",
     englishName: "Sinnoh",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("sinnoh"),
     hasMap: true,
     // Sinnoh now has real, clickable zones (data/maps/sinnoh-map-config.ts,
     // manually placed via /dev/sinnoh-map-editor against the real
@@ -104,7 +98,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   unova: {
     id: "unova",
     englishName: "Unova",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("unova"),
     hasMap: true,
     // Unova now has real, clickable zones (data/maps/unova-map-config.ts,
     // manually placed via /dev/unova-map-editor against the real
@@ -124,7 +118,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   kalos: {
     id: "kalos",
     englishName: "Kalos",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("kalos"),
     hasMap: true,
     // Kalos now has real, clickable zones (data/maps/kalos-map-config.ts,
     // manually placed via /dev/kalos-map-editor against the real
@@ -146,7 +140,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   alola: {
     id: "alola",
     englishName: "Alola",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("alola"),
     hasMap: true,
     // Alola now has real, clickable zones (data/maps/alola-map-config.ts,
     // manually placed via /dev/alola-map-editor against the real
@@ -168,7 +162,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   galar: {
     id: "galar",
     englishName: "Galar",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("galar"),
     hasMap: true,
     // Galar now has real, clickable zones (data/maps/galar-map-config.ts,
     // manually placed via /dev/galar-map-editor against the real
@@ -190,7 +184,7 @@ const REGION_REGISTRY_BY_ID: Record<RegionId, RegionDefinition> = {
   paldea: {
     id: "paldea",
     englishName: "Paldea",
-    cardImageSrc: DEFAULT_CARD_IMAGE_SRC,
+    cardImageSrc: getRegionStarterImagePath("paldea"),
     hasMap: true,
     // Paldea now has real, clickable zones (data/maps/paldea-map-config.ts,
     // manually placed via /dev/paldea-map-editor against the real

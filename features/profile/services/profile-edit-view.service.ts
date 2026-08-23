@@ -9,9 +9,10 @@ import type { ProfileEditViewModel, PublicPartyMemberView } from "../types/profi
 // The owner-only edit query — deliberately separate from
 // getPublicProfileView (that one applies privacy toggles; this one never
 // does, since the owner must always be able to see and change what they're
-// currently hiding). `username` is passed in rather than re-queried: the
-// only caller (app/(game)/profile/[username]/page.tsx) already has it from
-// getCurrentSession(), so this never needs its own User table read.
+// currently hiding). No username field: this view model backs
+// EditProfileModal's profile-content-only save — see SecurityAccountSection
+// for the separate, paid username-change flow, which resolves the current
+// username itself (from the session) rather than through this model.
 //
 // Every optional/boolean field is coalesced to a safe default rather than
 // trusted as always-present (see public-profile-view.service.ts's own doc
@@ -19,7 +20,7 @@ import type { ProfileEditViewModel, PublicPartyMemberView } from "../types/profi
 // field as undefined, not its real column default" risk applies here too,
 // and this is the exact view model that used to crash EditProfileModal on
 // mount when that happened).
-export async function getProfileEditViewModel(userId: string, username: string): Promise<ProfileEditViewModel> {
+export async function getProfileEditViewModel(userId: string): Promise<ProfileEditViewModel> {
   const profile = await getPlayerProfile(userId);
   const theme = getProfileTheme(profile.profileThemeId);
 
@@ -33,7 +34,6 @@ export async function getProfileEditViewModel(userId: string, username: string):
   }));
 
   return {
-    username,
     aboutMe: profile.aboutMe ?? "",
     avatarDexNumber: profile.avatarDexNumber ?? null,
     themeId: theme.id,

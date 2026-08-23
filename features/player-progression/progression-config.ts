@@ -10,9 +10,21 @@
 // the last while keeping level 1->2 (1,000 XP) reachable for new players.
 export const XP_PER_LEVEL = 1000;
 
-// Player XP reward for defeating a wild Pokémon: BASE + wildLevel * PER_LEVEL.
-export const VICTORY_XP_BASE = 10;
-export const VICTORY_XP_PER_LEVEL = 5;
+// Player XP reward for defeating a wild Pokémon in a Field Battle:
+// BASE + wildLevel * PER_LEVEL, rounded (see calculateVictoryXpReward). The
+// ONE place this reward is tuned — battle-session.service.ts never adds a
+// second multiplier of its own. Halved from the original 10/5 (which
+// produced ~80-120 for the game's typical wild levels) to ~40-60, per this
+// project's own rebalance: Field Battle Player XP specifically was judged
+// too generous relative to the rest of the account-XP economy. Deliberately
+// NOT touched by this change: CAPTURE_XP_BASE/CAPTURE_XP_PER_LEVEL below
+// (a completely separate reward for successfully CATCHING a wild Pokémon,
+// not defeating one), Pokémon XP (features/pokemon-progression/'s own,
+// unrelated config), and Gym/League player XP (features/gyms/features/
+// leagues's own calculateGymRewardXp/calculateLeagueRewardXp formulas —
+// neither reads these constants at all).
+export const VICTORY_XP_BASE = 5;
+export const VICTORY_XP_PER_LEVEL = 2.5;
 
 // Player XP reward for successfully capturing a wild Pokémon.
 export const CAPTURE_XP_BASE = 15;

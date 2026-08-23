@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { AuthTabs, type AuthTab } from "./AuthTabs";
+import { ForgotPasswordForm } from "./ForgotPasswordForm";
 import { LoginForm } from "./LoginForm";
 import { RegisterForm } from "./RegisterForm";
 import { GameScreen } from "@/components/layout/GameScreen";
@@ -33,9 +34,15 @@ export function AuthScreen() {
           </h1>
           <p className="mb-6 text-center text-sm text-slate-400">העולם מחכה למסע שלך</p>
 
-          <AuthTabs active={activeTab} onChange={setActiveTab} />
+          {activeTab === "forgot-password" ? null : <AuthTabs active={activeTab} onChange={setActiveTab} />}
 
-          <div className="mt-6">{activeTab === "login" ? <LoginForm /> : <RegisterForm />}</div>
+          <div className="mt-6">
+            {activeTab === "login" ? <LoginForm onForgotPassword={() => setActiveTab("forgot-password")} /> : null}
+            {activeTab === "register" ? <RegisterForm /> : null}
+            {activeTab === "forgot-password" ? (
+              <ForgotPasswordForm onBackToLogin={() => setActiveTab("login")} />
+            ) : null}
+          </div>
         </div>
       </div>
     </GameScreen>

@@ -41,7 +41,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     );
   }
 
-  const editData = view.isOwner ? await getProfileEditViewModel(session.user.id, view.username) : null;
+  const editData = view.isOwner ? await getProfileEditViewModel(session.user.id) : null;
 
   return (
     <GameScreen>

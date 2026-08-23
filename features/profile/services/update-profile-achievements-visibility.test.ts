@@ -69,5 +69,5 @@ test("14 (source): update-profile.service.ts actually forwards input.showGymAchi
 test("13 (source): only the server-resolved playerId (never a client-supplied id) is ever passed into updateProfile — ownership is never trusted from the client", () => {
   const src = fs.readFileSync("features/profile/actions/update-profile.action.ts", "utf8");
   assert.ok(src.includes("const profile = await getPlayerProfile(session.user.id);"), "the acting profile must be resolved from the authenticated session, never client input");
-  assert.ok(src.includes("await updateProfile(profile.id, currentUsername, parsed.data);"), "updateProfile must be called with the session-resolved profile id");
+  assert.ok(src.includes("await updateProfile(profile.id, parsed.data);"), "updateProfile must be called with the session-resolved profile id");
 });

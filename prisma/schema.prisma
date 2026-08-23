@@ -25,10 +25,104 @@ model User {
   sessions        Session[]
   accounts        Account[]
   playerProfile   PlayerProfile?
+  deletionRequests AccountDeletionRequest[]
+
+  // FAILED LOGIN LOCKOUT — LEGACY / UNUSED. These two columns used to be
+  // the authoritative GLOBAL per-account lockout state (5 failures from
+  // ANYWHERE locked the account out for everyone, everywhere). That design
+  // was itself an abuse vector — an attacker only needed to know a victim's
+  // username to lock the real owner out from every device — so it was
+  // replaced by LoginAttemptLock below, keyed by (identifierKey, ipHash)
+  // instead of the account alone: only the offending requester's own
+  // IP+identifier pair is ever blocked, never the account globally. Neither
+  // field is read or written by lib/auth/login-lockout.ts anymore. Left in
+  // place (not dropped) since removal wasn't proven safe within this task —
+  // a future migration can drop them once confirmed genuinely dead.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   @@unique([email])
   @@unique([username])
   @@map("user")
+}
+
+// AUTH SECURITY — LOGIN RATE LIMITING (username/email + requester IP), the
+// replacement for the legacy global User.failedLoginAttempts/lockedUntil
+// design (see that model's own doc comment for why: a global lock lets an
+// attacker who only knows a victim's identifier lock the real owner out
+// from everywhere, just by submitting 5 wrong passwords). Keyed by
+// (identifierKey, ipHash) instead: only THAT specific requester is ever
+// blocked, and the legitimate owner can always still sign in from a
+// different IP/device while an attacker's own source is locked out. See
+// lib/auth/login-lockout.ts, the one module that reads/writes this table.
+//
+// `identifierKey` is a plain normalized string (lowercased email or
+// username, via lib/auth/login-lockout.ts's own normalizeLoginIdentifier —
+// the SAME normalization sign-in itself uses), deliberately NEVER a
+// foreign key to User: an attacker probing entirely made-up usernames must
+// still be rate-limited (see this file's own architecture notes on why —
+// section "account enumeration protection"), which would be impossible if
+// a row could only exist for a real User.
+//
+// `ipHash` is an HMAC-SHA256 of the resolved client IP, keyed by
+// BETTER_AUTH_SECRET (lib/auth/request-ip.ts's hashIp) — never the raw IP.
+// The IPv4 address space is small enough that an unsalted/unkeyed hash
+// would be practically reversible by brute force, which would defeat the
+// entire point of not storing IPs in the clear; keying by a secret this
+// app alone holds makes that infeasible.
+model LoginAttemptLock {
+  id             String    @id @default(cuid())
+  identifierKey  String
+  ipHash         String
+  failedAttempts Int       @default(0)
+  // Non-null exactly while this (identifierKey, ipHash) pair is currently
+  // locked out. A read against an already-expired lock self-heals it
+  // (failedAttempts reset to 0, lockedUntil cleared) rather than leaving it
+  // stale — see isLockedOut's own doc comment, same convention the legacy
+  // per-account design already established.
+  lockedUntil    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([identifierKey, ipHash])
+  @@map("login_attempt_lock")
+}
+
+// ACCOUNT DELETION — EMAIL-CONFIRMED PERMANENT DELETE. A small dedicated
+// model, same precedent as LoginAttemptLock above, rather than reusing
+// Better Auth's own generic Verification table: Better Auth's public API
+// (auth.api.*) exposes no documented way for application code to create or
+// consume a Verification row for a CUSTOM purpose — the internal-adapter
+// methods password-reset relies on (createVerificationValue/
+// consumeVerificationValue, see lib/auth/actions.ts's own comment on
+// resetPasswordAction) only ever run inside Better Auth's own installed
+// endpoints. Reaching into `auth.$context.internalAdapter` from application
+// code to fake a second use of that table would be exactly the kind of
+// fragile, undocumented reliance this project avoids elsewhere.
+//
+// `tokenHash` stores only an HMAC-SHA256 of the raw token (see
+// lib/auth/account-deletion-token.ts) — the same keyed-hash posture as
+// LoginAttemptLock's `ipHash` above (request-ip.ts's hashIp), so a raw DB
+// read alone can never be replayed as a valid deletion link. The raw token
+// itself is never persisted anywhere; it exists only in the emailed URL.
+//
+// Single-use via `consumedAt` (null until the deletion actually completes).
+// Issuing a new request first invalidates any previous outstanding
+// (unconsumed) row for the same user — see account-deletion-request.
+// service.ts — so at most one valid deletion link ever exists per account
+// at a time. Cascades from User so a row can never outlive the account it
+// describes.
+model AccountDeletionRequest {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("account_deletion_request")
 }
 
 // Game-domain data, deliberately kept out of the auth tables above (which

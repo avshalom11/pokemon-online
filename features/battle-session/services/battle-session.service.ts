@@ -280,7 +280,7 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 //
 // `regionId` (Phase 4) is only ever consulted on the "start a brand new
 // session" path below — restoring an existing row never needs it, since
-// PlayerProfile.regionId can only ever change via setActiveRegion
+// PlayerProfile.regionId can only ever change via travelToRegion
 // (features/regions/services/region.service.ts), which always deletes any
 // in-progress FieldBattleSession in the same transaction. That means a
 // session can only ever exist while the player's region has stayed exactly

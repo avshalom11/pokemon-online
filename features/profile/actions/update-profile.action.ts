@@ -14,9 +14,9 @@ export type UpdateProfileActionResult = UpdateProfileResult;
 // (resolve session, zod-validate, delegate to the service). Ownership is
 // never trusted from the client: the profile actually written is always
 // resolved server-side from the session's own user id
-// (getPlayerProfile(session.user.id)), and the username-change path inside
-// updateProfile identifies the caller purely via the request's own auth
-// cookie — never anything this input could influence.
+// (getPlayerProfile(session.user.id)). Username is no longer part of this
+// action at all — see change-username.action.ts for that dedicated,
+// 100-Gold flow.
 export async function updateProfileAction(input: unknown): Promise<UpdateProfileActionResult> {
   const session = await getCurrentSession();
   if (!session) return { status: "error", message: "יש להתחבר מחדש." };
@@ -27,15 +27,14 @@ export async function updateProfileAction(input: unknown): Promise<UpdateProfile
   const currentUsername = session.user.username ?? session.user.name;
   const profile = await getPlayerProfile(session.user.id);
 
-  const result = await updateProfile(profile.id, currentUsername, parsed.data);
+  const result = await updateProfile(profile.id, parsed.data);
 
   if (result.status === "success") {
-    // The route itself is keyed by username, so a changed username needs
-    // its NEW path revalidated (the old one simply stops resolving to
-    // anything on its next visit — no stale cache to worry about there).
-    // /home's nav card links to this same profile, so it needs a refresh
-    // too whenever the target path changes.
-    revalidatePath(`/profile/${result.username}`);
+    // Avatar/theme changes can affect other surfaces that read this same
+    // profile (e.g. /home's nav card) — the route itself is keyed by
+    // username, which this action can no longer change, so it's always
+    // this same current path.
+    revalidatePath(`/profile/${currentUsername}`);
     revalidatePath("/home");
   }
 
@@ -50,7 +49,7 @@ export type UpdateSoundEnabledActionResult = { status: "success" } | { status: "
 // session.user.id — never a client-supplied id — delegate to the
 // service). Deliberately not routed through updateProfileAction/
 // updateProfileSchema: this toggles exactly one field and needs none of
-// that action's username/content-block handling.
+// that action's content-block handling.
 export async function updateSoundEnabledAction(soundEnabled: boolean): Promise<UpdateSoundEnabledActionResult> {
   const session = await getCurrentSession();
   if (!session) return { status: "error" };

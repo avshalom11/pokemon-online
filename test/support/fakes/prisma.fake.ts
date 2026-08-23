@@ -100,6 +100,14 @@ interface PlayerProfileRow {
   // this keeps behaving as "never seen" (offline), same convention every
   // other nullable column here already follows.
   lastSeenAt: Date | null;
+  // NEW PLAYER STARTER — mirrors PlayerProfile.onboardingCompleted's own
+  // @default(false) and starterPokemonId's own nullable, no-@default
+  // column — needed by select-starter.service.ts's selectStarterPokemon
+  // (the only real caller). Every existing test that never explicitly
+  // seeds these keeps behaving as "onboarding not yet completed", same
+  // convention every other column here already follows.
+  onboardingCompleted: boolean;
+  starterPokemonId: string | null;
 }
 
 // PLAYER SEARCH — mirrors prisma/schema.prisma's User model's own
@@ -111,9 +119,46 @@ interface PlayerProfileRow {
 // comment already establishes — so resolving one player's `user` relation
 // is just `users.get(profile.id)` / `profiles.get(user.id)`, no separate
 // foreign key needed in this fake.
+// FAILED LOGIN LOCKOUT — email/failedLoginAttempts/lockedUntil mirror
+// prisma/schema.prisma's User model exactly (see login-lockout.ts, the
+// only reader/writer of the latter two). email defaults to null rather
+// than a real string so every pre-existing seedUser/seedPlayerProfile call
+// (username-only, from PLAYER SEARCH) keeps behaving exactly as before —
+// findUnique({ where: { email } }) simply never matches those rows, same
+// as a real account with a different email would.
 interface UserRow {
   id: string;
   username: string | null;
+  email: string | null;
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
+}
+
+// AUTH SECURITY — LOGIN RATE LIMITING — mirrors prisma/schema.prisma's
+// LoginAttemptLock exactly (see that model's own doc comment). Keyed by
+// (identifierKey, ipHash), never by a User id — this table intentionally
+// has no relation to UserRow at all, since login-lockout.ts must rate-limit
+// entirely made-up identifiers too.
+interface LoginAttemptLockRow {
+  id: string;
+  identifierKey: string;
+  ipHash: string;
+  failedAttempts: number;
+  lockedUntil: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ACCOUNT DELETION — mirrors prisma/schema.prisma's AccountDeletionRequest
+// exactly (see that model's own doc comment). `tokenHash` is the fake's
+// own uniqueness key, matching the real @@unique([tokenHash]).
+interface AccountDeletionRequestRow {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  createdAt: Date;
 }
 
 interface DailyFieldBattleCountRow {
@@ -402,6 +447,10 @@ let notifications = new Map<string, NotificationRow>();
 let globalChatMessages = new Map<string, GlobalChatMessageRow>();
 // PLAYER SEARCH
 let users = new Map<string, UserRow>();
+// AUTH SECURITY — LOGIN RATE LIMITING
+let loginAttemptLocks = new Map<string, LoginAttemptLockRow>();
+// ACCOUNT DELETION
+let accountDeletionRequests = new Map<string, AccountDeletionRequestRow>();
 // FRIENDS PHASE 1
 let friendships = new Map<string, FriendshipRow>();
 let privateConversations = new Map<string, PrivateConversationRow>();
@@ -525,6 +574,7 @@ function cloneState() {
     notifications: new Map([...notifications].map(([id, row]) => [id, { ...row }])),
     globalChatMessages: new Map([...globalChatMessages].map(([id, row]) => [id, { ...row }])),
     users: new Map([...users].map(([id, row]) => [id, { ...row }])),
+    loginAttemptLocks: new Map([...loginAttemptLocks].map(([id, row]) => [id, { ...row }])),
     friendships: new Map([...friendships].map(([id, row]) => [id, { ...row }])),
     privateConversations: new Map([...privateConversations].map(([id, row]) => [id, { ...row }])),
     privateMessages: new Map([...privateMessages].map(([id, row]) => [id, { ...row }])),
@@ -544,6 +594,7 @@ function cloneState() {
     leagueTournamentMatches: new Map([...leagueTournamentMatches].map(([id, row]) => [id, { ...row }])),
     leagueBattleSessions: new Map([...leagueBattleSessions].map(([id, row]) => [id, { ...row }])),
     leagueTournamentPlacements: new Map([...leagueTournamentPlacements].map(([id, row]) => [id, { ...row }])),
+    accountDeletionRequests: new Map([...accountDeletionRequests].map(([id, row]) => [id, { ...row }])),
   };
 }
 
@@ -557,6 +608,7 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   notifications = snapshot.notifications;
   globalChatMessages = snapshot.globalChatMessages;
   users = snapshot.users;
+  loginAttemptLocks = snapshot.loginAttemptLocks;
   friendships = snapshot.friendships;
   privateConversations = snapshot.privateConversations;
   privateMessages = snapshot.privateMessages;
@@ -576,6 +628,7 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   leagueTournamentMatches = snapshot.leagueTournamentMatches;
   leagueBattleSessions = snapshot.leagueBattleSessions;
   leagueTournamentPlacements = snapshot.leagueTournamentPlacements;
+  accountDeletionRequests = snapshot.accountDeletionRequests;
 }
 
 export function resetFakeDb() {
@@ -588,6 +641,7 @@ export function resetFakeDb() {
   notifications = new Map();
   globalChatMessages = new Map();
   users = new Map();
+  loginAttemptLocks = new Map();
   friendships = new Map();
   privateConversations = new Map();
   privateMessages = new Map();
@@ -607,6 +661,7 @@ export function resetFakeDb() {
   leagueTournamentMatches = new Map();
   leagueBattleSessions = new Map();
   leagueTournamentPlacements = new Map();
+  accountDeletionRequests = new Map();
   idCounter = 0;
   transactionQueue = Promise.resolve();
   playerPokemonUpdateCallCount = 0;
@@ -711,6 +766,9 @@ export function seedPlayerProfile(row: {
   // tests) creates no User row at all, exactly like before this field
   // existed.
   username?: string;
+  // NEW PLAYER STARTER — optional convenience for onboarding tests.
+  onboardingCompleted?: boolean;
+  starterPokemonId?: string | null;
 }) {
   const full: PlayerProfileRow = {
     id: row.id,
@@ -740,24 +798,107 @@ export function seedPlayerProfile(row: {
     aboutMe: row.aboutMe ?? "",
     profileThemeId: row.profileThemeId ?? "default",
     lastSeenAt: row.lastSeenAt ?? null,
+    onboardingCompleted: row.onboardingCompleted ?? false,
+    starterPokemonId: row.starterPokemonId ?? null,
   };
   profiles.set(row.id, full);
   if (row.username !== undefined) {
-    users.set(row.id, { id: row.id, username: row.username });
+    users.set(row.id, { id: row.id, username: row.username, email: null, failedLoginAttempts: 0, lockedUntil: null });
   }
   return full;
 }
 
-// PLAYER SEARCH — seeds a standalone fake User row (username only — see
-// UserRow's own doc comment). Prefer passing `username` directly to
-// seedPlayerProfile above for the common case of "one player, needs a
-// username"; this exists for tests that need a User row WITHOUT (or
-// before) its matching PlayerProfile, or that need to change just the
-// username in isolation.
-export function seedUser(row: { id: string; username: string | null }) {
-  const full: UserRow = { id: row.id, username: row.username };
+// PLAYER SEARCH / FAILED LOGIN LOCKOUT — seeds a standalone fake User row.
+// Prefer passing `username` directly to seedPlayerProfile above for the
+// common case of "one player, needs a username"; this exists for tests
+// that need a User row WITHOUT (or before) its matching PlayerProfile, or
+// that need to seed email/lockout state (login-lockout.ts's own tests) —
+// every field beyond id/username defaults to the same "fresh account"
+// state a real freshly-registered User row has.
+export function seedUser(row: {
+  id: string;
+  username: string | null;
+  email?: string | null;
+  failedLoginAttempts?: number;
+  lockedUntil?: Date | null;
+}) {
+  const full: UserRow = {
+    id: row.id,
+    username: row.username,
+    email: row.email ?? null,
+    failedLoginAttempts: row.failedLoginAttempts ?? 0,
+    lockedUntil: row.lockedUntil ?? null,
+  };
   users.set(row.id, full);
   return full;
+}
+
+export function getUserRow(id: string) {
+  const row = users.get(id);
+  return row ? { ...row } : undefined;
+}
+
+// AUTH SECURITY — LOGIN RATE LIMITING — seed/get helpers for
+// LoginAttemptLock, same "seed + read-only getter" pair every other fake
+// table here already provides. Keyed by (identifierKey, ipHash) — matching
+// the real @@unique([identifierKey, ipHash]) constraint — never by a User
+// id, since login-lockout.ts rate-limits identifiers that may not resolve
+// to any real account at all.
+function loginAttemptLockKey(identifierKey: string, ipHash: string): string {
+  return `${identifierKey}::${ipHash}`;
+}
+
+export function seedLoginAttemptLock(row: {
+  identifierKey: string;
+  ipHash: string;
+  failedAttempts?: number;
+  lockedUntil?: Date | null;
+}) {
+  const now = new Date();
+  const full: LoginAttemptLockRow = {
+    id: nextId("login_attempt_lock"),
+    identifierKey: row.identifierKey,
+    ipHash: row.ipHash,
+    failedAttempts: row.failedAttempts ?? 0,
+    lockedUntil: row.lockedUntil ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  loginAttemptLocks.set(loginAttemptLockKey(row.identifierKey, row.ipHash), full);
+  return full;
+}
+
+// ACCOUNT DELETION — seed/get helpers, same "seed + read-only getter" pair
+// every other fake table here already provides. Lets tests construct
+// expired/already-consumed states directly, without going through
+// requestAccountDeletion's own (always-fresh) create path.
+export function seedAccountDeletionRequest(row: {
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  consumedAt?: Date | null;
+}) {
+  const id = nextId("account_deletion_request");
+  const full: AccountDeletionRequestRow = {
+    id,
+    userId: row.userId,
+    tokenHash: row.tokenHash,
+    expiresAt: row.expiresAt,
+    consumedAt: row.consumedAt ?? null,
+    createdAt: new Date(),
+  };
+  accountDeletionRequests.set(id, full);
+  return full;
+}
+
+export function getAccountDeletionRequestByUserId(userId: string) {
+  const row = [...accountDeletionRequests.values()].find((candidate) => candidate.userId === userId);
+  return row ? { ...row } : undefined;
+}
+
+export function getLoginAttemptLockRow(identifierKey: string, ipHash: string) {
+  const row = loginAttemptLocks.get(loginAttemptLockKey(identifierKey, ipHash));
+  return row ? { ...row } : undefined;
 }
 
 // GLOBAL CHAT — bypasses sendGlobalChatMessage's own validation/cooldown/cap
@@ -952,6 +1093,18 @@ export function getPlayerPokemonRow(id: string) {
   return row ? { ...row } : undefined;
 }
 
+// NEW PLAYER STARTER — same "seed + read-only getter" pair every other
+// fake table here already provides; needed by select-starter's own tests
+// to look up a newly-created Pokémon (and its known moves) without
+// already knowing its generated id.
+export function getPlayerPokemonsByPlayerId(playerId: string) {
+  return [...pokemons.values()].filter((row) => row.playerId === playerId).map((row) => ({ ...row }));
+}
+
+export function getKnownMoveRows(playerPokemonId: string) {
+  return [...knownMoves.values()].filter((row) => row.playerPokemonId === playerPokemonId).map((row) => ({ ...row }));
+}
+
 export function getFieldBattleSessionRow(playerId: string) {
   const row = sessions.get(playerId);
   return row ? { ...row } : undefined;
@@ -1135,13 +1288,23 @@ function applyOrderBy<T>(
 // fields (player-search.service.ts's own nested select).
 function projectUserRow(
   row: UserRow,
-  select?: { id?: boolean; username?: boolean; playerProfile?: true | { select?: Record<string, boolean> } }
+  select?: {
+    id?: boolean;
+    username?: boolean;
+    email?: boolean;
+    lockedUntil?: boolean;
+    failedLoginAttempts?: boolean;
+    playerProfile?: true | { select?: Record<string, boolean> };
+  }
 ) {
   if (!select) return { ...row };
 
   const result: Record<string, unknown> = {};
   if (select.id) result.id = row.id;
   if (select.username) result.username = row.username;
+  if (select.email) result.email = row.email;
+  if (select.lockedUntil) result.lockedUntil = row.lockedUntil;
+  if (select.failedLoginAttempts) result.failedLoginAttempts = row.failedLoginAttempts;
   if (select.playerProfile) {
     const profile = profiles.get(row.id);
     if (!profile) {
@@ -1270,10 +1433,68 @@ const client = {
     },
   },
   playerProfile: {
-    async findUniqueOrThrow({ where }: { where: { id: string } }) {
-      const row = profiles.get(where.id);
-      if (!row) throw new Error(`fake prisma: playerProfile ${where.id} not found`);
+    // NEW PLAYER STARTER — `userId` + `select` support added for
+    // select-starter.service.ts's own findUniqueOrThrow({where:{userId},
+    // select:{id:true}}) call — same "id === userId in this fake's own
+    // convention" dual-key lookup findUnique below already uses.
+    async findUniqueOrThrow({
+      where,
+      select,
+    }: {
+      where: { id: string } | { userId: string };
+      select?: { id?: boolean };
+    }) {
+      const lookupId = "id" in where ? where.id : where.userId;
+      const row = profiles.get(lookupId);
+      if (!row) throw new Error(`fake prisma: playerProfile ${lookupId} not found`);
+      if (select?.id) return { id: row.id };
       return { ...row };
+    },
+    // STARTING BALANCE — mirrors ensurePlayerProfile's own real call
+    // exactly (lib/auth/player-profile.ts): a no-op `update` on an
+    // existing row (never re-applies `create`'s starting values), a full
+    // row seeded from `create` the first time — same "profile id == user
+    // id" convention every other method here already uses, and the same
+    // default-filling seedPlayerProfile above already establishes for
+    // every column `create` doesn't explicitly set.
+    async upsert({
+      where,
+      create,
+      update,
+    }: {
+      where: { id: string } | { userId: string };
+      create: { userId: string; displayName: string; coins?: number; gold?: number };
+      update: Record<string, unknown>;
+    }) {
+      const lookupId = "id" in where ? where.id : where.userId;
+      const existing = profiles.get(lookupId);
+      if (existing) {
+        applyNumericOperators(existing as unknown as Record<string, unknown>, update);
+        return { ...existing };
+      }
+      const full: PlayerProfileRow = {
+        id: lookupId,
+        displayName: create.displayName,
+        level: 1,
+        experience: 0,
+        coins: create.coins ?? 500,
+        gold: create.gold ?? 0,
+        regionId: "kanto",
+        selectedWildLevelBracketIndex: null,
+        showGymAchievementsOnProfile: true,
+        soundEnabled: true,
+        avatarDexNumber: null,
+        showPartyOnProfile: true,
+        showStatsOnProfile: true,
+        showAboutMeOnProfile: true,
+        aboutMe: "",
+        profileThemeId: "default",
+        lastSeenAt: null,
+        onboardingCompleted: false,
+        starterPokemonId: null,
+      };
+      profiles.set(lookupId, full);
+      return { ...full };
     },
     // FIELD BATTLE PERFORMANCE — mirrors getActiveBattleSessionWithParty's
     // (battle-session.service.ts) one-query read of PlayerProfile's own
@@ -1286,24 +1507,38 @@ const client = {
       where,
       select,
     }: {
-      where: { id: string };
+      // AUTH SECURITY — SECURITY NOTIFICATION — `userId` support added for
+      // lib/auth/player-profile.ts's notifySecurityLoginLockout, the real
+      // Prisma schema's own PlayerProfile.userId @unique lookup. This
+      // fake's own PlayerProfileRow has no separate stored `userId` field
+      // (its established convention treats profile id and session user id
+      // as identical — see e.g. player-profile.fake.ts's own doc comment),
+      // so `where.userId` resolves through the exact same `profiles` map
+      // as `where.id` — accurate GIVEN that convention, without needing a
+      // second stored field that would only ever hold the same value.
+      where: { id: string } | { userId: string };
       select?: {
+        id?: boolean;
         fieldBattleSession?: boolean;
         pokemon?: { where?: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc">; take?: number };
       };
     }) {
-      const row = profiles.get(where.id);
+      const lookupId = "id" in where ? where.id : where.userId;
+      const row = profiles.get(lookupId);
       if (!row) return null;
       if (!select) return { ...row };
 
       const result: Record<string, unknown> = {};
+      if (select.id) {
+        result.id = row.id;
+      }
       if (select.fieldBattleSession) {
-        result.fieldBattleSession = sessions.get(where.id) ?? null;
+        result.fieldBattleSession = sessions.get(lookupId) ?? null;
       }
       if (select.pokemon) {
         const pokemonArgs = select.pokemon;
         const rows = [...pokemons.values()].filter(
-          (pokemon) => pokemon.playerId === where.id && matches(pokemon, pokemonArgs.where)
+          (pokemon) => pokemon.playerId === lookupId && matches(pokemon, pokemonArgs.where)
         );
         const sorted = applyOrderBy(rows, pokemonArgs.orderBy);
         result.pokemon = (pokemonArgs.take ? sorted.slice(0, pokemonArgs.take) : sorted).map((r) => ({ ...r }));
@@ -1845,6 +2080,19 @@ const client = {
     async findMany({ where, orderBy }: { where?: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc"> }) {
       const rows = [...leagueTournamentPlacements.values()].filter((row) => matches(row, where));
       return applyOrderBy(rows, orderBy).map((row) => ({ ...row }));
+    },
+    // ACCOUNT DELETION — explicit cleanup call site (this row has no real
+    // FK to PlayerProfile, see that model's own schema.prisma doc comment,
+    // so it would never cascade on its own).
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [id, row] of leagueTournamentPlacements) {
+        if (matches(row, where)) {
+          leagueTournamentPlacements.delete(id);
+          count += 1;
+        }
+      }
+      return { count };
     },
   },
   // GYMS & LEAGUES PHASE 6 fakes.
@@ -2427,12 +2675,22 @@ const client = {
       where,
       select,
     }: {
-      where: { id?: string; username?: string | null };
-      select?: { id?: boolean; username?: boolean; playerProfile?: true | { select?: Record<string, boolean> } };
+      where: { id?: string; username?: string | null; email?: string };
+      select?: {
+        id?: boolean;
+        username?: boolean;
+        email?: boolean;
+        lockedUntil?: boolean;
+        failedLoginAttempts?: boolean;
+        playerProfile?: true | { select?: Record<string, boolean> };
+      };
     }) {
       let row: UserRow | undefined;
       if (where.id) row = users.get(where.id);
       else if (where.username !== undefined) row = [...users.values()].find((candidate) => candidate.username === where.username);
+      // FAILED LOGIN LOCKOUT — mirrors login-lockout.ts's own
+      // findLockableUserByIdentifier, the only caller that looks up by email.
+      else if (where.email !== undefined) row = [...users.values()].find((candidate) => candidate.email === where.email);
       if (!row) return null;
       return projectUserRow(row, select);
     },
@@ -2448,6 +2706,161 @@ const client = {
       const rows = [...users.values()].filter((row) => matches(row, where ?? {}));
       const limited = take ? rows.slice(0, take) : rows;
       return limited.map((row) => projectUserRow(row, select));
+    },
+    // FAILED LOGIN LOCKOUT — mirrors login-lockout.ts's own
+    // resetFailedLoginAttempts/recordFailedLoginAttempt/isLockedOut, the
+    // only writers of failedLoginAttempts/lockedUntil in this codebase.
+    // Same increment-operator support applyNumericOperators already gives
+    // playerPokemon.update/playerProfile.update above.
+    async update({
+      where,
+      data,
+      select,
+    }: {
+      where: { id: string };
+      data: Record<string, unknown>;
+      select?: { failedLoginAttempts?: boolean };
+    }) {
+      const row = users.get(where.id);
+      if (!row) throw new Error(`fake prisma: user ${where.id} not found for update`);
+      applyNumericOperators(row as unknown as Record<string, unknown>, data);
+      if (select?.failedLoginAttempts) return { failedLoginAttempts: row.failedLoginAttempts };
+      return { ...row };
+    },
+    // ACCOUNT DELETION — mirrors the real `tx.user.delete()`'s cascade for
+    // just the two tables this fake's own tests actually assert on
+    // (User itself, and PlayerProfile — keyed by the same id in this
+    // fake's convention, see projectUserRow's own `profiles.get(row.id)`
+    // above). This is NOT a general-purpose cascade simulator for every
+    // other PlayerProfile-owned table — that guarantee is real Postgres
+    // ON DELETE CASCADE at the schema level (see prisma/schema.prisma and
+    // account-deletion.service.ts's own doc comment), verified separately
+    // by this feature's schema-audit source-boundary test rather than
+    // re-implemented here.
+    async delete({ where }: { where: { id: string } }) {
+      const row = users.get(where.id);
+      if (!row) throw new Error(`fake prisma: user ${where.id} not found for delete`);
+      users.delete(where.id);
+      profiles.delete(where.id);
+      return { ...row };
+    },
+  },
+  // AUTH SECURITY — LOGIN RATE LIMITING — mirrors login-lockout.ts's exact
+  // call shapes: findUnique/update by the compound (identifierKey, ipHash)
+  // key (matching the real @@unique constraint's Prisma-generated
+  // `identifierKey_ipHash` field name), upsert for
+  // recordFailedLoginAttempt, updateMany for resetLoginAttempts (a no-op
+  // when no row exists yet for that pair, same as the real DB).
+  loginAttemptLock: {
+    async findUnique({
+      where,
+    }: {
+      where: { identifierKey_ipHash: { identifierKey: string; ipHash: string } };
+    }) {
+      const row = loginAttemptLocks.get(loginAttemptLockKey(where.identifierKey_ipHash.identifierKey, where.identifierKey_ipHash.ipHash));
+      return row ? { ...row } : null;
+    },
+    async upsert({
+      where,
+      create,
+      update,
+    }: {
+      where: { identifierKey_ipHash: { identifierKey: string; ipHash: string } };
+      create: { identifierKey: string; ipHash: string; failedAttempts: number };
+      update: Record<string, unknown>;
+    }) {
+      const key = loginAttemptLockKey(where.identifierKey_ipHash.identifierKey, where.identifierKey_ipHash.ipHash);
+      const existing = loginAttemptLocks.get(key);
+      if (!existing) {
+        const now = new Date();
+        const full: LoginAttemptLockRow = {
+          id: nextId("login_attempt_lock"),
+          identifierKey: create.identifierKey,
+          ipHash: create.ipHash,
+          failedAttempts: create.failedAttempts,
+          lockedUntil: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        loginAttemptLocks.set(key, full);
+        return { ...full };
+      }
+      applyNumericOperators(existing as unknown as Record<string, unknown>, update);
+      existing.updatedAt = new Date();
+      return { ...existing };
+    },
+    async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
+      const row = [...loginAttemptLocks.values()].find((candidate) => candidate.id === where.id);
+      if (!row) throw new Error(`fake prisma: loginAttemptLock ${where.id} not found for update`);
+      applyNumericOperators(row as unknown as Record<string, unknown>, data);
+      row.updatedAt = new Date();
+      return { ...row };
+    },
+    async updateMany({ where, data }: { where: { identifierKey: string; ipHash: string }; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of loginAttemptLocks.values()) {
+        if (row.identifierKey === where.identifierKey && row.ipHash === where.ipHash) {
+          applyNumericOperators(row as unknown as Record<string, unknown>, data);
+          row.updatedAt = new Date();
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  // ACCOUNT DELETION — mirrors account-deletion-request.service.ts's /
+  // account-deletion.service.ts's exact call shapes: findUnique by the
+  // unique tokenHash, create, deleteMany (invalidating a user's previous
+  // outstanding request), delete (rollback on email-send failure), and the
+  // exactly-once updateMany claim guard (same idiom loginAttemptLock's own
+  // updateMany above, and wildDefeatRewardGranted elsewhere, already use).
+  accountDeletionRequest: {
+    async findUnique({ where }: { where: { tokenHash: string } }) {
+      const row = [...accountDeletionRequests.values()].find((candidate) => candidate.tokenHash === where.tokenHash);
+      return row ? { ...row } : null;
+    },
+    async create({
+      data,
+    }: {
+      data: { userId: string; tokenHash: string; expiresAt: Date };
+    }) {
+      const id = nextId("account_deletion_request");
+      const full: AccountDeletionRequestRow = {
+        id,
+        userId: data.userId,
+        tokenHash: data.tokenHash,
+        expiresAt: data.expiresAt,
+        consumedAt: null,
+        createdAt: new Date(),
+      };
+      accountDeletionRequests.set(id, full);
+      return { ...full };
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [id, row] of accountDeletionRequests) {
+        if (matches(row, where)) {
+          accountDeletionRequests.delete(id);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+    async delete({ where }: { where: { id: string } }) {
+      const row = accountDeletionRequests.get(where.id);
+      if (!row) throw new Error(`fake prisma: accountDeletionRequest ${where.id} not found for delete`);
+      accountDeletionRequests.delete(where.id);
+      return { ...row };
+    },
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of accountDeletionRequests.values()) {
+        if (matches(row, where)) {
+          Object.assign(row, data);
+          count += 1;
+        }
+      }
+      return { count };
     },
   },
   friendship: {

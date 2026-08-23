@@ -1,3 +1,4 @@
+import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 // Pure, framework-free party rules — no React, no Prisma, no "server-only".
@@ -26,4 +27,19 @@ export function isPartyDefeated(party: OwnedPokemon[]): boolean {
 // implicit), not already the active Pokémon, and not fainted.
 export function canSwitchTo(target: OwnedPokemon, activePokemonId: string): boolean {
   return target.id !== activePokemonId && isUsable(target);
+}
+
+// FIELD CAPTURE — AUTO-ADD TO PARTY IF SPACE. The one place "which slot
+// does a newly-added Pokémon land in" is decided — the lowest-numbered
+// slot (1..MAX_ACTIVE_TEAM_SIZE) not already present in `occupiedSlots`,
+// or null if every slot is taken (party full; caller keeps the Pokémon in
+// storage instead, never replacing an existing member). Shared by any
+// future auto-add-to-party flow — today, capture.service.ts's own
+// attemptCapture, right after a newly-captured Pokémon is created.
+export function getFirstEmptyPartySlot(occupiedSlots: readonly number[]): number | null {
+  const occupied = new Set(occupiedSlots);
+  for (let slot = 1; slot <= MAX_ACTIVE_TEAM_SIZE; slot++) {
+    if (!occupied.has(slot)) return slot;
+  }
+  return null;
 }

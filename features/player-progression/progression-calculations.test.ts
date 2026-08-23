@@ -62,12 +62,37 @@ test("negative XP is rejected/clamped safely", () => {
   assert.equal(progress.currentLevelXp, 0);
 });
 
-test("victory reward formula is correct", () => {
-  // 10 + (3 * 5) = 25
-  assert.equal(calculateVictoryXpReward(3), 25);
+// FIELD BATTLE PLAYER XP — REDUCED BY 50%. VICTORY_XP_BASE/PER_LEVEL were
+// halved (10/5 -> 5/2.5) from their original values — see
+// progression-config.ts's own doc comment for the full rationale. These
+// three wildLevel examples (14/18/22) are the exact ones the rebalance
+// task itself was framed around: the OLD formula (10 + wildLevel*5)
+// produced 80/100/120 XP for them; the new one must produce exactly half.
+test("victory reward formula: wildLevel 14 -> 40 XP (was 80, now exactly 50%)", () => {
+  assert.equal(calculateVictoryXpReward(14), 40);
 });
 
-test("capture reward formula is correct", () => {
-  // 15 + (3 * 5) = 30
+test("victory reward formula: wildLevel 18 -> 50 XP (was 100, now exactly 50%)", () => {
+  assert.equal(calculateVictoryXpReward(18), 50);
+});
+
+test("victory reward formula: wildLevel 22 -> 60 XP (was 120, now exactly 50%)", () => {
+  assert.equal(calculateVictoryXpReward(22), 60);
+});
+
+test("victory reward formula: an odd wildLevel rounds to the nearest whole XP (5 + 3*2.5 = 12.5 -> 13, half of the old 25)", () => {
+  assert.equal(calculateVictoryXpReward(3), 13);
+});
+
+test("victory reward is never negative/fractional even for an invalid (zero/negative) wildLevel", () => {
+  assert.equal(calculateVictoryXpReward(0), calculateVictoryXpReward(1));
+  assert.ok(Number.isInteger(calculateVictoryXpReward(-5)));
+});
+
+test("capture reward formula is UNCHANGED by the victory-XP rebalance (still 15 + wildLevel*5 — a completely separate reward)", () => {
+  // 15 + (3 * 5) = 30 — same as before this task; capturing a wild
+  // Pokémon is a distinct reward from defeating one, and this task only
+  // ever touches VICTORY_XP_BASE/VICTORY_XP_PER_LEVEL.
   assert.equal(calculateCaptureXpReward(3), 30);
+  assert.equal(calculateCaptureXpReward(14), 85);
 });

@@ -18,13 +18,12 @@ export const aboutMeSchema = z
   .trim()
   .max(ABOUT_ME_MAX_LENGTH, { error: `התיאור יכול להכיל עד ${ABOUT_ME_MAX_LENGTH} תווים` });
 
-// Structural validation only — reuses the SAME usernameSchema the
-// registration form already validates against (lib/auth/validation.ts), so
-// the two can never drift apart on length/character rules. Whether the
-// requested username is actually available is Better Auth's own job (see
-// update-profile.service.ts's auth.api.updateUser call), never this schema's.
+// SECURITY & ACCOUNT — username is deliberately NOT part of this schema.
+// Changing it now costs 100 Gold and goes through its own dedicated flow
+// (changeUsernameSchema + change-username.service.ts), never bundled into
+// this free profile-content save — see SecurityAccountSection's own doc
+// comment for why the two are kept visually and functionally separate.
 export const updateProfileSchema = z.object({
-  username: usernameSchema,
   aboutMe: aboutMeSchema,
   avatarDexNumber: z
     .number()
@@ -53,3 +52,17 @@ export const changePasswordSchema = z
   });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+// SECURITY & ACCOUNT — the dedicated, paid (100 Gold) username-change
+// flow's own input. Reuses the SAME usernameSchema every other
+// username-accepting form in the app validates against (lib/auth/
+// validation.ts) — structural rules can never drift apart between them.
+// Availability (is this username actually free) is checked later, in
+// change-username.service.ts, never here — same "structural schema,
+// service owns uniqueness" split updateProfileSchema used to document for
+// its own now-removed username field.
+export const changeUsernameSchema = z.object({
+  newUsername: usernameSchema,
+});
+
+export type ChangeUsernameInput = z.infer<typeof changeUsernameSchema>;

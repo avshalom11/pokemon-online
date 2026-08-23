@@ -81,9 +81,12 @@ export function progressFromLevelUpResult(result: LevelUpResult): PlayerProgress
   };
 }
 
-// Player XP reward for defeating a wild Pokémon of `wildLevel`.
+// Player XP reward for defeating a wild Pokémon of `wildLevel`. Rounded —
+// VICTORY_XP_PER_LEVEL is a non-integer (see progression-config.ts's own
+// doc comment on why), so an odd wildLevel would otherwise produce a
+// fractional XP amount; addPlayerExperience always persists a whole number.
 export function calculateVictoryXpReward(wildLevel: number): number {
-  return VICTORY_XP_BASE + safeLevel(wildLevel) * VICTORY_XP_PER_LEVEL;
+  return Math.round(VICTORY_XP_BASE + safeLevel(wildLevel) * VICTORY_XP_PER_LEVEL);
 }
 
 // Player XP reward for successfully capturing a wild Pokémon of `wildLevel`.

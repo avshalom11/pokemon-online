@@ -41,6 +41,12 @@ export interface BattleSceneProps {
   /** Universal fast player-attack lunge, forwarded to the player's
    * PokemonSprite — see its own `isAttacking` doc comment. */
   playerAttacking?: boolean;
+  /** CAPTURE SHAKE ANIMATION — forwarded to the enemy's PokemonSprite only
+   * (see its own doc comment). Both default to undefined/null, a no-op —
+   * Gym/League battles share this component but never pass these, so they
+   * render exactly as before this feature. */
+  captureAnimationStage?: "shaking" | "success" | null;
+  captureBallImageSrc?: string | null;
   /** Forwarded straight through to BattleBackground — see its own
    * `rarityOverlayClassName` doc comment
    * (components/battle/BattleBackground.tsx). */
@@ -94,6 +100,8 @@ export function BattleScene({
   enemyHit,
   playerHit,
   playerAttacking,
+  captureAnimationStage,
+  captureBallImageSrc,
   rarityOverlayClassName,
   playerHudFooter,
   enemyHudFooter,
@@ -109,7 +117,14 @@ export function BattleScene({
       {/* Sprites — percentage-anchored to this theme's two battle-platform
           circles in the art, independent of the HUD/footer layout below. */}
       <PlatformAnchor point={theme.arena.wildPlatform}>
-        <PokemonSprite role="enemy" spriteUrl={enemy.spriteUrl} name={enemy.name} isHit={enemyHit} />
+        <PokemonSprite
+          role="enemy"
+          spriteUrl={enemy.spriteUrl}
+          name={enemy.name}
+          isHit={enemyHit}
+          captureAnimationStage={captureAnimationStage}
+          captureBallImageSrc={captureBallImageSrc}
+        />
       </PlatformAnchor>
       <PlatformAnchor point={theme.arena.playerPlatform}>
         <PokemonSprite

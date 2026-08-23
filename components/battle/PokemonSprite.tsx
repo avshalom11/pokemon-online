@@ -25,6 +25,17 @@ interface PokemonSpriteProps {
    * battle-attack-lunge and features/battle/utils/battle-attack-effect.ts)
    * — only ever passed for role="player", played once per accepted attack. */
   isAttacking?: boolean;
+  /** CAPTURE SHAKE ANIMATION — only ever passed for role="enemy", and only
+   * by Field Battle (BattleContent.tsx); Gym/League never set this, so
+   * they render exactly as before even though they share this component.
+   * While set, the wild Pokémon's own sprite/placeholder is replaced
+   * entirely by a rocking Poké Ball rendered at the same anchored
+   * position — see app/globals.css's capture-ball-shake/capture-ball-success. */
+  captureAnimationStage?: "shaking" | "success" | null;
+  /** The exact ball image being thrown (InventoryItemView.item.imageUrl —
+   * never a separate/duplicated path lookup) — required whenever
+   * captureAnimationStage is set. */
+  captureBallImageSrc?: string | null;
 }
 
 const PLACEHOLDER_TINT = "#2dd4bf";
@@ -32,7 +43,16 @@ const PLACEHOLDER_TINT = "#2dd4bf";
 // Reserves generous, responsive space for a large animated sprite (GIF)
 // rather than a small fixed-size placeholder — swapping in real art later
 // only ever touches this file, never BattleScene.
-export function PokemonSprite({ role, spriteUrl, fallbackSpriteUrl, name, isHit, isAttacking }: PokemonSpriteProps) {
+export function PokemonSprite({
+  role,
+  spriteUrl,
+  fallbackSpriteUrl,
+  name,
+  isHit,
+  isAttacking,
+  captureAnimationStage,
+  captureBallImageSrc,
+}: PokemonSpriteProps) {
   const isEnemy = role === "enemy";
 
   // Flip only ever applies to the player — see FLIP_PLAYER_SPRITE_HORIZONTALLY's
@@ -62,7 +82,9 @@ export function PokemonSprite({ role, spriteUrl, fallbackSpriteUrl, name, isHit,
           <div
             className={`relative flex h-20 w-20 items-center justify-center sm:h-28 sm:w-28 md:h-36 md:w-36 lg:h-40 lg:w-40 ${isHit ? "animate-battle-hit-flash" : ""}`}
           >
-            {spriteUrl ? (
+            {captureAnimationStage && captureBallImageSrc ? (
+              <CaptureBall src={captureBallImageSrc} stage={captureAnimationStage} />
+            ) : spriteUrl ? (
               <SpriteImage
                 src={spriteUrl}
                 fallbackSrc={fallbackSpriteUrl}
@@ -76,7 +98,12 @@ export function PokemonSprite({ role, spriteUrl, fallbackSpriteUrl, name, isHit,
 
             {/* Small impact burst overlay (app/globals.css's
                 battle-impact-burst) — purely decorative, layered on top of
-                whichever sprite is currently hit-flashing. */}
+                whichever sprite is currently hit-flashing. Never shown
+                together with the capture-ball animation (isHit is never
+                true while a capture is in flight — see BattleContent's
+                proceedCapture, which only triggers the enemy hit-flash on
+                a FAILED capture, after the ball animation has already
+                cleared). */}
             {isHit ? (
               <div
                 className="pointer-events-none absolute inset-0 m-auto h-1/2 w-1/2 animate-battle-impact-burst rounded-full bg-white/70"
@@ -88,6 +115,30 @@ export function PokemonSprite({ role, spriteUrl, fallbackSpriteUrl, name, isHit,
       </div>
 
       <div className="mx-auto -mt-2 h-3 w-20 rounded-full bg-black/35 blur-sm sm:h-4 sm:w-28" />
+    </div>
+  );
+}
+
+// CAPTURE SHAKE ANIMATION — renders in place of the wild Pokémon's own
+// sprite/placeholder above, inside the exact same anchored/scaled wrapper,
+// so it appears centered at the wild Pokémon's own battle position with no
+// extra positioning logic of its own. Sized smaller than the full sprite
+// box (a Poké Ball is much smaller than a Pokémon) and centered within it.
+// "shaking" plays the rocking animation (app/globals.css's
+// capture-ball-shake, CAPTURE_SHAKE_DURATION_MS); "success" plays the
+// brief glow/pop (capture-ball-success, CAPTURE_SUCCESS_HOLD_MS) — see
+// BattleContent.tsx's proceedCapture for the state machine driving this.
+function CaptureBall({ src, stage }: { src: string; stage: "shaking" | "success" }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        className={`h-1/2 w-1/2 object-contain drop-shadow-2xl ${
+          stage === "shaking" ? "animate-capture-ball-shake" : "animate-capture-ball-success"
+        }`}
+      />
     </div>
   );
 }

@@ -44,7 +44,13 @@ import { playAttackHitSound } from "@/features/battle/utils/battle-attack-effect
 import { playDefeatSound, playVictorySound } from "@/features/battle/utils/battle-result-sound";
 import { FIELD_BATTLE_MUSIC_PATH } from "@/features/battle/utils/battle-music";
 import { determineNextPhaseAfterFaint, resolveWildCounterAttack } from "@/features/battle/utils/battle-turn-rules";
-import { ATTACK_EFFECT_DURATION_MS, HIT_FLASH_DURATION_MS, XP_TOAST_DURATION_MS } from "@/features/battle/utils/battle-timing";
+import {
+  ATTACK_EFFECT_DURATION_MS,
+  CAPTURE_SHAKE_DURATION_MS,
+  CAPTURE_SUCCESS_HOLD_MS,
+  HIT_FLASH_DURATION_MS,
+  XP_TOAST_DURATION_MS,
+} from "@/features/battle/utils/battle-timing";
 import { EvolutionBranchChoiceDialog } from "@/features/evolution/components/EvolutionBranchChoiceDialog";
 import { EvolutionPromptDialog } from "@/features/evolution/components/EvolutionPromptDialog";
 import { acceptEvolutionAction, chooseEvolutionBranchAction, rejectEvolutionAction } from "@/features/evolution/actions/evolution.actions";
@@ -399,6 +405,17 @@ export function BattleContent({
   const playerAttackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const xpToastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // CAPTURE SHAKE ANIMATION — captureAnimationStage null = no capture in
+  // flight (the enemy's real sprite renders normally); "shaking" while the
+  // ball rocks (set the instant proceedCapture starts, alongside phase
+  // "capturing"); "success" for the brief post-shake glow, ONLY on a
+  // captured result. captureBallImageSrc is resolved once, at throw time,
+  // from the exact same InventoryItemView the Bag already uses — never a
+  // separate/duplicated ball-image lookup. See proceedCapture below.
+  const [captureAnimationStage, setCaptureAnimationStage] = useState<"shaking" | "success" | null>(null);
+  const [captureBallImageSrc, setCaptureBallImageSrc] = useState<string | null>(null);
+  const captureSuccessTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // SIDEBAR STUCK IN ACTIVE-BATTLE MODE — STALE-STATE FIX. Escape and a full
   // party defeat are the two exits that must delete the FieldBattleSession
   // themselves (endBattleSessionAction — capture already does this
@@ -425,6 +442,7 @@ export function BattleContent({
       if (playerHitTimeout.current) clearTimeout(playerHitTimeout.current);
       if (playerAttackTimeout.current) clearTimeout(playerAttackTimeout.current);
       if (xpToastTimeout.current) clearTimeout(xpToastTimeout.current);
+      if (captureSuccessTimeout.current) clearTimeout(captureSuccessTimeout.current);
     },
     []
   );
@@ -1016,14 +1034,34 @@ export function BattleContent({
     // runs before either result branch below.
     setMessage(throwPokeballMessage(playerName, wildState.pokemon.name));
 
+    // CAPTURE SHAKE ANIMATION — started synchronously, alongside `phase`
+    // above, so the wild sprite swaps out for the thrown ball the instant
+    // the throw is confirmed, not after the (real) network round trip
+    // resolves. Image comes straight from the same InventoryItemView the
+    // Bag already renders — never a second/duplicated ball-image lookup.
+    setCaptureBallImageSrc(liveInventoryItems.find((view) => view.item.id === ballItemId)?.item.imageUrl ?? null);
+    setCaptureAnimationStage("shaking");
+
     startCaptureTransition(async () => {
       // See handleAttack's identical try/catch for why this must never
       // leave `phase` stuck on "capturing" forever after a thrown/rejected
-      // request.
+      // request. The real capture RNG/roll (attemptCaptureAction, entirely
+      // unmodified) and the minimum shake duration run IN PARALLEL via
+      // Promise.all — never sequentially — so a fast server response is
+      // never made to feel slower than CAPTURE_SHAKE_DURATION_MS, and a
+      // slow one is never made to feel faster: the reveal below only ever
+      // waits for whichever of the two takes longer. A thrown/rejected
+      // request short-circuits Promise.all immediately, exactly like the
+      // original un-animated version did — the shake is never allowed to
+      // mask or delay a genuine error.
       let result: Awaited<ReturnType<typeof attemptCaptureAction>>;
       try {
-        result = await attemptCaptureAction(ballItemId);
+        [result] = await Promise.all([
+          attemptCaptureAction(ballItemId),
+          new Promise<void>((resolve) => setTimeout(resolve, CAPTURE_SHAKE_DURATION_MS)),
+        ]);
       } catch {
+        setCaptureAnimationStage(null);
         setPhase("playerTurn");
         return;
       }
@@ -1035,11 +1073,25 @@ export function BattleContent({
         // path above). The ending behavior (modal, manual return-to-map)
         // is unchanged; only its message content and the independent XP
         // toast are new.
-        setMessage(captureSucceededMessage(result.pokemonName));
+        setMessage(captureSucceededMessage(result.pokemonName, result.addedToParty));
         applyBattleReward(result.xpResult);
-        setPhase("captured");
+
+        // Brief success glow on the ball (CAPTURE_SUCCESS_HOLD_MS) before
+        // handing off into the existing captured/result flow — `phase`
+        // only flips to "captured" (which mounts BattleResultOverlay) once
+        // this hold finishes, so the overlay never appears mid-shake.
+        setCaptureAnimationStage("success");
+        captureSuccessTimeout.current = setTimeout(() => {
+          setCaptureAnimationStage(null);
+          setPhase("captured");
+        }, CAPTURE_SUCCESS_HOLD_MS);
         return;
       }
+
+      // Every other outcome (failed / no-balls / error) reveals immediately
+      // once the shake ends — the wild Pokémon's own sprite reappears the
+      // instant the ball animation clears.
+      setCaptureAnimationStage(null);
 
       if (result.status !== "failed") {
         // "no-balls" (a race against this exact ball running out
@@ -1402,6 +1454,8 @@ export function BattleContent({
         enemyHit={enemyHit}
         playerHit={playerHit}
         playerAttacking={playerAttacking}
+        captureAnimationStage={captureAnimationStage}
+        captureBallImageSrc={captureBallImageSrc}
       />
 
       <XpToast message={xpToastMessage} />

@@ -45,6 +45,15 @@
 // documented limitation: this is NOT live "is the recipient currently
 // looking at this chat" presence detection, which this project's polling-
 // only architecture has no reliable way to determine).
+//
+// SECURITY_LOGIN_LOCKOUT: created by lib/auth/player-profile.ts's
+// notifySecurityLoginLockout, called from lib/auth/actions.ts's loginAction
+// the ONE time a given (identifier, IP) pair's failed-attempt count newly
+// crosses the lockout threshold (see lib/auth/login-lockout.ts's own
+// recordFailedLoginAttempt doc comment for why that's naturally exactly
+// once per lock window, with no separate dedup flag needed). Never carries
+// the attacker's IP or any other security detail in `message`/`metadata` —
+// only the fact that a lockout happened.
 export type NotificationType =
   | "PLAYER_LEVEL_UP"
   | "CURRENCY_MONEY_REWARD"
@@ -54,7 +63,8 @@ export type NotificationType =
   | "POKEMON_EVOLVED"
   | "CHEST_OPENED"
   | "FRIEND_REQUEST_RECEIVED"
-  | "PRIVATE_MESSAGE_RECEIVED";
+  | "PRIVATE_MESSAGE_RECEIVED"
+  | "SECURITY_LOGIN_LOCKOUT";
 
 export interface NotificationSummary {
   id: string;

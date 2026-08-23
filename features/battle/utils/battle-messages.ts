@@ -54,8 +54,14 @@ export function medicineUseMessage(playerName: string, itemName: string, targetN
   return `${playerName} השתמש ב${itemName} על ${targetName}!`;
 }
 
-export function captureSucceededMessage(wildName: string): string {
-  return `${wildName} נתפס בהצלחה!`;
+// FIELD CAPTURE — AUTO-ADD TO PARTY IF SPACE. `addedToParty` reflects
+// capture.service.ts's own real outcome (never re-derived/guessed here) —
+// appends the matching Hebrew line to the existing capture message rather
+// than replacing it, so the "X נתפס בהצלחה!" text every existing capture
+// already shows stays exactly the same either way.
+export function captureSucceededMessage(wildName: string, addedToParty: boolean): string {
+  const partyStatus = addedToParty ? "הפוקימון נוסף לשישייה שלך" : "השישייה שלך מלאה — הפוקימון נוסף למאגר";
+  return `${wildName} נתפס בהצלחה! ${partyStatus}.`;
 }
 
 export function escapeMessage(): string {

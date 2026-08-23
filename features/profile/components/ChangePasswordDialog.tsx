@@ -8,13 +8,13 @@ interface ChangePasswordDialogProps {
   onClose: () => void;
 }
 
-// A separate, small dialog stacked on top of EditProfileModal — password
-// changes are deliberately never bundled into the profile-save action
-// (they go through changePasswordAction, a thin wrapper around Better
-// Auth's own official changePassword flow; see that action's own doc
-// comment). Never touches PlayerProfile, never affects the profile view,
-// so a successful change here needs no page refresh — just its own inline
-// confirmation.
+// A separate, small dialog opened from SecurityAccountSection ("אבטחה
+// וחשבון") — password changes are deliberately never bundled into the
+// profile-save action (they go through changePasswordAction, a thin
+// wrapper around Better Auth's own official changePassword flow; see that
+// action's own doc comment). Never touches PlayerProfile, never affects
+// the profile view, so a successful change here needs no page refresh —
+// just its own inline confirmation.
 export function ChangePasswordDialog({ onClose }: ChangePasswordDialogProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");

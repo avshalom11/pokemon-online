@@ -154,7 +154,6 @@ export interface PublicProfileView {
 // this feature's own spec: "the owner may still preview their own party
 // while editing").
 export interface ProfileEditViewModel {
-  username: string;
   aboutMe: string;
   avatarDexNumber: number | null;
   themeId: ProfileThemeId;

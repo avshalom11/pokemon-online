@@ -10,6 +10,7 @@ import { ProfileContentBlocksSection } from "./ProfileContentBlocksSection";
 import { ProfileHeader } from "./ProfileHeader";
 import { ProfilePartySection } from "./ProfilePartySection";
 import { ProfileStatsSection } from "./ProfileStatsSection";
+import { SecurityAccountSection } from "./SecurityAccountSection";
 import { BackButton } from "@/components/layout/BackButton";
 import { ProfileFriendsSection } from "@/features/friends/components/ProfileFriendsSection";
 import { getProfileTheme } from "../themes/profile-themes";
@@ -37,20 +38,24 @@ export function ProfileContent({ view, editData }: ProfileContentProps) {
   const successTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const theme = getProfileTheme(view.themeId);
 
-  function handleSaved(newUsername: string) {
-    setIsEditOpen(false);
-    setSuccessMessage("הפרופיל עודכן בהצלחה.");
+  function showSuccessMessage(message: string) {
+    setSuccessMessage(message);
     if (successTimeout.current) clearTimeout(successTimeout.current);
     successTimeout.current = setTimeout(() => setSuccessMessage(null), 4000);
+  }
 
-    if (newUsername !== view.username) {
-      // The route itself is keyed by username — a changed username means
-      // this exact URL no longer points at the right profile, so navigate
-      // to the new one instead of just refreshing in place.
-      router.replace(`/profile/${newUsername}`);
-    } else {
-      router.refresh();
-    }
+  function handleProfileSaved() {
+    setIsEditOpen(false);
+    showSuccessMessage("הפרופיל עודכן בהצלחה.");
+    router.refresh();
+  }
+
+  function handleUsernameChanged(newUsername: string) {
+    showSuccessMessage("שם המשתמש שונה בהצלחה.");
+    // The route itself is keyed by username — a changed username means
+    // this exact URL no longer points at the right profile, so navigate to
+    // the new one instead of just refreshing in place.
+    router.replace(`/profile/${newUsername}`);
   }
 
   return (
@@ -61,6 +66,10 @@ export function ProfileContent({ view, editData }: ProfileContentProps) {
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-6">
           <ProfileHeader view={view} onEditClick={() => setIsEditOpen(true)} />
         </div>
+
+        {view.isOwner ? (
+          <SecurityAccountSection currentUsername={view.username} onUsernameChanged={handleUsernameChanged} />
+        ) : null}
 
         {successMessage ? (
           <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-center text-sm font-semibold text-emerald-300">
@@ -77,7 +86,7 @@ export function ProfileContent({ view, editData }: ProfileContentProps) {
       </div>
 
       {isEditOpen && editData ? (
-        <EditProfileModal data={editData} onClose={() => setIsEditOpen(false)} onSaved={handleSaved} />
+        <EditProfileModal data={editData} onClose={() => setIsEditOpen(false)} onSaved={handleProfileSaved} />
       ) : null}
     </div>
   );

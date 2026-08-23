@@ -26,7 +26,14 @@ export async function changePassword(input: ChangePasswordInput): Promise<Change
       body: {
         currentPassword: input.currentPassword,
         newPassword: input.newPassword,
-        revokeOtherSessions: false,
+        // Every OTHER session for this account is signed out on a
+        // successful change (the current one — the one making this very
+        // request — is deliberately left alone, so the player isn't logged
+        // out by their own change-password action). Same "a password
+        // change should kill any session an attacker might already be
+        // holding" reasoning as the forgot-password reset flow's own
+        // revokeSessionsOnPasswordReset (lib/auth/auth.ts).
+        revokeOtherSessions: true,
       },
       headers: await headers(),
     });

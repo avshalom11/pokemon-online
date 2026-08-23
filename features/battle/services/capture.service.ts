@@ -2,6 +2,7 @@ import "server-only";
 
 import { isCaptureBallId } from "@/data/battle/capture-rate-config";
 import { rollCapture } from "@/engine/battle/capture";
+import { getFirstEmptyPartySlot } from "@/features/party/utils/party-rules";
 import { getInventoryItemQuantity, removeInventoryItem } from "@/features/inventory/services/inventory.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
@@ -14,7 +15,7 @@ import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { prisma } from "@/lib/db/prisma";
 
 export type AttemptCaptureResult =
-  | { status: "captured"; speciesName: string; xpResult: LevelUpResult; remainingQuantity: number }
+  | { status: "captured"; speciesName: string; xpResult: LevelUpResult; remainingQuantity: number; addedToParty: boolean }
   | { status: "failed"; remainingQuantity: number }
   | { status: "invalid-encounter" }
   | { status: "invalid-item" }
@@ -117,7 +118,7 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
     // assigns this Pokémon's starting known moves in the same transaction
     // — see that function's doc comment for why this must never be
     // duplicated as a second, separate call site.
-    await createOwnedPokemon(tx, {
+    const { pokemon } = await createOwnedPokemon(tx, {
       playerId: profile.id,
       speciesId: species.id,
       level: session.wildLevel,
@@ -132,7 +133,44 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
       currentHp: session.wildCurrentHp,
       isStarter: false,
       source: "capture",
+      // partySlot deliberately omitted — createOwnedPokemon's own default
+      // (storage only, null) is exactly the correct starting state; the
+      // auto-add-to-party step right below is what may promote it out of
+      // that default, never the other way around.
     });
+
+    // FIELD CAPTURE — AUTO-ADD TO PARTY IF SPACE. Reuses
+    // getFirstEmptyPartySlot (features/party/utils/party-rules.ts, the
+    // same pure "which slot is next" logic a future party-editor auto-add
+    // would also use) against the party's CURRENT occupancy, read fresh
+    // inside this same transaction. Never touches assignToPartySlot
+    // (features/party/services/party-management.service.ts): that
+    // function's own ownership/Daycare checks and "vacate the destination
+    // slot first" logic all exist for MOVING an already-in-party Pokémon
+    // — a brand-new capture has neither an old slot to vacate nor any
+    // possibility of already being in Daycare, so reusing it here would
+    // just re-check guarantees this code path already has by
+    // construction. Wrapped in its own try/catch, never allowed to fail
+    // the capture itself: on the vanishingly rare chance of a genuine
+    // race against a concurrent party edit (a real
+    // [playerId, partySlot] unique-constraint hit), the Pokémon simply
+    // stays in storage — its own already-correct default state — rather
+    // than aborting an otherwise-successful capture (section 8's own
+    // "keep it in storage rather than corrupting the capture flow" rule).
+    let addedToParty = false;
+    const currentParty = await tx.playerPokemon.findMany({
+      where: { playerId: profile.id, partySlot: { not: null } },
+      select: { partySlot: true },
+    });
+    const emptySlot = getFirstEmptyPartySlot(currentParty.map((member) => member.partySlot as number));
+    if (emptySlot !== null) {
+      try {
+        await tx.playerPokemon.update({ where: { id: pokemon.id }, data: { partySlot: emptySlot } });
+        addedToParty = true;
+      } catch {
+        // Left in storage — see this block's own doc comment.
+      }
+    }
 
     // Same transaction, same race guard as the delete/create above — the
     // deleteMany count check already makes this whole block run at most
@@ -140,6 +178,6 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
     // exactly-once guarantee for free.
     const xpResult = await addPlayerExperience(tx, profile.id, calculateCaptureXpReward(session.wildLevel));
 
-    return { status: "captured", speciesName: species.name, xpResult, remainingQuantity };
+    return { status: "captured", speciesName: species.name, xpResult, remainingQuantity, addedToParty };
   });
 }

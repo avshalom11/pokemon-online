@@ -2,7 +2,6 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 
-import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { ProfileContentEditor } from "./ProfileContentEditor";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { updateProfileAction } from "@/features/profile/actions/update-profile.action";
@@ -16,18 +15,18 @@ import type { ProfileEditViewModel } from "../types/profile.types";
 interface EditProfileModalProps {
   data: ProfileEditViewModel;
   onClose: () => void;
-  onSaved: (username: string) => void;
+  onSaved: () => void;
 }
 
-// The owner's edit form — every field the spec lists (username, about me,
-// avatar, theme, and the three visibility toggles), plus a live preview of
-// the REAL current party (data.partyPreview — always the real party,
-// regardless of the showPartyOnProfile toggle below it, per this feature's
-// own "owner may still preview their own party while editing" rule) and a
-// separate entry point to change password (its own dialog — password
-// changes are never bundled into this same save action).
+// The owner's edit form — about me, avatar, theme, and the three privacy
+// toggles, plus a live preview of the REAL current party (data.partyPreview
+// — always the real party, regardless of the showPartyOnProfile toggle
+// below it, per this feature's own "owner may still preview their own
+// party while editing" rule). Username and password are deliberately NOT
+// here — see SecurityAccountSection, the dedicated "אבטחה וחשבון" area
+// (ProfileContent.tsx) those two now live in, kept visually and
+// functionally separate from this free profile-content save.
 export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalProps) {
-  const [username, setUsername] = useState(data.username);
   const [aboutMe, setAboutMe] = useState(data.aboutMe);
   const [avatarDexNumber, setAvatarDexNumber] = useState<number | null>(data.avatarDexNumber);
   const [themeId, setThemeId] = useState<ProfileThemeId>(data.themeId);
@@ -36,7 +35,6 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
   const [showAboutMeOnProfile, setShowAboutMeOnProfile] = useState(data.showAboutMeOnProfile);
   const [showGymAchievementsOnProfile, setShowGymAchievementsOnProfile] = useState(data.showGymAchievementsOnProfile);
   const [contentBlocks, setContentBlocks] = useState<ProfileContentBlock[]>(data.contentBlocks ?? []);
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -44,7 +42,6 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
     setErrorMessage(null);
     startTransition(async () => {
       const result = await updateProfileAction({
-        username,
         aboutMe,
         avatarDexNumber,
         themeId,
@@ -56,7 +53,7 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
       });
 
       if (result.status === "success") {
-        onSaved(result.username);
+        onSaved();
         return;
       }
 
@@ -88,16 +85,6 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
         <h2 className="text-lg font-bold text-slate-100">ערוך פרופיל</h2>
 
         <div className="mt-5 flex flex-col gap-5">
-          <Field label="שם משתמש">
-            <input
-              type="text"
-              dir="ltr"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400/50 focus:outline-none"
-            />
-          </Field>
-
           <Field label={`אודות (${aboutMe.length}/${ABOUT_ME_MAX_LENGTH})`}>
             <textarea
               value={aboutMe}
@@ -184,14 +171,6 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
           <Field label="תוכן הפרופיל הציבורי">
             <ProfileContentEditor blocks={contentBlocks} onChange={setContentBlocks} />
           </Field>
-
-          <button
-            type="button"
-            onClick={() => setIsChangePasswordOpen(true)}
-            className="self-start rounded-lg border border-white/10 bg-slate-800/70 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-slate-800"
-          >
-            שינוי סיסמה
-          </button>
         </div>
 
         {errorMessage ? <p className="mt-4 text-center text-xs font-semibold text-rose-400">{errorMessage}</p> : null}
@@ -215,8 +194,6 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
           </button>
         </div>
       </div>
-
-      {isChangePasswordOpen ? <ChangePasswordDialog onClose={() => setIsChangePasswordOpen(false)} /> : null}
     </div>
   );
 }

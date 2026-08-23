@@ -53,9 +53,17 @@ test("handleAttack: a thrown/rejected executeBattleActionAction call is caught a
 test("proceedCapture: a thrown/rejected attemptCaptureAction call is caught and recovers phase to playerTurn", () => {
   const body = bodyOf("function proceedCapture(ballItemId: string) {", "function handleSelectMedicineTarget(");
   assert.ok(body.includes("try {"), "the Server Action call must be wrapped in a try block");
-  assert.ok(body.includes("result = await attemptCaptureAction(ballItemId);"));
+  // CAPTURE SHAKE ANIMATION — the real Server Action call is now awaited
+  // alongside the shake's minimum-duration timer via Promise.all (see
+  // proceedCapture's own doc comment: a rejection still short-circuits
+  // immediately, exactly like the un-animated version did), so the exact
+  // call site text changed — this still proves the real, unmodified
+  // attemptCaptureAction call is the one being awaited inside the try.
+  assert.ok(body.includes("attemptCaptureAction(ballItemId),"), "the real, unmodified attemptCaptureAction call must still be awaited inside the try");
+  assert.ok(body.includes("[result] = await Promise.all(["));
   const catchBody = body.slice(body.indexOf("} catch {"), body.indexOf("} catch {") + 120);
   assert.ok(catchBody.includes('setPhase("playerTurn");'), "the catch branch must recover phase back to playerTurn, never leave it stuck on capturing");
+  assert.ok(catchBody.includes('setCaptureAnimationStage(null);'), "the catch branch must also clear the capture-ball animation, never leave the ball stuck showing after an error");
 });
 
 test("handleSelectMedicineTarget: a thrown/rejected applyMedicineItemAction call is caught, closes the Bag, and recovers phase to playerTurn", () => {

@@ -37,10 +37,15 @@ test("the League reward registry's exact numbers are untouched by this Phase (Le
   assert.match(src, /money: 5_000,/, "Champions League's own participation money must still be present, unmodified");
 });
 
-test("no Prisma schema change was made by this Phase — no new migration directory beyond Phase 8's own reward-claim-guard migration", () => {
+test("no Prisma schema change was made by this Phase — Phase 8's own reward-claim-guard migration is still the newest LEAGUE-related migration (a later, unrelated feature — e.g. AUTH + ACCOUNT SETTINGS's failed-login lockout — may legitimately add its own migrations after it)", () => {
   const migrations = fs.readdirSync("prisma/migrations").filter((name) => name !== "migration_lock.toml");
-  const newestMigration = [...migrations].sort().at(-1)!;
-  assert.equal(newestMigration, "20260818082913_add_league_reward_claim_guard", "Phase 9 must not add a new Prisma migration (section 37 — presentation-only)");
+  const leagueMigrations = migrations.filter((name) => /league/i.test(name));
+  const newestLeagueMigration = [...leagueMigrations].sort().at(-1)!;
+  assert.equal(
+    newestLeagueMigration,
+    "20260818082913_add_league_reward_claim_guard",
+    "Phase 9 must not add a new League-related Prisma migration (section 37 — presentation-only)"
+  );
 });
 
 // ROUND-1 GENERATION LIFECYCLE FIX — the gap this Phase originally reported

@@ -24,8 +24,9 @@ export const PRESENCE_HEARTBEAT_INTERVAL_MS = 30_000;
 export const PRESENCE_ONLINE_WINDOW_MS = 60_000;
 
 // How often clients re-fetch presence-DERIVED data that has no other poll
-// already carrying it — today, only the Home online-count card
-// (OnlinePlayersCounter.tsx). Global Chat and the Friends Bar deliberately
+// already carrying it — today, only the Home Statistics panel's online-
+// count tile (features/home/components/OnlinePlayerCountStat.tsx). Global
+// Chat and the Friends Bar deliberately
 // need NO separate presence poll at all: their own existing ~2.5s polls
 // (useGlobalChat, FriendsDataProvider) already re-fetch on this same kind
 // of cadence, and this feature's server-side view-builders (see

@@ -55,11 +55,12 @@ export interface HomeViewData {
   // global-chat.actions.ts) keeps it live after that.
   globalChatMessages: GlobalChatMessageView[];
 
-  // ONLINE PRESENCE — HOME ONLINE COUNT. Seeds OnlinePlayersCounter's first
-  // paint; that component's own light poll (features/presence/config/
-  // presence.config.ts's PRESENCE_READ_POLL_INTERVAL_MS) keeps it live
-  // after that, same "server seeds first paint, client poll keeps it live"
-  // pattern globalChatMessages above already establishes.
+  // ONLINE PRESENCE — HOME STATISTICS. Seeds StatisticsPanel's
+  // OnlinePlayerCountStat tile for its first paint; that component's own
+  // light poll (features/presence/config/presence.config.ts's
+  // PRESENCE_READ_POLL_INTERVAL_MS) keeps it live after that, same "server
+  // seeds first paint, client poll keeps it live" pattern globalChatMessages
+  // above already establishes.
   onlinePlayerCount: number;
 }
 

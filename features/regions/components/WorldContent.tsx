@@ -4,13 +4,15 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { RegionCard } from "./RegionCard";
+import { TravelConfirmDialog } from "./TravelConfirmDialog";
 import { BackButton } from "@/components/layout/BackButton";
 import { selectRegionAction } from "@/features/regions/actions/select-region.action";
 import type { RegionId } from "@/shared/types/region";
 
 export interface WorldRegionView {
   id: RegionId;
-  englishName: string;
+  hebrewName: string;
+  travelCost: number;
   cardImageSrc: string;
 }
 
@@ -21,30 +23,43 @@ interface WorldContentProps {
 
 // The World page's body — lets the player pick their active region out of
 // every RegionDefinition in the Region Registry (all available from the
-// start; there is no locked-region state in this phase). Optimistically
+// start; there is no locked-region state in this phase). Clicking a
+// DIFFERENT region only ever opens TravelConfirmDialog first (REGION
+// TRAVEL COST — section 5): the actual selectRegionAction call, and
+// therefore the Money charge, only ever happens from that dialog's own
+// "עבור למחוז" button, never from the card click itself. Optimistically
 // shows the newly-picked card as active the instant the server action
 // resolves successfully, then calls router.refresh() so the rest of the
 // current route (crucially the global header in app/(game)/layout.tsx,
-// which reads the player's region on every server render) picks up the
-// change too — same pattern ProfileContent.tsx already uses after its own
-// profile-editing action.
+// which reads the player's region AND coins on every server render) picks
+// up the change too — same pattern ProfileContent.tsx already uses after
+// its own profile-editing action.
 export function WorldContent({ regions, activeRegionId }: WorldContentProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedRegionId, setSelectedRegionId] = useState(activeRegionId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingTravelRegionId, setPendingTravelRegionId] = useState<RegionId | null>(null);
 
-  function handleSelect(regionId: RegionId) {
+  function handleCardClick(regionId: RegionId) {
     if (regionId === selectedRegionId || isPending) return;
     setErrorMessage(null);
+    setPendingTravelRegionId(regionId);
+  }
+
+  function handleConfirmTravel() {
+    const regionId = pendingTravelRegionId;
+    if (!regionId || isPending) return;
 
     startTransition(async () => {
       const result = await selectRegionAction(regionId);
 
       if (result.status === "success") {
         setSelectedRegionId(result.regionId);
+        setPendingTravelRegionId(null);
         router.refresh();
       } else {
+        setPendingTravelRegionId(null);
         setErrorMessage(result.message);
       }
     });
@@ -59,7 +74,7 @@ export function WorldContent({ regions, activeRegionId }: WorldContentProps) {
         <BackButton />
 
         <div>
-          <h1 className="text-lg font-bold text-slate-100">עולם</h1>
+          <h1 className="text-lg font-bold text-slate-100">מחוזות</h1>
           <p className="mt-1 text-sm text-slate-400">בחר את האזור הפעיל שלך</p>
         </div>
 
@@ -73,15 +88,25 @@ export function WorldContent({ regions, activeRegionId }: WorldContentProps) {
           {regions.map((region) => (
             <RegionCard
               key={region.id}
-              englishName={region.englishName}
+              hebrewName={region.hebrewName}
+              travelCost={region.travelCost}
               cardImageSrc={region.cardImageSrc}
               isActive={region.id === selectedRegionId}
               isPending={isPending}
-              onSelect={() => handleSelect(region.id)}
+              onSelect={() => handleCardClick(region.id)}
             />
           ))}
         </div>
       </div>
+
+      {pendingTravelRegionId ? (
+        <TravelConfirmDialog
+          regionId={pendingTravelRegionId}
+          isPending={isPending}
+          onCancel={() => setPendingTravelRegionId(null)}
+          onConfirm={handleConfirmTravel}
+        />
+      ) : null}
     </div>
   );
 }
