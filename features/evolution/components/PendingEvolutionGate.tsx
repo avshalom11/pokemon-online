@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { EvolutionBranchChoiceDialog } from "./EvolutionBranchChoiceDialog";
@@ -26,13 +26,34 @@ interface PendingEvolutionGateProps {
   // takes priority, matching BattleContent's own "handle one decision at a
   // time" rule.
   initialPendingBranch: PendingEvolutionBranchView | null;
+  // MOVE LEARNING UX — optional, purely additive: fired whenever this gate
+  // has no outstanding decision to show (both `pending` and
+  // `pendingBranch` are null) — including immediately, on first render, if
+  // the player never had one to begin with. LevelUpDecisionsGate is the
+  // one caller, using it to hold off mounting PendingMoveLearningGate
+  // until evolution is completely out of the way (this task's own
+  // "evolution must come first, never show both at once" rule). Omitted
+  // by every other existing caller, which keeps this component's own
+  // evolution-only behavior completely unchanged.
+  onFullyResolved?: () => void;
 }
 
-export function PendingEvolutionGate({ initialPending, initialPendingBranch }: PendingEvolutionGateProps) {
+export function PendingEvolutionGate({ initialPending, initialPendingBranch, onFullyResolved }: PendingEvolutionGateProps) {
   const router = useRouter();
   const [pending, setPending] = useState(initialPending);
   const [pendingBranch, setPendingBranch] = useState(initialPending ? null : initialPendingBranch);
   const [isSubmitting, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!pending && !pendingBranch) {
+      onFullyResolved?.();
+    }
+    // Deliberately omits onFullyResolved from deps: it's expected to be an
+    // inline callback from the one caller that uses it, and this must only
+    // ever re-fire on an actual pending/pendingBranch transition, never on
+    // a parent rerender that happens to pass a new function identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, pendingBranch]);
 
   function handleAccept() {
     if (!pending) return;

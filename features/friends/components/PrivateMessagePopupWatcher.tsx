@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getNotificationBellDataAction } from "@/features/notifications/actions/notification.actions";
 import { usePrivateChatWindow } from "@/features/friends/context/private-chat-window-context";
+import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 // How often this polls for new PRIVATE_MESSAGE_RECEIVED notifications —
 // same interval Global Chat/Private Chat already poll at.
@@ -62,8 +63,15 @@ export function PrivateMessagePopupWatcher() {
   const isMinimizedRef = useRef(isMinimized);
   activeConversationRef.current = activeConversation;
   isMinimizedRef.current = isMinimized;
+  const isPageVisible = usePageVisible();
 
+  // SITE RENDER PERFORMANCE — pauses while the tab is hidden; re-running on
+  // `isPageVisible` flipping true reuses the same unconditional `tick()` at
+  // the top of the effect that already runs on mount, so becoming visible
+  // again gets one immediate refresh for free.
   useEffect(() => {
+    if (!isPageVisible) return;
+
     let cancelled = false;
 
     async function tick() {
@@ -113,7 +121,7 @@ export function PrivateMessagePopupWatcher() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [isPageVisible]);
 
   function handleOpen(toast: Toast) {
     setToasts((current) => current.filter((t) => t.id !== toast.id));

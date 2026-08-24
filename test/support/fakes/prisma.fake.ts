@@ -3061,6 +3061,42 @@ const client = {
     async count({ where }: { where: Record<string, unknown> }) {
       return [...pending.values()].filter((row) => matches(row, where)).length;
     },
+    // MOVE LEARNING UX / DAYCARE LEVEL-UP DECISIONS — mirrors
+    // move-learning-service.ts's createPendingMoveLearning, the one real
+    // caller: a plain insert, EXCEPT for the schema's own
+    // @@unique([playerPokemonId, moveId, status]) constraint (see the real
+    // Prisma model in schema.prisma), which that caller explicitly relies
+    // on to treat a racing/duplicate insert as "already pending" rather
+    // than a hard failure — thrown here as an object shaped like a real
+    // Prisma `PrismaClientKnownRequestError` (`{ code: "P2002" }"), the
+    // only field createPendingMoveLearning's own isUniqueConstraintViolation
+    // check reads.
+    async create({
+      data,
+    }: {
+      data: { playerPokemonId: string; moveId: string; learnedAtLevel: number; status: string };
+    }) {
+      const alreadyExists = [...pending.values()].some(
+        (row) => row.playerPokemonId === data.playerPokemonId && row.moveId === data.moveId && row.status === data.status
+      );
+      if (alreadyExists) {
+        throw Object.assign(new Error("fake prisma: unique constraint violation on playerPendingMoveLearning"), { code: "P2002" });
+      }
+
+      const id = nextId("pending");
+      idCounter += 1;
+      const full: PlayerPendingMoveLearningRow = {
+        id,
+        playerPokemonId: data.playerPokemonId,
+        moveId: data.moveId,
+        learnedAtLevel: data.learnedAtLevel,
+        status: data.status as PendingStatus,
+        sequence: idCounter,
+        resolvedAt: null,
+      };
+      pending.set(id, full);
+      return { ...full };
+    },
     async update({
       where,
       data,

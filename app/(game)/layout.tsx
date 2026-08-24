@@ -20,6 +20,7 @@ import { hasActiveLeagueBattleSession } from "@/features/leagues/services/league
 import { getNotificationBellData } from "@/features/notifications/services/notification-service";
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
 import { PresenceHeartbeat } from "@/features/presence/components/PresenceHeartbeat";
+import { PlayerLevelUpDialog } from "@/features/player/components/PlayerLevelUpDialog";
 import { DailyBattleCountProvider } from "@/features/player/context/daily-battle-count-context";
 import { PlayerProgressionProvider } from "@/features/player/context/player-progression-context";
 import { SoundSettingsProvider } from "@/features/player/context/sound-settings-context";
@@ -124,6 +125,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
                 <FriendshipSyncWatcher />
                 <PrivateMessagePopupWatcher />
                 <PresenceHeartbeat />
+                <PlayerLevelUpDialog />
               </PrivateChatWindowProvider>
             </FriendsDataProvider>
           </ActiveBattleProvider>

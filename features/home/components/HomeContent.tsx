@@ -6,7 +6,7 @@ import { RefreshHomeOnMount } from "./RefreshHomeOnMount";
 import { SignificantCapturesCard } from "./SignificantCapturesCard";
 import { StatisticsPanel } from "./StatisticsPanel";
 import { HomeChatPanel } from "@/features/chat/components/HomeChatPanel";
-import { PendingEvolutionGate } from "@/features/evolution/components/PendingEvolutionGate";
+import { LevelUpDecisionsGate } from "@/features/move-learning/components/LevelUpDecisionsGate";
 import { PartySection } from "@/features/pokemon/components/PartySection";
 import type { HomeViewData } from "@/features/home/services/home-data.service";
 
@@ -38,7 +38,11 @@ export function HomeContent({ data, username, currentPlayerDisplayName }: HomeCo
       />
 
       <RefreshHomeOnMount />
-      <PendingEvolutionGate initialPending={data.pendingEvolution} initialPendingBranch={data.pendingEvolutionBranch} />
+      <LevelUpDecisionsGate
+        initialPendingEvolution={data.pendingEvolution}
+        initialPendingEvolutionBranch={data.pendingEvolutionBranch}
+        initialPendingMoveLearning={data.pendingMoveLearning}
+      />
 
       <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap gap-3">

@@ -10,6 +10,8 @@ import { DaycareEmptySlotCard } from "@/features/daycare/components/DaycareEmpty
 import { DaycareRulesInfo } from "@/features/daycare/components/DaycareRulesInfo";
 import { DAYCARE_DEPOSIT_FEE, DAYCARE_MAX_SLOTS, DAYCARE_VIEW_POLL_INTERVAL_MS } from "@/features/daycare/config/daycare.config";
 import type { DaycareViewData } from "@/features/daycare/types";
+import { getPendingLevelUpDecisionsAction, type PendingLevelUpDecisions } from "@/features/move-learning/actions/level-up-decisions.actions";
+import { LevelUpDecisionsGate } from "@/features/move-learning/components/LevelUpDecisionsGate";
 
 interface DaycareContentProps {
   initialData: DaycareViewData;
@@ -52,6 +54,21 @@ export function DaycareContent({ initialData }: DaycareContentProps) {
   const [data, setData] = useState(initialData);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // DAYCARE — SHOW EVOLUTION / MOVE LEARNING AFTER PICKUP. Set only after a
+  // SUCCESSFUL pickup (never on deposit, never on a failed pickup — see
+  // handlePickup below). `decisionsKey` is bumped alongside it so
+  // LevelUpDecisionsGate (and the PendingEvolutionGate/
+  // PendingMoveLearningGate it wraps) fully remounts with these fresh
+  // `initial...` props: those components seed their own local state from
+  // `initial...` exactly once, via useState(initialProp) — the same
+  // pattern Home's own already-mounted gate relies on for a page load, but
+  // here the "page load" is really "a new pickup result just arrived on an
+  // already-mounted page," so a changed `key` is what makes them pick up
+  // the fresh values instead of keeping whatever they resolved to last
+  // time. No new evolution/move-learning logic here — this only decides
+  // WHEN to (re)seed the exact same existing gates Home already uses.
+  const [pendingDecisions, setPendingDecisions] = useState<PendingLevelUpDecisions | null>(null);
+  const [decisionsKey, setDecisionsKey] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -78,10 +95,21 @@ export function DaycareContent({ initialData }: DaycareContentProps) {
     startTransition(async () => {
       const result = await collectFromDaycareAction(playerPokemonId);
       if (!result.ok) {
+        // PICKUP FAILED — show no decision popup. Deliberately does not
+        // touch pendingDecisions/decisionsKey at all, so a failed pickup
+        // can never surface (or re-surface) a decision popup.
         setErrorMessage(PICKUP_ERROR_MESSAGES[result.error] ?? "אירעה שגיאה, נסה שוב.");
         return;
       }
       setData(await getDaycareViewAction());
+
+      // PICKUP SUCCEEDED — reuse the exact same account-wide reads Home's
+      // own safety net is seeded from (see getPendingLevelUpDecisionsAction's
+      // own doc comment) to find whatever evolution/move-learning decision
+      // this pickup just created, if any.
+      const decisionsResult = await getPendingLevelUpDecisionsAction();
+      setPendingDecisions(decisionsResult.status === "ok" ? decisionsResult.decisions : null);
+      setDecisionsKey((key) => key + 1);
     });
   }
 
@@ -97,6 +125,15 @@ export function DaycareContent({ initialData }: DaycareContentProps) {
             "radial-gradient(ellipse 70% 40% at 50% 0%, rgba(129,90,238,0.16), transparent 60%), radial-gradient(ellipse 50% 30% at 90% 100%, rgba(99,102,241,0.12), transparent 60%)",
         }}
       />
+
+      {pendingDecisions ? (
+        <LevelUpDecisionsGate
+          key={decisionsKey}
+          initialPendingEvolution={pendingDecisions.pendingEvolution}
+          initialPendingEvolutionBranch={pendingDecisions.pendingEvolutionBranch}
+          initialPendingMoveLearning={pendingDecisions.pendingMoveLearning}
+        />
+      ) : null}
 
       <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
         <BackButton />

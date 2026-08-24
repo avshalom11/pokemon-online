@@ -93,3 +93,35 @@ export async function getNextPendingMove(playerPokemonId: string): Promise<Pendi
 export async function hasPendingMoves(playerPokemonId: string): Promise<boolean> {
   return hasAnyPendingMoveLearning(playerPokemonId);
 }
+
+// MOVE LEARNING UX — the account-wide counterpart to getNextPendingMove:
+// which OWNED POKÉMON (any of them, not one caller already knows about)
+// has the earliest unresolved Pending Move Learning decision. Same "Home
+// safety net" role as features/evolution/queries/evolution-queries.ts's
+// getFirstPendingEvolutionView (findFirst, ordered so the earliest-created
+// decision wins) — the actual per-Pokémon "which move, which slot options"
+// detail is still assembled by move-learning-view.service.ts's
+// getPendingMoveLearningView once this resolves which Pokémon to ask.
+//
+// Two steps (this player's own owned-Pokémon ids, then the earliest
+// pending row among them) rather than one relational query, since
+// PlayerPendingMoveLearning has no playerId column of its own — only
+// playerPokemonId. Ordered by `sequence` alone (not learnedAtLevel first):
+// `sequence` is a single table-wide autoincrement, already assigned in the
+// exact order applyLevelUpMoveLearning created each pending row —
+// including, for one Pokémon's own rows, the same learnedAtLevel-ascending
+// order getNextPendingMove itself sorts by. Ordering the account-wide pick
+// by sequence alone therefore reduces to "resolve pending decisions in the
+// order they were created" everywhere, which is exactly PENDING DECISION
+// ORDER's rule, without needing a second, Pokémon-scoped sort key here.
+export async function getFirstPendingMoveLearningPlayerPokemonId(playerId: string): Promise<string | null> {
+  const ownedPokemon = await prisma.playerPokemon.findMany({ where: { playerId }, select: { id: true } });
+  if (ownedPokemon.length === 0) return null;
+
+  const row = await prisma.playerPendingMoveLearning.findFirst({
+    where: { status: "pending", playerPokemonId: { in: ownedPokemon.map((pokemon) => pokemon.id) } },
+    orderBy: { sequence: "asc" },
+    select: { playerPokemonId: true },
+  });
+  return row?.playerPokemonId ?? null;
+}

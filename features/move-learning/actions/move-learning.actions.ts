@@ -6,7 +6,12 @@ import {
   resolvePendingMoveLearn,
   declinePendingMove,
 } from "@/features/move-learning/move-learning-service";
-import { getPendingMoveLearningView, type PendingMoveLearningView } from "@/features/move-learning/move-learning-view.service";
+import {
+  getFirstPendingMoveLearningView,
+  getPendingMoveLearningView,
+  type PendingMoveLearningPromptView,
+  type PendingMoveLearningView,
+} from "@/features/move-learning/move-learning-view.service";
 import {
   resolvePendingMoveLearnSchema,
   declinePendingMoveSchema,
@@ -49,6 +54,25 @@ export async function getPendingMoveLearningViewAction(playerPokemonId: string):
   if (!owned) return { status: "error" };
 
   const view = await getPendingMoveLearningView(parsed.data.playerPokemonId);
+  return { status: "ok", view };
+}
+
+// MOVE LEARNING UX — the account-wide counterpart above, used by
+// PendingMoveLearningGate (the site-wide safety-net dialog, and its own
+// "resolve one, then fetch the next one" chaining for a multi-level XP
+// jump that queued more than one pending decision — see that component's
+// own doc comment). No playerPokemonId input at all: unlike the per-
+// Pokémon action above, this derives which Pokémon (if any) has the
+// earliest pending decision entirely from the session itself, so there is
+// nothing here for a client to spoof.
+export type FirstPendingMoveLearningViewActionResult = { status: "ok"; view: PendingMoveLearningPromptView | null } | { status: "error" };
+
+export async function getFirstPendingMoveLearningViewAction(): Promise<FirstPendingMoveLearningViewActionResult> {
+  const session = await getCurrentSession();
+  if (!session) return { status: "error" };
+
+  const profile = await getPlayerProfile(session.user.id);
+  const view = await getFirstPendingMoveLearningView(profile.id);
   return { status: "ok", view };
 }
 

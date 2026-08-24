@@ -81,6 +81,22 @@ export function progressFromLevelUpResult(result: LevelUpResult): PlayerProgress
   };
 }
 
+// PLAYER LEVEL UP — CONGRATULATIONS DIALOG. The one place "did the
+// player's account level actually go up" is decided — a plain strict
+// comparison, but pulled out here (rather than inlined as `newLevel >
+// previousLevel` inside PlayerLevelUpDialog.tsx) so that decision stays a
+// pure, directly-testable function alongside the rest of this module's
+// progression math, per this feature's own "no level calculations
+// duplicated in React" rule. Deliberately strict (`>`, never `>=`): equal
+// XP gained with no level change (or a same-or-lower level from an
+// out-of-order/stale snapshot) must never show the dialog. A multi-level
+// jump in one grant is still just one comparison — newLevel is already the
+// FINAL level after the grant (see getPlayerProgress), never a per-level
+// step — so this naturally returns true exactly once for that grant.
+export function hasPlayerLeveledUp(previousLevel: number, newLevel: number): boolean {
+  return newLevel > previousLevel;
+}
+
 // Player XP reward for defeating a wild Pokémon of `wildLevel`. Rounded —
 // VICTORY_XP_PER_LEVEL is a non-integer (see progression-config.ts's own
 // doc comment on why), so an odd wildLevel would otherwise produce a

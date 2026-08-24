@@ -17,8 +17,8 @@ export const FIELD_BATTLE_CURRENCY_REWARD_CONFIG: Record<"money" | "gold", Curre
     maxAmount: 40,
   },
   gold: {
-    dropChance: 0.015,
+    dropChance: 0.025,
     minAmount: 1,
-    maxAmount: 10,
+    maxAmount: 12,
   },
 };

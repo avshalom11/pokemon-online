@@ -67,7 +67,7 @@ test("2: (source) neither FriendsBar nor FloatingPrivateChatWindow carries its o
 // optimistic local-state path feeding FriendsBar remains wired, carried
 // over unchanged from the prior ticket).
 test("3: (source) FriendsDataProvider's removeFriend updates local `friends` state optimistically, before the server round trip resolves", () => {
-  const removeFnBody = friendsDataContextSrc.slice(friendsDataContextSrc.indexOf("async function removeFriend"));
+  const removeFnBody = friendsDataContextSrc.slice(friendsDataContextSrc.indexOf("const removeFriend = useCallback"));
   const optimisticIndex = removeFnBody.indexOf("setFriends((current) => current.filter");
   const awaitIndex = removeFnBody.indexOf("await removeFriendAction");
   assert.ok(optimisticIndex >= 0 && awaitIndex > optimisticIndex, "local state must update BEFORE the server round trip");
@@ -85,7 +85,7 @@ test("3b: removeFriend actually deletes the friendship row for the remover", asy
 // can discover a change the OTHER side made), reusing the same lightweight
 // setInterval + server-action pattern already used elsewhere in the app.
 test("4: (source) FriendsDataProvider polls refresh() in the background on a fixed interval, so User2's client eventually discovers a removal User1 made server-side without any manual action", () => {
-  assert.match(friendsDataContextSrc, /useEffect\(\(\) => \{\s*const interval = setInterval\(\(\) => \{\s*refresh\(\);\s*\}, FRIENDS_DATA_POLL_INTERVAL_MS\);/, "must poll refresh() via setInterval using the shared config constant");
+  assert.match(friendsDataContextSrc, /const interval = setInterval\(\(\) => \{\s*refresh\(\);\s*\}, FRIENDS_DATA_POLL_INTERVAL_MS\);/, "must poll refresh() via setInterval using the shared config constant");
   assert.ok(friendsDataContextSrc.includes("clearInterval(interval)"), "must clean up the interval on unmount");
   assert.match(friendsConfigSrc, /export const FRIENDS_DATA_POLL_INTERVAL_MS = 2500;/, "must stay in the same ~2-3s cadence already established elsewhere in the app");
 });

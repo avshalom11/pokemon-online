@@ -132,7 +132,7 @@ test("8: an unrelated third player cannot remove someone else's friendship", asy
 // 9 — FriendsDataProvider updates immediately (optimistic, before the
 // server round trip resolves).
 test("9: (source) the shared context removes the friend from local state optimistically, before awaiting the server action", () => {
-  const removeFnBody = friendsDataContextSrc.slice(friendsDataContextSrc.indexOf("async function removeFriend"));
+  const removeFnBody = friendsDataContextSrc.slice(friendsDataContextSrc.indexOf("const removeFriend = useCallback"));
   const optimisticIndex = removeFnBody.indexOf("setFriends((current) => current.filter");
   const awaitIndex = removeFnBody.indexOf("await removeFriendAction");
   assert.ok(optimisticIndex >= 0 && awaitIndex > optimisticIndex, "local state must update BEFORE the server round trip, not after");

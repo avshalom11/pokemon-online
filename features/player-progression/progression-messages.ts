@@ -15,3 +15,18 @@ export function playerXpToastMessage(xpGained: number): string {
 export function playerLevelUpMessage(newLevel: number): string {
   return `עלית לרמת שחקן ${newLevel}!`;
 }
+
+// PLAYER LEVEL UP — CONGRATULATIONS DIALOG (features/player/components/
+// PlayerLevelUpDialog.tsx). Deliberately its own, richer copy — a short,
+// blocking congratulations moment — rather than reusing playerLevelUpMessage
+// above verbatim: that one stays the terse notification-bell/toast line,
+// this one is the one-time "you leveled up" confirmation. Both are always
+// derived from the exact same server-authoritative newLevel value, never a
+// second computation of it.
+export const playerLevelUpDialogTitle = "כל הכבוד!";
+
+export function playerLevelUpDialogMessage(newLevel: number): string {
+  return `עבדת קשה ועלית לרמה ${newLevel}!`;
+}
+
+export const playerLevelUpDialogButtonLabel = "אישור";

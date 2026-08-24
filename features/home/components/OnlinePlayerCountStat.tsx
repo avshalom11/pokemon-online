@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getOnlineCountAction } from "@/features/presence/actions/presence.actions";
 import { PRESENCE_READ_POLL_INTERVAL_MS } from "@/features/presence/config/presence.config";
+import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 interface OnlinePlayerCountStatProps {
   initialCount: number;
@@ -22,8 +23,19 @@ interface OnlinePlayerCountStatProps {
 // project's other live numbers (Global Chat, Friends Bar) already follow.
 export function OnlinePlayerCountStat({ initialCount }: OnlinePlayerCountStatProps) {
   const [count, setCount] = useState(initialCount);
+  const isPageVisible = usePageVisible();
+  // SITE RENDER PERFORMANCE — set while the tab is hidden so the effect
+  // below fires exactly one immediate refresh the moment it becomes visible
+  // again, without also firing one on the ordinary first mount (which never
+  // fetched immediately — `initialCount` already seeds it).
+  const wasHiddenRef = useRef(false);
 
   useEffect(() => {
+    if (!isPageVisible) {
+      wasHiddenRef.current = true;
+      return;
+    }
+
     let cancelled = false;
 
     async function tick() {
@@ -37,12 +49,17 @@ export function OnlinePlayerCountStat({ initialCount }: OnlinePlayerCountStatPro
       }
     }
 
+    if (wasHiddenRef.current) {
+      wasHiddenRef.current = false;
+      tick();
+    }
+
     const interval = setInterval(tick, PRESENCE_READ_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [isPageVisible]);
 
   return (
     <div className="rounded-lg bg-slate-950/40 p-2.5 text-center">

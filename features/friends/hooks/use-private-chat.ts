@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from "rea
 import { getConversationMessagesAction, sendPrivateMessageAction } from "@/features/friends/actions/private-chat.actions";
 import { PRIVATE_CHAT_MESSAGE_MAX_LENGTH, PRIVATE_CHAT_POLL_INTERVAL_MS } from "@/features/friends/config/friends.config";
 import type { PrivateMessageView, SendPrivateMessageError } from "@/features/friends/types";
+import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 const NEAR_BOTTOM_THRESHOLD_PX = 60;
 
@@ -81,8 +82,15 @@ export function usePrivateChat({
 
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const isPageVisible = usePageVisible();
 
+  // SITE RENDER PERFORMANCE — pauses while the tab is hidden; re-running on
+  // `isPageVisible` flipping true reuses the same unconditional `tick()` at
+  // the top of the effect that already runs for "conversation just opened",
+  // so becoming visible again gets one immediate refresh for free.
   useEffect(() => {
+    if (!isPageVisible) return;
+
     let cancelled = false;
     async function tick() {
       try {
@@ -100,7 +108,7 @@ export function usePrivateChat({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [conversationId]);
+  }, [conversationId, isPageVisible]);
 
   useEffect(() => {
     const el = listRef.current;

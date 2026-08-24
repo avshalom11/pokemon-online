@@ -5,6 +5,8 @@ import { getRecentGlobalChatMessages } from "@/features/chat/services/global-cha
 import type { GlobalChatMessageView } from "@/features/chat/types";
 import { getFirstPendingEvolutionBranchView, getFirstPendingEvolutionView } from "@/features/evolution/queries/evolution-queries";
 import type { PendingEvolutionBranchView, PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import { getFirstPendingMoveLearningView } from "@/features/move-learning/move-learning-view.service";
+import type { PendingMoveLearningPromptView } from "@/features/move-learning/move-learning-view.service";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getSignificantCaptures, type SignificantCaptures } from "@/features/home/services/significant-captures.service";
 import { getOnlinePlayerCount } from "@/features/presence/services/presence.service";
@@ -40,6 +42,17 @@ export interface HomeViewData {
   // different owned Pokémon could theoretically each have one pending at
   // once; PendingEvolutionGate only ever surfaces the first one it's given.
   pendingEvolutionBranch: PendingEvolutionBranchView | null;
+
+  // MOVE LEARNING UX — the account-wide safety net for a pending "Known
+  // Moves already full, learn or decline?" decision (features/move-learning/
+  // components/PendingMoveLearningGate.tsx, mounted via
+  // LevelUpDecisionsGate) — null unless the player has an unresolved
+  // move-learning decision, from either a Field Battle victory or a
+  // Daycare pickup (both feed the same PlayerPendingMoveLearning rows via
+  // applyLevelUpMoveLearning). Deliberately fetched and shown AFTER
+  // pendingEvolution/pendingEvolutionBranch above are fully resolved —
+  // see LevelUpDecisionsGate's own doc comment for the ordering rule.
+  pendingMoveLearning: PendingMoveLearningPromptView | null;
 
   // HOME — SIGNIFICANT CAPTURES — a site-wide (not per-player) feed: the
   // latest Very Rare/Legendary capture from ANY player, across all time
@@ -79,6 +92,7 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
     dailyBattleCount,
     pendingEvolution,
     pendingEvolutionBranch,
+    pendingMoveLearning,
     significantCaptures,
     globalChatMessages,
     onlinePlayerCount,
@@ -88,6 +102,7 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
     getTodayBattleCount(profile.id),
     getFirstPendingEvolutionView(profile.id),
     getFirstPendingEvolutionBranchView(profile.id),
+    getFirstPendingMoveLearningView(profile.id),
     getSignificantCaptures(),
     getRecentGlobalChatMessages(),
     getOnlinePlayerCount(),
@@ -105,6 +120,7 @@ export async function getHomeViewData(userId: string): Promise<HomeViewData> {
     dailyBattleCount,
     pendingEvolution,
     pendingEvolutionBranch,
+    pendingMoveLearning,
     significantCaptures,
     globalChatMessages,
     onlinePlayerCount,

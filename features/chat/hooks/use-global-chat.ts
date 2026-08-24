@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from "rea
 import { getGlobalChatMessagesAction, sendGlobalChatMessageAction } from "@/features/chat/actions/global-chat.actions";
 import { GLOBAL_CHAT_MESSAGE_MAX_LENGTH, GLOBAL_CHAT_POLL_INTERVAL_MS } from "@/features/chat/config/global-chat.config";
 import type { GlobalChatMessageView, SendGlobalChatMessageError } from "@/features/chat/types";
+import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 const NEAR_BOTTOM_THRESHOLD_PX = 60;
 
@@ -90,10 +91,18 @@ export function useGlobalChat({
 
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const isPageVisible = usePageVisible();
 
-  // Polling — only while this consumer is actually visible.
+  // Polling — only while this consumer is actually expanded AND the tab is
+  // actually visible (SITE RENDER PERFORMANCE — a backgrounded/minimized
+  // tab has no reader for this, so it must not keep polling). The effect
+  // re-running on either `active` or `isPageVisible` flipping true is what
+  // gives "resume with one immediate refresh" for free: `tick()` already
+  // ran unconditionally at the top of this effect for the "chat just
+  // expanded" case, so reusing it for "tab just became visible again" is
+  // the same behavior, not a new one.
   useEffect(() => {
-    if (!active) return;
+    if (!active || !isPageVisible) return;
 
     let cancelled = false;
     async function tick() {
@@ -113,7 +122,7 @@ export function useGlobalChat({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [active]);
+  }, [active, isPageVisible]);
 
   // "When chat first opens: scroll to the newest message."
   useEffect(() => {

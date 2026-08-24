@@ -1,10 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { getFriendsAndRequestsAction, removeFriendAction, respondToFriendRequestAction } from "@/features/friends/actions/friendship.actions";
 import { FRIENDS_DATA_POLL_INTERVAL_MS } from "@/features/friends/config/friends.config";
 import type { FriendsAndRequestsView, FriendSummary, PendingFriendRequestView } from "@/features/friends/types";
+import { friendsEqual, incomingRequestsEqual } from "@/features/friends/utils/friends-equality";
+import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 interface FriendsDataContextValue {
   friends: FriendSummary[];
@@ -72,83 +74,111 @@ interface FriendsDataProviderProps {
 export function FriendsDataProvider({ initial, children }: FriendsDataProviderProps) {
   const [friends, setFriends] = useState<FriendSummary[]>(initial.friends);
   const [incomingRequests, setIncomingRequests] = useState<PendingFriendRequestView[]>(initial.incomingRequests);
+  const isVisible = usePageVisible();
+  // SITE RENDER PERFORMANCE — set while the tab is hidden so the effect
+  // below fires exactly one immediate refresh() the moment it becomes
+  // visible again, without also firing one on the ordinary first mount
+  // (which never refreshed immediately — `initial` already seeds it).
+  const wasHiddenRef = useRef(false);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const fresh = await getFriendsAndRequestsAction();
-    setFriends(fresh.friends);
-    setIncomingRequests(fresh.incomingRequests);
-  }
+    // Bail out (return the SAME reference) when the fresh read is
+    // equivalent to what's already in state — React skips the rerender
+    // entirely for a setState call given back its own previous value, so an
+    // unchanged poll tick no longer touches the context value or any of its
+    // consumers (NotificationBell, FriendsBar, ...).
+    setFriends((current) => (friendsEqual(current, fresh.friends) ? current : fresh.friends));
+    setIncomingRequests((current) => (incomingRequestsEqual(current, fresh.incomingRequests) ? current : fresh.incomingRequests));
+  }, []);
 
   useEffect(() => {
+    if (!isVisible) {
+      wasHiddenRef.current = true;
+      return;
+    }
+
+    if (wasHiddenRef.current) {
+      wasHiddenRef.current = false;
+      refresh();
+    }
+
     const interval = setInterval(() => {
       refresh();
     }, FRIENDS_DATA_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-    // Intentionally empty deps, same convention useGlobalChat/usePrivateChat
-    // already establish for their own poll loops: `refresh` only ever
-    // calls the server action and the (stable-identity) setters, so it
-    // never closes over anything that can go stale.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isVisible, refresh]);
 
-  async function respondToRequest(requestId: string, action: "accept" | "decline"): Promise<boolean> {
-    const request = incomingRequests.find((incoming) => incoming.requestId === requestId);
+  const respondToRequest = useCallback(
+    async (requestId: string, action: "accept" | "decline"): Promise<boolean> => {
+      const request = incomingRequests.find((incoming) => incoming.requestId === requestId);
 
-    // Optimistic: removes the request immediately, and — on accept — adds
-    // the new friend using the data already on hand from the pending
-    // request itself, so the Friends bar/Profile section update the
-    // instant the click happens rather than waiting on the round trip.
-    setIncomingRequests((current) => current.filter((incoming) => incoming.requestId !== requestId));
-    if (action === "accept" && request) {
-      setFriends((current) => [
-        ...current,
-        {
-          playerId: request.requesterPlayerId,
-          displayName: request.requesterDisplayName,
-          username: request.requesterUsername,
-          // ONLINE PRESENCE — unknown at this optimistic instant; the
-          // background poll's next tick (refresh(), same effect this file
-          // already runs every FRIENDS_DATA_POLL_INTERVAL_MS) corrects this
-          // to the real value within seconds, same as every other
-          // optimistic-then-reconciled field this provider already has.
-          isOnline: false,
-        },
-      ]);
-    }
+      // Optimistic: removes the request immediately, and — on accept — adds
+      // the new friend using the data already on hand from the pending
+      // request itself, so the Friends bar/Profile section update the
+      // instant the click happens rather than waiting on the round trip.
+      setIncomingRequests((current) => current.filter((incoming) => incoming.requestId !== requestId));
+      if (action === "accept" && request) {
+        setFriends((current) => [
+          ...current,
+          {
+            playerId: request.requesterPlayerId,
+            displayName: request.requesterDisplayName,
+            username: request.requesterUsername,
+            // ONLINE PRESENCE — unknown at this optimistic instant; the
+            // background poll's next tick (refresh(), same effect this file
+            // already runs every FRIENDS_DATA_POLL_INTERVAL_MS) corrects this
+            // to the real value within seconds, same as every other
+            // optimistic-then-reconciled field this provider already has.
+            isOnline: false,
+          },
+        ]);
+      }
 
-    const result = await respondToFriendRequestAction(requestId, action);
-    if (!result.ok) {
-      // Already resolved elsewhere, or a genuine failure — either way,
-      // real server state is the only trustworthy source to reconcile
-      // against now, never a guess.
-      await refresh();
-      return false;
-    }
-    return true;
-  }
-
-  async function removeFriend(friendPlayerId: string): Promise<boolean> {
-    const previousFriends = friends;
-    // Optimistic: the friend disappears from every consumer immediately.
-    setFriends((current) => current.filter((friend) => friend.playerId !== friendPlayerId));
-
-    const result = await removeFriendAction(friendPlayerId);
-    if (!result.ok) {
-      // Reconcile against real server state rather than assuming the
-      // optimistic removal was correct (e.g. a race where the friendship
-      // was already removed from the other side).
-      setFriends(previousFriends);
-      await refresh();
-      return false;
-    }
-    return true;
-  }
-
-  return (
-    <FriendsDataContext.Provider value={{ friends, incomingRequests, refresh, respondToRequest, removeFriend }}>
-      {children}
-    </FriendsDataContext.Provider>
+      const result = await respondToFriendRequestAction(requestId, action);
+      if (!result.ok) {
+        // Already resolved elsewhere, or a genuine failure — either way,
+        // real server state is the only trustworthy source to reconcile
+        // against now, never a guess.
+        await refresh();
+        return false;
+      }
+      return true;
+    },
+    [incomingRequests, refresh]
   );
+
+  const removeFriend = useCallback(
+    async (friendPlayerId: string): Promise<boolean> => {
+      const previousFriends = friends;
+      // Optimistic: the friend disappears from every consumer immediately.
+      setFriends((current) => current.filter((friend) => friend.playerId !== friendPlayerId));
+
+      const result = await removeFriendAction(friendPlayerId);
+      if (!result.ok) {
+        // Reconcile against real server state rather than assuming the
+        // optimistic removal was correct (e.g. a race where the friendship
+        // was already removed from the other side).
+        setFriends(previousFriends);
+        await refresh();
+        return false;
+      }
+      return true;
+    },
+    [friends, refresh]
+  );
+
+  // SITE RENDER PERFORMANCE — memoized so a render that doesn't actually
+  // change friends/incomingRequests (or the now-stable refresh/
+  // respondToRequest/removeFriend identities) hands consumers back the
+  // exact same context value object, which is what actually stops
+  // useContext(FriendsDataContext) consumers from rerendering.
+  const value = useMemo<FriendsDataContextValue>(
+    () => ({ friends, incomingRequests, refresh, respondToRequest, removeFriend }),
+    [friends, incomingRequests, refresh, respondToRequest, removeFriend]
+  );
+
+  return <FriendsDataContext.Provider value={value}>{children}</FriendsDataContext.Provider>;
 }
 
 export function useFriendsData(): FriendsDataContextValue {
