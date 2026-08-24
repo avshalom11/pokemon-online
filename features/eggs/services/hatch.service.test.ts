@@ -13,9 +13,11 @@ import {
   getIncubatorRows,
   getOwnedEggRow,
   getPlayerPokemonRow,
+  getPlayerPokemonsByPlayerId,
   resetFakeDb,
   seedIncubator,
   seedOwnedEgg,
+  seedPlayerPokemon,
   seedPlayerProfile,
 } from "../../../test/support/fakes/prisma.fake.ts";
 import { prisma } from "@/lib/db/prisma";
@@ -116,15 +118,40 @@ test("the hatched Pokémon is added to the player's collection/storage, using th
   assert.equal(row?.isStarter, false);
 });
 
-test("the hatched Pokémon is NOT automatically placed into the active party", async () => {
+// EGG HATCH — AUTO-ADD TO PARTY IF SPACE, matching capture.service.ts's own
+// attemptCapture behavior (see capture.service.auto-party.test.ts).
+test("a hatched Pokémon is auto-added to the first empty party slot", async () => {
+  seedPlayerPokemon({ id: "active", playerId: "owner-1", speciesId: "charmander", partySlot: 1 });
   const { eggId } = await seedReadyIncubation("common", "kanto");
 
   const result = await hatchIncubation("owner-1", eggId, () => 0);
   assert.equal(result.status, "hatched");
   if (result.status !== "hatched") return;
+  assert.equal(result.result.addedToParty, true);
 
   const row = getPlayerPokemonRow(result.result.ownedPokemonId);
-  assert.equal(row?.partySlot, null, "a hatched Pokémon must land in storage, never an occupied party slot");
+  assert.equal(row?.partySlot, 2, "must land in the first free slot (2 — slot 1 is already occupied)");
+});
+
+test("a full party (6/6) leaves the hatched Pokémon in storage — never replaces an existing member", async () => {
+  for (let slot = 1; slot <= 6; slot++) {
+    seedPlayerPokemon({ id: `member-${slot}`, playerId: "owner-1", speciesId: "charmander", partySlot: slot });
+  }
+  const { eggId } = await seedReadyIncubation("common", "kanto");
+
+  const result = await hatchIncubation("owner-1", eggId, () => 0);
+  assert.equal(result.status, "hatched");
+  if (result.status !== "hatched") return;
+  assert.equal(result.result.addedToParty, false);
+
+  const row = getPlayerPokemonRow(result.result.ownedPokemonId);
+  assert.equal(row?.partySlot, null, "a full party must leave the hatched Pokémon in storage (partySlot null)");
+
+  const partySlots = getPlayerPokemonsByPlayerId("owner-1")
+    .filter((pokemon) => pokemon.partySlot !== null)
+    .map((pokemon) => pokemon.partySlot)
+    .sort();
+  assert.deepEqual(partySlots, [1, 2, 3, 4, 5, 6], "no existing party member's slot may change");
 });
 
 test("hatching with the permanent starter incubator consumes the egg and removes the incubation row, but the incubator itself remains permanently owned", async () => {

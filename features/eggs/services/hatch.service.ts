@@ -5,6 +5,7 @@ import { rollHatchLevel } from "@/features/eggs/services/hatch-level.service";
 import { rollHatchSpecies } from "@/features/eggs/services/hatch-pool.service";
 import { isIncubatorPermanent } from "@/features/eggs/services/incubator.service";
 import { isIncubationReady } from "@/features/eggs/services/incubation.service";
+import { getFirstEmptyPartySlot } from "@/features/party/utils/party-rules";
 import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { getTotalXpRequiredForPokemonLevel } from "@/features/pokemon-progression/pokemon-progression-calculations";
@@ -20,6 +21,7 @@ export interface HatchOutcome {
   rarity: PokemonRarity;
   regionId: RegionId;
   spriteUrl: string;
+  addedToParty: boolean;
 }
 
 export type HatchIncubationResult =
@@ -104,8 +106,9 @@ export async function hatchIncubation(
     // createOwnedPokemon (shared with capture.service.ts/select-starter.
     // service.ts) — the one canonical PlayerPokemon creation path, same
     // ownership architecture every other newly owned Pokémon already uses.
-    // partySlot is omitted (defaults to null): storage only, never
-    // auto-added to the active party/team, per this phase's own spec.
+    // partySlot is deliberately omitted here (defaults to null, storage
+    // only) — the auto-add-to-party step right below is what may promote
+    // it out of that default, never this call itself.
     const { pokemon } = await createOwnedPokemon(tx, {
       playerId,
       speciesId: species.id,
@@ -119,6 +122,26 @@ export async function hatchIncubation(
       source: "egg",
     });
 
+    // EGG HATCH — AUTO-ADD TO PARTY IF SPACE, matching capture.service.ts's
+    // own attemptCapture exactly (same getFirstEmptyPartySlot helper, same
+    // "read current occupancy fresh inside this transaction, try/catch the
+    // update, never let a race abort an otherwise-successful hatch" shape —
+    // see that function's own doc comment for why the try/catch exists).
+    let addedToParty = false;
+    const currentParty = await tx.playerPokemon.findMany({
+      where: { playerId, partySlot: { not: null } },
+      select: { partySlot: true },
+    });
+    const emptySlot = getFirstEmptyPartySlot(currentParty.map((member) => member.partySlot as number));
+    if (emptySlot !== null) {
+      try {
+        await tx.playerPokemon.update({ where: { id: pokemon.id }, data: { partySlot: emptySlot } });
+        addedToParty = true;
+      } catch {
+        // Left in storage — see this block's own doc comment.
+      }
+    }
+
     return {
       status: "hatched",
       incubatorId: incubator.id,
@@ -131,6 +154,7 @@ export async function hatchIncubation(
         rarity,
         regionId,
         spriteUrl: getFrontSpritePath(species),
+        addedToParty,
       },
     };
   });

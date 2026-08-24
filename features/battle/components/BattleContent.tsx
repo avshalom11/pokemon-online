@@ -8,6 +8,7 @@ import { BattleResultOverlay } from "./BattleResultOverlay";
 import { BattleWindow } from "./BattleWindow";
 import { ChestFoundDialog } from "./ChestFoundDialog";
 import { EggFoundDialog } from "./EggFoundDialog";
+import { FleeConfirmDialog } from "./FleeConfirmDialog";
 import { MasterBallConfirmDialog } from "./MasterBallConfirmDialog";
 import { XpToast } from "./XpToast";
 import { chestFoundMessage } from "@/features/chests/messages/chest-found-messages";
@@ -359,6 +360,12 @@ export function BattleContent({
     null
   );
   const [pendingMasterBallConfirm, setPendingMasterBallConfirm] = useState(false);
+  // FLEE CONFIRMATION — non-null-ish gate on the "בריחה" menu action, same
+  // "no server call, no phase change until the player explicitly confirms"
+  // shape pendingMasterBallConfirm already establishes above. Cancelling
+  // leaves phase/message/session completely untouched; only
+  // handleConfirmFlee proceeds to the real handleEscape.
+  const [pendingFleeConfirm, setPendingFleeConfirm] = useState(false);
   const [isUsingItem, startUseItemTransition] = useTransition();
   const [activeId, setActiveId] = useState(activePokemonId);
   // A restored (post-refresh) battle must reopen onto whatever phase the
@@ -1350,17 +1357,34 @@ export function BattleContent({
       endSessionPromiseRef.current = endBattleSessionAction();
     });
 
-    // handleReturnToMap now waits for the delete above to settle before its
-    // own router.replace navigates — still real, non-instant navigation, so
-    // the "escaped" message above still gets a genuine on-screen moment.
-    handleReturnToMap();
+    // FLEE CONFIRMATION — no longer calls handleReturnToMap itself: the
+    // "escaped" BattleResultOverlay rendered below (phase === "escaped")
+    // owns navigation now, via its own onReturnToMap={handleReturnToMap}
+    // button. That keeps the escaped-result screen on-screen until the
+    // player explicitly clicks it — never an automatic router.replace the
+    // instant the session-ending delete above happens to settle. The
+    // delete itself still fires immediately (session cleanup shouldn't
+    // wait on a click); only the actual navigation waits.
+  }
+
+  // FLEE CONFIRMATION — the "בריחה" menu action only ever opens this
+  // confirmation now; nothing server-side happens, and phase/message/
+  // session are all completely untouched, until the player explicitly
+  // confirms via handleConfirmFlee below.
+  function handleConfirmFlee() {
+    setPendingFleeConfirm(false);
+    handleEscape();
+  }
+
+  function handleCancelFlee() {
+    setPendingFleeConfirm(false);
   }
 
   function handleMenuAction(actionId: string) {
     if (phase !== "playerTurn") return;
 
     if (actionId === "run") {
-      handleEscape();
+      setPendingFleeConfirm(true);
     } else if (actionId === "capture") {
       handleCapture();
     } else if (actionId === "switch") {
@@ -1517,6 +1541,8 @@ export function BattleContent({
       {pendingMasterBallConfirm ? (
         <MasterBallConfirmDialog pending={isCapturing} onCancel={handleCancelMasterBall} onConfirm={handleConfirmMasterBall} />
       ) : null}
+
+      {pendingFleeConfirm ? <FleeConfirmDialog onCancel={handleCancelFlee} onConfirm={handleConfirmFlee} /> : null}
 
       {pendingEvolution ? (
         <EvolutionPromptDialog

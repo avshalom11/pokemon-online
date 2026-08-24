@@ -25,13 +25,13 @@ const VARIANT_STYLES: Record<BattleResultOverlayProps["variant"], { icon: string
 // way out, and always returns to /map via router.replace (see
 // BattleContent), never leaving a finished battle in browser history.
 //
-// FIELD BATTLE STUCK — escape used to have no overlay at all: it relied
-// entirely on handleEscape's automatic router.replace("/map") succeeding,
-// with zero manual retry if that navigation ever failed to commit (a real,
-// reproduced dev-environment failure mode — HMR/network interruptions can
-// silently strand a pending client-side transition). The "escaped" variant
-// gives the player the exact same always-available manual fallback
-// captured/lost already had, so a stuck escape is never a dead end.
+// FLEE CONFIRMATION — the "escaped" variant is this button's primary
+// trigger for a flee, not just a fallback: handleEscape (BattleContent) no
+// longer auto-navigates on its own, so this screen — and its button —
+// genuinely stays up until the player explicitly clicks it, exactly like
+// captured/lost already did. (It also still doubles as the same
+// always-available manual retry those two variants provide if a prior
+// router.replace ever failed to commit.)
 export function BattleResultOverlay({ variant, title, message, onReturnToMap }: BattleResultOverlayProps) {
   const { icon, accent } = VARIANT_STYLES[variant];
 

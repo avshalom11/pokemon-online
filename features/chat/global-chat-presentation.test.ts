@@ -18,6 +18,7 @@ import { resetFakeDb, seedPlayerProfile } from "../../test/support/fakes/prisma.
 const homeContentSrc = fs.readFileSync("features/home/components/HomeContent.tsx", "utf8");
 const homeChatPanelSrc = fs.readFileSync("features/chat/components/HomeChatPanel.tsx", "utf8");
 const chatBarSrc = fs.readFileSync("features/chat/components/GlobalChatBar.tsx", "utf8");
+const chatBarLayoutContextSrc = fs.readFileSync("features/chat/context/global-chat-bar-layout-context.tsx", "utf8");
 const homeDataServiceSrc = fs.readFileSync("features/home/services/home-data.service.ts", "utf8");
 
 // 1: Home renders chat expanded/embedded.
@@ -50,12 +51,17 @@ test("3: non-Home pages default collapsed — navigating between two non-Home pa
 });
 
 test("3b: (source) the overlay bar defaults to collapsed and renders nothing on Home", () => {
-  assert.match(chatBarSrc, /const \[minimized, setMinimized\] = useState\(true\)/, "the overlay bar must default to collapsed");
+  // BOTTOM UI — FRIENDS PANEL BESIDE GLOBAL CHAT moved this state (and its
+  // route-driven collapse logic) out of GlobalChatBar.tsx itself and into
+  // the shared GlobalChatBarLayoutProvider, so SocialDock can read the same
+  // live value — see that module's own doc comment.
+  assert.match(chatBarLayoutContextSrc, /const \[minimized, setMinimized\] = useState\(true\)/, "the shared layout context must default to collapsed");
   assert.match(chatBarSrc, /if \(isHome\) return null/, "the overlay bar must render nothing on Home — HomeChatPanel is the only chat surface there");
   // Checks actual USAGE (window.localStorage.getItem/setItem), not a
   // blanket "localStorage" substring ban — this file's own doc comment
   // legitimately discusses its deliberate absence in prose.
   assert.ok(!chatBarSrc.includes("window.localStorage"), "an old persisted value must never be able to force the bar open on load");
+  assert.ok(!chatBarLayoutContextSrc.includes("window.localStorage"), "the shared layout context must not persist this either");
 });
 
 // 4: user can expand on non-Home pages.

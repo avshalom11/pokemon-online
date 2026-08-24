@@ -2,6 +2,10 @@
 
 import type { ReactNode } from "react";
 
+import { useSidebarOpen } from "@/components/layout/sidebar-open-context";
+import { useGlobalChatBarLayout } from "@/features/chat/context/global-chat-bar-layout-context";
+import { SIDEBAR_PANEL_WIDTH_CSS } from "@/lib/layout/gameLayout";
+
 // FRIENDS UI — MINIMIZED CHAT POSITION FIX. One shared fixed flex
 // container anchored to the bottom-right corner, holding both floating
 // social panels (Private Chat, then Friends Bar, in that DOM order) in
@@ -33,9 +37,51 @@ import type { ReactNode } from "react";
 // right-most, child. items-end aligns both panels' bottom edges so each
 // grows upward independently regardless of the other's current height
 // (a collapsed pill next to a tall expanded panel, or vice versa).
+// RIGHT SIDEBAR — PUSH FRIENDS BAR + GLOBAL CHAT. `right` shifts left by the
+// sidebar's own real width (SIDEBAR_PANEL_WIDTH_CSS, the one shared
+// constant GameSidebar.tsx's aside panel itself uses — never a second,
+// independently-hardcoded guess) whenever it's open, so this dock — and
+// everything docked inside it — never renders underneath the open sidebar.
+// transition-[right] duration-200 matches the sidebar's own open/close
+// transition (both its toggle button and aside panel use the same 200ms),
+// so the two move together as one motion instead of one snapping ahead of
+// the other.
+//
+// BOTTOM UI — FRIENDS PANEL BESIDE GLOBAL CHAT — this dock has two
+// mutually-exclusive presentations now, chosen by the same isHome/minimized
+// values GlobalChatBar itself reads (via the shared
+// GlobalChatBarLayoutProvider — see that module's own doc comment): (1) row
+// mode, whenever there's an actual minimized bar to sit beside — then this
+// is just a plain flex-row grouping, no positioning of its own, since the
+// shared BottomDock wrapper (components/layout/BottomDock.tsx) already
+// supplies ONE fixed, sidebar-aware, centered row for both this dock and
+// the chat bar together; (2) the ORIGINAL standalone stacked-above-chat
+// position below, completely unchanged, for the two cases that fall
+// outside row mode — Home (no chat bar exists there at all) and an
+// expanded chat panel (deliberately left exactly as it was by this
+// ticket).
 export function SocialDock({ children }: { children: ReactNode }) {
+  const { isOpen } = useSidebarOpen();
+  const { isHome, minimized } = useGlobalChatBarLayout();
+
+  if (!isHome && minimized) {
+    return (
+      <div dir="ltr" className="flex flex-row items-end gap-3">
+        {children}
+      </div>
+    );
+  }
+
+  // Sidebar closed: right-4 (the class) applies untouched — pixel-identical
+  // to this dock's prior positioning. Sidebar open: an inline `right`
+  // override (which always wins over the utility class) shifts it left by
+  // the sidebar's own width instead.
   return (
-    <div dir="ltr" className="fixed bottom-[calc(var(--app-chat-bar-height)+1rem)] right-4 z-[45] flex flex-row items-end gap-3">
+    <div
+      dir="ltr"
+      className="fixed bottom-[calc(var(--app-chat-bar-height)+1rem)] right-4 z-[45] flex flex-row items-end gap-3 transition-[right] duration-200"
+      style={isOpen ? { right: `calc(${SIDEBAR_PANEL_WIDTH_CSS} + 1rem)` } : undefined}
+    >
       {children}
     </div>
   );

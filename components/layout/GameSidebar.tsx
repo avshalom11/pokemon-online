@@ -1,22 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useActiveBattle } from "@/features/battle-session/context/active-battle-context";
 import { buildSidebarCategories, type SidebarMenuItem } from "@/features/navigation/data/sidebar-menu";
 import { PlayerSearchModal } from "@/features/player-search/components/PlayerSearchModal";
-
-const OPEN_STORAGE_KEY = "game-sidebar-open";
-
-// The exact same formula as the aside panel's own width below (18rem,
-// clamped to 85% of the viewport on very narrow screens) — kept as one
-// shared value so the toggle button's "just outside the open panel" offset
-// can never drift out of sync with the panel's real rendered width at any
-// viewport size, the same "kept in sync by hand, single source of truth"
-// convention app/globals.css's --app-header-height doc comment already
-// establishes for its own cross-file constant.
-const SIDEBAR_PANEL_WIDTH_CSS = "min(18rem, 85vw)";
+import { useSidebarOpen } from "@/components/layout/sidebar-open-context";
+import { SIDEBAR_PANEL_WIDTH_CSS } from "@/lib/layout/gameLayout";
 
 const BATTLE_LOCKED_TITLE = "לא ניתן לנווט בזמן קרב פעיל";
 
@@ -44,8 +35,14 @@ export function GameSidebar({ username }: GameSidebarProps) {
   const { isActiveBattle } = useActiveBattle();
   const categories = buildSidebarCategories(username);
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [hasHydrated, setHasHydrated] = useState(false);
+  // RIGHT SIDEBAR — PUSH FRIENDS BAR + GLOBAL CHAT. Open/closed state (and
+  // its localStorage persistence) now lives in the shared SidebarOpenProvider
+  // (components/layout/sidebar-open-context.tsx) rather than as local state
+  // here, so FriendsBar/SocialDock and GlobalChatBar — plain siblings of
+  // this component in app/(game)/layout.tsx, not parent/child — can read
+  // the exact same live value and shift themselves out from under this
+  // panel while it's open.
+  const { isOpen, setIsOpen } = useSidebarOpen();
   // PLAYER SEARCH — the sidebar's own action-item state (see
   // sidebar-menu.ts's hasAction doc comment). Not persisted — always
   // starts closed on a fresh mount, same as every other modal in this
@@ -54,22 +51,6 @@ export function GameSidebar({ username }: GameSidebarProps) {
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(
     () => new Set(categories.map((category) => category.id))
   );
-
-  // Hydrate the persisted open/closed state after mount (not during
-  // useState's initializer) so this renders identically on server and first
-  // client paint, then picks up the saved value right after — same
-  // hydration-safe pattern the map editors already use for their own
-  // localStorage-backed state.
-  useEffect(() => {
-    const stored = window.localStorage.getItem(OPEN_STORAGE_KEY);
-    if (stored !== null) setIsOpen(stored === "true");
-    setHasHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-    window.localStorage.setItem(OPEN_STORAGE_KEY, String(isOpen));
-  }, [isOpen, hasHydrated]);
 
   function toggleCategory(categoryId: string) {
     setExpandedCategoryIds((current) => {

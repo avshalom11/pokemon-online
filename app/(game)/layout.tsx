@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { BottomDock } from "@/components/layout/BottomDock";
 import { GameHeader } from "@/components/layout/GameHeader";
 import { GameSidebar } from "@/components/layout/GameSidebar";
+import { SidebarOpenProvider } from "@/components/layout/sidebar-open-context";
 import { ActiveBattleProvider } from "@/features/battle-session/context/active-battle-context";
 import { hasActiveBattleSession } from "@/features/battle-session/services/battle-session.service";
 import { GlobalChatBar } from "@/features/chat/components/GlobalChatBar";
+import { GlobalChatBarLayoutProvider } from "@/features/chat/context/global-chat-bar-layout-context";
 import { getRecentGlobalChatMessages } from "@/features/chat/services/global-chat.service";
 import { FloatingPrivateChatWindow } from "@/features/friends/components/FloatingPrivateChatWindow";
 import { FriendsBar } from "@/features/friends/components/FriendsBar";
@@ -108,20 +111,40 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
             <FriendsDataProvider initial={friendsData}>
               <PrivateChatWindowProvider>
                 <GameHeader player={player} notifications={notifications} />
-                <GameSidebar username={player.username} />
-                {children}
-                <GlobalChatBar
-                  initialMessages={globalChatMessages}
-                  currentPlayerDisplayName={player.displayName}
-                  currentPlayerUsername={session.user.username ?? null}
-                />
-                <SocialDock>
-                  <FloatingPrivateChatWindow
-                    currentPlayerDisplayName={player.displayName}
-                    currentPlayerUsername={session.user.username ?? null}
-                  />
-                  <FriendsBar />
-                </SocialDock>
+                {/* RIGHT SIDEBAR — PUSH FRIENDS BAR + GLOBAL CHAT. Shared
+                    open/closed state for GameSidebar's aside panel — read by
+                    GlobalChatBar and SocialDock below (plain siblings here,
+                    not parent/child of GameSidebar) so they can shift/resize
+                    themselves out from under it while it's open. See
+                    components/layout/sidebar-open-context.tsx's own doc
+                    comment. */}
+                <SidebarOpenProvider>
+                  <GameSidebar username={player.username} />
+                  {children}
+                  {/* BOTTOM UI — FRIENDS PANEL BESIDE GLOBAL CHAT. Shared
+                      isHome/minimized state for the chat bar — read by
+                      SocialDock and BottomDock below (plain siblings of
+                      GlobalChatBar, not parent/child) so Friends can sit
+                      beside the minimized bar on one row instead of
+                      stacked above it. See features/chat/context/
+                      global-chat-bar-layout-context.tsx's own doc comment. */}
+                  <GlobalChatBarLayoutProvider>
+                    <BottomDock>
+                      <GlobalChatBar
+                        initialMessages={globalChatMessages}
+                        currentPlayerDisplayName={player.displayName}
+                        currentPlayerUsername={session.user.username ?? null}
+                      />
+                      <SocialDock>
+                        <FloatingPrivateChatWindow
+                          currentPlayerDisplayName={player.displayName}
+                          currentPlayerUsername={session.user.username ?? null}
+                        />
+                        <FriendsBar />
+                      </SocialDock>
+                    </BottomDock>
+                  </GlobalChatBarLayoutProvider>
+                </SidebarOpenProvider>
                 <FriendshipSyncWatcher />
                 <PrivateMessagePopupWatcher />
                 <PresenceHeartbeat />
