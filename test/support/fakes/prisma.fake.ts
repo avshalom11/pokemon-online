@@ -300,6 +300,8 @@ interface FieldBattleSessionRow {
   wildStatusTurnsRemaining: number | null;
   wildVolatileState: unknown;
   playerVolatileState: unknown;
+  // GAME TUTORIAL — PHASE 3
+  isTutorialEncounter: boolean;
 }
 
 // GYMS & LEAGUES PHASE 3
@@ -323,6 +325,21 @@ interface NpcBattleSessionRow {
   playerBattleStatus: unknown;
   playerStatStages: unknown;
   playerVolatileState: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// GAME TUTORIAL — PHASE 0
+interface PlayerTutorialProgressRow {
+  id: string;
+  playerId: string;
+  currentStageId: string;
+  currentSubStep: string | null;
+  status: string;
+  completedAt: Date | null;
+  rewardClaimed: boolean;
+  // GAME TUTORIAL — PHASE 3
+  pidgeyCaptured: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -461,6 +478,9 @@ let ownedEggs = new Map<string, PlayerOwnedEggRow>();
 let incubators = new Map<string, PlayerIncubatorRow>();
 let eggIncubations = new Map<string, PlayerEggIncubationRow>();
 let daycareStays = new Map<string, PlayerDaycareStayRow>();
+// GAME TUTORIAL — PHASE 0 — keyed by playerId, same "one row per player" shape
+// as npcBattleSessions below.
+let tutorialProgresses = new Map<string, PlayerTutorialProgressRow>();
 // GYMS & LEAGUES PHASE 3
 let npcBattleSessions = new Map<string, NpcBattleSessionRow>();
 // GYMS & LEAGUES PHASE 1
@@ -584,6 +604,7 @@ function cloneState() {
     incubators: new Map([...incubators].map(([id, row]) => [id, { ...row }])),
     eggIncubations: new Map([...eggIncubations].map(([id, row]) => [id, { ...row }])),
     daycareStays: new Map([...daycareStays].map(([id, row]) => [id, { ...row }])),
+    tutorialProgresses: new Map([...tutorialProgresses].map(([id, row]) => [id, { ...row }])),
     npcBattleSessions: new Map([...npcBattleSessions].map(([id, row]) => [id, { ...row }])),
     gymBattleProgress: new Map([...gymBattleProgress].map(([id, row]) => [id, { ...row }])),
     gymBadges: new Map([...gymBadges].map(([id, row]) => [id, { ...row }])),
@@ -618,6 +639,7 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   incubators = snapshot.incubators;
   eggIncubations = snapshot.eggIncubations;
   daycareStays = snapshot.daycareStays;
+  tutorialProgresses = snapshot.tutorialProgresses;
   npcBattleSessions = snapshot.npcBattleSessions;
   gymBattleProgress = snapshot.gymBattleProgress;
   gymBadges = snapshot.gymBadges;
@@ -651,6 +673,7 @@ export function resetFakeDb() {
   incubators = new Map();
   eggIncubations = new Map();
   daycareStays = new Map();
+  tutorialProgresses = new Map();
   npcBattleSessions = new Map();
   gymBattleProgress = new Map();
   gymBadges = new Map();
@@ -1050,6 +1073,8 @@ export function seedFieldBattleSession(row: {
   wildStatusTurnsRemaining?: number | null;
   wildVolatileState?: unknown;
   playerVolatileState?: unknown;
+  // GAME TUTORIAL — PHASE 3
+  isTutorialEncounter?: boolean;
 }) {
   const full: FieldBattleSessionRow = {
     playerId: row.playerId,
@@ -1071,6 +1096,7 @@ export function seedFieldBattleSession(row: {
     wildStatusTurnsRemaining: row.wildStatusTurnsRemaining ?? null,
     wildVolatileState: row.wildVolatileState ?? {},
     playerVolatileState: row.playerVolatileState ?? {},
+    isTutorialEncounter: row.isTutorialEncounter ?? false,
   };
   sessions.set(row.playerId, full);
   return full;
@@ -1431,6 +1457,17 @@ const client = {
       }
       return { count };
     },
+    // RELEASE POKÉMON — release-pokemon.service.ts's own single real
+    // caller, only ever reached after its own ownership/in-party/in-battle/
+    // in-daycare/last-pokemon guards already passed — same "throw if
+    // missing" shape playerOwnedEgg's own delete() above already
+    // establishes, never a silent no-op.
+    async delete({ where }: { where: { id: string } }) {
+      const row = pokemons.get(where.id);
+      if (!row) throw new Error(`fake prisma: playerPokemon ${where.id} not found for delete`);
+      pokemons.delete(where.id);
+      return { ...row };
+    },
   },
   playerProfile: {
     // NEW PLAYER STARTER — `userId` + `select` support added for
@@ -1710,6 +1747,55 @@ const client = {
       const row = npcBattleSessions.get(where.playerId);
       if (!row || !matches(row, where)) return { count: 0 };
       npcBattleSessions.delete(where.playerId);
+      return { count: 1 };
+    },
+  },
+  // GAME TUTORIAL — PHASE 0 — mirrors npcBattleSession's own shape (single
+  // row per playerId), plus an idempotent upsert mirroring ensurePlayerProfile's
+  // own "create on first call, no-op on every call after" idiom
+  // (lib/auth/player-profile.ts) for getOrCreateTutorialProgress.
+  playerTutorialProgress: {
+    async upsert({
+      where,
+      create,
+      update,
+    }: {
+      where: { playerId: string };
+      create: { playerId: string };
+      update: Record<string, unknown>;
+    }) {
+      const existing = tutorialProgresses.get(where.playerId);
+      if (existing) {
+        Object.assign(existing, update, { updatedAt: new Date() });
+        return { ...existing };
+      }
+      const full: PlayerTutorialProgressRow = {
+        id: nextId("tutorial_progress"),
+        playerId: create.playerId,
+        currentStageId: "welcome",
+        currentSubStep: null,
+        status: "not_started",
+        completedAt: null,
+        rewardClaimed: false,
+        pidgeyCaptured: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      tutorialProgresses.set(where.playerId, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { playerId: string } }) {
+      const row = tutorialProgresses.get(where.playerId);
+      return row ? { ...row } : null;
+    },
+    // The CAS-style guard tutorial-progress.service.ts's advanceTutorialStage
+    // relies on (where also carries the currently-read currentStageId) —
+    // same idiom promoteToNextEncounter's own updateMany guard already uses
+    // (battle-session.service.ts).
+    async updateMany({ where, data }: { where: { playerId: string } & Record<string, unknown>; data: Record<string, unknown> }) {
+      const row = tutorialProgresses.get(where.playerId);
+      if (!row || !matches(row, where)) return { count: 0 };
+      Object.assign(row, data, { updatedAt: new Date() });
       return { count: 1 };
     },
   },
@@ -2503,6 +2589,7 @@ const client = {
         wildStatusTurnsRemaining: (data.wildStatusTurnsRemaining as number | null | undefined) ?? null,
         wildVolatileState: data.wildVolatileState ?? {},
         playerVolatileState: data.playerVolatileState ?? {},
+        isTutorialEncounter: (data.isTutorialEncounter as boolean | undefined) ?? false,
       };
       sessions.set(full.playerId, full);
       return { ...full };
@@ -2515,6 +2602,17 @@ const client = {
       const row = sessions.get(where.playerId);
       if (!row) throw new Error(`fake prisma: fieldBattleSession ${where.playerId} not found`);
       return { ...row };
+    },
+    // DAYCARE — HIDE DEPOSITED POKÉMON + PROTECT FROM REMOVAL — same
+    // generic where-filter support other findFirst/findMany fakes already
+    // establish. release-pokemon.service.ts's own in-battle check
+    // (findFirst({ where: { playerId, activePlayerPokemonId } })) is the
+    // one caller; sessions is keyed uniquely by playerId (one active
+    // session per player, exactly like the real schema), so this is just
+    // findUnique-by-playerId plus the generic matches() check on top.
+    async findFirst({ where }: { where: Record<string, unknown> }) {
+      const row = typeof where.playerId === "string" ? sessions.get(where.playerId) : undefined;
+      return row && matches(row, where) ? { ...row } : null;
     },
     async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
       let count = 0;

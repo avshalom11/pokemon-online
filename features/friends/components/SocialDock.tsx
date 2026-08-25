@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { useSidebarOpen } from "@/components/layout/sidebar-open-context";
 import { useGlobalChatBarLayout } from "@/features/chat/context/global-chat-bar-layout-context";
+import { useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
 import { SIDEBAR_PANEL_WIDTH_CSS } from "@/lib/layout/gameLayout";
 
 // FRIENDS UI — MINIMIZED CHAT POSITION FIX. One shared fixed flex
@@ -63,10 +64,16 @@ import { SIDEBAR_PANEL_WIDTH_CSS } from "@/lib/layout/gameLayout";
 export function SocialDock({ children }: { children: ReactNode }) {
   const { isOpen } = useSidebarOpen();
   const { isHome, minimized } = useGlobalChatBarLayout();
+  // GAME TUTORIAL — PHASE 1. Spotlights the whole dock (Friends bar +
+  // private chat) regardless of which of the two mutually-exclusive
+  // presentations below is currently rendering — the Friends stage never
+  // requires a specific interaction (see tutorial-stages.config.ts's own
+  // "friends" stage doc comment), only that the player notices this area.
+  const friendsBarTargetRef = useTutorialTarget("friends-bar");
 
   if (!isHome && minimized) {
     return (
-      <div dir="ltr" className="flex flex-row items-end gap-3">
+      <div ref={friendsBarTargetRef} dir="ltr" className="flex flex-row items-end gap-3">
         {children}
       </div>
     );
@@ -78,6 +85,7 @@ export function SocialDock({ children }: { children: ReactNode }) {
   // the sidebar's own width instead.
   return (
     <div
+      ref={friendsBarTargetRef}
       dir="ltr"
       className="fixed bottom-[calc(var(--app-chat-bar-height)+1rem)] right-4 z-[45] flex flex-row items-end gap-3 transition-[right] duration-200"
       style={isOpen ? { right: `calc(${SIDEBAR_PANEL_WIDTH_CSS} + 1rem)` } : undefined}

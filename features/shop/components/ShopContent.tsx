@@ -14,6 +14,15 @@ import { purchaseIncubatorShopItemAction } from "@/features/shop/actions/purchas
 import { purchaseShopItemAction } from "@/features/shop/actions/purchase-shop-item.action";
 import { getDefaultShopCategoryId, getShopCategories, getShopItemsByCategory } from "@/features/shop/services/shop-catalog.service";
 import type { ShopCategoryId } from "@/features/shop/types/shop.types";
+import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
+
+// GAME TUTORIAL — PHASE 2. The real Shop catalog id for the normal Poké
+// Ball (features/shop/data/shop-items.ts) — the one item/price this stage's
+// own registry entry requires ("its existing 100 Money price", this task's
+// own words) — a plain constant, never re-derived from anything the client
+// could influence (the price check below reads it off the real
+// purchaseShopItemAction result, not this constant).
+const TUTORIAL_POKE_BALL_ITEM_ID = "poke-ball";
 
 function insufficientFundsMessage(currency: CurrencyType): string {
   return currency === "gold" ? "אין לך מספיק זהב לרכישה זו." : "אין לך מספיק מטבעות לרכישה זו.";
@@ -39,6 +48,19 @@ export function ShopContent() {
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchaseSuccessMessage, setPurchaseSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // GAME TUTORIAL — PHASE 2. Spotlights the whole purchase flow (category
+  // menu + item grid + purchase panel — never one specific item card,
+  // which ShopItemGrid/ShopItemCard render generically for every category
+  // and know nothing about this feature). reportAction("poke-ball-purchased")
+  // fires only once the REAL purchaseShopItemAction result below confirms
+  // a success for exactly the real "poke-ball" item, quantity 1, at its
+  // real 100-money price — "do not trust a client event alone if the
+  // Server Action result can verify success" (this task's own explicit
+  // rule). A no-op unless the Tutorial is currently awaiting exactly this
+  // action.
+  const purchaseFlowTargetRef = useTutorialTarget("shop-purchase-flow");
+  const { reportAction } = useTutorial();
 
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId);
   const items = selectedCategoryId ? getShopItemsByCategory(selectedCategoryId) : [];
@@ -110,6 +132,13 @@ export function ShopContent() {
         setIsConfirmOpen(false);
         setPurchaseSuccessMessage(`נרכשו ${result.quantity} יחידות של ${result.itemName} בהצלחה.`);
         setQuantity(1);
+
+        // GAME TUTORIAL — PHASE 2. Only ever reported once the real result
+        // confirms exactly what this stage requires — never merely "some
+        // purchase succeeded".
+        if (item.id === TUTORIAL_POKE_BALL_ITEM_ID && result.quantity === 1 && result.totalPrice === 100 && result.currency === "money") {
+          reportAction("poke-ball-purchased");
+        }
         return;
       }
 
@@ -134,7 +163,7 @@ export function ShopContent() {
         }}
       />
 
-      <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <div ref={purchaseFlowTargetRef} className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
         <BackButton />
 
         <h1 className="text-lg font-bold text-slate-100">חנות</h1>

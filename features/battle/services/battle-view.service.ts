@@ -4,6 +4,8 @@ import { getMoveById } from "@/engine/moves";
 import type { MoveCategory, MoveType } from "@/engine/moves";
 import { getOrStartBattle } from "@/features/battle-session/services/battle-session.service";
 import { getKnownMoves } from "@/features/known-moves/known-moves-queries";
+import { getActiveTutorialTarget, getTutorialStageById } from "@/features/tutorial/data/tutorial-stages.config";
+import { getOrCreateTutorialProgress } from "@/features/tutorial/services/tutorial-progress.service";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { getZoneFrontSpriteUrls, type EncounterResult } from "@/engine/encounter/pokemon-encounter-engine";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
@@ -98,7 +100,51 @@ export async function getBattleViewData(userId: string, zoneId: ZoneId): Promise
   // roll a different region's encounter pool than the one
   // app/(game)/battle/page.tsx's own region gate already validated.
   const regionId = toRegionId(profile.regionId);
-  const result = await getOrStartBattle(profile.id, zoneId, regionId);
+
+  // GAME TUTORIAL — PHASE 3. Only ever true when the player's own
+  // persisted Tutorial progress is genuinely still sitting at its own
+  // unresolved Field Battle stage, for the exact zone that stage's own
+  // registry entry points at (Grassland) — never trusted from anything
+  // client-supplied, and never true again once pidgeyCaptured flips (see
+  // getOrStartBattle's own doc comment on this parameter, and
+  // markTutorialPidgeyCaptured — capture.service.ts). Every other zone, or
+  // any other Tutorial stage, resolves a completely normal RNG encounter,
+  // exactly as before this phase.
+  //
+  // MAP CRASH/RACE FIX — real bug: the very FIRST time a player ever
+  // clicks Grassland, this function's own DB read (via
+  // getOrCreateTutorialProgress) runs as part of the SAME navigation that
+  // brings up /battle — while the player's persisted currentStageId is
+  // STILL "map" (Map's own "enter-grassland" step, tutorial-stages.
+  // config.ts, is only ever marked complete by a SEPARATE, LATER,
+  // client-side effect that fires only after usePathname() reports "/battle"
+  // — see tutorial-context.tsx's own pathname-watcher — which cannot
+  // possibly happen before this server-side read). A plain
+  // `currentStageId === "field-battle"` check therefore missed this one
+  // real window: a normal, un-forced RNG encounter got created and
+  // persisted (FieldBattleSession is keyed uniquely per player, so every
+  // later /battle visit just kept restoring that same wrong session — see
+  // getOrStartBattle's own "existing" branch). Fixed by ALSO recognizing
+  // "the player is still on the map stage, but Grassland is genuinely the
+  // very next real target it's waiting on" — resolved generically through
+  // the registry's own getActiveTutorialTarget (never a second hardcoded
+  // sub-step id), so this stays correct even if Map's own step sequence is
+  // ever restructured.
+  const tutorialProgress = await getOrCreateTutorialProgress(profile.id);
+  const currentTutorialStage = getTutorialStageById(tutorialProgress.currentStageId);
+  const activeTutorialTarget = currentTutorialStage
+    ? getActiveTutorialTarget({ currentStage: currentTutorialStage, currentSubStep: tutorialProgress.currentSubStep })
+    : null;
+  const isEnteringGrasslandFromMapStage =
+    tutorialProgress.currentStageId === "map" && activeTutorialTarget?.target.targetId === "zone-grassland";
+
+  const forceTutorialEncounter =
+    zoneId === "grassland" &&
+    tutorialProgress.status === "in_progress" &&
+    !tutorialProgress.pidgeyCaptured &&
+    (tutorialProgress.currentStageId === "field-battle" || isEnteringGrasslandFromMapStage);
+
+  const result = await getOrStartBattle(profile.id, zoneId, regionId, { forceTutorialEncounter });
 
   if (result.status !== "ready") {
     return result;

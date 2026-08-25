@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { MoveLearningDecisionDialog } from "@/features/move-learning/components/MoveLearningDecisionDialog";
 import {
@@ -24,6 +24,18 @@ interface PendingMoveLearningGateProps {
   // already establishes for evolution — LevelUpDecisionsGate is what makes
   // sure this one never mounts before that one is fully resolved.
   initialView: PendingMoveLearningPromptView | null;
+  // FIELD BATTLE MOVE LEARNING — optional, purely additive: fired whenever
+  // this gate has no outstanding decision to show (`view` resolves to
+  // null) — including immediately, on first render, if `initialView` was
+  // already null. Same "report full resolution" contract features/
+  // evolution/components/PendingEvolutionGate.tsx's own onFullyResolved
+  // already establishes; BattleContent uses it to clear the local state
+  // that seeded `initialView`, so a later, separate battle-victory grant
+  // in the same still-mounted battle screen can seed and show a fresh one
+  // instead of this callback-less version silently going stale. Omitted by
+  // every other existing caller (Home's LevelUpDecisionsGate), which keeps
+  // this component's prior behavior completely unchanged there.
+  onFullyResolved?: () => void;
 }
 
 // MOVE LEARNING UX — mounted once at Home (via LevelUpDecisionsGate), same
@@ -43,13 +55,25 @@ interface PendingMoveLearningGateProps {
 // -> Move 3 popup" (this task's own required flow) keeps working
 // regardless of how many are queued, one at a time, in the existing
 // canonical (sequence-ascending) pending order.
-export function PendingMoveLearningGate({ initialView }: PendingMoveLearningGateProps) {
+export function PendingMoveLearningGate({ initialView, onFullyResolved }: PendingMoveLearningGateProps) {
   const [view, setView] = useState(initialView);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, startTransition] = useTransition();
 
   const pending = view?.nextPending ?? null;
+
+  useEffect(() => {
+    if (!pending) {
+      onFullyResolved?.();
+    }
+    // Deliberately omits onFullyResolved from deps — same reasoning as
+    // PendingEvolutionGate's own identical effect: this must only ever
+    // re-fire on an actual pending transition, never on a parent rerender
+    // that happens to pass a new function identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending]);
+
   if (!pending) return null;
 
   async function advanceToNextPending() {
@@ -86,6 +110,7 @@ export function PendingMoveLearningGate({ initialView }: PendingMoveLearningGate
 
   return (
     <MoveLearningDecisionDialog
+      pokemonName={view?.pokemonName ?? ""}
       pending={pending}
       knownMoves={view?.knownMoves ?? []}
       selectedSlot={selectedSlot}

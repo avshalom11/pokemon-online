@@ -13,18 +13,18 @@ datasource db {
 }
 
 model User {
-  id              String         @id
-  name            String
-  email           String
-  emailVerified   Boolean        @default(false)
-  image           String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  username        String?
-  displayUsername String?
-  sessions        Session[]
-  accounts        Account[]
-  playerProfile   PlayerProfile?
+  id               String                   @id
+  name             String
+  email            String
+  emailVerified    Boolean                  @default(false)
+  image            String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  username         String?
+  displayUsername  String?
+  sessions         Session[]
+  accounts         Account[]
+  playerProfile    PlayerProfile?
   deletionRequests AccountDeletionRequest[]
 
   // FAILED LOGIN LOCKOUT — LEGACY / UNUSED. These two columns used to be
@@ -113,13 +113,13 @@ model LoginAttemptLock {
 // at a time. Cascades from User so a row can never outlive the account it
 // describes.
 model AccountDeletionRequest {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique
-  expiresAt DateTime
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
   consumedAt DateTime?
-  createdAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
   @@map("account_deletion_request")
@@ -236,7 +236,7 @@ model PlayerProfile {
   // isOnline/getOnlinePlayerIdSet/getOnlinePlayerCount, which only ever
   // return a derived boolean or an aggregate count — this feature's own
   // explicit privacy rule.
-  lastSeenAt                     DateTime?
+  lastSeenAt DateTime?
 
   // The owner's structured public showcase content — an ARRAY of
   // ProfileContentBlock (features/profile/types/profile-content.types.ts),
@@ -287,6 +287,9 @@ model PlayerProfile {
   // see PlayerDaycareStay's own doc comment below for how the slot cap is
   // now enforced instead (service-layer, race-safely).
   daycareStays                 PlayerDaycareStay[]
+  // GAME TUTORIAL — PHASE 0. At most one row per player — see
+  // PlayerTutorialProgress's own doc comment below.
+  tutorialProgress             PlayerTutorialProgress?
   createdAt                    DateTime                         @default(now())
   updatedAt                    DateTime                         @updatedAt
 
@@ -650,6 +653,17 @@ model FieldBattleSession {
   // without a separate reward ledger table. See
   // battle-session.service.ts's syncWildHp.
   wildDefeatRewardGranted Boolean @default(false)
+
+  // GAME TUTORIAL — PHASE 3. True exactly for the deterministic, guaranteed-
+  // capture Pidgey session created by getOrStartBattle's own
+  // forceTutorialEncounter path (features/battle-session/services/
+  // battle-session.service.ts) — never set any other way, and never true
+  // for a normal RNG wild encounter. The one flag capture.service.ts's
+  // attemptCapture checks to decide whether a capture attempt bypasses the
+  // real capture RNG (same unconditional-success shape as its own existing
+  // Master Ball branch) — normal Field Battle capture odds are completely
+  // unaffected for every session where this is false.
+  isTutorialEncounter Boolean @default(false)
 
   // The already-resolved encounter waiting to be promoted the instant the
   // current wild faints — same fields/meaning as wild*/above, one encounter
@@ -1547,7 +1561,17 @@ model GlobalChatMessage {
 // accidentally couple them.
 model PlayerDaycareStay {
   playerPokemonId String        @id
-  pokemon         PlayerPokemon @relation(fields: [playerPokemonId], references: [id], onDelete: Cascade)
+  // DAYCARE — HIDE DEPOSITED + PROTECT FROM REMOVAL. onDelete: Restrict
+  // (not Cascade) — same "block the delete outright rather than silently
+  // destroying the row that references it" rule FieldBattleSession.
+  // activePlayerPokemon already establishes for a Pokémon that's busy
+  // elsewhere. Deleting a PlayerPokemon that's currently deposited must
+  // never succeed at all (see release-pokemon.service.ts's own explicit
+  // application-level "in-daycare" check, which is what actually produces
+  // a clean user-facing rejection before the DB constraint would ever be
+  // reached) — Cascade previously let a delete silently destroy the
+  // deposit alongside the Pokémon itself.
+  pokemon         PlayerPokemon @relation(fields: [playerPokemonId], references: [id], onDelete: Restrict)
 
   playerId String
   player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -1560,6 +1584,57 @@ model PlayerDaycareStay {
 
   @@index([playerId])
   @@map("player_daycare_stay")
+}
+
+// GAME TUTORIAL — PHASE 0. One row per player, tracking progress through the
+// central Tutorial stage registry (features/tutorial/data/
+// tutorial-stages.config.ts) — same "one flag/row per player, guarded by an
+// atomic updateMany, never a per-stage table" idiom PlayerProfile.
+// onboardingCompleted already established for a comparable one-time flow.
+// Lazily created (getOrCreateTutorialProgress) the first time an
+// already-onboarded player loads any (game) route — never part of
+// selectStarterPokemon's own transaction, so onboarding stays entirely
+// unaware the Tutorial exists.
+model PlayerTutorialProgress {
+  id       String        @id @default(cuid())
+  playerId String        @unique
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // A stable string id into TUTORIAL_STAGES, never a numeric index — the
+  // registry can be reordered/extended (e.g. a future Trading stage) later
+  // without invalidating already-saved progress.
+  currentStageId String  @default("welcome")
+  // Sub-step key within the current stage (e.g. the scripted Field Battle
+  // stage's own multi-part sequence, added in a later phase) — null
+  // whenever the current stage has none. No stage sets this yet in Phase 0.
+  currentSubStep String?
+
+  status      String    @default("not_started")
+  completedAt DateTime?
+
+  // Not yet read or written by anything in Phase 0 — reserved for the
+  // completion-reward phase's exactly-once grant guard, same atomic-
+  // updateMany idiom as FieldBattleSession.wildDefeatRewardGranted.
+  rewardClaimed Boolean @default(false)
+
+  // GAME TUTORIAL — PHASE 3. True exactly once this player has genuinely
+  // captured the guaranteed Tutorial Pidgey (FieldBattleSession.
+  // isTutorialEncounter's own guaranteed-capture branch, capture.service.ts)
+  // — set exclusively inside that same capture transaction, never by any
+  // client-reported event alone. Two jobs: (1) battle-session.service.ts's
+  // getOrStartBattle checks this (via getOrCreateTutorialProgress) before
+  // ever forcing a fresh tutorial encounter, so the guaranteed capture can
+  // only ever be obtained once per account; (2) advanceTutorialSubStep
+  // refuses to record the field-battle stage's own "capture-pidgey" step
+  // as complete unless this is already true, so a spoofed/racing
+  // reportAction call can never advance the Tutorial without a real
+  // capture having actually happened.
+  pidgeyCaptured Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("player_tutorial_progress")
 }
 
 model Session {

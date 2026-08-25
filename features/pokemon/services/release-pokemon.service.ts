@@ -7,23 +7,29 @@ export type ReleasePokemonResult =
   | { status: "not-owned" }
   | { status: "in-party" }
   | { status: "in-battle" }
+  // DAYCARE — HIDE DEPOSITED + PROTECT FROM REMOVAL. A Pokémon currently
+  // deposited in the Daycare (features/daycare) can never be released —
+  // see this function's own doc comment below.
+  | { status: "in-daycare" }
   | { status: "last-pokemon" };
 
 // Permanently deletes a PlayerPokemon row — the only place that ever
 // happens. A hard delete (not a soft/flagged delete) is deliberate: nothing
 // else in this project reads a released Pokémon for history or audit
-// purposes (no capture log, no trade history), and no other table has a
-// foreign key into PlayerPokemon except FieldBattleSession, which is always
-// deleted the moment a battle ends — so by the time a release request
-// reaches here, the only thing that could still legitimately reference this
-// row is a *currently active* session, which the in-battle check below
-// catches, and the FK's onDelete: Restrict (prisma/schema.prisma) backs
-// that up at the database level regardless.
+// purposes (no capture log, no trade history). Two other tables hold a
+// foreign key into PlayerPokemon: FieldBattleSession (always deleted the
+// moment a battle ends — the in-battle check below catches a session still
+// active right now) and PlayerDaycareStay (deleted only by a real
+// collection — the in-daycare check below catches a deposit still active
+// right now). Both FKs are onDelete: Restrict (prisma/schema.prisma),
+// which backs both checks up at the database level regardless — this
+// function's own checks exist to turn that into a clean, typed result
+// instead of a raw constraint-violation error reaching the caller.
 //
 // Every check re-reads fresh from the database (never trusts a client's
-// idea of party/battle/collection state) and re-validates ownership before
-// any business rule, exactly like party-management.service.ts's existing
-// mutations.
+// idea of party/battle/Daycare/collection state) and re-validates
+// ownership before any business rule, exactly like
+// party-management.service.ts's existing mutations.
 export async function releasePokemon(playerId: string, playerPokemonId: string): Promise<ReleasePokemonResult> {
   const pokemon = await prisma.playerPokemon.findUnique({ where: { id: playerPokemonId } });
 
@@ -35,13 +41,22 @@ export async function releasePokemon(playerId: string, playerPokemonId: string):
     return { status: "in-party" };
   }
 
-  const [totalOwned, activeBattleSession] = await Promise.all([
+  const [totalOwned, activeBattleSession, daycareStay] = await Promise.all([
     prisma.playerPokemon.count({ where: { playerId } }),
     prisma.fieldBattleSession.findFirst({ where: { playerId, activePlayerPokemonId: playerPokemonId } }),
+    // Same direct row-existence check (not a features/daycare import) as
+    // party-management.service.ts's own assignToPartySlot — "check the
+    // other feature's own table directly rather than depend on its
+    // service".
+    prisma.playerDaycareStay.findUnique({ where: { playerPokemonId } }),
   ]);
 
   if (activeBattleSession) {
     return { status: "in-battle" };
+  }
+
+  if (daycareStay) {
+    return { status: "in-daycare" };
   }
 
   // The heal system (features/pokemon-center) can always bring a fainted

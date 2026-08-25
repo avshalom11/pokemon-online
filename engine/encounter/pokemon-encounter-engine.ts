@@ -4,6 +4,7 @@ import { getAllRegionsWithZoneData, getZone, getZoneData } from "@/data/zones/zo
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
 import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effective-encounter-rarity";
 import { getEligibleWildLevelRange } from "@/engine/evolution-stage-scaling/species-eligibility";
+import { getLegendaryWildLevelRangeForPlayerLevel } from "@/engine/player-level-scaling/legendary-wild-level-brackets.config";
 import { getWildLevelRangeForPlayerLevel, type WildLevelRange } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 import { rollLevelInRange } from "@/engine/player-level-scaling/wild-level-generator";
 import { getFrontSpritePath, type SpriteSource } from "@/features/pokemon/media/pokemon-media-paths";
@@ -276,7 +277,26 @@ export function startPokemonEncounter(
     );
   }
 
-  const level = rollLevelInRange(eligibleRange);
+  // LEGENDARY ENCOUNTER LEVELS. Post-selection only — everything above
+  // (rarity chance, rarity weights, zone encounter weights, and which
+  // species got picked, including `eligibleRange` itself) is completely
+  // unaffected. Once — and only once — the SELECTED species' own real
+  // catalog rarity is "legendary", the final level rolls from the separate
+  // LEGENDARY_WILD_LEVEL_BRACKETS table (engine/player-level-scaling/
+  // legendary-wild-level-brackets.config.ts) instead of the normal
+  // bracket-derived `eligibleRange`, still intersected with this species'
+  // own legal evolution-stage range via the same getEligibleWildLevelRange
+  // primitive every normal encounter already uses (a no-op in practice —
+  // every legendary is a final/standalone species with no evolution-stage
+  // ceiling — but kept for defensive consistency). Every non-legendary
+  // rarity's level roll is byte-for-byte unchanged.
+  let levelRange = eligibleRange;
+  if (pokemon.rarity === "legendary") {
+    const legendaryRange = getLegendaryWildLevelRangeForPlayerLevel(playerLevel);
+    levelRange = getEligibleWildLevelRange(pokemon.id, legendaryRange) ?? legendaryRange;
+  }
+
+  const level = rollLevelInRange(levelRange);
 
   const maximumHealth = calculatePokemonHpStat(pokemon.baseStats.health, level);
 

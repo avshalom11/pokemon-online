@@ -9,6 +9,7 @@ import { BackButton } from "@/components/layout/BackButton";
 import { CollectionPicker } from "@/features/party/components/CollectionPicker";
 import { assignPartySlotAction, swapPartySlotsAction } from "@/features/party/actions/party.actions";
 import type { MyPokemonViewData } from "@/features/pokemon/services/my-pokemon-view.service";
+import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
 import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
 
 interface MyPokemonContentProps {
@@ -34,6 +35,18 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
   const [isPending, startTransition] = useTransition();
   const releaseNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // GAME TUTORIAL — PHASE 1. Spotlights the whole party section (never a
+  // single card pulled out of PartySlot/PartySection — both are reused on
+  // Home and in PartySelector too, so surgically targeting one card inside
+  // them would leak this feature's own concern into components unaware of
+  // it). reportAction("starter-details-opened") fires the instant the
+  // player opens ANY occupied slot's details in view mode AND that slot's
+  // own occupant really is the Starter (never merely "party slot 1", in
+  // case a swap ever moved the Starter elsewhere) — a no-op unless the
+  // Tutorial is currently awaiting exactly this action.
+  const partySectionTargetRef = useTutorialTarget("my-pokemon-party-section");
+  const { reportAction } = useTutorial();
+
   useEffect(() => () => {
     if (releaseNoticeTimeout.current) clearTimeout(releaseNoticeTimeout.current);
   }, []);
@@ -55,7 +68,10 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
     const occupant = data.party.find((p) => p.partySlot === slotIndex) ?? null;
 
     if (!isEditMode) {
-      if (occupant) setSelectedId(occupant.id);
+      if (occupant) {
+        setSelectedId(occupant.id);
+        if (occupant.isStarter) reportAction("starter-details-opened");
+      }
       return;
     }
 
@@ -140,12 +156,14 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
         {partyError ? <p className="text-xs text-rose-400">{partyError}</p> : null}
         {releaseNotice ? <p className="text-xs text-emerald-400">{releaseNotice}</p> : null}
 
-        <PartySection
-          party={data.party}
-          variant="detailed"
-          onSlotSelect={handlePartySlotSelect}
-          disabledSlotIndexes={isPending ? [1, 2, 3, 4, 5, 6] : undefined}
-        />
+        <div ref={partySectionTargetRef}>
+          <PartySection
+            party={data.party}
+            variant="detailed"
+            onSlotSelect={handlePartySlotSelect}
+            disabledSlotIndexes={isPending ? [1, 2, 3, 4, 5, 6] : undefined}
+          />
+        </div>
 
         <section>
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">האוסף שלי</h2>

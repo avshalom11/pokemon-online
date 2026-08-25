@@ -32,6 +32,7 @@ function MoveStatsLine({ type, category, power, accuracy }: MoveStatsRowProps) {
 }
 
 interface MoveLearningDecisionDialogProps {
+  pokemonName: string;
   pending: PendingMoveLearningViewPending;
   knownMoves: PendingMoveLearningViewSlot[];
   selectedSlot: number | null;
@@ -59,6 +60,7 @@ interface MoveLearningDecisionDialogProps {
 // auto-replace a move" / "do not enable Learn until a slot is selected"
 // requirement.
 export function MoveLearningDecisionDialog({
+  pokemonName,
   pending,
   knownMoves,
   selectedSlot,
@@ -76,9 +78,9 @@ export function MoveLearningDecisionDialog({
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
     >
       <div className="w-full max-w-sm rounded-2xl border border-indigo-400/30 bg-slate-900 p-6 text-center shadow-2xl">
-        <h2 className="text-lg font-bold text-slate-100">{moveLearningPromptTitle}</h2>
+        <h2 className="text-lg font-bold text-slate-100">{moveLearningPromptTitle(pokemonName)}</h2>
 
-        <p className="mt-4 text-sm text-slate-300">{moveLearningPromptMessage(pending.moveName, pending.learnedAtLevel)}</p>
+        <p className="mt-4 whitespace-pre-line text-sm text-slate-300">{moveLearningPromptMessage(pokemonName, pending.moveName)}</p>
 
         <div className="mt-4 rounded-lg border border-indigo-400/30 bg-indigo-950/30 p-3 text-right">
           <p className="text-xs font-semibold text-indigo-300">{moveLearningNewMoveLabel}</p>

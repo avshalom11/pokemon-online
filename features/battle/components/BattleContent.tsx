@@ -57,6 +57,9 @@ import { EvolutionPromptDialog } from "@/features/evolution/components/Evolution
 import { acceptEvolutionAction, chooseEvolutionBranchAction, rejectEvolutionAction } from "@/features/evolution/actions/evolution.actions";
 import { getBranchEvolution } from "@/data/pokemon/pokemon-evolutions";
 import type { PendingEvolutionBranchView, PendingEvolutionView } from "@/features/evolution/types/evolution.types";
+import { PendingMoveLearningGate } from "@/features/move-learning/components/PendingMoveLearningGate";
+import { getFirstPendingMoveLearningViewAction } from "@/features/move-learning/actions/move-learning.actions";
+import type { PendingMoveLearningPromptView } from "@/features/move-learning/move-learning-view.service";
 import type { PokemonSpecies } from "@/shared/types/pokemon";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { PartySelector } from "@/features/party/components/PartySelector";
@@ -70,6 +73,7 @@ import type { LevelUpResult } from "@/features/player-progression/progression-ty
 import { getBackSpritePath, getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import type { PokemonLevelUpResult } from "@/features/pokemon-progression/pokemon-progression-types";
+import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
 import { getRarityPresentation } from "@/lib/battle/battleRarityPresentation";
 import { getBattleTheme } from "@/lib/battle/battleThemes";
 import type { BattleMenuAction } from "@/shared/types/battle-ui";
@@ -313,6 +317,21 @@ export function BattleContent({
   // for the second, explicit step.
   const [pendingEvolutionBranch, setPendingEvolutionBranch] = useState<PendingEvolutionBranchView | null>(null);
   const [isResolvingEvolution, startEvolutionTransition] = useTransition();
+  // FIELD BATTLE MOVE LEARNING — the in-battle counterpart to Home's own
+  // server-seeded PendingMoveLearningGate: non-null exactly while the move-
+  // learning dialog is showing, set the instant a battle-victory response
+  // reports a freshly-created pending move-learning decision for the
+  // rewarded Pokémon (result.moveLearning.pendingMoves — see
+  // applyPokemonRewards below), cleared via PendingMoveLearningGate's own
+  // onFullyResolved once every queued decision is resolved. Reuses the
+  // EXISTING PendingMoveLearningGate/MoveLearningDecisionDialog/
+  // resolvePendingMoveLearnAction/declinePendingMoveAction wholesale — this
+  // component never re-implements move-learning resolution, only decides
+  // *when* to mount the gate (immediately, in-battle, same "sub-menu
+  // overlay" reasoning pendingEvolution above already established, and only
+  // once evolution — if any — is fully resolved, see the render below).
+  const [pendingMoveLearningView, setPendingMoveLearningView] = useState<PendingMoveLearningPromptView | null>(null);
+  const [, startMoveLearningFetchTransition] = useTransition();
   // The Bag's live quantity mirror — seeded from the server-fetched
   // `bagItems` prop at mount, decremented the instant a capture/medicine
   // action's response confirms exactly how many remain (never optimistic,
@@ -328,6 +347,21 @@ export function BattleContent({
   // inventory every time it needs a fallback (see applyBallConsumption).
   const [selectedBallItemId, setSelectedBallItemId] = useState<string | null>(() => pickNextBall(inventoryQtyMap));
   const [isBagOpen, setIsBagOpen] = useState(false);
+
+  // GAME TUTORIAL — PHASE 3. Spotlights the whole battle screen (never a
+  // single button — the real attack/menu/Bag controls are rendered deep
+  // inside the shared BattleScene/BattleAttackPanel/BattleMenu components,
+  // also reused by Gym/League battles; drilling a ref through those
+  // generic, widely-shared components for one extra pixel of precision
+  // isn't worth the added surface — same "spotlight the general area, not
+  // one surgical child" precedent My Pokémon's own party-section target
+  // and Shop's own purchase-flow target already establish). reportAction
+  // calls below fire only after each REAL Server Action result confirms
+  // success — never a bare click — and are always a no-op unless the
+  // Tutorial is currently awaiting exactly that action, so this never
+  // affects a normal (non-Tutorial) battle.
+  const battleSceneTargetRef = useTutorialTarget("battle-scene");
+  const { reportAction } = useTutorial();
   // Set the instant a medicine use's server response confirms success —
   // never before, never faked. While non-null, the Bag shows a dedicated
   // result screen (the healed Pokémon's updated HP/HP bar, how much was
@@ -645,6 +679,36 @@ export function BattleContent({
         }
       }
     }
+
+    // FIELD BATTLE MOVE LEARNING — show it immediately, in-battle, instead
+    // of only after the player later navigates to Home (this task's own
+    // bug report: a Kangaskhan that leveled into Bite mid-battle only saw
+    // the popup on Home). `moveLearning.pendingMoves` is non-empty ONLY on
+    // the exact grant that just created the pending row(s) (same "just
+    // became pending" contract pendingEvolutionSpeciesId/
+    // pendingEvolutionBranch above already have — see
+    // PokemonLevelUpResult's own doc comments), so this never re-triggers
+    // for an already-existing pending decision from an earlier reward.
+    // Guarded on `!pendingMoveLearningView` so an in-flight/already-showing
+    // decision is never clobbered by a second, unrelated grant in the same
+    // battle — PendingMoveLearningGate's own "resolve one, fetch next" loop
+    // (advanceToNextPending) already handles multiple queued decisions for
+    // the SAME grant without this component's help. The account-wide fetch
+    // (not a locally-built view) is deliberate: it reuses the exact same
+    // persisted-row query Home's safety net already relies on, rather than
+    // hand-assembling a view from this response — see this task's own "do
+    // not create battle-specific move-learning logic" rule.
+    if (!pendingMoveLearningView) {
+      const justBecamePendingMove = results.some((result) => result.moveLearning.pendingMoves.length > 0);
+      if (justBecamePendingMove) {
+        startMoveLearningFetchTransition(async () => {
+          const viewResult = await getFirstPendingMoveLearningViewAction();
+          if (viewResult.status === "ok" && viewResult.view) {
+            setPendingMoveLearningView(viewResult.view);
+          }
+        });
+      }
+    }
   }
 
   // The lethal-attack path's single reward-application entry point: both
@@ -917,6 +981,10 @@ export function BattleContent({
         return;
       }
 
+      // GAME TUTORIAL — PHASE 3. Only ever reported once the real result
+      // confirms the attack actually landed.
+      reportAction("battle-attack-performed");
+
       setWildState((prev) => ({ ...prev, currentHealth: result.updatedWildHp }));
       setWildStatusState(result.enemyStatus);
       setPartyStatusMap((prev) => ({ ...prev, [activeId]: result.playerStatus }));
@@ -1082,6 +1150,14 @@ export function BattleContent({
         // toast are new.
         setMessage(captureSucceededMessage(result.pokemonName, result.addedToParty));
         applyBattleReward(result.xpResult);
+
+        // GAME TUTORIAL — PHASE 3. Only ever reported once the real
+        // capture succeeded — the server itself (advanceTutorialSubStep,
+        // tutorial-progress.service.ts) additionally refuses to record
+        // this as complete unless PlayerTutorialProgress.pidgeyCaptured is
+        // already true, so this call alone can never grant Tutorial
+        // progress without a real capture.
+        reportAction("pidgey-captured");
 
         // Brief success glow on the ball (CAPTURE_SUCCESS_HOLD_MS) before
         // handing off into the existing captured/result flow — `phase`
@@ -1391,6 +1467,9 @@ export function BattleContent({
       setPhase("selectingVoluntarySwitch");
     } else if (actionId === "bag") {
       setIsBagOpen(true);
+      // GAME TUTORIAL — PHASE 3. Opening the Bag is itself the real event —
+      // nothing further to verify (unlike a heal/purchase/capture result).
+      reportAction("battle-bag-opened");
     }
   }
 
@@ -1436,6 +1515,9 @@ export function BattleContent({
   const rarityPresentation = getRarityPresentation(wildState.pokemon.rarity);
 
   return (
+    // GAME TUTORIAL — PHASE 3. See battleSceneTargetRef's own doc comment
+    // above — a plain, unstyled wrapper, never affecting layout.
+    <div ref={battleSceneTargetRef}>
     <BattleWindow
       backgroundClassName={rarityPresentation.windowBackgroundClass}
       banner={<RarityWarningBanner rarity={wildState.pokemon.rarity} />}
@@ -1562,6 +1644,14 @@ export function BattleContent({
         />
       ) : null}
 
+      {/* FIELD BATTLE MOVE LEARNING — EVOLUTION MUST COME FIRST, same rule
+          LevelUpDecisionsGate already establishes for Home: never mounted
+          while an evolution decision (either shape, above) is still
+          showing, so the two are never shown at once. */}
+      {!pendingEvolution && !pendingEvolutionBranch && pendingMoveLearningView ? (
+        <PendingMoveLearningGate initialView={pendingMoveLearningView} onFullyResolved={() => setPendingMoveLearningView(null)} />
+      ) : null}
+
       {eggFound ? (
         <EggFoundDialog
           eggDisplayName={eggFound.eggDisplayName}
@@ -1586,5 +1676,6 @@ export function BattleContent({
         />
       ) : null}
     </BattleWindow>
+    </div>
   );
 }

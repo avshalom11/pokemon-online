@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import { useTutorial } from "@/features/tutorial/context/tutorial-context";
 import type { WorldMapConfig } from "@/shared/types/map";
 import type { ZoneId } from "@/shared/types/zone";
+
+// GAME TUTORIAL — PHASE 1. The one zone this stage's own registry entry
+// spotlights (tutorial-stages.config.ts's "map" stage) — a plain constant,
+// never a prop threaded through from the registry itself, since this
+// component has no other reason to know about the Tutorial at all.
+const GRASSLAND_TUTORIAL_TARGET_ID = "zone-grassland";
 
 interface InteractiveWorldMapProps {
   config: WorldMapConfig;
@@ -23,6 +30,36 @@ export function InteractiveWorldMap({
   onZoneHover,
 }: InteractiveWorldMapProps) {
   const [hoveredZoneId, setHoveredZoneId] = useState<ZoneId | null>(null);
+  // GAME TUTORIAL — PHASE 1. Zone polygons are rendered from a dynamic
+  // .map() below, so this calls registerTarget/unregisterTarget directly
+  // (plain functions from context, safe to call anywhere) rather than the
+  // useTutorialTarget hook — that hook itself must never be called
+  // conditionally/per-iteration (Rules of Hooks), which a variable-length
+  // regions list would violate.
+  const { registerTarget, unregisterTarget } = useTutorial();
+
+  // MAP CRASH FIX. Must be a STABLE function identity across renders —
+  // registerTarget/unregisterTarget are themselves stable (empty-dep
+  // useCallback, see tutorial-context.tsx), so this stays stable too. This
+  // matters because this component re-renders on every registryVersion
+  // bump ANYWHERE in the app (useTutorial()'s own context value includes
+  // it) — an inline ref callback recreated on every render gets a new
+  // identity each time, and React detaches+reattaches any ref whose
+  // callback identity changed, even when the underlying DOM node didn't.
+  // Detaching called unregisterTarget, which bumped registryVersion, which
+  // re-rendered this component, which created a new inline callback again
+  // — an infinite register/unregister loop that crashed the real /map page
+  // ("Maximum update depth exceeded", React's runaway-setState guard) the
+  // instant the Grassland polygon mounted. A stable callback ref is only
+  // ever invoked on a genuine mount/unmount of the DOM node, never on a
+  // same-node re-render.
+  const registerGrasslandRef = useCallback(
+    (node: SVGPolygonElement | null) => {
+      if (node) registerTarget(GRASSLAND_TUTORIAL_TARGET_ID, node);
+      else unregisterTarget(GRASSLAND_TUTORIAL_TARGET_ID);
+    },
+    [registerTarget, unregisterTarget]
+  );
 
   const { imageSrc, viewBox, regions } = config;
 
@@ -49,6 +86,7 @@ export function InteractiveWorldMap({
           return (
             <polygon
               key={`${region.zoneId}-${index}`}
+              ref={region.zoneId === "grassland" ? registerGrasslandRef : undefined}
               points={region.points}
               onMouseEnter={() => {
                 setHoveredZoneId(region.zoneId);

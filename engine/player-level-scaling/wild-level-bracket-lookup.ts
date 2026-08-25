@@ -8,8 +8,10 @@ export interface WildLevelRange {
 // Never below 1, and never a fractional/NaN player level reaching the
 // bracket scan below — same defensive-clamp precedent
 // pokemon-stat-calculations.ts's safeLevel already establishes for wild/
-// owned-Pokémon levels.
-function safePlayerLevel(playerLevel: number): number {
+// owned-Pokémon levels. Exported so legendary-wild-level-brackets.config.ts
+// can apply the exact same clamp to its own, separate bracket scan rather
+// than duplicating this logic.
+export function safePlayerLevel(playerLevel: number): number {
   if (!Number.isFinite(playerLevel)) return 1;
   return Math.max(1, Math.floor(playerLevel));
 }

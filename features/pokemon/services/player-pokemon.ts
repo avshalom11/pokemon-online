@@ -73,15 +73,36 @@ export function hydrateOwnedPokemonRows(rows: PlayerPokemonModel[]): OwnedPokemo
 }
 
 // Every Pokémon a player owns, not capped at MAX_ACTIVE_TEAM_SIZE — powers
-// the My Pokémon collection grid. Same default ordering as getPlayerParty
-// for a stable, predictable listing (starter first, then oldest-caught).
+// the My Pokémon collection grid (features/pokemon/services/my-pokemon-view
+// .service.ts), the evolution-item panel (app/(game)/inventory), and the
+// league/gym team builders. Same default ordering as getPlayerParty for a
+// stable, predictable listing (starter first, then oldest-caught).
+//
+// DAYCARE — HIDE DEPOSITED + PROTECT FROM REMOVAL. A Pokémon currently
+// deposited in the Daycare (features/daycare) is excluded from every one
+// of those consumers — it's still owned (the row itself is untouched), just
+// unavailable for party management/other normal owned-Pokémon actions
+// until a real collection removes its PlayerDaycareStay row. A plain
+// second query + in-JS filter (not a Prisma relation `where`) — same
+// "compose simple queries rather than relation-filter magic" style
+// release-pokemon.service.ts's own in-battle check already uses, and the
+// only shape the fake-DB test harness's generic matches() actually
+// supports. Collection makes a Pokémon reappear here automatically: once
+// its PlayerDaycareStay row is gone, this query includes it again with no
+// extra code needed.
 export async function getAllOwnedPokemon(playerId: string): Promise<OwnedPokemon[]> {
-  const rows = await prisma.playerPokemon.findMany({
-    where: { playerId },
-    orderBy: [{ isStarter: "desc" }, { createdAt: "asc" }],
-  });
+  const [rows, daycareStays] = await Promise.all([
+    prisma.playerPokemon.findMany({
+      where: { playerId },
+      orderBy: [{ isStarter: "desc" }, { createdAt: "asc" }],
+    }),
+    prisma.playerDaycareStay.findMany({ where: { playerId }, select: { playerPokemonId: true } }),
+  ]);
 
-  return rows.flatMap((row) => hydrateOwnedPokemon(row) ?? []);
+  const deposited = new Set(daycareStays.map((stay) => stay.playerPokemonId));
+  const availableRows = rows.filter((row) => !deposited.has(row.id));
+
+  return availableRows.flatMap((row) => hydrateOwnedPokemon(row) ?? []);
 }
 
 export interface OwnedPokemonStats {

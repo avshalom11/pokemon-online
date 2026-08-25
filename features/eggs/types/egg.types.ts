@@ -20,9 +20,15 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // Participation Reward egg (features/leagues/services/league-reward.service.ts).
 // Same reasoning as "chest": never reuses "shop" or "battle" for a reward
 // that was never purchased or dropped from a wild encounter.
-export type EggAcquisitionSource = "battle" | "shop" | "chest" | "league";
+//
+// GAME TUTORIAL — PHASE 4 — "tutorial" added for the one-time Tutorial
+// completion reward's own Very Rare Sinnoh egg (features/tutorial/services/
+// tutorial-progress.service.ts's claimTutorialReward). Same reasoning as
+// "chest"/"league": never reuses an existing source for a reward that was
+// never purchased, dropped from a wild encounter, or won in a League.
+export type EggAcquisitionSource = "battle" | "shop" | "chest" | "league" | "tutorial";
 
-export const EGG_ACQUISITION_SOURCES: readonly EggAcquisitionSource[] = ["battle", "shop", "chest", "league"];
+export const EGG_ACQUISITION_SOURCES: readonly EggAcquisitionSource[] = ["battle", "shop", "chest", "league", "tutorial"];
 
 // EGGS PHASE 2 — the battle-response shape for "did this victory drop an
 // egg". Deliberately minimal/generic per this phase's own scope (no visual

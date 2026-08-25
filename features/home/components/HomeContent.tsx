@@ -8,6 +8,8 @@ import { StatisticsPanel } from "./StatisticsPanel";
 import { HomeChatPanel } from "@/features/chat/components/HomeChatPanel";
 import { LevelUpDecisionsGate } from "@/features/move-learning/components/LevelUpDecisionsGate";
 import { PartySection } from "@/features/pokemon/components/PartySection";
+import { HomeTutorialCard } from "@/features/tutorial/components/HomeTutorialCard";
+import { HomeTutorialReplayEntry } from "@/features/tutorial/components/HomeTutorialReplayEntry";
 import type { HomeViewData } from "@/features/home/services/home-data.service";
 
 interface HomeContentProps {
@@ -45,6 +47,8 @@ export function HomeContent({ data, username, currentPlayerDisplayName }: HomeCo
       />
 
       <div className="relative mx-auto flex max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <HomeTutorialCard />
+
         <div className="flex flex-wrap gap-3">
           <DailyBattleCounter count={data.dailyBattleCount} />
         </div>
@@ -64,6 +68,8 @@ export function HomeContent({ data, username, currentPlayerDisplayName }: HomeCo
             onlinePlayerCount={data.onlinePlayerCount}
           />
         </div>
+
+        <HomeTutorialReplayEntry />
 
         <HomeChatPanel
           initialMessages={data.globalChatMessages}

@@ -125,6 +125,8 @@ export function PokemonDetailsPanel({
         setErrorMessage("יש להסיר את הפוקימון מהשישייה לפני שניתן לשחרר אותו.");
       } else if (result.status === "in-battle") {
         setErrorMessage("לא ניתן לשחרר פוקימון שמשתתף כרגע בקרב פעיל.");
+      } else if (result.status === "in-daycare") {
+        setErrorMessage("לא ניתן לשחרר פוקימון שנמצא כרגע במעון הפוקימונים.");
       } else if (result.status === "last-pokemon") {
         setErrorMessage("לא ניתן לשחרר את הפוקימון האחרון שבבעלותך.");
       } else {

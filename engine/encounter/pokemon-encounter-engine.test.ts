@@ -8,6 +8,7 @@ import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { KANTO_ZONE_DATA } from "@/data/zones/kanto-zone-data";
 import { getEffectiveEncounterRarity } from "@/engine/encounter-rarity/get-effective-encounter-rarity";
 import { isSpeciesEligibleForWildRange } from "@/engine/evolution-stage-scaling/species-eligibility";
+import { getLegendaryWildLevelRangeForPlayerLevel } from "@/engine/player-level-scaling/legendary-wild-level-brackets.config";
 import { getWildLevelRangeForPlayerLevel } from "@/engine/player-level-scaling/wild-level-bracket-lookup";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 import type { ZoneId } from "@/shared/types/zone";
@@ -44,14 +45,22 @@ test("throws for an unknown zone", () => {
 test("the returned level always falls within the player's own level bracket, never the picked encounter's stale zone min/max", () => {
   const { minimumLevel, maximumLevel } = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
 
-  for (let i = 0; i < 300; i++) {
-    const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
-    assert.ok(
-      result.level >= minimumLevel && result.level <= maximumLevel,
-      `level ${result.level} outside player-level bracket [${minimumLevel}, ${maximumLevel}]`
-    );
-    assert.equal(result.zoneId, "lava");
-  }
+  // LEGENDARY ENCOUNTER LEVELS — lava has a legendary entry (moltres),
+  // which now deliberately rolls from a SEPARATE table (see the dedicated
+  // "LEGENDARY ENCOUNTER LEVELS" tests below) — excluded here (legendary
+  // probability forced to 0, every other rarity left at its real default)
+  // so this test keeps verifying exactly what it always has: the NORMAL
+  // bracket path, untouched by that change.
+  withRarityProbabilities({ legendary: 0 }, () => {
+    for (let i = 0; i < 300; i++) {
+      const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
+      assert.ok(
+        result.level >= minimumLevel && result.level <= maximumLevel,
+        `level ${result.level} outside player-level bracket [${minimumLevel}, ${maximumLevel}]`
+      );
+      assert.equal(result.zoneId, "lava");
+    }
+  });
 });
 
 test("a different player level produces levels from that level's own bracket, not the previous one", () => {
@@ -59,10 +68,14 @@ test("a different player level produces levels from that level's own bracket, no
   const highLevelRange = getWildLevelRangeForPlayerLevel(56);
   assert.notDeepEqual(lowLevelRange, highLevelRange, "test assumption: brackets differ");
 
-  for (let i = 0; i < 100; i++) {
-    const result = startPokemonEncounter("kanto", "lava", 56);
-    assert.ok(result.level >= highLevelRange.minimumLevel && result.level <= highLevelRange.maximumLevel);
-  }
+  // LEGENDARY ENCOUNTER LEVELS — see the test above for why legendary is
+  // excluded here.
+  withRarityProbabilities({ legendary: 0 }, () => {
+    for (let i = 0; i < 100; i++) {
+      const result = startPokemonEncounter("kanto", "lava", 56);
+      assert.ok(result.level >= highLevelRange.minimumLevel && result.level <= highLevelRange.maximumLevel);
+    }
+  });
 });
 
 // MAP — SELECTABLE WILD LEVEL RANGE
@@ -73,25 +86,35 @@ test("an explicit selectedWildLevelRange override is used in place of the player
   // the roll whenever it's provided.
   const override = { minimumLevel: 2, maximumLevel: 4 };
 
-  for (let i = 0; i < 200; i++) {
-    const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL, override);
-    assert.ok(
-      result.level >= override.minimumLevel && result.level <= override.maximumLevel,
-      `level ${result.level} outside the explicit override range [${override.minimumLevel}, ${override.maximumLevel}]`
-    );
-    // The final level must still respect this species' own evolution-stage
-    // eligibility at the override range — never a species illegal there.
-    assert.ok(isSpeciesEligibleForWildRange(result.pokemon.id, override));
-  }
+  // LEGENDARY ENCOUNTER LEVELS — a legendary pick deliberately ignores
+  // selectedWildLevelRange entirely (see the dedicated tests below) —
+  // excluded here so this test keeps verifying the override's effect on
+  // every OTHER rarity, unchanged.
+  withRarityProbabilities({ legendary: 0 }, () => {
+    for (let i = 0; i < 200; i++) {
+      const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL, override);
+      assert.ok(
+        result.level >= override.minimumLevel && result.level <= override.maximumLevel,
+        `level ${result.level} outside the explicit override range [${override.minimumLevel}, ${override.maximumLevel}]`
+      );
+      // The final level must still respect this species' own evolution-stage
+      // eligibility at the override range — never a species illegal there.
+      assert.ok(isSpeciesEligibleForWildRange(result.pokemon.id, override));
+    }
+  });
 });
 
 test("omitting selectedWildLevelRange keeps the exact same behavior as before this feature existed", () => {
   const { minimumLevel, maximumLevel } = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
 
-  for (let i = 0; i < 100; i++) {
-    const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
-    assert.ok(result.level >= minimumLevel && result.level <= maximumLevel);
-  }
+  // LEGENDARY ENCOUNTER LEVELS — see the first test above for why legendary
+  // is excluded here.
+  withRarityProbabilities({ legendary: 0 }, () => {
+    for (let i = 0; i < 100; i++) {
+      const result = startPokemonEncounter("kanto", "lava", TEST_PLAYER_LEVEL);
+      assert.ok(result.level >= minimumLevel && result.level <= maximumLevel);
+    }
+  });
 });
 
 test("Stage 1 reads probabilities from data/encounter/rarity-config.ts, never a literal object defined inline", () => {
@@ -276,5 +299,83 @@ test("every PokemonRarity has a probability entry in the config", () => {
   const rarities: PokemonRarity[] = ["common", "rare", "very-rare", "legendary"];
   for (const rarity of rarities) {
     assert.equal(typeof RARITY_ENCOUNTER_PROBABILITIES[rarity], "number");
+  }
+});
+
+// ===========================================================================
+// LEGENDARY ENCOUNTER LEVELS — post-selection level range only. Rarity
+// chance, rarity weights, zone encounter weights, and species selection
+// itself are proven unaffected by the pre-existing legendary-focused tests
+// above (e.g. "haunted-house's two equal-weight legendary entries...split
+// roughly evenly when legendary is forced" — still passing unmodified);
+// these tests cover only the new, separate level range.
+// ===========================================================================
+
+test("a forced legendary pick rolls its level from LEGENDARY_WILD_LEVEL_BRACKETS, not the normal player-level bracket", () => {
+  const normalRange = getWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
+  const legendaryRange = getLegendaryWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
+  assert.notDeepEqual(legendaryRange, normalRange, "test assumption: the two tables differ at this player level");
+
+  withRarityProbabilities({ common: 0, rare: 0, "very-rare": 0, legendary: 1 }, () => {
+    for (let i = 0; i < 300; i++) {
+      const result = startPokemonEncounter("kanto", "haunted-house", TEST_PLAYER_LEVEL);
+      assert.equal(RARITY_BY_ID.get(result.pokemon.id), "legendary");
+      assert.ok(
+        result.level >= legendaryRange.minimumLevel && result.level <= legendaryRange.maximumLevel,
+        `legendary level ${result.level} outside its own bracket [${legendaryRange.minimumLevel}, ${legendaryRange.maximumLevel}]`
+      );
+    }
+  });
+});
+
+test("a different player level produces legendary levels from THAT level's own legendary bracket, converging toward the normal table's own top bracket by player 56+", () => {
+  const lowRange = getLegendaryWildLevelRangeForPlayerLevel(3);
+  const highRange = getLegendaryWildLevelRangeForPlayerLevel(56);
+  assert.deepEqual(lowRange, { minimumLevel: 15, maximumLevel: 20 });
+  assert.deepEqual(highRange, { minimumLevel: 53, maximumLevel: 60 });
+  // Converges into the SAME range as the normal table's own top bracket —
+  // never a separate, ever-diverging endpoint.
+  assert.deepEqual(highRange, getWildLevelRangeForPlayerLevel(56));
+
+  withRarityProbabilities({ common: 0, rare: 0, "very-rare": 0, legendary: 1 }, () => {
+    for (let i = 0; i < 100; i++) {
+      const result = startPokemonEncounter("kanto", "haunted-house", 56);
+      assert.ok(result.level >= highRange.minimumLevel && result.level <= highRange.maximumLevel);
+    }
+  });
+});
+
+test("a legendary pick completely ignores selectedWildLevelRange — it is never scaled by the player's manually-selected normal bracket, only their real playerLevel", () => {
+  const lowOverride = { minimumLevel: 2, maximumLevel: 4 };
+  const legendaryRange = getLegendaryWildLevelRangeForPlayerLevel(TEST_PLAYER_LEVEL);
+
+  withRarityProbabilities({ common: 0, rare: 0, "very-rare": 0, legendary: 1 }, () => {
+    for (let i = 0; i < 100; i++) {
+      const result = startPokemonEncounter("kanto", "haunted-house", TEST_PLAYER_LEVEL, lowOverride);
+      assert.ok(
+        result.level >= legendaryRange.minimumLevel && result.level <= legendaryRange.maximumLevel,
+        `legendary level ${result.level} must stay within its own bracket [${legendaryRange.minimumLevel}, ${legendaryRange.maximumLevel}], never the override [${lowOverride.minimumLevel}, ${lowOverride.maximumLevel}]`
+      );
+    }
+  });
+});
+
+test("LEGENDARY_WILD_LEVEL_BRACKETS matches this task's own required table exactly", () => {
+  const expected: Array<[number, { minimumLevel: number; maximumLevel: number }]> = [
+    [1, { minimumLevel: 15, maximumLevel: 20 }],
+    [6, { minimumLevel: 15, maximumLevel: 22 }],
+    [11, { minimumLevel: 17, maximumLevel: 25 }],
+    [16, { minimumLevel: 20, maximumLevel: 28 }],
+    [21, { minimumLevel: 23, maximumLevel: 31 }],
+    [26, { minimumLevel: 27, maximumLevel: 35 }],
+    [31, { minimumLevel: 31, maximumLevel: 39 }],
+    [36, { minimumLevel: 35, maximumLevel: 43 }],
+    [41, { minimumLevel: 40, maximumLevel: 48 }],
+    [46, { minimumLevel: 44, maximumLevel: 53 }],
+    [51, { minimumLevel: 49, maximumLevel: 58 }],
+    [56, { minimumLevel: 53, maximumLevel: 60 }],
+  ];
+  for (const [playerLevel, range] of expected) {
+    assert.deepEqual(getLegendaryWildLevelRangeForPlayerLevel(playerLevel), range, `player level ${playerLevel}`);
   }
 });

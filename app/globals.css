@@ -163,6 +163,27 @@ body {
   animation: home-glow-pulse 2.6s ease-in-out infinite;
 }
 
+/* GAME TUTORIAL — PHASE 1 SPOTLIGHT. The pulsing ring TutorialSpotlightOverlay
+   draws around whichever real control the current stage is waiting on —
+   visual only (the element itself carries pointer-events: none, see that
+   component's own doc comment), so this never blocks the real control's own
+   click handling underneath it. */
+@keyframes tutorial-spotlight-pulse {
+  0%,
+  100% {
+    outline-color: rgba(129, 140, 248, 0.9);
+    outline-offset: 2px;
+  }
+  50% {
+    outline-color: rgba(129, 140, 248, 0.45);
+    outline-offset: 5px;
+  }
+}
+
+.animate-tutorial-spotlight-pulse {
+  animation: tutorial-spotlight-pulse 1.6s ease-in-out infinite;
+}
+
 /* Brief "took a hit" feedback for battle sprites — a quick shake + red
    tint, played once (not infinite, unlike the battle-* set above) whenever
    the temporary fixed-damage attack lands or a capture attempt fails. See

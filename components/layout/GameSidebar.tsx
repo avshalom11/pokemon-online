@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useActiveBattle } from "@/features/battle-session/context/active-battle-context";
 import { buildSidebarCategories, type SidebarMenuItem } from "@/features/navigation/data/sidebar-menu";
 import { PlayerSearchModal } from "@/features/player-search/components/PlayerSearchModal";
+import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
 import { useSidebarOpen } from "@/components/layout/sidebar-open-context";
 import { SIDEBAR_PANEL_WIDTH_CSS } from "@/lib/layout/gameLayout";
 
@@ -52,6 +53,22 @@ export function GameSidebar({ username }: GameSidebarProps) {
     () => new Set(categories.map((category) => category.id))
   );
 
+  // GAME TUTORIAL — PHASE 1. "sidebar-opener" spotlights the toggle button
+  // below; reportAction("sidebar-opened") fires the instant `isOpen`
+  // actually transitions to true (never on mount, never on close) — a
+  // no-op unless the Tutorial is currently awaiting exactly this action
+  // (see tutorial-context.tsx's own reportAction doc comment), so this is
+  // always safe to call regardless of whether the Tutorial is even active.
+  const sidebarOpenerTargetRef = useTutorialTarget("sidebar-opener");
+  const { reportAction } = useTutorial();
+  const wasOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (!wasOpenRef.current && isOpen) {
+      reportAction("sidebar-opened");
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, reportAction]);
+
   function toggleCategory(categoryId: string) {
     setExpandedCategoryIds((current) => {
       const next = new Set(current);
@@ -67,6 +84,7 @@ export function GameSidebar({ username }: GameSidebarProps) {
   return (
     <div dir="rtl">
       <button
+        ref={sidebarOpenerTargetRef}
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         aria-expanded={isOpen}
@@ -144,6 +162,15 @@ interface SidebarMenuItemLinkProps {
 // no known username) — the last two render identically inert but carry
 // different tooltips so the reason is never ambiguous.
 function SidebarMenuItemLink({ item, isBattleLocked, onNavigate, onAction }: SidebarMenuItemLinkProps) {
+  // GAME TUTORIAL — PHASE 1. Every real sidebar item is a potential
+  // spotlight target under a stable "sidebar-<id>" id, reusing the exact
+  // same ids as sidebar-menu.ts's own SidebarMenuItem.id — never a second,
+  // parallel id scheme. Attached unconditionally (this hook must never be
+  // called from inside a branch) but only ever meaningful on the real
+  // clickable <Link> branch below — the inert/locked/hasAction branches
+  // are never real navigation targets and never referenced by the
+  // registry.
+  const targetRef = useTutorialTarget(`sidebar-${item.id}`);
   const baseClassName = "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors";
 
   if (item.hasAction) {
@@ -192,6 +219,7 @@ function SidebarMenuItemLink({ item, isBattleLocked, onNavigate, onAction }: Sid
 
   return (
     <Link
+      ref={targetRef}
       href={item.href}
       onClick={onNavigate}
       className={`${baseClassName} text-slate-200 hover:bg-white/10 hover:text-white`}

@@ -28,6 +28,10 @@ import { DailyBattleCountProvider } from "@/features/player/context/daily-battle
 import { PlayerProgressionProvider } from "@/features/player/context/player-progression-context";
 import { SoundSettingsProvider } from "@/features/player/context/sound-settings-context";
 import { getPlayerHeaderData } from "@/features/player/services/player-header-data.service";
+import { TutorialPanel } from "@/features/tutorial/components/TutorialPanel";
+import { TutorialSpotlightOverlay } from "@/features/tutorial/components/TutorialSpotlightOverlay";
+import { TutorialProvider } from "@/features/tutorial/context/tutorial-context";
+import { getTutorialProgressView } from "@/features/tutorial/services/tutorial-progress.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 
@@ -63,7 +67,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // one DB round trip — needed here only to get the PlayerProfile id
   // getNotificationBellData is scoped by.
   const profile = await getPlayerProfile(session.user.id);
-  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle, globalChatMessages, friendsData] = await Promise.all([
+  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle, globalChatMessages, friendsData, tutorialProgress] = await Promise.all([
     getPlayerHeaderData(session.user.id, session.user.username ?? null),
     getNotificationBellData(profile.id),
     hasActiveBattleSession(profile.id),
@@ -92,68 +96,86 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     // comment for why this replaces what used to be a separate fetch on
     // the profile page itself.
     getFriendsAndRequests(profile.id),
+    // GAME TUTORIAL — PHASE 0. Lazily creates this player's
+    // PlayerTutorialProgress row on first read (see
+    // getOrCreateTutorialProgress's own doc comment) — this is what makes
+    // Stage 1 auto-open the very first time an onboarded player reaches
+    // any (game) route, and what seeds TutorialProvider's client state on
+    // every render after that.
+    getTutorialProgressView(profile.id),
   ]);
   const activeBattle = hasFieldBattle || hasNpcBattle || hasLeagueBattle;
 
   return (
-    <SoundSettingsProvider initial={profile.soundEnabled ?? true}>
-      <PlayerProgressionProvider initial={player.progress}>
-        <DailyBattleCountProvider initial={player.dailyBattleCount}>
-          <ActiveBattleProvider initial={activeBattle}>
-            {/* FRIENDS + PRIVATE CHAT UX — mounted once here (never inside
-                {children}), so the floating chat window's own state
-                (which conversation is active, minimized or expanded)
-                survives every client-side navigation for the lifetime of
-                this layout — same pattern ActiveBattleProvider itself
-                already establishes. FriendsDataProvider wraps GameHeader
-                too (not just {children}) since the notification bell's own
-                inline accept/decline needs it as well. */}
-            <FriendsDataProvider initial={friendsData}>
-              <PrivateChatWindowProvider>
-                <GameHeader player={player} notifications={notifications} />
-                {/* RIGHT SIDEBAR — PUSH FRIENDS BAR + GLOBAL CHAT. Shared
-                    open/closed state for GameSidebar's aside panel — read by
-                    GlobalChatBar and SocialDock below (plain siblings here,
-                    not parent/child of GameSidebar) so they can shift/resize
-                    themselves out from under it while it's open. See
-                    components/layout/sidebar-open-context.tsx's own doc
-                    comment. */}
-                <SidebarOpenProvider>
-                  <GameSidebar username={player.username} />
-                  {children}
-                  {/* BOTTOM UI — FRIENDS PANEL BESIDE GLOBAL CHAT. Shared
-                      isHome/minimized state for the chat bar — read by
-                      SocialDock and BottomDock below (plain siblings of
-                      GlobalChatBar, not parent/child) so Friends can sit
-                      beside the minimized bar on one row instead of
-                      stacked above it. See features/chat/context/
-                      global-chat-bar-layout-context.tsx's own doc comment. */}
-                  <GlobalChatBarLayoutProvider>
-                    <BottomDock>
-                      <GlobalChatBar
-                        initialMessages={globalChatMessages}
-                        currentPlayerDisplayName={player.displayName}
-                        currentPlayerUsername={session.user.username ?? null}
-                      />
-                      <SocialDock>
-                        <FloatingPrivateChatWindow
+    // GAME TUTORIAL — PHASE 0. Outermost provider here (same "mounted once
+    // at the (game) layout level, survives every client-side navigation"
+    // reasoning every other provider in this tree already follows) — its
+    // own TutorialPanel is a plain sibling watcher further down, right next
+    // to PlayerLevelUpDialog, not nested inside any of the more specific
+    // providers below, since none of them are things a future Tutorial
+    // stage's own real-action detection needs to reach through.
+    <TutorialProvider initial={tutorialProgress}>
+      <SoundSettingsProvider initial={profile.soundEnabled ?? true}>
+        <PlayerProgressionProvider initial={player.progress}>
+          <DailyBattleCountProvider initial={player.dailyBattleCount}>
+            <ActiveBattleProvider initial={activeBattle}>
+              {/* FRIENDS + PRIVATE CHAT UX — mounted once here (never inside
+                  {children}), so the floating chat window's own state
+                  (which conversation is active, minimized or expanded)
+                  survives every client-side navigation for the lifetime of
+                  this layout — same pattern ActiveBattleProvider itself
+                  already establishes. FriendsDataProvider wraps GameHeader
+                  too (not just {children}) since the notification bell's own
+                  inline accept/decline needs it as well. */}
+              <FriendsDataProvider initial={friendsData}>
+                <PrivateChatWindowProvider>
+                  <GameHeader player={player} notifications={notifications} />
+                  {/* RIGHT SIDEBAR — PUSH FRIENDS BAR + GLOBAL CHAT. Shared
+                      open/closed state for GameSidebar's aside panel — read by
+                      GlobalChatBar and SocialDock below (plain siblings here,
+                      not parent/child of GameSidebar) so they can shift/resize
+                      themselves out from under it while it's open. See
+                      components/layout/sidebar-open-context.tsx's own doc
+                      comment. */}
+                  <SidebarOpenProvider>
+                    <GameSidebar username={player.username} />
+                    {children}
+                    {/* BOTTOM UI — FRIENDS PANEL BESIDE GLOBAL CHAT. Shared
+                        isHome/minimized state for the chat bar — read by
+                        SocialDock and BottomDock below (plain siblings of
+                        GlobalChatBar, not parent/child) so Friends can sit
+                        beside the minimized bar on one row instead of
+                        stacked above it. See features/chat/context/
+                        global-chat-bar-layout-context.tsx's own doc comment. */}
+                    <GlobalChatBarLayoutProvider>
+                      <BottomDock>
+                        <GlobalChatBar
+                          initialMessages={globalChatMessages}
                           currentPlayerDisplayName={player.displayName}
                           currentPlayerUsername={session.user.username ?? null}
                         />
-                        <FriendsBar />
-                      </SocialDock>
-                    </BottomDock>
-                  </GlobalChatBarLayoutProvider>
-                </SidebarOpenProvider>
-                <FriendshipSyncWatcher />
-                <PrivateMessagePopupWatcher />
-                <PresenceHeartbeat />
-                <PlayerLevelUpDialog />
-              </PrivateChatWindowProvider>
-            </FriendsDataProvider>
-          </ActiveBattleProvider>
-        </DailyBattleCountProvider>
-      </PlayerProgressionProvider>
-    </SoundSettingsProvider>
+                        <SocialDock>
+                          <FloatingPrivateChatWindow
+                            currentPlayerDisplayName={player.displayName}
+                            currentPlayerUsername={session.user.username ?? null}
+                          />
+                          <FriendsBar />
+                        </SocialDock>
+                      </BottomDock>
+                    </GlobalChatBarLayoutProvider>
+                  </SidebarOpenProvider>
+                  <FriendshipSyncWatcher />
+                  <PrivateMessagePopupWatcher />
+                  <PresenceHeartbeat />
+                  <PlayerLevelUpDialog />
+                  <TutorialSpotlightOverlay />
+                  <TutorialPanel />
+                </PrivateChatWindowProvider>
+              </FriendsDataProvider>
+            </ActiveBattleProvider>
+          </DailyBattleCountProvider>
+        </PlayerProgressionProvider>
+      </SoundSettingsProvider>
+    </TutorialProvider>
   );
 }

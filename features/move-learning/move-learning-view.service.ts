@@ -4,6 +4,8 @@ import { getMoveById } from "@/engine/moves";
 import type { MoveCategory, MoveType } from "@/engine/moves";
 import { getKnownMoves } from "@/features/known-moves/known-moves-queries";
 import { getFirstPendingMoveLearningPlayerPokemonId, getNextPendingMove } from "@/features/move-learning/move-learning-queries";
+import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
+import { prisma } from "@/lib/db/prisma";
 
 // MOVE LEARNING UX — comparison stats for one move, read straight off the
 // static Move Registry at view-assembly time (never duplicated/reformatted
@@ -38,6 +40,13 @@ export interface PendingMoveLearningViewPending {
 }
 
 export interface PendingMoveLearningView {
+  // FIELD BATTLE MOVE LEARNING — the owning Pokémon's own display name
+  // (nickname, falling back to species name — same precedent every other
+  // Known-Moves/party surface already uses, e.g. PokemonCard.tsx's
+  // `pokemon.nickname ?? pokemon.species.name`), resolved here once,
+  // server-side, so MoveLearningDecisionDialog never has to hardcode it or
+  // re-derive it from a second prop.
+  pokemonName: string;
   knownMoves: PendingMoveLearningViewSlot[];
   nextPending: PendingMoveLearningViewPending | null;
 }
@@ -58,12 +67,16 @@ export interface PendingMoveLearningPromptView extends PendingMoveLearningView {
 // power/accuracy are all resolved from the static move registry, never
 // stored redundantly.
 export async function getPendingMoveLearningView(playerPokemonId: string): Promise<PendingMoveLearningView> {
-  const [knownMoves, nextPending] = await Promise.all([
+  const [knownMoves, nextPending, pokemon] = await Promise.all([
     getKnownMoves(playerPokemonId),
     getNextPendingMove(playerPokemonId),
+    prisma.playerPokemon.findUnique({ where: { id: playerPokemonId } }),
   ]);
 
+  const pokemonName = pokemon ? (pokemon.nickname ?? getSpeciesById(pokemon.speciesId)?.name ?? pokemon.speciesId) : "";
+
   return {
+    pokemonName,
     knownMoves: knownMoves
       .slice()
       .sort((a, b) => a.slot - b.slot)

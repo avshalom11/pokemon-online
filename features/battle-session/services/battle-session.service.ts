@@ -268,6 +268,36 @@ function isUniqueConstraintViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
 }
 
+// GAME TUTORIAL — PHASE 3. Pidgey's real species/base stats — never a
+// second/fabricated Pokémon; only the LEVEL is fixed rather than rolled.
+// Level 6 is deliberately the top of Grassland's own real level-up range
+// for Pidgey (data/zones/kanto-zone-data.ts: minimumLevel 2, maximumLevel
+// 6) — chosen (not guessed) against the real formulas: verified against
+// engine/battle/damage-calculation.ts and pokemon-stat-calculations.ts
+// that even a critical-hit Tackle/Scratch (every Starter's own strongest
+// move still known at STARTER_POKEMON_LEVEL, the level onboarding creates
+// every Starter at) cannot faint a level-6 Pidgey in one hit, while a
+// level-6 Pidgey's own only offensive move at this level (tackle —
+// sand-attack, its other level-≤6 move, is a status move with no damage)
+// deals only minor damage back to any real Starter species. `currentHealth`
+// equals `maximumHealth` — a freshly-started encounter, exactly like any
+// real wild encounter's own EncounterResult.
+const TUTORIAL_PIDGEY_SPECIES_ID = "pidgey";
+const TUTORIAL_PIDGEY_LEVEL = 6;
+
+function buildTutorialPidgeyEncounter(zoneId: ZoneId): EncounterResult {
+  const species = getSpeciesById(TUTORIAL_PIDGEY_SPECIES_ID);
+  if (!species) {
+    // Should never happen — "pidgey" is a real, static catalog entry — but
+    // never worth crashing ambiguously if the catalog ever changes.
+    throw new Error(`tutorial Pidgey species "${TUTORIAL_PIDGEY_SPECIES_ID}" not found in the species catalog`);
+  }
+
+  const maxHealth = calculatePokemonHpStat(species.baseStats.health, TUTORIAL_PIDGEY_LEVEL);
+
+  return { zoneId, pokemon: species, level: TUTORIAL_PIDGEY_LEVEL, currentHealth: maxHealth, maximumHealth: maxHealth };
+}
+
 // The single entry point for "the player is opening the battle screen for
 // this zone" — restores an existing session for that zone if one exists,
 // redirects to the player's real session if it's for a different zone,
@@ -288,7 +318,20 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 // restored row is guaranteed to still belong to the caller's own current
 // region without this function needing to store or re-check regionId
 // itself.
-export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId, regionId: RegionId): Promise<GetOrStartBattleResult> {
+export async function getOrStartBattle(
+  playerId: string,
+  requestedZoneId: ZoneId,
+  regionId: RegionId,
+  // GAME TUTORIAL — PHASE 3. Set only by battle-view.service.ts's own
+  // getBattleViewData, only after it has confirmed (via
+  // getOrCreateTutorialProgress) that this player's Tutorial is genuinely
+  // still at its own unresolved Field Battle stage — never trusted from
+  // anywhere else, and never consulted at all on the "existing session"
+  // restore path below, which behaves identically regardless (a resumed
+  // session already carries whatever isTutorialEncounter value it was
+  // created with).
+  options?: { forceTutorialEncounter?: boolean }
+): Promise<GetOrStartBattleResult> {
   const party = await getPlayerParty(playerId);
   const existing = await prisma.fieldBattleSession.findUnique({ where: { playerId } });
 
@@ -326,14 +369,28 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
   // same reason playerLevel is.
   const playerLevel = await getPlayerLevel(playerId);
   const wildLevelRange = await resolveEffectiveWildLevelRange(playerId);
-  const wild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
-  // The session is created already one encounter ahead — see the model's
-  // own nextWild* doc comment. resolveWildEncounter is a pure, in-memory
-  // weighted pick (no I/O), so precomputing this second encounter up front
-  // costs nothing measurable; it just guarantees a promotion is always
-  // instant, from the very first encounter of the session onward, never
-  // only after the first defeat.
-  const nextWild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
+
+  let wild: EncounterResult;
+  let nextWild: EncounterResult;
+  if (options?.forceTutorialEncounter) {
+    // GAME TUTORIAL — PHASE 3. Deterministic — never resolveWildEncounter's
+    // real RNG — and never promoted: this session always ends in a
+    // guaranteed capture (capture.service.ts's own attemptCapture), so
+    // `nextWild` is only ever populated to satisfy the schema's NOT NULL
+    // columns, never actually shown to the player. Reusing the exact same
+    // encounter object for both is deliberate, not a bug.
+    wild = buildTutorialPidgeyEncounter(requestedZoneId);
+    nextWild = wild;
+  } else {
+    wild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
+    // The session is created already one encounter ahead — see the model's
+    // own nextWild* doc comment. resolveWildEncounter is a pure, in-memory
+    // weighted pick (no I/O), so precomputing this second encounter up
+    // front costs nothing measurable; it just guarantees a promotion is
+    // always instant, from the very first encounter of the session
+    // onward, never only after the first defeat.
+    nextWild = resolveWildEncounter(regionId, requestedZoneId, playerLevel, wildLevelRange);
+  }
 
   try {
     await prisma.fieldBattleSession.create({
@@ -353,6 +410,8 @@ export async function getOrStartBattle(playerId: string, requestedZoneId: ZoneId
         // encounter from the moment the session exists — see
         // BattleParticipantRecord's own doc comment.
         participants: serializeParticipants([{ playerPokemonId: activePokemon.id, fainted: false, order: 0 }]),
+        // GAME TUTORIAL — PHASE 3.
+        isTutorialEncounter: Boolean(options?.forceTutorialEncounter),
       },
     });
   } catch (error) {

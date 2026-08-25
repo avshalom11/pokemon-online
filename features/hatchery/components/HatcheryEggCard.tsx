@@ -6,6 +6,7 @@ const SOURCE_LABELS: Record<string, string> = {
   shop: "חנות",
   chest: "תיבה",
   league: "ליגה",
+  tutorial: "הכרת המשחק",
 };
 
 interface HatcheryEggCardProps {

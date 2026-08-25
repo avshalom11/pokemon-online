@@ -8,6 +8,7 @@ import { PartyHealSelector } from "./PartyHealSelector";
 import { BackButton } from "@/components/layout/BackButton";
 import { healPartyAction } from "@/features/pokemon-center/actions/heal-party.action";
 import { partyNeedsHealing } from "@/features/pokemon-center/utils/heal-status";
+import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 interface PokemonCenterContentProps {
@@ -40,6 +41,18 @@ export function PokemonCenterContent({ initialParty }: PokemonCenterContentProps
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [healError, setHealError] = useState<string | null>(null);
   const [isHealing, startHealTransition] = useTransition();
+
+  // GAME TUTORIAL — PHASE 2. Spotlights the whole heal flow (never a single
+  // button — the real flow is itself multi-step: Yes -> select -> confirm).
+  // reportAction("pokemon-healed") fires only once the REAL healPartyAction
+  // result below confirms success AND the Starter's own id is among the
+  // ones actually healed — "do not trust a client event alone if the
+  // Server Action result can verify success" (this task's own explicit
+  // rule). A no-op unless the Tutorial is currently awaiting exactly this
+  // action, so this is always safe to call regardless of whether the
+  // Tutorial is even active.
+  const healFlowTargetRef = useTutorialTarget("pokemon-center-heal-flow");
+  const { reportAction } = useTutorial();
 
   function handleYes() {
     if (!partyNeedsHealing(party)) {
@@ -100,6 +113,12 @@ export function PokemonCenterContent({ initialParty }: PokemonCenterContentProps
         setSelectedIds(new Set());
         setPhase("healed");
         setMessage(HEALED_MESSAGE);
+
+        // GAME TUTORIAL — PHASE 2. Only ever reported once the real result
+        // is in hand AND it genuinely includes the Starter — never merely
+        // "a heal succeeded" for some other party member.
+        const healedStarter = party.find((pokemon) => pokemon.isStarter && healedIds.has(pokemon.id));
+        if (healedStarter) reportAction("pokemon-healed");
         return;
       }
 
@@ -137,7 +156,7 @@ export function PokemonCenterContent({ initialParty }: PokemonCenterContentProps
         }}
       />
 
-      <div className="relative mx-auto flex max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <div ref={healFlowTargetRef} className="relative mx-auto flex max-w-4xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
         <BackButton />
 
         <NurseJoyDialogue message={message} actions={dialogueActions}>

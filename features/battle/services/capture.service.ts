@@ -11,6 +11,7 @@ import { calculateCaptureXpReward } from "@/features/player-progression/progress
 import { addPlayerExperience } from "@/features/player-progression/progression-service";
 import type { LevelUpResult } from "@/features/player-progression/progression-types";
 import { getShopItemById } from "@/features/shop/services/shop-catalog.service";
+import { markTutorialPidgeyCaptured } from "@/features/tutorial/services/tutorial-progress.service";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { prisma } from "@/lib/db/prisma";
 
@@ -84,8 +85,17 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
   // is rejected — a Shop item that's somehow categorized "poke-balls" but
   // isn't one of the three rollable balls or Master Ball can never reach
   // rollCapture with an untyped id.
+  //
+  // GAME TUTORIAL — PHASE 3. `session.isTutorialEncounter` bypasses the RNG
+  // the exact same unconditional-success way Master Ball already does —
+  // this is the ONLY place a guaranteed capture can ever happen, and it
+  // can only ever be true for the deterministic session
+  // battle-session.service.ts's getOrStartBattle creates specifically for
+  // this. Every normal (non-tutorial) Field Battle capture, with any ball,
+  // is completely unaffected — this flag is false on every real wild
+  // encounter's session.
   let captured: boolean;
-  if (ball.id === MASTER_BALL_ITEM_ID) {
+  if (ball.id === MASTER_BALL_ITEM_ID || session.isTutorialEncounter) {
     captured = true;
   } else if (isCaptureBallId(ball.id)) {
     captured = rollCapture({ currentHp: session.wildCurrentHp, maxHp: session.wildMaxHp, rarity: species.rarity }, ball.id);
@@ -177,6 +187,14 @@ export async function attemptCapture(userId: string, ballItemId: string): Promis
     // once per encounter, so the XP grant inherits that same
     // exactly-once guarantee for free.
     const xpResult = await addPlayerExperience(tx, profile.id, calculateCaptureXpReward(session.wildLevel));
+
+    // GAME TUTORIAL — PHASE 3. Same transaction as the capture itself, so
+    // the flag can never be set without a genuine capture, and never lost
+    // if one just happened — see markTutorialPidgeyCaptured's own doc
+    // comment (features/tutorial/services/tutorial-progress.service.ts).
+    if (session.isTutorialEncounter) {
+      await markTutorialPidgeyCaptured(tx, profile.id);
+    }
 
     return { status: "captured", speciesName: species.name, xpResult, remainingQuantity, addedToParty };
   });
