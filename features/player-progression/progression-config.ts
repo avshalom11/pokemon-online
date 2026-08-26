@@ -29,3 +29,27 @@ export const VICTORY_XP_PER_LEVEL = 2.5;
 // Player XP reward for successfully capturing a wild Pokémon.
 export const CAPTURE_XP_BASE = 15;
 export const CAPTURE_XP_PER_LEVEL = 5;
+
+// PLAYER LEVEL-UP REWARDS — Money/Gold granted once for each account level
+// reached (level 1 is the player's starting level, never rewarded — the
+// lowest tier below starts at level 2). Read via
+// progression-calculations.ts's calculateLevelUpReward, the one place these
+// tiers are looked up; never hardcode a bracket elsewhere. `maxLevel` is an
+// inclusive upper bound — a level's own reward is the first tier whose
+// maxLevel is >= that level, so the final tier's Infinity catches every
+// level from 55 up.
+export interface LevelUpRewardTier {
+  maxLevel: number;
+  money: number;
+  gold: number;
+}
+
+export const LEVEL_UP_REWARD_TIERS: readonly LevelUpRewardTier[] = [
+  { maxLevel: 10, money: 1500, gold: 20 },
+  { maxLevel: 20, money: 1750, gold: 22 },
+  { maxLevel: 30, money: 2000, gold: 24 },
+  { maxLevel: 40, money: 2500, gold: 27 },
+  { maxLevel: 50, money: 3000, gold: 30 },
+  { maxLevel: 54, money: 3250, gold: 33 },
+  { maxLevel: Infinity, money: 3500, gold: 35 },
+];

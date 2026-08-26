@@ -53,3 +53,39 @@ export function getZone(regionId: RegionId, zoneId: ZoneId): Zone | undefined {
 export function getAllRegionsWithZoneData(): RegionId[] {
   return Object.keys(ZONE_DATA_BY_REGION) as RegionId[];
 }
+
+// POKÉDEX — LOCATION HINTS FOR UNSEEN POKÉMON. One (region, zone) pair a
+// species can actually be encountered in.
+export interface SpeciesEncounterLocation {
+  regionId: RegionId;
+  zoneId: ZoneId;
+}
+
+// The one place a species' possible encounter locations are ever derived —
+// a plain scan of every region's own zone encounter tables (the exact same
+// data startPokemonEncounter itself rolls against, engine/encounter/
+// pokemon-encounter-engine.ts), never a second, hand-maintained species ->
+// location table. Returns plain (regionId, zoneId) facts only — never
+// Hebrew text; turning this into player-facing copy is
+// features/pokedex/messages/pokedex-location-messages.ts's own job, so a
+// zone/region naming change here can never silently break the wording.
+// Deduped by (regionId, zoneId) pair — a species can't appear twice in the
+// exact same zone's own encounter list — and in region/zone iteration
+// order (deterministic run to run). Empty for a species that never appears
+// in any zone's encounter table (e.g. a starter, or a form only ever
+// obtained by evolving) — a caller decides how to phrase that, this
+// function never invents a location.
+export function getSpeciesEncounterLocations(pokemonId: string): SpeciesEncounterLocation[] {
+  const locations: SpeciesEncounterLocation[] = [];
+
+  for (const regionId of getAllRegionsWithZoneData()) {
+    for (const zone of getZoneData(regionId)) {
+      const appearsHere = zone.encounters.some((encounter) => encounter.pokemonId === pokemonId);
+      if (appearsHere) {
+        locations.push({ regionId, zoneId: zone.id });
+      }
+    }
+  }
+
+  return locations;
+}

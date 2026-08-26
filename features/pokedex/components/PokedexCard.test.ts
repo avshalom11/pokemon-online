@@ -23,7 +23,18 @@ test("an unseen entry's types are never rendered at all", () => {
   );
 });
 
-test("an unseen card is never clickable — there is nothing to open a detail panel for", () => {
-  assert.ok(/onClick=\{isUnseen \? undefined : onSelect\}/.test(cardSource), "onClick must be disabled for an unseen entry");
-  assert.ok(/disabled=\{isUnseen\}/.test(cardSource), "the button itself must be disabled for an unseen entry");
+// POKÉDEX — LOCATION HINTS FOR UNSEEN POKÉMON. An unseen card is now
+// clickable (it opens the strictly limited PokedexUnseenPanel instead of
+// the full detail panel — see PokedexContent's own status branch), but
+// this card component itself must never gain a disabled/enabled split of
+// its own — onClick is unconditional here.
+test("a card is always clickable, regardless of status — unseen no longer disables it", () => {
+  assert.ok(cardSource.includes("onClick={onSelect}"), "onClick must always be onSelect, never conditionally undefined");
+  assert.ok(!cardSource.includes("disabled={isUnseen}"), "the button must never be disabled for an unseen entry anymore");
+  assert.ok(!cardSource.includes("disabled"), "no disabled attribute of any kind should remain on this button");
+});
+
+test("an unseen card's sprite/name are still exactly as hidden as before — this task never loosens that", () => {
+  assert.ok(cardSource.includes('isUnseen ? "opacity-80 brightness-0"'), "the silhouette treatment must be unchanged");
+  assert.ok(cardSource.includes('alt={isUnseen ? "פוקימון שטרם התגלה" : species.name}'));
 });

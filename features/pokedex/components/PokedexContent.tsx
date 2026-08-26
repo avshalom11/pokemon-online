@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { PokedexCard } from "./PokedexCard";
 import { PokedexDetailPanel } from "./PokedexDetailPanel";
+import { PokedexUnseenPanel } from "./PokedexUnseenPanel";
 import { BackButton } from "@/components/layout/BackButton";
 import { POKEMON_RARITY_LABELS, POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
 import type { PokemonRarity, PokemonType } from "@/shared/types/pokemon";
@@ -61,7 +62,11 @@ export function PokedexContent({ entries }: PokedexContentProps) {
   const [rarityFilter, setRarityFilter] = useState<PokemonRarity | "all">("all");
   const [selectedSpeciesId, setSelectedSpeciesId] = useState<string | null>(null);
 
-  const selectedEntry = entries.find((entry) => entry.species.id === selectedSpeciesId && entry.status !== "unseen") ?? null;
+  // POKÉDEX — LOCATION HINTS FOR UNSEEN POKÉMON. An "unseen" entry is now
+  // also selectable (see PokedexCard's own doc comment), so this no longer
+  // excludes it — it opens PokedexUnseenPanel below instead of the full
+  // PokedexDetailPanel, which stays reserved for "seen"/"caught" entries.
+  const selectedEntry = entries.find((entry) => entry.species.id === selectedSpeciesId) ?? null;
 
   const filteredEntries = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -172,7 +177,13 @@ export function PokedexContent({ entries }: PokedexContentProps) {
         )}
       </div>
 
-      {selectedEntry ? <PokedexDetailPanel entry={selectedEntry} onClose={() => setSelectedSpeciesId(null)} /> : null}
+      {selectedEntry ? (
+        selectedEntry.status === "unseen" ? (
+          <PokedexUnseenPanel entry={selectedEntry} onClose={() => setSelectedSpeciesId(null)} />
+        ) : (
+          <PokedexDetailPanel entry={selectedEntry} onClose={() => setSelectedSpeciesId(null)} />
+        )
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,15 @@ export interface PlayerProgress {
   xpRequiredForNextLevel: number;
 }
 
+// PLAYER LEVEL-UP REWARDS — a combined Money/Gold total, produced by
+// progression-calculations.ts's calculateLevelUpReward (summed across every
+// level crossed in one XP grant) and by LevelUpResult below (the exact
+// amount already granted for that grant).
+export interface LevelUpReward {
+  money: number;
+  gold: number;
+}
+
 // Returned by addPlayerExperience so callers (battle feedback, future
 // systems) never have to recompute progression independently.
 export interface LevelUpResult {
@@ -25,4 +34,11 @@ export interface LevelUpResult {
   levelsGained: number;
   currentLevelXp: number;
   xpRequiredForNextLevel: number;
+  // PLAYER LEVEL-UP REWARDS — combined Money/Gold already granted (see
+  // progression-service.ts's addPlayerExperience) for every level crossed by
+  // this XP grant. Always 0/0 when leveledUp is false; never recomputed by a
+  // caller — these are the exact amounts already applied to the player's
+  // PlayerProfile row server-side.
+  moneyReward: number;
+  goldReward: number;
 }

@@ -108,3 +108,44 @@ test("7: (source) the component reads the SAME shared PlayerProgressionContext e
   assert.ok(dialogSrc.includes('import { usePlayerProgression } from "@/features/player/context/player-progression-context";'));
   assert.ok(dialogSrc.includes("usePlayerProgression()"));
 });
+
+// ===========================================================================
+// PLAYER LEVEL-UP REWARDS — shown in this SAME dialog, never a second popup.
+// ===========================================================================
+test("8: (source) the reward Money/Gold copy comes from progression-messages.ts — no inline/duplicated Hebrew reward text", () => {
+  assert.ok(
+    dialogSrc.includes(
+      "  playerLevelUpDialogRewardGoldLine,\n  playerLevelUpDialogRewardMoneyLine,\n  playerLevelUpDialogRewardTitle,"
+    )
+  );
+  assert.match(dialogSrc, /\{playerLevelUpDialogRewardTitle\}/);
+  assert.match(dialogSrc, /playerLevelUpDialogRewardMoneyLine\(dialogReward\.money\)/);
+  assert.match(dialogSrc, /playerLevelUpDialogRewardGoldLine\(dialogReward\.gold\)/);
+});
+
+test("8b: the exact required Hebrew reward copy exists (title, and money/gold lines with the amount + label)", () => {
+  assert.match(messagesSrc, /playerLevelUpDialogRewardTitle = "פרס עליית רמה:"/);
+  assert.match(messagesSrc, /playerLevelUpDialogRewardMoneyLine\(money: number\)[\s\S]*?כסף/);
+  assert.match(messagesSrc, /playerLevelUpDialogRewardGoldLine\(gold: number\)[\s\S]*?זהב/);
+});
+
+test("9: (source) the reward block lives INSIDE the same role=\"dialog\" element as the level text — never a second/separate popup", () => {
+  const dialogOpenIndex = dialogSrc.indexOf('role="dialog"');
+  const rewardBlockIndex = dialogSrc.indexOf("dialogReward ?");
+  const buttonIndex = dialogSrc.indexOf("<button");
+  assert.ok(dialogOpenIndex > -1 && rewardBlockIndex > -1 && buttonIndex > -1);
+  // The reward block sits between the dialog's own opening tag and its
+  // single confirm button — i.e. inside the one dialog, before the one
+  // dismiss action — never a second overlay/dialog element of its own.
+  assert.ok(dialogOpenIndex < rewardBlockIndex && rewardBlockIndex < buttonIndex);
+  assert.equal((dialogSrc.match(/role="dialog"/g) ?? []).length, 1);
+});
+
+test("10: (source) the reward shown is read from context's levelUpReward — never recomputed locally (no level-up math/reward table in this component)", () => {
+  assert.ok(dialogSrc.includes("const { progress, levelUpReward } = usePlayerProgression();"));
+  assert.ok(!/calculateLevelUpReward|LEVEL_UP_REWARD_TIERS/.test(dialogSrc), "reward math must stay server-side, not duplicated here");
+});
+
+test("11: (source) a mismatched/stale levelUpReward (wrong level) is rejected, never shown against the wrong level-up", () => {
+  assert.match(dialogSrc, /levelUpReward\s*&&\s*levelUpReward\.level\s*===\s*progress\.level/);
+});

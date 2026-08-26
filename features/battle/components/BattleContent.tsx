@@ -585,7 +585,20 @@ export function BattleContent({
   // fields the server already computed (progression-calculations.ts).
   function applyBattleReward(xpResult: LevelUpResult | null) {
     if (!xpResult) return;
-    applyProgress(progressFromLevelUpResult(xpResult));
+    // PLAYER LEVEL-UP REWARDS — shown in PlayerLevelUpDialog, never a
+    // second popup here. Passed alongside the progress update itself (not a
+    // separate call) so an out-of-order/stale response can never overwrite
+    // an already-shown newer reward — see applyProgress's own doc comment
+    // (player-progression-context.tsx). Only included when this grant
+    // actually leveled the player up; xpResult.newLevel is already the
+    // final, server-authoritative level (see progressFromLevelUpResult's
+    // own doc comment above).
+    applyProgress(
+      progressFromLevelUpResult(xpResult),
+      xpResult.leveledUp
+        ? { level: xpResult.newLevel, money: xpResult.moneyReward, gold: xpResult.goldReward }
+        : undefined
+    );
     showXpToast(xpResult);
   }
 

@@ -29,9 +29,9 @@ export interface SidebarCategory {
 // label/icon/href triples features/home/components/NavigationGrid.tsx
 // already established for Home's own nav grid, reused here rather than
 // re-invented, so the two menus never drift into disagreeing wording for
-// the same destination. Pokédex is deliberately excluded — the task's own
-// category spec doesn't ask for it here, and NavigationGrid already covers
-// it on Home.
+// the same destination. Pokédex reuses the exact same label/icon/href
+// NavigationGrid's own card already established, so the two menus never
+// drift into disagreeing wording for that destination either.
 export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
   {
     id: "world",
@@ -47,6 +47,14 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       { id: "home", label: "מסך ראשי", icon: "🏠", href: "/home" },
       { id: "world", label: "מחוזות", icon: "🌍", href: "/world" },
       { id: "map", label: "מפה", icon: "🗺️", href: "/map" },
+      // POKÉDEX — SIDEBAR ENTRY. Placed right after Map (the natural
+      // "world discovery" grouping: where you go, then what you've found
+      // there), reusing NavigationGrid's own label/icon/href exactly — no
+      // new route, no duplicate Pokédex page. Inherits the same generic
+      // battle-lock behavior every other sidebar item already gets from
+      // GameSidebar's own isActiveBattle check — no Pokédex-specific
+      // navigation-lock logic added.
+      { id: "pokedex", label: "פוקדקס", icon: "📖", href: "/pokedex" },
       // GYMS & LEAGUES PHASE 4 — placed right after World/Map, per this
       // Phase's own nav spec. Inherits the exact same battle-lock behavior
       // every other sidebar item already gets from GameSidebar's own

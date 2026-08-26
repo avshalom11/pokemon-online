@@ -1,6 +1,7 @@
 // EGGS PHASE 7 focused coverage for the sidebar menu data — pure data
 // assertions, no DOM/browser needed.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { buildSidebarCategories, SIDEBAR_CATEGORIES } from "./sidebar-menu.ts";
@@ -41,9 +42,27 @@ test("Home is listed under the WORLD category (never a new category), using the 
   assert.equal(home?.label, "מסך ראשי");
 });
 
-test("Home is the first item in the world category, alongside World/Map/Gyms/Leagues", () => {
+test("Home is the first item in the world category, alongside World/Map/Pokédex/Gyms/Leagues", () => {
   const world = SIDEBAR_CATEGORIES.find((category) => category.id === "world");
-  assert.deepEqual(world?.items.map((item) => item.id), ["home", "world", "map", "gyms", "leagues"]);
+  assert.deepEqual(world?.items.map((item) => item.id), ["home", "world", "map", "pokedex", "gyms", "leagues"]);
+});
+
+// POKÉDEX — SIDEBAR ENTRY.
+test("Pokédex is listed under the WORLD category, right after Map, using the real /pokedex route", () => {
+  const world = SIDEBAR_CATEGORIES.find((category) => category.id === "world");
+  const pokedex = world?.items.find((item) => item.id === "pokedex");
+  assert.ok(pokedex, "a pokedex item must exist under world");
+  assert.equal(pokedex?.href, "/pokedex");
+  assert.equal(pokedex?.label, "פוקדקס");
+});
+
+test("Pokédex's label/icon/href match NavigationGrid's own existing card exactly — no disagreeing wording between the two menus", () => {
+  const navigationGridSrc = readFileSync("features/home/components/NavigationGrid.tsx", "utf8");
+  assert.ok(navigationGridSrc.includes('{ title: "פוקדקס", icon: "📖", href: "/pokedex" }'));
+
+  const world = SIDEBAR_CATEGORIES.find((category) => category.id === "world");
+  const pokedex = world?.items.find((item) => item.id === "pokedex");
+  assert.equal(pokedex?.icon, "📖");
 });
 
 // GYMS & LEAGUES PHASE 4 — section 34's own "sidebar Gym link data exists"

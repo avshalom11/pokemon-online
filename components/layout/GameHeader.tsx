@@ -1,9 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { ExperienceBar } from "@/components/battle/ExperienceBar";
 import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
+import { CurrencyInfoDialog } from "@/features/currency/components/CurrencyInfoDialog";
+import type { CurrencyType } from "@/features/currency/types/currency.types";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { SoundToggle } from "@/components/layout/SoundToggle";
 import type { NotificationBellData } from "@/features/notifications/types";
@@ -49,6 +52,12 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
   const remainingXp = progress.xpRequiredForNextLevel - progress.currentLevelXp;
   const remainingXpLabel = `נותרו ${remainingXp} XP לרמה הבאה`;
 
+  // CURRENCY INFO — which currency's info dialog (if any) is open. Null
+  // whenever closed; only ever "money" or "gold" while open — never both
+  // at once (opening one always replaces the other, same single-slot
+  // pattern every other one-at-a-time dialog in this header area uses).
+  const [openCurrencyInfo, setOpenCurrencyInfo] = useState<CurrencyType | null>(null);
+
   return (
     <header
       dir="rtl"
@@ -88,8 +97,18 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
             label={`קרבות היום: ${dailyBattleCount}`}
             title="קרבות היום"
           />
-          <ResourcePill icon={<CurrencyIcon type="money" />} label={player.coins.toLocaleString("he-IL")} title="מטבעות" />
-          <ResourcePill icon={<CurrencyIcon type="gold" />} label={player.gold.toLocaleString("he-IL")} title="זהב" />
+          <ResourcePill
+            icon={<CurrencyIcon type="money" />}
+            label={player.coins.toLocaleString("he-IL")}
+            title="מטבעות — לחצו למידע"
+            onClick={() => setOpenCurrencyInfo("money")}
+          />
+          <ResourcePill
+            icon={<CurrencyIcon type="gold" />}
+            label={player.gold.toLocaleString("he-IL")}
+            title="זהב — לחצו למידע"
+            onClick={() => setOpenCurrencyInfo("gold")}
+          />
 
           <SoundToggle />
 
@@ -117,6 +136,23 @@ export function GameHeader({ player, notifications }: GameHeaderProps) {
           {progress.currentLevelXp} / {progress.xpRequiredForNextLevel} XP
         </span>
       </div>
+
+      {/* CURRENCY INFO — CENTER ON SCREEN. Rendered through a portal into
+          document.body rather than in place: this <header> carries
+          backdrop-blur-md (a backdrop-filter), which — like `transform` —
+          establishes a new containing block for any `position: fixed`
+          descendant per the CSS spec. Left in place, the dialog's own
+          `fixed inset-0` (CurrencyInfoDialog's existing, unchanged
+          centering pattern) would resolve against THIS header's small
+          fixed box instead of the viewport, pinning it near the top
+          instead of centering it on screen. The portal is the only change
+          — the dialog's markup, styling, and behavior are untouched. */}
+      {openCurrencyInfo
+        ? createPortal(
+            <CurrencyInfoDialog type={openCurrencyInfo} onClose={() => setOpenCurrencyInfo(null)} />,
+            document.body
+          )
+        : null}
     </header>
   );
 }
@@ -125,19 +161,35 @@ interface ResourcePillProps {
   icon: ReactNode;
   label: string;
   title: string;
+  // CURRENCY INFO — optional: only the Money/Gold pills pass this (opens
+  // CurrencyInfoDialog); the daily-battle-count pill passes none and stays
+  // a plain, non-interactive div exactly as before.
+  onClick?: () => void;
 }
 
 // Icon-agnostic shell — both current callers pass a CurrencyIcon
 // (features/currency/components/CurrencyIcon.tsx), which is what actually
 // owns each currency's color/shape, so both pills stay visually
 // consistent (same size, shape, spacing, glow) automatically rather than
-// this component re-deriving that styling itself.
-function ResourcePill({ icon, label, title }: ResourcePillProps) {
+// this component re-deriving that styling itself. Renders as a real
+// <button> (same visual shell, same padding/border/text classes) only when
+// `onClick` is given, so a pill with nothing to click never gains a
+// misleading interactive affordance.
+function ResourcePill({ icon, label, title, onClick }: ResourcePillProps) {
+  const className =
+    "flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-100 sm:px-2.5 sm:text-sm";
+
+  if (onClick) {
+    return (
+      <button type="button" title={title} onClick={onClick} className={`${className} transition-colors hover:border-white/20 hover:bg-slate-800`}>
+        {icon}
+        {label}
+      </button>
+    );
+  }
+
   return (
-    <div
-      title={title}
-      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-900/60 px-2 py-1 text-xs font-semibold text-slate-100 sm:px-2.5 sm:text-sm"
-    >
+    <div title={title} className={className}>
       {icon}
       {label}
     </div>

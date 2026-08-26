@@ -1,9 +1,11 @@
 import "server-only";
 
+import { grantCurrencyRewards } from "@/features/currency/services/currency-reward.service";
+import type { CurrencyReward } from "@/features/currency/types/currency.types";
 import { createLevelUpNotification } from "@/features/notifications/services/notification-service";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { getPlayerProgress } from "./progression-calculations";
+import { calculateLevelUpReward, getPlayerProgress } from "./progression-calculations";
 import type { LevelUpResult } from "./progression-types";
 
 // The only place PlayerProfile.level/experience are ever written. Always
@@ -45,8 +47,25 @@ export async function addPlayerExperience(
     data: { level: progress.level, experience: progress.totalXp },
   });
 
+  // PLAYER LEVEL-UP REWARDS — granted here, inside the same exactly-once
+  // transaction every current caller already wraps this call in (see this
+  // function's own doc comment), so the Money/Gold grant inherits the exact
+  // same exactly-once guarantee the level-up notification above does — no
+  // separate guard needed. calculateLevelUpReward already returns {0, 0}
+  // when no level was crossed, so `reward` is always safe to compute
+  // unconditionally.
+  const reward = calculateLevelUpReward(previousLevel, progress.level);
+
   if (progress.level > previousLevel) {
     await createLevelUpNotification(tx, playerId, progress.level);
+  }
+
+  const currencyRewards: CurrencyReward[] = [
+    ...(reward.money > 0 ? [{ type: "money", amount: reward.money } as const] : []),
+    ...(reward.gold > 0 ? [{ type: "gold", amount: reward.gold } as const] : []),
+  ];
+  if (currencyRewards.length > 0) {
+    await grantCurrencyRewards(tx, playerId, currencyRewards);
   }
 
   return {
@@ -58,6 +77,8 @@ export async function addPlayerExperience(
     levelsGained: progress.level - previousLevel,
     currentLevelXp: progress.currentLevelXp,
     xpRequiredForNextLevel: progress.xpRequiredForNextLevel,
+    moneyReward: reward.money,
+    goldReward: reward.gold,
   };
 }
 

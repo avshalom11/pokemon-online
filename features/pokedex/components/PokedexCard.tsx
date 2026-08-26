@@ -14,11 +14,14 @@ interface PokedexCardProps {
 //
 // - "unseen": the sprite is rendered but silhouetted (brightness-0 — same
 //   real sprite, no separate asset, so this never needs its own art), the
-//   name is replaced with "???", types are hidden entirely, and the card
-//   is non-interactive (no onClick, disabled) — there is nothing to show
-//   in a detail panel for a species the player has never encountered.
+//   name is replaced with "???", and types are hidden entirely — same
+//   visual treatment as before. UNLIKE before, the card IS clickable: it
+//   opens PokedexUnseenPanel (PokedexContent's own status branch), a
+//   strictly limited view (same dark sprite/"???" name, plus a location
+//   hint derived from real zone data) — never the full PokedexDetailPanel,
+//   which stays reserved for "seen"/"caught" entries only.
 // - "seen"/"caught": full name, real sprite, types, and (caught only) a
-//   small badge — clicking opens the detail panel.
+//   small badge — clicking opens the full detail panel.
 export function PokedexCard({ entry, onSelect }: PokedexCardProps) {
   const { species, status } = entry;
   const isUnseen = status === "unseen";
@@ -26,12 +29,10 @@ export function PokedexCard({ entry, onSelect }: PokedexCardProps) {
   return (
     <button
       type="button"
-      onClick={isUnseen ? undefined : onSelect}
-      disabled={isUnseen}
-      aria-disabled={isUnseen}
+      onClick={onSelect}
       className={`group relative flex flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all ${
         isUnseen
-          ? "cursor-default border-white/5 bg-slate-900/30"
+          ? "border-white/5 bg-slate-900/30 hover:border-indigo-400/30 hover:bg-slate-900/50"
           : "border-white/10 bg-slate-900/60 hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-slate-900/80 hover:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
       }`}
     >

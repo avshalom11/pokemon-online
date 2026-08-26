@@ -30,3 +30,17 @@ export function playerLevelUpDialogMessage(newLevel: number): string {
 }
 
 export const playerLevelUpDialogButtonLabel = "אישור";
+
+// PLAYER LEVEL-UP REWARDS — shown in the SAME dialog above, never a second
+// popup. `he-IL` locale formatting matches this codebase's own convention
+// for every other Money/Gold amount (see e.g. GymVictoryRewardDialog.tsx,
+// components/layout/GameHeader.tsx) — thousands-separated, no decimals.
+export const playerLevelUpDialogRewardTitle = "פרס עליית רמה:";
+
+export function playerLevelUpDialogRewardMoneyLine(money: number): string {
+  return `${money.toLocaleString("he-IL")} כסף`;
+}
+
+export function playerLevelUpDialogRewardGoldLine(gold: number): string {
+  return `${gold.toLocaleString("he-IL")} זהב`;
+}

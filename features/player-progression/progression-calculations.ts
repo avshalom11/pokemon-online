@@ -1,11 +1,12 @@
 import {
   CAPTURE_XP_BASE,
   CAPTURE_XP_PER_LEVEL,
+  LEVEL_UP_REWARD_TIERS,
   VICTORY_XP_BASE,
   VICTORY_XP_PER_LEVEL,
   XP_PER_LEVEL,
 } from "./progression-config.ts";
-import type { LevelUpResult, PlayerProgress } from "./progression-types";
+import type { LevelUpReward, LevelUpResult, PlayerProgress } from "./progression-types";
 
 // Pure, framework-free player-progression math — no React, no Prisma, no
 // "server-only" (mirrors features/party/utils/party-rules.ts and
@@ -95,6 +96,36 @@ export function progressFromLevelUpResult(result: LevelUpResult): PlayerProgress
 // step — so this naturally returns true exactly once for that grant.
 export function hasPlayerLeveledUp(previousLevel: number, newLevel: number): boolean {
   return newLevel > previousLevel;
+}
+
+// The Money/Gold tier for one specific level reached — the first tier in
+// LEVEL_UP_REWARD_TIERS whose maxLevel is >= level. The final tier's
+// Infinity maxLevel means this always finds one for any level >= 1.
+function getLevelUpRewardTier(level: number): LevelUpReward {
+  const tier = LEVEL_UP_REWARD_TIERS.find((candidate) => level <= candidate.maxLevel);
+  return tier ? { money: tier.money, gold: tier.gold } : { money: 0, gold: 0 };
+}
+
+// PLAYER LEVEL-UP REWARDS — the combined Money/Gold total for every level
+// actually crossed by one XP grant (previousLevel -> newLevel), never just
+// the final level's own tier: a multi-level jump in one grant (see
+// hasPlayerLeveledUp's own doc comment) still owes the player every
+// individual level's reward, summed. Level 1 itself is never included (the
+// loop only ever starts at previousLevel + 1, and previousLevel is always
+// >= 1), matching LEVEL_UP_REWARD_TIERS's lowest bracket starting at level
+// 2. Returns { money: 0, gold: 0 } when no level was crossed (newLevel <=
+// previousLevel), so a caller never has to guard this separately.
+export function calculateLevelUpReward(previousLevel: number, newLevel: number): LevelUpReward {
+  let money = 0;
+  let gold = 0;
+
+  for (let level = safeLevel(previousLevel) + 1; level <= newLevel; level++) {
+    const tier = getLevelUpRewardTier(level);
+    money += tier.money;
+    gold += tier.gold;
+  }
+
+  return { money, gold };
 }
 
 // Player XP reward for defeating a wild Pokémon of `wildLevel`. Rounded —

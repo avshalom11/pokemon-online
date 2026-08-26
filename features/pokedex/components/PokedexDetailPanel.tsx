@@ -27,9 +27,10 @@ const BASE_STAT_LABELS: { key: keyof PokemonBaseStats; label: string }[] = [
 // PokemonDetailsPanel already established, but with no actions of its own
 // (the Pokédex never mutates anything; every field here is canonical
 // species data plus this player's own already-loaded status). Only ever
-// rendered for a "seen" or "caught" entry — see PokedexCard, which makes an
-// "unseen" card non-interactive — so there is no separate hidden/obscured
-// branch to handle in here.
+// rendered for a "seen" or "caught" entry — PokedexContent's own status
+// branch routes an "unseen" selection to PokedexUnseenPanel instead (the
+// strictly limited location-hint view) — so there is no separate hidden/
+// obscured branch to handle in here.
 export function PokedexDetailPanel({ entry, onClose }: PokedexDetailPanelProps) {
   // Which of entry.forms is currently displayed — defaults to entry.forms[0]
   // (always the base/headline form, see PokedexEntryView's own doc comment).

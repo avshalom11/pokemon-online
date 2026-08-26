@@ -6,8 +6,12 @@ import { hasPlayerLeveledUp } from "@/features/player-progression/progression-ca
 import {
   playerLevelUpDialogButtonLabel,
   playerLevelUpDialogMessage,
+  playerLevelUpDialogRewardGoldLine,
+  playerLevelUpDialogRewardMoneyLine,
+  playerLevelUpDialogRewardTitle,
   playerLevelUpDialogTitle,
 } from "@/features/player-progression/progression-messages";
+import type { LevelUpReward } from "@/features/player-progression/progression-types";
 import { usePlayerProgression } from "@/features/player/context/player-progression-context";
 
 // PLAYER LEVEL UP — CONGRATULATIONS DIALOG. Mounted once at the (game)
@@ -38,16 +42,28 @@ import { usePlayerProgression } from "@/features/player/context/player-progressi
 // spuriously re-shows the dialog. Only a genuine INCREASE observed after
 // that point — within this same mounted lifetime — triggers it.
 export function PlayerLevelUpDialog() {
-  const { progress } = usePlayerProgression();
+  const { progress, levelUpReward } = usePlayerProgression();
   const lastSeenLevelRef = useRef(progress.level);
   const [dialogLevel, setDialogLevel] = useState<number | null>(null);
+  // PLAYER LEVEL-UP REWARDS — shown in this SAME dialog, never a second
+  // popup. Captured alongside dialogLevel below rather than read from
+  // levelUpReward directly at render time, so a LATER level-up's reward
+  // (context's levelUpReward moving on) can never overwrite the amount
+  // already shown for the dialog currently on screen.
+  const [dialogReward, setDialogReward] = useState<LevelUpReward | null>(null);
 
   useEffect(() => {
     if (hasPlayerLeveledUp(lastSeenLevelRef.current, progress.level)) {
       setDialogLevel(progress.level);
+      // Only trust levelUpReward when its level matches the increase just
+      // observed — a level-up detected via the OTHER update path (the
+      // background getPlayerProgressAction re-sync in BattleContent, which
+      // carries no reward info) must never show a stale/mismatched amount
+      // left over from an earlier level-up.
+      setDialogReward(levelUpReward && levelUpReward.level === progress.level ? levelUpReward : null);
     }
     lastSeenLevelRef.current = progress.level;
-  }, [progress.level]);
+  }, [progress.level, levelUpReward]);
 
   if (dialogLevel === null) return null;
 
@@ -61,6 +77,16 @@ export function PlayerLevelUpDialog() {
       <div className="w-full max-w-sm rounded-2xl border border-amber-400/30 bg-slate-900 p-6 text-center shadow-2xl">
         <h2 className="text-lg font-bold text-slate-100">{playerLevelUpDialogTitle}</h2>
         <p className="mt-3 text-sm text-slate-300">{playerLevelUpDialogMessage(dialogLevel)}</p>
+
+        {dialogReward ? (
+          <div className="mt-4 rounded-lg border border-amber-400/20 bg-slate-800/60 p-3">
+            <p className="text-xs font-semibold text-slate-400">{playerLevelUpDialogRewardTitle}</p>
+            <p className="mt-1 text-sm font-semibold text-amber-300">
+              {playerLevelUpDialogRewardMoneyLine(dialogReward.money)}
+            </p>
+            <p className="text-sm font-semibold text-amber-300">{playerLevelUpDialogRewardGoldLine(dialogReward.gold)}</p>
+          </div>
+        ) : null}
 
         <button
           type="button"
