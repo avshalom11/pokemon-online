@@ -20,6 +20,11 @@ test("changeUsernameSchema rejects characters outside the shared username patter
   assert.ok(!changeUsernameSchema.safeParse({ newUsername: "not valid!" }).success);
 });
 
+test("changeUsernameSchema accepts a Hebrew username, letters-only and mixed with digits", () => {
+  assert.ok(changeUsernameSchema.safeParse({ newUsername: "אבשלום" }).success);
+  assert.ok(changeUsernameSchema.safeParse({ newUsername: "אבשלום123" }).success);
+});
+
 test("updateProfileSchema no longer accepts/requires a username field — username changes go through changeUsernameSchema's own dedicated (100 Gold) flow", () => {
   const parsed = updateProfileSchema.safeParse({
     aboutMe: "",

@@ -46,6 +46,15 @@
 // looking at this chat" presence detection, which this project's polling-
 // only architecture has no reliable way to determine).
 //
+// MARKETPLACE_LISTING_SOLD: created by features/marketplace/services/
+// purchase-listing.service.ts's purchaseMarketplaceListing, for the SELLER
+// only, inside the exact same transaction as the purchase itself — a
+// thrown/rolled-back purchase never reaches this, so a failed/rolled-back
+// purchase can never leave a stray notification behind. Message lists the
+// real buyer username and every Pokémon/item actually transferred (see
+// features/marketplace/messages/marketplace-purchase-messages.ts). Never
+// carries metadata — this is informational only, no inline quick action.
+//
 // SECURITY_LOGIN_LOCKOUT: created by lib/auth/player-profile.ts's
 // notifySecurityLoginLockout, called from lib/auth/actions.ts's loginAction
 // the ONE time a given (identifier, IP) pair's failed-attempt count newly
@@ -64,7 +73,8 @@ export type NotificationType =
   | "CHEST_OPENED"
   | "FRIEND_REQUEST_RECEIVED"
   | "PRIVATE_MESSAGE_RECEIVED"
-  | "SECURITY_LOGIN_LOCKOUT";
+  | "SECURITY_LOGIN_LOCKOUT"
+  | "MARKETPLACE_LISTING_SOLD";
 
 export interface NotificationSummary {
   id: string;

@@ -12,6 +12,8 @@ import {
   resetFakeDb,
   seedDaycareStay,
   seedFieldBattleSession,
+  seedMarketplaceListing,
+  seedMarketplaceListingPokemon,
   seedPlayerPokemon,
   seedPlayerProfile,
 } from "../../../test/support/fakes/prisma.fake.ts";
@@ -88,6 +90,18 @@ test("DAYCARE — once collected (the PlayerDaycareStay row is gone), the same P
   const result = await releasePokemon(PLAYER_ID, "was-deposited");
   assert.deepEqual(result, { status: "released" });
   assert.equal(getPlayerPokemonRow("was-deposited"), undefined);
+});
+
+test("MARKETPLACE PHASE 7 — a Pokémon currently locked into a listing is rejected, and the release never touches the listing lock", async () => {
+  seedPlayerPokemon({ id: "extra", playerId: PLAYER_ID, speciesId: "rattata" });
+  seedPlayerPokemon({ id: "listed", playerId: PLAYER_ID, speciesId: "pidgey" });
+  const listing = seedMarketplaceListing({ sellerId: PLAYER_ID });
+  seedMarketplaceListingPokemon({ playerPokemonId: "listed", listingId: listing.id });
+
+  const result = await releasePokemon(PLAYER_ID, "listed");
+
+  assert.deepEqual(result, { status: "marketplace-listed" });
+  assert.ok(getPlayerPokemonRow("listed"), "the listed Pokémon must still exist after a rejected release");
 });
 
 test("the player's last remaining Pokémon is rejected, even the last one that happens to be free (not in-party/battle/Daycare)", async () => {

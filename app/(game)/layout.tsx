@@ -52,8 +52,17 @@ import { getPlayerProfile } from "@/lib/auth/player-profile";
 export default async function GameLayout({ children }: { children: ReactNode }) {
   const session = await getCurrentSession();
 
+  // STALE SESSION COOKIE — reaching this page at all means proxy.ts already
+  // saw a session_token cookie present (it redirects away before this
+  // layout ever runs otherwise — see proxy.ts's own PROTECTED_PATHS). A
+  // real, DB-backed getCurrentSession() finding no session here therefore
+  // means the cookie itself is stale (its Session/User row is gone — e.g.
+  // the account was deleted on this or another device). Redirecting
+  // straight to "/" would send the browser right back into proxy.ts's
+  // optimistic "cookie present -> /home" redirect — an infinite loop. See
+  // app/api/clear-stale-session/route.ts's own doc comment for the fix.
   if (!session) {
-    redirect("/");
+    redirect("/api/clear-stale-session");
   }
 
   const redirectTarget = await getOnboardingRedirectTarget(session.user.id);

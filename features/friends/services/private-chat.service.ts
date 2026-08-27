@@ -5,23 +5,11 @@ import { areFriends, buildFriendPairKey } from "@/features/friends/services/frie
 import type { OpenConversationResult, PrivateMessageView, SendPrivateMessageResult } from "@/features/friends/types";
 import { createNotification } from "@/features/notifications/services/notification-service";
 import { getPlayerIdentitiesByIds, type PlayerIdentity } from "@/lib/auth/player-profile";
+import { formatChatMessageTimestamp } from "@/lib/chat/format-message-timestamp";
 import { prisma } from "@/lib/db/prisma";
 
 function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
-}
-
-// "HH:MM" in Asia/Jerusalem wall-clock time, same Intl.DateTimeFormat-parts
-// technique as global-chat.service.ts's own formatSentTime.
-function formatSentTime(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Jerusalem",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("hour")}:${get("minute")}`;
 }
 
 function toMessageView(
@@ -35,7 +23,7 @@ function toMessageView(
     playerUsername: identity?.username ?? null,
     message: row.message,
     createdAt: row.createdAt.toISOString(),
-    sentTimeLabel: formatSentTime(row.createdAt),
+    sentTimeLabel: formatChatMessageTimestamp(row.createdAt),
   };
 }
 

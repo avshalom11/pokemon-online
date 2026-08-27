@@ -46,11 +46,16 @@ function findIllegalUseServerExports(src: string): string[] {
 test("(16) the account-deletion row lives inside SecurityAccountSection (no separate danger-zone section), which is only ever rendered behind view.isOwner", () => {
   assert.ok(
     profileContentSrc.includes(
-      "<SecurityAccountSection currentUsername={view.username} onUsernameChanged={handleUsernameChanged} />"
+      "<SecurityAccountSection currentUsername={view.username} ownerEmail={ownerEmail} onUsernameChanged={handleUsernameChanged} />"
     )
   );
   const occurrences = (profileContentSrc.match(/<SecurityAccountSection\b/g) ?? []).length;
   assert.equal(occurrences, 1, "exactly one render site — no second, ungated place it could also mount from");
+  assert.match(
+    profileContentSrc,
+    /view\.isOwner && ownerEmail !== null \? \(/,
+    "the render must still be gated behind view.isOwner (plus the ownerEmail null-check the email feature added)"
+  );
   assert.ok(!profileContentSrc.includes("AccountDangerZoneSection"), "the old separate danger-zone section must be gone entirely");
   assert.ok(securitySectionSrc.includes("מחק משתמש"));
   assert.ok(!securitySectionSrc.includes("אזור מסוכן"), "no separate danger-zone title may exist anywhere in this section");

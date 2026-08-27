@@ -76,6 +76,13 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
     label: "שירותים וחנויות",
     items: [
       { id: "shop", label: "חנות", icon: "🛒", href: "/shop" },
+      // MARKETPLACE PHASE 3 — player-to-player trading, placed right after
+      // Shop (the natural grouping: both are "get Pokémon/items" screens,
+      // one from the game, one from other players). Inherits the exact
+      // same battle-lock behavior every other sidebar item here already
+      // gets from GameSidebar's own generic isActiveBattle check — no
+      // Marketplace-specific navigation-lock logic added.
+      { id: "marketplace", label: "שוק", icon: "🏪", href: "/marketplace" },
       { id: "pokemon-center", label: "מרכז פוקימון", icon: "🏥", href: "/pokemon-center" },
       // EGGS PHASE 7 — the existing /hatchery page (Phase 5), placed under
       // this same category rather than a new one: it's a service the

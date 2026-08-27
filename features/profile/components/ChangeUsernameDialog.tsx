@@ -30,7 +30,7 @@ export function ChangeUsernameDialog({ currentUsername, onClose, onSuccess }: Ch
 
     if (trimmed.length < USERNAME_MIN_LENGTH || trimmed.length > USERNAME_MAX_LENGTH || !USERNAME_PATTERN.test(trimmed)) {
       setErrorMessage(
-        `שם המשתמש חייב להכיל ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} תווים: אותיות באנגלית, ספרות וקו תחתון בלבד.`
+        `שם המשתמש חייב להכיל ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} תווים: אותיות באנגלית או בעברית, ספרות וקו תחתון בלבד.`
       );
       return;
     }
@@ -76,7 +76,7 @@ export function ChangeUsernameDialog({ currentUsername, onClose, onSuccess }: Ch
           <div className="mt-4 flex flex-col gap-3">
             <input
               type="text"
-              dir="ltr"
+              dir="auto"
               placeholder="שם משתמש חדש"
               value={newUsername}
               onChange={(event) => setNewUsername(event.target.value)}
@@ -88,7 +88,7 @@ export function ChangeUsernameDialog({ currentUsername, onClose, onSuccess }: Ch
           <div className="mt-4 flex flex-col gap-2 text-center">
             <p className="text-sm text-slate-200">
               שם המשתמש החדש:{" "}
-              <span dir="ltr" className="font-semibold text-indigo-300">
+              <span dir="auto" className="font-semibold text-indigo-300">
                 {newUsername.trim()}
               </span>
             </p>

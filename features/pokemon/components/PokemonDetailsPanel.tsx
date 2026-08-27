@@ -127,6 +127,8 @@ export function PokemonDetailsPanel({
         setErrorMessage("לא ניתן לשחרר פוקימון שמשתתף כרגע בקרב פעיל.");
       } else if (result.status === "in-daycare") {
         setErrorMessage("לא ניתן לשחרר פוקימון שנמצא כרגע במעון הפוקימונים.");
+      } else if (result.status === "marketplace-listed") {
+        setErrorMessage("לא ניתן לשחרר פוקימון שמוצע כרגע למכירה בשוק.");
       } else if (result.status === "last-pokemon") {
         setErrorMessage("לא ניתן לשחרר את הפוקימון האחרון שבבעלותך.");
       } else {

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from "rea
 import { getGlobalChatMessagesAction, sendGlobalChatMessageAction } from "@/features/chat/actions/global-chat.actions";
 import { GLOBAL_CHAT_MESSAGE_MAX_LENGTH, GLOBAL_CHAT_POLL_INTERVAL_MS } from "@/features/chat/config/global-chat.config";
 import type { GlobalChatMessageView, SendGlobalChatMessageError } from "@/features/chat/types";
+import { formatChatMessageTimestamp } from "@/lib/chat/format-message-timestamp";
 import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 const NEAR_BOTTOM_THRESHOLD_PX = 60;
@@ -23,10 +24,6 @@ export const GLOBAL_CHAT_ERROR_LABELS: Record<SendGlobalChatMessageError, string
 // server round trip confirms it — see mergeWithFresh below for how it's
 // reconciled with the next poll tick.
 export type DisplayMessage = GlobalChatMessageView & { pending?: boolean };
-
-function formatClientSentTime(date: Date): string {
-  return date.toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
-}
 
 // Replaces the confirmed half of the list with the server's own canonical
 // order/cap (`fresh` is already oldest-first, capped at
@@ -171,7 +168,7 @@ export function useGlobalChat({
         playerUsername: currentPlayerUsername,
         message: trimmed,
         createdAt: now.toISOString(),
-        sentTimeLabel: formatClientSentTime(now),
+        sentTimeLabel: formatChatMessageTimestamp(now),
         // ONLINE PRESENCE — the caller sending this message is, by
         // definition, online right now.
         isOnline: true,

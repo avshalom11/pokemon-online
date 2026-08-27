@@ -111,7 +111,7 @@ export function PlayerSearchModal({ onClose }: PlayerSearchModalProps) {
                     )}
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-slate-100">{result.displayName}</span>
-                      <span dir="ltr" className="text-xs text-slate-500">{`@${result.username}`}</span>
+                      <span dir="auto" className="text-xs text-slate-500">{`@${result.username}`}</span>
                     </div>
                   </Link>
                 </li>

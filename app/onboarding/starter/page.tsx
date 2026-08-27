@@ -13,8 +13,14 @@ import { getCurrentSession } from "@/lib/auth/auth-session";
 export default async function StarterSelectionPage() {
   const session = await getCurrentSession();
 
+  // STALE SESSION COOKIE — same reasoning as app/(game)/layout.tsx's own
+  // identical guard: proxy.ts already confirmed a session_token cookie is
+  // present for this PROTECTED_PATHS route, so getCurrentSession() finding
+  // no session here means the cookie is stale, not merely absent.
+  // redirect("/") would loop forever against proxy.ts's optimistic
+  // cookie-presence redirect — see app/api/clear-stale-session/route.ts.
   if (!session) {
-    redirect("/");
+    redirect("/api/clear-stale-session");
   }
 
   const redirectTarget = await getOnboardingRedirectTarget(session.user.id);

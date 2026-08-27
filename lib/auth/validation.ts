@@ -6,7 +6,7 @@ import { z } from "zod";
 // enforcement can never drift apart.
 export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 20;
-export const USERNAME_PATTERN = /^[A-Za-z0-9_]+$/;
+export const USERNAME_PATTERN = /^[A-Za-z0-9א-ת_]+$/;
 
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
@@ -17,7 +17,7 @@ export const usernameSchema = z
   .min(USERNAME_MIN_LENGTH, { error: `שם המשתמש חייב להכיל לפחות ${USERNAME_MIN_LENGTH} תווים` })
   .max(USERNAME_MAX_LENGTH, { error: `שם המשתמש יכול להכיל עד ${USERNAME_MAX_LENGTH} תווים` })
   .regex(USERNAME_PATTERN, {
-    error: "שם המשתמש יכול להכיל רק אותיות באנגלית, ספרות וקו תחתון, ללא רווחים",
+    error: "שם המשתמש יכול להכיל רק אותיות באנגלית או בעברית, ספרות וקו תחתון, ללא רווחים",
   });
 
 export const emailSchema = z

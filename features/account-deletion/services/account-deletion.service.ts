@@ -75,6 +75,22 @@ export type ConfirmAccountDeletionResult =
 //     strictly required, but removes any reliance on that ordering
 //     guarantee and makes the intent explicit, per the task's own "do not
 //     blindly rely on cascade everywhere" instruction.
+//  3. MARKETPLACE PHASE 7 (hardening) — MarketplaceListingPokemon.pokemon
+//     -> PlayerPokemon is also onDelete: Restrict, the exact same
+//     defense-in-depth shape as FieldBattleSession above (a locked
+//     Pokémon must never silently vanish out from under an active/editing
+//     listing). MarketplaceListing.seller is onDelete: Cascade, so this
+//     player's own listings (and, via THEIR own onDelete: Cascade to
+//     MarketplaceListingPokemon/MarketplaceListingItem, every lock row on
+//     them) would already be swept away by the same single cascading
+//     `tx.user.delete()` regardless — but exactly like point 2, this is
+//     made explicit rather than relied on implicitly. Only the lock rows
+//     need clearing here (never a real cancel — the listing row itself is
+//     about to be destroyed by the cascade either way, so writing
+//     status/cancelledAt on it first would never be observed by anyone).
+//     The seller's own PlayerInventoryItem.lockedQuantity is left
+//     untouched for the same reason: that row cascades away with the
+//     account regardless of its locked/unlocked state.
 export async function confirmAccountDeletion(rawToken: string): Promise<ConfirmAccountDeletionResult> {
   const tokenHash = hashDeletionToken(rawToken);
 
@@ -100,6 +116,14 @@ export async function confirmAccountDeletion(rawToken: string): Promise<ConfirmA
       if (profile) {
         await tx.leagueTournamentPlacement.deleteMany({ where: { playerId: profile.id } });
         await tx.fieldBattleSession.deleteMany({ where: { playerId: profile.id } });
+
+        // MARKETPLACE PHASE 7 (hardening) — see point 3 above.
+        const ownListingIds = (await tx.marketplaceListing.findMany({ where: { sellerId: profile.id }, select: { id: true } })).map(
+          (listing) => listing.id
+        );
+        if (ownListingIds.length > 0) {
+          await tx.marketplaceListingPokemon.deleteMany({ where: { listingId: { in: ownListingIds } } });
+        }
       }
 
       await tx.user.delete({ where: { id: record.userId } });

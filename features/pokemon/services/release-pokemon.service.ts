@@ -11,6 +11,12 @@ export type ReleasePokemonResult =
   // deposited in the Daycare (features/daycare) can never be released —
   // see this function's own doc comment below.
   | { status: "in-daycare" }
+  // MARKETPLACE PHASE 7 (hardening) — a Pokémon currently locked into a
+  // listing can never be released; MarketplaceListingPokemon's own
+  // onDelete: Restrict backs this up at the database level regardless (same
+  // "typed result instead of a raw constraint-violation error" reasoning as
+  // this function's own in-battle/in-daycare checks above).
+  | { status: "marketplace-listed" }
   | { status: "last-pokemon" };
 
 // Permanently deletes a PlayerPokemon row — the only place that ever
@@ -41,7 +47,7 @@ export async function releasePokemon(playerId: string, playerPokemonId: string):
     return { status: "in-party" };
   }
 
-  const [totalOwned, activeBattleSession, daycareStay] = await Promise.all([
+  const [totalOwned, activeBattleSession, daycareStay, marketplaceLock] = await Promise.all([
     prisma.playerPokemon.count({ where: { playerId } }),
     prisma.fieldBattleSession.findFirst({ where: { playerId, activePlayerPokemonId: playerPokemonId } }),
     // Same direct row-existence check (not a features/daycare import) as
@@ -49,6 +55,7 @@ export async function releasePokemon(playerId: string, playerPokemonId: string):
     // other feature's own table directly rather than depend on its
     // service".
     prisma.playerDaycareStay.findUnique({ where: { playerPokemonId } }),
+    prisma.marketplaceListingPokemon.findUnique({ where: { playerPokemonId } }),
   ]);
 
   if (activeBattleSession) {
@@ -57,6 +64,10 @@ export async function releasePokemon(playerId: string, playerPokemonId: string):
 
   if (daycareStay) {
     return { status: "in-daycare" };
+  }
+
+  if (marketplaceLock) {
+    return { status: "marketplace-listed" };
   }
 
   // The heal system (features/pokemon-center) can always bring a fainted

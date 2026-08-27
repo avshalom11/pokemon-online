@@ -172,6 +172,10 @@ interface PlayerInventoryItemRow {
   playerId: string;
   itemId: string;
   quantity: number;
+  // MARKETPLACE PHASE 1 — mirrors PlayerInventoryItem.lockedQuantity
+  // (prisma/schema.prisma). Always 0 until a create/edit listing service
+  // exists to write it (later phase) — see that column's own doc comment.
+  lockedQuantity: number;
 }
 
 interface PlayerSeenSpeciesRow {
@@ -453,6 +457,33 @@ interface LeagueBattleSessionRow {
   updatedAt: Date;
 }
 
+// MARKETPLACE PHASE 1 — mirrors prisma/schema.prisma's own three new
+// models. See features/marketplace/services/ for the only current readers.
+interface MarketplaceListingRow {
+  id: string;
+  sellerId: string;
+  status: string;
+  priceMoney: number;
+  priceGold: number;
+  buyerId: string | null;
+  soldAt: Date | null;
+  cancelledAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MarketplaceListingPokemonRow {
+  playerPokemonId: string;
+  listingId: string;
+}
+
+interface MarketplaceListingItemRow {
+  id: string;
+  listingId: string;
+  itemId: string;
+  quantity: number;
+}
+
 let pokemons = new Map<string, PlayerPokemonRow>();
 let knownMoves = new Map<string, PlayerKnownMoveRow>();
 let pending = new Map<string, PlayerPendingMoveLearningRow>();
@@ -494,6 +525,13 @@ let leagueTournamentParticipants = new Map<string, LeagueTournamentParticipantRo
 let leagueTournamentMatches = new Map<string, LeagueTournamentMatchRow>();
 let leagueBattleSessions = new Map<string, LeagueBattleSessionRow>();
 let leagueTournamentPlacements = new Map<string, LeagueTournamentPlacementRow>();
+// MARKETPLACE PHASE 1 — marketplaceListingPokemon is keyed by
+// playerPokemonId (its own real primary key — a Pokémon can be locked into
+// at most one listing, same "existence IS the fact" idiom
+// playerDaycareStay's own Map already establishes).
+let marketplaceListings = new Map<string, MarketplaceListingRow>();
+let marketplaceListingPokemon = new Map<string, MarketplaceListingPokemonRow>();
+let marketplaceListingItems = new Map<string, MarketplaceListingItemRow>();
 let idCounter = 0;
 // POKÉMON DAYCARE — PHASE 2 (5 SLOTS + DEPOSIT FEE) — a simple async mutex
 // so concurrent $transaction calls never interleave their bodies (see
@@ -616,6 +654,9 @@ function cloneState() {
     leagueBattleSessions: new Map([...leagueBattleSessions].map(([id, row]) => [id, { ...row }])),
     leagueTournamentPlacements: new Map([...leagueTournamentPlacements].map(([id, row]) => [id, { ...row }])),
     accountDeletionRequests: new Map([...accountDeletionRequests].map(([id, row]) => [id, { ...row }])),
+    marketplaceListings: new Map([...marketplaceListings].map(([id, row]) => [id, { ...row }])),
+    marketplaceListingPokemon: new Map([...marketplaceListingPokemon].map(([id, row]) => [id, { ...row }])),
+    marketplaceListingItems: new Map([...marketplaceListingItems].map(([id, row]) => [id, { ...row }])),
   };
 }
 
@@ -651,6 +692,9 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   leagueBattleSessions = snapshot.leagueBattleSessions;
   leagueTournamentPlacements = snapshot.leagueTournamentPlacements;
   accountDeletionRequests = snapshot.accountDeletionRequests;
+  marketplaceListings = snapshot.marketplaceListings;
+  marketplaceListingPokemon = snapshot.marketplaceListingPokemon;
+  marketplaceListingItems = snapshot.marketplaceListingItems;
 }
 
 export function resetFakeDb() {
@@ -685,6 +729,9 @@ export function resetFakeDb() {
   leagueBattleSessions = new Map();
   leagueTournamentPlacements = new Map();
   accountDeletionRequests = new Map();
+  marketplaceListings = new Map();
+  marketplaceListingPokemon = new Map();
+  marketplaceListingItems = new Map();
   idCounter = 0;
   transactionQueue = Promise.resolve();
   playerPokemonUpdateCallCount = 0;
@@ -1048,6 +1095,40 @@ export function getDaycareStayRow(playerPokemonId: string) {
   return row ? { ...row } : undefined;
 }
 
+// MARKETPLACE PHASE 1 — same "seed the row a test needs directly" idiom
+// every other seedX helper above already follows.
+export function seedMarketplaceListing(row: {
+  id?: string;
+  sellerId: string;
+  status?: string;
+  priceMoney?: number;
+  priceGold?: number;
+  buyerId?: string | null;
+}) {
+  const id = row.id ?? nextId("marketplace_listing");
+  const now = new Date();
+  const full: MarketplaceListingRow = {
+    id,
+    sellerId: row.sellerId,
+    status: row.status ?? "active",
+    priceMoney: row.priceMoney ?? 0,
+    priceGold: row.priceGold ?? 0,
+    buyerId: row.buyerId ?? null,
+    soldAt: null,
+    cancelledAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  marketplaceListings.set(id, full);
+  return full;
+}
+
+export function seedMarketplaceListingPokemon(row: { playerPokemonId: string; listingId: string }) {
+  const full: MarketplaceListingPokemonRow = { playerPokemonId: row.playerPokemonId, listingId: row.listingId };
+  marketplaceListingPokemon.set(row.playerPokemonId, full);
+  return full;
+}
+
 export function seedFieldBattleSession(row: {
   playerId: string;
   zoneId: string;
@@ -1165,8 +1246,8 @@ export function getInventoryItemRow(playerId: string, itemId: string) {
   return row ? { ...row } : undefined;
 }
 
-export function seedInventoryItem(row: { playerId: string; itemId: string; quantity: number }) {
-  const full: PlayerInventoryItemRow = { id: nextId("inventory"), ...row };
+export function seedInventoryItem(row: { playerId: string; itemId: string; quantity: number; lockedQuantity?: number }) {
+  const full: PlayerInventoryItemRow = { id: nextId("inventory"), lockedQuantity: 0, ...row };
   inventoryItems.set(inventoryItemKey(row.playerId, row.itemId), full);
   return full;
 }
@@ -1635,7 +1716,7 @@ const client = {
         applyNumericOperators(existing as unknown as Record<string, unknown>, update);
         return { ...existing };
       }
-      const full: PlayerInventoryItemRow = { id: nextId("inventory"), ...create };
+      const full: PlayerInventoryItemRow = { id: nextId("inventory"), lockedQuantity: 0, ...create };
       inventoryItems.set(key, full);
       return { ...full };
     },
@@ -2545,6 +2626,115 @@ const client = {
       for (const [key, row] of daycareStays) {
         if (matches(row, where)) {
           daycareStays.delete(key);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  // MARKETPLACE PHASE 1 — minimal generic CRUD, same shape every other
+  // model's fake already follows (findUnique/findMany/updateMany via the
+  // shared matches() helper). No cascade-delete simulation yet (no test
+  // needs to delete a listing and observe its children disappear) — that's
+  // later create/edit/cancel-listing phase work.
+  marketplaceListing: {
+    async create({ data }: { data: { sellerId: string; priceMoney?: number; priceGold?: number; status?: string } }) {
+      const id = nextId("marketplace_listing");
+      const now = new Date();
+      const full: MarketplaceListingRow = {
+        id,
+        sellerId: data.sellerId,
+        status: data.status ?? "active",
+        priceMoney: data.priceMoney ?? 0,
+        priceGold: data.priceGold ?? 0,
+        buyerId: null,
+        soldAt: null,
+        cancelledAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      marketplaceListings.set(id, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = marketplaceListings.get(where.id);
+      return row ? { ...row } : null;
+    },
+    async findMany({ where }: { where?: Record<string, unknown> }) {
+      return [...marketplaceListings.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of marketplaceListings.values()) {
+        if (matches(row, where)) {
+          applyNumericOperators(row as unknown as Record<string, unknown>, data);
+          row.updatedAt = new Date();
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  marketplaceListingPokemon: {
+    // playerPokemonId is this row's own primary key — a second create() for
+    // an already-locked Pokémon must fail with the same P2002 code real
+    // Postgres would raise (mirrors playerDaycareStay's own create() guard
+    // above for the identical "existence IS the fact" idiom).
+    async create({ data }: { data: { playerPokemonId: string; listingId: string } }) {
+      if (marketplaceListingPokemon.has(data.playerPokemonId)) {
+        throw Object.assign(new Error("Unique constraint failed on the fields: (`playerPokemonId`)"), { code: "P2002" });
+      }
+      const full: MarketplaceListingPokemonRow = { playerPokemonId: data.playerPokemonId, listingId: data.listingId };
+      marketplaceListingPokemon.set(data.playerPokemonId, full);
+      return { ...full };
+    },
+    async findUnique({ where }: { where: { playerPokemonId: string } }) {
+      const row = marketplaceListingPokemon.get(where.playerPokemonId);
+      return row ? { ...row } : null;
+    },
+    async findMany({ where }: { where?: Record<string, unknown> }) {
+      return [...marketplaceListingPokemon.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [key, row] of marketplaceListingPokemon) {
+        if (matches(row, where)) {
+          marketplaceListingPokemon.delete(key);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  marketplaceListingItem: {
+    async create({ data }: { data: { listingId: string; itemId: string; quantity: number } }) {
+      const id = nextId("marketplace_listing_item");
+      const full: MarketplaceListingItemRow = { id, listingId: data.listingId, itemId: data.itemId, quantity: data.quantity };
+      marketplaceListingItems.set(id, full);
+      return { ...full };
+    },
+    async findMany({ where }: { where?: Record<string, unknown> }) {
+      return [...marketplaceListingItems.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+    // MARKETPLACE PHASE 6 — save-edit-listing.service.ts's own "update the
+    // retained quantity for a still-listed item stack" write. Same generic
+    // filter-and-mutate shape every other updateMany in this fake already
+    // uses.
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of marketplaceListingItems.values()) {
+        if (matches(row, where)) {
+          applyNumericOperators(row as unknown as Record<string, unknown>, data);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [key, row] of marketplaceListingItems) {
+        if (matches(row, where)) {
+          marketplaceListingItems.delete(key);
           count += 1;
         }
       }

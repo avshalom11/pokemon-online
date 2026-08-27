@@ -30,6 +30,8 @@ import {
   resetFakeDb,
   seedDaycareStay,
   seedKnownMove,
+  seedMarketplaceListing,
+  seedMarketplaceListingPokemon,
   seedPlayerPokemon,
   seedPlayerProfile,
 } from "../../test/support/fakes/prisma.fake.ts";
@@ -395,6 +397,24 @@ function assertNoHardcodedNumberLiteral(src: string, literals: string[], label: 
     assert.ok(!pattern.test(code), `${label} must never hardcode ${literal} as a real number literal — it must always come from daycare.config.ts`);
   }
 }
+
+// ===========================================================================
+// MARKETPLACE PHASE 7 (hardening) — a Pokémon locked into a listing must
+// never be deposited.
+// ===========================================================================
+
+test("MARKETPLACE PHASE 7 — a Pokémon currently locked into a listing is rejected, and no fee is charged", async () => {
+  seedPlayerPokemon({ id: "listed", playerId: "player-a", level: 5 });
+  const listing = seedMarketplaceListing({ sellerId: "player-a" });
+  seedMarketplaceListingPokemon({ playerPokemonId: "listed", listingId: listing.id });
+
+  const before = getPlayerProfileRow("player-a")!.coins;
+  const result = await depositToDaycare("player-a", "listed");
+
+  assert.deepEqual(result, { ok: false, error: "marketplace-listed" });
+  assert.equal(getPlayerProfileRow("player-a")!.coins, before, "the deposit fee must never be charged for a rejected deposit");
+  assert.equal(getDaycareStayRow("listed"), undefined);
+});
 
 test("SSOT: no file outside daycare.config.ts hardcodes 500 (the deposit fee) a second time", () => {
   const files = [

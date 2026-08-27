@@ -290,6 +290,13 @@ model PlayerProfile {
   // GAME TUTORIAL — PHASE 0. At most one row per player — see
   // PlayerTutorialProgress's own doc comment below.
   tutorialProgress             PlayerTutorialProgress?
+  // MARKETPLACE PHASE 1 — see MarketplaceListing's own doc comment below.
+  // Two separate relations to the same model (seller vs. buyer) require
+  // distinct relation names, same "named @relation" precedent
+  // Friendship/PrivateConversation already establish for their own
+  // requester/addressee and playerA/playerB splits.
+  marketplaceListingsAsSeller  MarketplaceListing[]             @relation("MarketplaceListingSeller")
+  marketplaceListingsAsBuyer   MarketplaceListing[]             @relation("MarketplaceListingBuyer")
   createdAt                    DateTime                         @default(now())
   updatedAt                    DateTime                         @updatedAt
 
@@ -515,6 +522,11 @@ model PlayerPokemon {
   // POKÉMON DAYCARE — PHASE 1. Non-null exactly while this Pokémon is
   // currently deposited — see PlayerDaycareStay's own doc comment below.
   daycareStay PlayerDaycareStay?
+
+  // MARKETPLACE PHASE 1. Non-null exactly while this Pokémon is currently
+  // locked into a listing — see MarketplaceListingPokemon's own doc
+  // comment below.
+  marketplaceListing MarketplaceListingPokemon?
 
   @@unique([playerId, partySlot])
   @@index([playerId])
@@ -828,6 +840,21 @@ model PlayerInventoryItem {
 
   itemId   String
   quantity Int    @default(0)
+  // MARKETPLACE PHASE 1 — the portion of `quantity` currently committed to
+  // this player's own active/editing Marketplace listings (see
+  // MarketplaceListingItem below). Always <= quantity — enforced at the
+  // application layer (features/marketplace/services/
+  // inventory-availability.service.ts), never a DB CHECK constraint, same
+  // "no declarative CHECK support in this setup" precedent every other
+  // invariant in this file already follows (e.g. PlayerPokemon.partySlot's
+  // own doc comment). "Available to spend/use right now" is always
+  // `quantity - lockedQuantity`, never raw `quantity` — see that helper's
+  // own doc comment. Every EXISTING consumer of raw `quantity`
+  // (removeInventoryItem, battle item use, evolution stones, selling) is
+  // deliberately NOT retrofitted to read this yet — that is later
+  // hardening work once create/buy/edit/cancel listing actions exist; this
+  // column is inert (always 0) until then.
+  lockedQuantity Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1584,6 +1611,135 @@ model PlayerDaycareStay {
 
   @@index([playerId])
   @@map("player_daycare_stay")
+}
+
+// MARKETPLACE PHASE 1 — FOUNDATION. Player-to-player trading: a listing
+// bundles zero-or-more Pokémon (MarketplaceListingPokemon) plus zero-or-more
+// stackable item stacks (MarketplaceListingItem) under one Money/Gold
+// price, bought as a single all-or-nothing unit — no per-item purchases, no
+// counteroffers (this feature's own confirmed product rules). This phase
+// only adds the schema plus read-only availability primitives
+// (features/marketplace/services/) — create/buy/edit/cancel listing
+// actions are a later phase; nothing here is written to yet outside tests.
+//
+// `status` is a plain String (not a Prisma enum) — same no-enum precedent
+// every other status-ish column in this file already follows
+// (FieldBattleSession.zoneId, LeagueBattleSession.status, ...) — validated
+// at the app layer against MarketplaceListingStatus
+// (features/marketplace/types/marketplace.types.ts).
+//
+// Deliberately no `version`/optimistic-lock column: state transitions
+// (active -> editing -> active, active -> sold, {active,editing} ->
+// cancelled) are meant to be guarded exactly like AccountDeletionRequest's
+// own exactly-once `consumedAt` claim and spendCurrency's balance guard — a
+// conditional `updateMany` keyed on the CURRENT status, count-checked by
+// the caller — never a numeric version counter. That guard is future
+// service-layer work (the later create/buy/edit/cancel phase); this schema
+// only provides the `status` column it will be guarded on.
+//
+// No fee column, no expiration column — this feature's own confirmed
+// product rules ("no fees", "no expiration") mean there is nothing to
+// store for either.
+model MarketplaceListing {
+  id       String        @id @default(cuid())
+  sellerId String
+  seller   PlayerProfile @relation("MarketplaceListingSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  // "active" | "editing" | "sold" | "cancelled" — see this model's own doc
+  // comment above for why this is a guarded-updateMany state machine, not
+  // an optimistic-lock version counter.
+  status String @default("active")
+
+  // Money/Gold price — a listing can price in either or both; "at least
+  // one price must be positive" is an app-layer validation rule (later
+  // phase), not a schema constraint, same "no declarative CHECK constraint
+  // support in this setup" precedent PlayerPokemon.partySlot's own doc
+  // comment already establishes.
+  priceMoney Int @default(0)
+  priceGold  Int @default(0)
+
+  // Set exactly once, atomically alongside the active -> sold transition.
+  // Never the seller's own id — "buyer cannot buy their own listing" is a
+  // service-layer check (later phase), not a schema constraint.
+  buyerId String?
+  buyer   PlayerProfile? @relation("MarketplaceListingBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+
+  soldAt      DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pokemon MarketplaceListingPokemon[]
+  items   MarketplaceListingItem[]
+
+  @@index([sellerId])
+  @@index([status])
+  @@map("marketplace_listing")
+}
+
+// One row = one Pokémon currently locked into exactly one listing.
+// `playerPokemonId` is this row's own primary key (not a separate cuid) —
+// same "existence of a row IS the fact, and a second create is a
+// primary-key collision the database itself refuses" idiom
+// PlayerDaycareStay already establishes for "this Pokémon is currently
+// deposited" (see that model's own doc comment above): a Pokémon can never
+// be locked into two listings at once, enforced by the schema itself, not
+// merely by application code remembering to check first.
+//
+// onDelete: Restrict (not Cascade) on the pokemon relation — same "block
+// the delete outright rather than silently destroying the row that
+// references it" rule FieldBattleSession.activePlayerPokemon and
+// PlayerDaycareStay.pokemon already establish: a listed Pokémon can never
+// be released while still locked in a listing. The application-level
+// availability check (features/marketplace/services/
+// pokemon-availability.service.ts's getPokemonMarketAvailability) is what
+// actually produces a clean user-facing rejection before this constraint
+// would ever be reached.
+model MarketplaceListingPokemon {
+  playerPokemonId String        @id
+  pokemon         PlayerPokemon @relation(fields: [playerPokemonId], references: [id], onDelete: Restrict)
+
+  listingId String
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("marketplace_listing_pokemon")
+}
+
+// One stackable item stack committed to one listing (a quantity, not a
+// per-instance row — same fungible-counter reasoning PlayerInventoryItem's
+// own doc comment already establishes). Deliberately not a foreign key
+// into PlayerInventoryItem itself (that table is keyed by (playerId,
+// itemId), not by a single id this could reference) — itemId is a bare
+// string resolved against the static Shop catalog, same "static catalog
+// id, no enforced FK" precedent PlayerInventoryItem.itemId already
+// establishes. Multiple item stacks (and multiple Pokémon, via
+// MarketplaceListingPokemon above) can belong to the same listing — this is
+// what lets one listing bundle several Pokémon and several item types
+// together.
+//
+// This row's own `quantity` is exactly what backs the seller's
+// PlayerInventoryItem.lockedQuantity for this item while the listing is
+// active/editing — keeping the two in agreement (locking on list/edit-save,
+// releasing on cancel/edit-save) is later create/edit/cancel service work,
+// not this phase's.
+//
+// Eggs and Incubators (PlayerOwnedEgg / PlayerIncubator) are explicitly OUT
+// OF SCOPE for Marketplace v1 — both are per-instance rows, not stackable
+// counters (see their own doc comments), so a future listing for either
+// would need its own dedicated join model, not this one.
+model MarketplaceListingItem {
+  id String @id @default(cuid())
+
+  listingId String
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  itemId   String
+  quantity Int
+
+  @@unique([listingId, itemId])
+  @@map("marketplace_listing_item")
 }
 
 // GAME TUTORIAL — PHASE 0. One row per player, tracking progress through the

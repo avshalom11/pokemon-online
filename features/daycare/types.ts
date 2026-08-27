@@ -72,7 +72,12 @@ export type DepositToDaycareError =
   // PHASE 2 — the player already has DAYCARE_MAX_SLOTS active stays.
   | "daycare-full"
   // PHASE 2 — the player has less than DAYCARE_DEPOSIT_FEE Money.
-  | "insufficient-funds";
+  | "insufficient-funds"
+  // MARKETPLACE PHASE 7 (hardening) — this Pokémon is currently locked
+  // into a Marketplace listing (see MarketplaceListingPokemon) and must
+  // not be deposited until it's sold, cancelled, or removed from the
+  // listing.
+  | "marketplace-listed";
 
 export type DepositToDaycareResult = { ok: true } | { ok: false; error: DepositToDaycareError };
 

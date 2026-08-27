@@ -98,3 +98,31 @@ test("Home's href survives buildSidebarCategories unchanged (it needs no dynamic
   const home = world?.items.find((item) => item.id === "home");
   assert.equal(home?.href, "/home");
 });
+
+// MARKETPLACE PHASE 3 — sidebar entry.
+test("Marketplace is listed under the SERVICES/SHOPS category (never a new category), right after Shop, using the real /marketplace route", () => {
+  const services = SIDEBAR_CATEGORIES.find((category) => category.id === "services");
+  assert.ok(services, "the services category must exist");
+
+  const marketplace = services?.items.find((item) => item.id === "marketplace");
+  assert.ok(marketplace, "a marketplace item must exist under services");
+  assert.equal(marketplace?.href, "/marketplace");
+  assert.equal(marketplace?.label, "שוק");
+
+  const ids = services?.items.map((item) => item.id) ?? [];
+  assert.equal(ids.indexOf("marketplace"), ids.indexOf("shop") + 1, "Marketplace must sit directly after Shop");
+});
+
+test("no new sidebar category was added for Marketplace either", () => {
+  assert.deepEqual(
+    SIDEBAR_CATEGORIES.map((category) => category.id),
+    ["world", "services", "account"]
+  );
+});
+
+test("Marketplace's href survives buildSidebarCategories unchanged (it needs no dynamic per-player data, unlike Profile)", () => {
+  const categories = buildSidebarCategories("some-username");
+  const services = categories.find((category) => category.id === "services");
+  const marketplace = services?.items.find((item) => item.id === "marketplace");
+  assert.equal(marketplace?.href, "/marketplace");
+});

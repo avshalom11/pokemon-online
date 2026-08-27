@@ -18,6 +18,8 @@ import {
   seedPlayerPokemon,
   seedFieldBattleSession,
   seedAccountDeletionRequest,
+  seedMarketplaceListing,
+  seedMarketplaceListingPokemon,
   getUserRow,
   getAccountDeletionRequestByUserId,
   getFieldBattleSessionRow,
@@ -264,11 +266,62 @@ test("(11) deleting account A never deletes account B", async () => {
   assert.ok(getUserRow("user-b2"), "account B must be completely untouched");
 });
 
-// (12) confirmAccountDeletion never accepts a userId/playerId at all — the
+// (13) MARKETPLACE PHASE 7 (hardening) — deleting a seller's account with an
+// active/editing listing must not be blocked by the listing's own
+// Marketplace-lock row (MarketplaceListingPokemon, onDelete: Restrict on
+// its Pokémon relation) — the lock row is explicitly cleared as part of
+// the same deletion transaction, alongside FieldBattleSession/
+// LeagueTournamentPlacement above.
+test("(13) MARKETPLACE — deleting an account with an active listing succeeds and releases the listing's Pokémon lock", async () => {
+  seedUser({ id: "seller-13", username: "seller13", email: "seller13@example.com" });
+  seedPlayerProfile({ id: "seller-13" });
+  seedPlayerPokemon({ id: "pkmn-13", playerId: "seller-13" });
+  const listing = seedMarketplaceListing({ sellerId: "seller-13", status: "active" });
+  seedMarketplaceListingPokemon({ playerPokemonId: "pkmn-13", listingId: listing.id });
+
+  const rawToken = "g".repeat(64);
+  seedAccountDeletionRequest({ userId: "seller-13", tokenHash: hashDeletionToken(rawToken), expiresAt: new Date(Date.now() + 60_000) });
+
+  const result = await confirmAccountDeletion(rawToken);
+
+  assert.deepEqual(result, { status: "success" });
+  assert.equal(getUserRow("seller-13"), undefined);
+  const lock = await prisma.marketplaceListingPokemon.findUnique({ where: { playerPokemonId: "pkmn-13" } });
+  assert.equal(lock, null, "the listing's Pokémon lock must be released as part of account deletion");
+});
+
+// (14) MARKETPLACE PHASE 7 (hardening) — same, but for an "editing" listing
+// (the mid-edit state), and proves an unrelated seller's own listing/lock
+// is left completely untouched.
+test("(14) MARKETPLACE — deleting an account with an editing listing succeeds and never touches another seller's own listing lock", async () => {
+  seedUser({ id: "seller-14", username: "seller14", email: "seller14@example.com" });
+  seedPlayerProfile({ id: "seller-14" });
+  seedPlayerPokemon({ id: "pkmn-14", playerId: "seller-14" });
+  const listing = seedMarketplaceListing({ sellerId: "seller-14", status: "editing" });
+  seedMarketplaceListingPokemon({ playerPokemonId: "pkmn-14", listingId: listing.id });
+
+  seedPlayerProfile({ id: "other-seller-14" });
+  seedPlayerPokemon({ id: "other-pkmn-14", playerId: "other-seller-14" });
+  const otherListing = seedMarketplaceListing({ sellerId: "other-seller-14", status: "active" });
+  seedMarketplaceListingPokemon({ playerPokemonId: "other-pkmn-14", listingId: otherListing.id });
+
+  const rawToken = "h".repeat(64);
+  seedAccountDeletionRequest({ userId: "seller-14", tokenHash: hashDeletionToken(rawToken), expiresAt: new Date(Date.now() + 60_000) });
+
+  const result = await confirmAccountDeletion(rawToken);
+
+  assert.deepEqual(result, { status: "success" });
+  const ownLock = await prisma.marketplaceListingPokemon.findUnique({ where: { playerPokemonId: "pkmn-14" } });
+  assert.equal(ownLock, null);
+  const otherLock = await prisma.marketplaceListingPokemon.findUnique({ where: { playerPokemonId: "other-pkmn-14" } });
+  assert.ok(otherLock, "an unrelated seller's own listing lock must never be touched");
+});
+
+// (15) confirmAccountDeletion never accepts a userId/playerId at all — the
 // token record's OWN userId is the only source of truth for which account
 // gets deleted, so a token minted for account A can never be aimed at a
 // different account B (there is no parameter through which B's id could
 // even be supplied).
-test("(12) confirmAccountDeletion's only input is the token — resolving the account entirely from the token record itself", () => {
+test("(15) confirmAccountDeletion's only input is the token — resolving the account entirely from the token record itself", () => {
   assert.equal(confirmAccountDeletion.length, 1, "confirmAccountDeletion must take exactly one parameter (the raw token)");
 });

@@ -13,7 +13,12 @@ export type PartyMutationResult =
   // Daycare (features/daycare) can never re-enter the active party — see
   // assignToPartySlot's own doc comment for why this check lives here
   // rather than only at deposit time.
-  | { status: "in-daycare" };
+  | { status: "in-daycare" }
+  // MARKETPLACE PHASE 7 (hardening) — a Pokémon currently locked into a
+  // listing can never enter the active party — see assignToPartySlot's own
+  // doc comment for why this check lives here rather than only at
+  // listing-creation time.
+  | { status: "marketplace-listed" };
 
 // Every mutation here re-validates ownership server-side against `playerId`
 // (the caller's own profile id, resolved from the session — never a
@@ -56,16 +61,21 @@ export async function assignToPartySlot(
     return { status: "in-daycare" };
   }
 
-  await prisma.$transaction([
-    prisma.playerPokemon.updateMany({
+  const marketplaceLock = await prisma.marketplaceListingPokemon.findUnique({ where: { playerPokemonId } });
+  if (marketplaceLock) {
+    return { status: "marketplace-listed" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.playerPokemon.updateMany({
       where: { playerId, partySlot: slotIndex },
       data: { partySlot: null },
-    }),
-    prisma.playerPokemon.update({
+    });
+    await tx.playerPokemon.update({
       where: { id: playerPokemonId },
       data: { partySlot: slotIndex },
-    }),
-  ]);
+    });
+  });
 
   return { status: "ok" };
 }

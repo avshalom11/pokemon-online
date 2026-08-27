@@ -8,18 +8,8 @@ import {
 import type { GlobalChatMessageView, SendGlobalChatMessageResult } from "@/features/chat/types";
 import { getOnlinePlayerIdSet } from "@/features/presence/services/presence.service";
 import { getPlayerIdentitiesByIds, type PlayerIdentity } from "@/lib/auth/player-profile";
+import { formatChatMessageTimestamp } from "@/lib/chat/format-message-timestamp";
 import { prisma } from "@/lib/db/prisma";
-
-function formatSentTime(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Jerusalem",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("hour")}:${get("minute")}`;
-}
 
 function toView(
   row: { id: string; playerId: string; message: string; createdAt: Date },
@@ -33,7 +23,7 @@ function toView(
     playerUsername: identity?.username ?? null,
     message: row.message,
     createdAt: row.createdAt.toISOString(),
-    sentTimeLabel: formatSentTime(row.createdAt),
+    sentTimeLabel: formatChatMessageTimestamp(row.createdAt),
     // ONLINE PRESENCE
     isOnline: onlinePlayerIds.has(row.playerId),
   };

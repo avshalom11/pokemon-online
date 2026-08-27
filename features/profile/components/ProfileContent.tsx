@@ -21,6 +21,10 @@ interface ProfileContentProps {
   // Only ever non-null when view.isOwner is true — see
   // app/(game)/profile/[username]/page.tsx, the only caller.
   editData: ProfileEditViewModel | null;
+  // PRIVACY — the account's own email, resolved server-side straight from
+  // the session (never part of PublicProfileView). Only ever non-null when
+  // view.isOwner is true — same contract as editData above.
+  ownerEmail: string | null;
 }
 
 // Page composition root for /profile/[username] — the SAME component for
@@ -31,7 +35,7 @@ interface ProfileContentProps {
 // since it only ever renders for the owner viewing their OWN data anyway —
 // ever mount at all. The page's own theme background (features/profile/
 // themes) is the only per-profile visual customization applied here.
-export function ProfileContent({ view, editData }: ProfileContentProps) {
+export function ProfileContent({ view, editData, ownerEmail }: ProfileContentProps) {
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -67,8 +71,8 @@ export function ProfileContent({ view, editData }: ProfileContentProps) {
           <ProfileHeader view={view} onEditClick={() => setIsEditOpen(true)} />
         </div>
 
-        {view.isOwner ? (
-          <SecurityAccountSection currentUsername={view.username} onUsernameChanged={handleUsernameChanged} />
+        {view.isOwner && ownerEmail !== null ? (
+          <SecurityAccountSection currentUsername={view.username} ownerEmail={ownerEmail} onUsernameChanged={handleUsernameChanged} />
         ) : null}
 
         {successMessage ? (

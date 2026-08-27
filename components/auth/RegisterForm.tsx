@@ -22,6 +22,7 @@ export function RegisterForm() {
           id="register-username"
           name="username"
           type="text"
+          dir="auto"
           autoComplete="username"
           required
           aria-invalid={state.fieldErrors?.username ? true : undefined}
@@ -30,7 +31,7 @@ export function RegisterForm() {
         {state.fieldErrors?.username ? (
           <p className="text-xs text-red-400">{state.fieldErrors.username[0]}</p>
         ) : (
-          <p className="text-xs text-slate-500">3–20 תווים: אותיות באנגלית, ספרות וקו תחתון בלבד</p>
+          <p className="text-xs text-slate-500">3–20 תווים: אותיות באנגלית או בעברית, ספרות וקו תחתון בלבד</p>
         )}
       </div>
 

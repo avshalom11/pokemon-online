@@ -5,7 +5,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "@/lib/auth/validation";
+import { forgotPasswordSchema, loginSchema, resetPasswordSchema, usernameSchema } from "@/lib/auth/validation";
+
+test("usernameSchema accepts Hebrew, English, digits, and mixed Hebrew+digits usernames", () => {
+  assert.ok(usernameSchema.safeParse("אבשלום").success);
+  assert.ok(usernameSchema.safeParse("אבשלום123").success);
+  assert.ok(usernameSchema.safeParse("Avshalom").success);
+  assert.ok(usernameSchema.safeParse("Avshalom123").success);
+});
+
+test("usernameSchema still rejects spaces and symbols outside the allowed set", () => {
+  assert.ok(!usernameSchema.safeParse("bad name!").success);
+});
 
 test("loginSchema: an unchecked rememberMe checkbox (FormData.get returns null) resolves to false", () => {
   const parsed = loginSchema.safeParse({ identifier: "trainer1", password: "hunter22", rememberMe: null });

@@ -204,3 +204,22 @@ test("13: a message in a DIFFERENT conversation is never suppressed by an unrela
 
   assert.equal(getNotificationsFor("player-b").length, 2, "two different conversations must each get their own notification");
 });
+
+// 14 — CHAT TIMESTAMPS: sentTimeLabel now carries the full date, not just
+// the time, using the message's real createdAt, same format as Global Chat.
+test("14: a sent message's sentTimeLabel shows DD/MM/YYYY HH:MM, derived from its real createdAt", async () => {
+  seedFriendship({ requesterId: "player-a", addresseeId: "player-b", status: "accepted" });
+  const opened = await getOrCreateConversation("player-a", "player-b");
+  assert.ok(opened.ok);
+  if (!opened.ok) return;
+
+  const sent = await sendPrivateMessage("player-a", opened.conversation.conversationId, "הודעה עם תאריך");
+  assert.ok(sent.ok);
+  if (!sent.ok) return;
+
+  assert.match(sent.message.sentTimeLabel, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+
+  const messages = await getConversationMessages("player-a", opened.conversation.conversationId);
+  assert.ok(messages);
+  assert.equal(messages?.at(-1)?.sentTimeLabel, sent.message.sentTimeLabel);
+});

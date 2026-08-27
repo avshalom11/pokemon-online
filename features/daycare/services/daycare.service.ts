@@ -76,6 +76,18 @@ export async function depositToDaycare(playerId: string, playerPokemonId: string
     return { ok: false, error: "already-in-daycare" };
   }
 
+  // MARKETPLACE PHASE 7 (hardening) — a Pokémon currently locked into a
+  // listing must never be deposited. Same "check the other feature's own
+  // table directly rather than depend on its service" convention this
+  // function already follows for `playerDaycareStay` above (and
+  // release-pokemon.service.ts/party-management.service.ts establish
+  // elsewhere) — reuses the Marketplace lock's own existence as the source
+  // of truth, never a duplicated flag.
+  const marketplaceLock = await prisma.marketplaceListingPokemon.findUnique({ where: { playerPokemonId } });
+  if (marketplaceLock) {
+    return { ok: false, error: "marketplace-listed" };
+  }
+
   // Fast, non-transactional pre-check for the common "already full" case —
   // avoids a wasted currency spend/rollback round trip when the player
   // obviously already has 5 stays. Never the ONLY guard against exceeding

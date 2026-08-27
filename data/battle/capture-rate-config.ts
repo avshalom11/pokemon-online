@@ -36,14 +36,15 @@ export type HpBracket = "100-75" | "75-50" | "50-25" | "25-10" | "10-0";
 type CaptureRateByBall = Record<CaptureBallId, number>;
 type CaptureRateByBracket = Record<HpBracket, CaptureRateByBall>;
 
-// rarity -> HP bracket -> ball -> capture chance (0-1, a plain probability
-// — never a multiplier applied on top of some other formula). A Record
-// keyed by the full PokemonRarity/HpBracket/CaptureBallId unions, so a
-// future addition to any of those three types is a compile error here
-// until this table is updated to match — the same exhaustiveness guarantee
-// RARITY_PRESENTATION (lib/battle/battleRarityPresentation.ts) already
-// relies on for PokemonRarity.
-export const CAPTURE_RATE_TABLE: Record<PokemonRarity, CaptureRateByBracket> = {
+// Every NON-legendary rarity, unchanged from before the LEGENDARY CAPTURE
+// CHANCES task — rarity -> HP bracket -> ball -> capture chance (0-1, a
+// plain probability, never a multiplier). "legendary" is deliberately
+// EXCLUDED from this Record (see LEGENDARY_CAPTURE_RATE_CURVE below for
+// why) — Exclude<PokemonRarity, "legendary"> still gives the same
+// compile-time exhaustiveness guarantee for every OTHER rarity that a
+// future addition to PokemonRarity (or HpBracket/CaptureBallId) is a
+// compile error here until this table is updated to match.
+export const CAPTURE_RATE_TABLE: Record<Exclude<PokemonRarity, "legendary">, CaptureRateByBracket> = {
   common: {
     "100-75": { "poke-ball": 0.3, "great-ball": 0.6, "ultra-ball": 0.9 },
     "75-50": { "poke-ball": 0.4, "great-ball": 0.7, "ultra-ball": 0.95 },
@@ -65,11 +66,36 @@ export const CAPTURE_RATE_TABLE: Record<PokemonRarity, CaptureRateByBracket> = {
     "25-10": { "poke-ball": 0.25, "great-ball": 0.4, "ultra-ball": 0.6 },
     "10-0": { "poke-ball": 0.3, "great-ball": 0.45, "ultra-ball": 0.7 },
   },
-  legendary: {
-    "100-75": { "poke-ball": 0.01, "great-ball": 0.02, "ultra-ball": 0.03 },
-    "75-50": { "poke-ball": 0.02, "great-ball": 0.03, "ultra-ball": 0.04 },
-    "50-25": { "poke-ball": 0.03, "great-ball": 0.04, "ultra-ball": 0.05 },
-    "25-10": { "poke-ball": 0.04, "great-ball": 0.05, "ultra-ball": 0.06 },
-    "10-0": { "poke-ball": 0.08, "great-ball": 0.1, "ultra-ball": 0.14 },
-  },
+};
+
+// LEGENDARY CAPTURE CHANCES — legendary is the one rarity that does NOT use
+// the discrete-bracket lookup above. Instead this is a curve of anchor
+// points at exact HP percentages (100/75/50/25/0), and engine/battle/
+// capture.ts's own getLegendaryCaptureChance SMOOTHLY (linearly)
+// interpolates between the two anchors surrounding the wild Pokémon's
+// actual, continuous HP percentage — so e.g. 60% HP lands strictly between
+// the 75% and 50% rows, rather than snapping to one bracket the way every
+// other rarity still does. 0 stands in for "Near 0%" (the table's own
+// bottom row) — an HP percentage never truly reaches exactly 0 while still
+// catchable (that Pokémon would be defeated instead), so this is the limit
+// the curve approaches, not a state ever actually queried at hpPercent < 0.
+//
+// Values are this task's own exact table, converted from percent to a 0-1
+// probability (e.g. "0.2%" -> 0.002):
+//   HP%   Poké Ball  Great Ball  Ultra Ball
+//   100    0.2%       0.5%        1%
+//    75    0.4%       1%          2%
+//    50    0.8%       2%          3%
+//    25    1.2%       3.5%        5%
+//     0    2%         5%          7%
+// Master Ball is unaffected (still guarantees capture, entirely outside
+// this table — see capture.service.ts).
+export type LegendaryHpAnchor = 100 | 75 | 50 | 25 | 0;
+
+export const LEGENDARY_CAPTURE_RATE_CURVE: Record<LegendaryHpAnchor, CaptureRateByBall> = {
+  100: { "poke-ball": 0.002, "great-ball": 0.005, "ultra-ball": 0.01 },
+  75: { "poke-ball": 0.004, "great-ball": 0.01, "ultra-ball": 0.02 },
+  50: { "poke-ball": 0.008, "great-ball": 0.02, "ultra-ball": 0.03 },
+  25: { "poke-ball": 0.012, "great-ball": 0.035, "ultra-ball": 0.05 },
+  0: { "poke-ball": 0.02, "great-ball": 0.05, "ultra-ball": 0.07 },
 };

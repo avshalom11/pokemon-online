@@ -8,6 +8,13 @@ import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 interface PokemonCardProps {
   pokemon: OwnedPokemon;
   onClick: () => void;
+  // MARKETPLACE PHASE 3 — optional multi-select highlight ring, for a
+  // picker where more than one card can be chosen at once (e.g. Create
+  // Listing's own Pokémon picker). Omitted (undefined/false) everywhere
+  // else in the app, which renders byte-for-byte the same as before this
+  // prop existed — every single-select caller (MyPokemonContent,
+  // CollectionPicker) is completely unaffected.
+  isSelected?: boolean;
 }
 
 // A single Collection grid entry. Presentational + one callback — no
@@ -18,14 +25,19 @@ interface PokemonCardProps {
 // the collection is expected to eventually hold hundreds of entries, so it
 // must scale as a compact grid, while the 6-slot party stays the visually
 // larger, "hero" section of the page.
-export function PokemonCard({ pokemon, onClick }: PokemonCardProps) {
+export function PokemonCard({ pokemon, onClick, isSelected = false }: PokemonCardProps) {
   const displayName = pokemon.nickname ?? pokemon.species.name;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-slate-900/60 p-2 text-center transition-all hover:-translate-y-0.5 hover:border-indigo-400/50 hover:bg-slate-900/80 hover:shadow-[0_0_14px_rgba(99,102,241,0.25)]"
+      aria-pressed={isSelected}
+      className={`group relative flex flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-[0_0_14px_rgba(99,102,241,0.25)] ${
+        isSelected
+          ? "border-indigo-400/70 bg-indigo-500/10 hover:border-indigo-400/70"
+          : "border-white/10 bg-slate-900/60 hover:border-indigo-400/50 hover:bg-slate-900/80"
+      }`}
     >
       {pokemon.isStarter ? (
         <span className="absolute right-1 top-1 rounded-full bg-amber-400/90 px-1.5 py-0 text-[8px] font-bold text-slate-950">

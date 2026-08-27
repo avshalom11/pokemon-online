@@ -30,7 +30,12 @@ export async function getInventoryView(playerId: string): Promise<InventoryItemV
     const item = getShopItemById(row.itemId);
     if (!item) continue;
 
-    views.push({ item, quantity: row.quantity, sellUnitPrice: sellUnitPriceFor(item.price) });
+    views.push({
+      item,
+      quantity: row.quantity,
+      availableQuantity: row.quantity - row.lockedQuantity,
+      sellUnitPrice: sellUnitPriceFor(item.price),
+    });
   }
 
   return views;

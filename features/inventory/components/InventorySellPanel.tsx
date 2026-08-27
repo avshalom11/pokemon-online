@@ -14,15 +14,25 @@ const MIN_QUANTITY = 1;
 
 // Appears once an item is selected in InventoryItemGrid — same layout as
 // ShopPurchasePanel, but the quantity stepper is capped at how many the
-// player actually owns (never MAX_QUANTITY=99 like the Shop's buy side,
-// since selling more than owned is meaningless). "מכירה" only ever opens
-// InventorySellConfirmDialog — this panel never sells anything itself.
+// player can actually sell right now (never MAX_QUANTITY=99 like the
+// Shop's buy side, since selling more than that is meaningless).
+// MARKETPLACE PHASE 7 (hardening) — the cap is `availableQuantity`
+// (quantity - lockedQuantity), never raw `quantity`: a stack partly or
+// fully committed to a Marketplace listing must never be offered for sale
+// beyond what's actually free, matching the same bound
+// removeInventoryItem now enforces server-side (features/inventory/
+// services/inventory.service.ts) — this is purely a UI-side reflection of
+// that server truth, never a new restriction the server doesn't already
+// have. The "X במלאי" line still shows the player's real total ownership
+// (raw `quantity`), only the stepper's own reachable range is bounded by
+// what's sellable. "מכירה" only ever opens InventorySellConfirmDialog —
+// this panel never sells anything itself.
 export function InventorySellPanel({ view, quantity, onQuantityChange, onSellClick, disabled }: InventorySellPanelProps) {
-  const { item, quantity: owned, sellUnitPrice } = view;
+  const { item, quantity: owned, availableQuantity, sellUnitPrice } = view;
   const totalReturn = sellUnitPrice * quantity;
 
   function clamp(next: number) {
-    return Math.min(owned, Math.max(MIN_QUANTITY, next));
+    return Math.min(availableQuantity, Math.max(MIN_QUANTITY, next));
   }
 
   return (
@@ -61,7 +71,7 @@ export function InventorySellPanel({ view, quantity, onQuantityChange, onSellCli
           <button
             type="button"
             onClick={() => onQuantityChange(clamp(quantity + 1))}
-            disabled={disabled || quantity >= owned}
+            disabled={disabled || quantity >= availableQuantity}
             className="flex h-7 w-7 items-center justify-center rounded text-slate-200 disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:bg-white/10"
           >
             +

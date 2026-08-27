@@ -202,3 +202,16 @@ test("14: (source) chat never reads or modifies ActiveBattleProvider/battle-lock
     assert.ok(!src.includes("active-battle-context"), "must never import the battle-lock context module");
   }
 });
+
+// 15 — CHAT TIMESTAMPS: sentTimeLabel now carries the full date, not just
+// the time, using the message's real createdAt.
+test("15: a sent message's sentTimeLabel shows DD/MM/YYYY HH:MM, derived from its real createdAt", async () => {
+  const result = await sendGlobalChatMessageAction("הודעה עם תאריך");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  assert.match(result.message.sentTimeLabel, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+
+  const [fresh] = await getRecentGlobalChatMessages();
+  assert.equal(fresh?.sentTimeLabel, result.message.sentTimeLabel);
+});

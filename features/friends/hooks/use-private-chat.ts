@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from "rea
 import { getConversationMessagesAction, sendPrivateMessageAction } from "@/features/friends/actions/private-chat.actions";
 import { PRIVATE_CHAT_MESSAGE_MAX_LENGTH, PRIVATE_CHAT_POLL_INTERVAL_MS } from "@/features/friends/config/friends.config";
 import type { PrivateMessageView, SendPrivateMessageError } from "@/features/friends/types";
+import { formatChatMessageTimestamp } from "@/lib/chat/format-message-timestamp";
 import { usePageVisible } from "@/lib/hooks/use-page-visible";
 
 const NEAR_BOTTOM_THRESHOLD_PX = 60;
@@ -21,10 +22,6 @@ const PRIVATE_CHAT_ERROR_LABELS: Record<SendPrivateMessageError, string> = {
 };
 
 export type PrivateDisplayMessage = PrivateMessageView & { pending?: boolean };
-
-function formatClientSentTime(date: Date): string {
-  return date.toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
-}
 
 // Same reconcile-optimistic-with-poll idiom as Global Chat's own
 // mergeWithFresh (features/chat/hooks/use-global-chat.ts) — kept as an
@@ -150,7 +147,7 @@ export function usePrivateChat({
         playerUsername: currentPlayerUsername,
         message: trimmed,
         createdAt: now.toISOString(),
-        sentTimeLabel: formatClientSentTime(now),
+        sentTimeLabel: formatChatMessageTimestamp(now),
         pending: true,
       },
     ]);

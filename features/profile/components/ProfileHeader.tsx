@@ -33,7 +33,7 @@ export function ProfileHeader({ view, onEditClick }: ProfileHeaderProps) {
       <div className="flex flex-1 flex-col items-center gap-1 sm:items-start">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <h1 className="text-xl font-bold text-slate-100">{view.displayName}</h1>
-          <span dir="ltr" className="text-xs text-slate-500">{`@${view.username}`}</span>
+          <span dir="auto" className="text-xs text-slate-500">{`@${view.username}`}</span>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-400 sm:justify-start">

@@ -9,6 +9,12 @@ import { USERNAME_CHANGE_COST_GOLD } from "@/features/profile/config/security-ac
 
 interface SecurityAccountSectionProps {
   currentUsername: string;
+  // PRIVACY — the account owner's own registered email. Only ever passed by
+  // ProfileContent when view.isOwner is true (see that component's own doc
+  // comment) — this component itself only ever renders for the owner, so
+  // there is no code path where another viewer's render tree holds this
+  // value at all.
+  ownerEmail: string;
   onUsernameChanged: (newUsername: string) => void;
 }
 
@@ -19,7 +25,7 @@ interface SecurityAccountSectionProps {
 // row alongside username/password changes — deliberately NOT a separate
 // "danger zone" section/title, per this feature's own UI spec — styled as
 // a destructive red row to stand apart from the two ordinary rows above it.
-export function SecurityAccountSection({ currentUsername, onUsernameChanged }: SecurityAccountSectionProps) {
+export function SecurityAccountSection({ currentUsername, ownerEmail, onUsernameChanged }: SecurityAccountSectionProps) {
   const [isChangeUsernameOpen, setIsChangeUsernameOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
@@ -27,6 +33,9 @@ export function SecurityAccountSection({ currentUsername, onUsernameChanged }: S
   return (
     <div dir="rtl" className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-6">
       <h2 className="text-sm font-bold tracking-wide text-slate-100">אבטחה וחשבון</h2>
+      <p className="mt-1 text-xs text-slate-400">
+        אימייל: <span dir="auto">{ownerEmail}</span>
+      </p>
 
       <div className="mt-3 flex flex-col gap-2">
         <SecurityActionRow

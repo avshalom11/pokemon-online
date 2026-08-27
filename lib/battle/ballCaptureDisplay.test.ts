@@ -108,7 +108,10 @@ test("Great Ball and Ultra Ball never show a lower percent than Poké Ball for t
 // calculateCaptureChance (the function rollCapture itself calls) still
 // returns the exact same raw probability this file reuses for display.
 test("capture mechanics are untouched — calculateCaptureChance still returns the real, unrounded probability", () => {
-  assert.equal(calculateCaptureChance({ currentHp: 100, maxHp: 100, rarity: "legendary" }, "poke-ball"), 0.01);
-  assert.equal(calculateCaptureChance({ currentHp: 5, maxHp: 100, rarity: "legendary" }, "ultra-ball"), 0.14);
+  // LEGENDARY CAPTURE CHANCES — pinned to the new smooth-interpolation
+  // curve's own exact anchor values (100% and 0% HP land exactly on an
+  // anchor, so no interpolation rounding is involved here).
+  assert.equal(calculateCaptureChance({ currentHp: 100, maxHp: 100, rarity: "legendary" }, "poke-ball"), 0.002);
+  assert.equal(calculateCaptureChance({ currentHp: 0, maxHp: 100, rarity: "legendary" }, "ultra-ball"), 0.07);
   assert.equal(calculateCaptureChance({ currentHp: 100, maxHp: 100, rarity: "common" }, "poke-ball"), 0.3);
 });
