@@ -37,4 +37,19 @@ export const SHOP_CATEGORIES: ShopCategory[] = [
   // architecture has somewhere ready to group owned chests once a later
   // phase adds them.
   { id: "chests", name: "תיבות", icon: "🎁" },
+  // TM SYSTEM PHASE 2 — holds the 54 TM products (features/shop/data/
+  // shop-items.ts's TM_SHOP_ITEMS). Teaching a TM to an owned Pokémon is a
+  // later phase — for now this category only buys/sells/stacks like any
+  // other Shop category.
+  {
+    id: "tms",
+    // UI POLISH (pre-Phase 6) — renamed from "דיסקיות טכניקה" to the
+    // shorter, more natural "מתקפות" per this task's own explicit spec.
+    // The category id itself ("tms") is unchanged — every existing
+    // category-id check (ShopItemGrid/ShopItemCard/InventoryContent/
+    // TmUsePanel wiring) keys off that id, never the display label.
+    name: "מתקפות",
+    icon: "💿",
+    tip: "💡 טיפ למאמן:\nכל הדיסקיות מאותו סוג פוקימון (אש, מים, חשמל ועוד) חולקות איור זהה בחנות.",
+  },
 ];

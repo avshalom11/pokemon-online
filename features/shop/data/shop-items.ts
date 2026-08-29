@@ -3,6 +3,8 @@ import { EGG_DEFINITIONS } from "@/features/eggs/data/egg-definitions";
 import { INCUBATOR_DEFINITIONS, type IncubatorTypeId } from "@/features/eggs/data/incubator-definitions";
 import { getShopItemImagePath } from "@/features/shop/media/shop-item-media-paths";
 import type { ShopItem } from "@/features/shop/types/shop.types";
+import { TM_CATALOG } from "@/features/tm-system/data/tm-catalog";
+import { getMoveById } from "@/engine/moves";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 import { POKEMON_RARITY_LABELS } from "@/shared/types/pokemon-labels";
 
@@ -105,6 +107,111 @@ const CHEST_SHOP_ITEMS: ShopItem[] = CHEST_DEFINITIONS.map((definition) => ({
   imageUrl: definition.imageUrl,
   chestTypeId: definition.id,
 }));
+
+// TM SYSTEM PHASE 2 — the spec's own explicit four-tier pricing, one price
+// per moveId. Deliberately its own map here rather than a field on
+// TmCatalogEntry (features/tm-system/data/tm-catalog.ts), same "price is a
+// Shop-domain fact, not a catalog-domain one" split EGG_PRICES/
+// INCUBATOR_PRICES/CHEST_PRICES already establish above. Every TM uses
+// Money (never Gold) and has no player-level requirement, per this
+// feature's own product rules — the Shop has no level-gating mechanism at
+// all today, so there's nothing to bypass for that second rule.
+const TM_PRICES: Record<string, number> = {
+  // Basic — 1,000
+  "fire-punch": 1000,
+  "thunder-punch": 1000,
+  "ice-punch": 1000,
+  "zen-headbutt": 1000,
+  hex: 1000,
+  "draining-kiss": 1000,
+  bulldoze: 1000,
+  "rock-tomb": 1000,
+  "brick-break": 1000,
+  venoshock: 1000,
+  "steel-wing": 1000,
+  "aerial-ace": 1000,
+  facade: 1000,
+
+  // Advanced — 2,500
+  waterfall: 2500,
+  "giga-drain": 2500,
+  psyshock: 2500,
+  "shadow-claw": 2500,
+  "dark-pulse": 2500,
+  "dragon-claw": 2500,
+  "dazzling-gleam": 2500,
+  dig: 2500,
+  "rock-slide": 2500,
+  "drain-punch": 2500,
+  "poison-jab": 2500,
+  "x-scissor": 2500,
+  "air-slash": 2500,
+  "body-slam": 2500,
+
+  // Premium — 4,000
+  flamethrower: 4000,
+  surf: 4000,
+  liquidation: 4000,
+  thunderbolt: 4000,
+  "energy-ball": 4000,
+  "ice-beam": 4000,
+  psychic: 4000,
+  "shadow-ball": 4000,
+  crunch: 4000,
+  "dragon-pulse": 4000,
+  "play-rough": 4000,
+  "sludge-bomb": 4000,
+  "bug-buzz": 4000,
+  "flash-cannon": 4000,
+
+  // Elite — 5,500
+  "fire-blast": 5500,
+  thunder: 5500,
+  "solar-beam": 5500,
+  blizzard: 5500,
+  "foul-play": 5500,
+  "draco-meteor": 5500,
+  earthquake: 5500,
+  "stone-edge": 5500,
+  "close-combat": 5500,
+  "u-turn": 5500,
+  "iron-head": 5500,
+  hurricane: 5500,
+  "hyper-beam": 5500,
+};
+
+// Built directly from TM_CATALOG (features/tm-system/data/tm-catalog.ts) —
+// moveId/type/imagePath are never re-typed here, only the Shop-specific
+// facts (price, description) and the display name (always derived live from
+// the move registry, per this feature's own "TM – <Move Name>" naming rule
+// — never hand-typed, so it can never drift from the move it teaches).
+// itemId is reused as-is from the catalog ("tm-<moveId>", never a
+// generation-specific TM number). Every TM uses Money (decision: "Regular
+// TMs use Money, not Gold") and is stackable purely by virtue of going
+// through the exact same PlayerInventoryItem path every other Shop item
+// uses — nothing TM-specific is needed for that.
+const TM_SHOP_ITEMS: ShopItem[] = TM_CATALOG.map((entry) => {
+  const move = getMoveById(entry.moveId);
+  if (!move) {
+    throw new Error(`TM shop item "${entry.itemId}" references moveId "${entry.moveId}", which does not exist in the move registry`);
+  }
+
+  const price = TM_PRICES[entry.moveId];
+  if (price === undefined) {
+    throw new Error(`TM shop item "${entry.itemId}" has no price defined in TM_PRICES`);
+  }
+
+  return {
+    id: entry.itemId,
+    categoryId: "tms",
+    name: `TM – ${move.name}`,
+    price,
+    currency: "money",
+    description: `דיסקית טכנית (TM) שמלמדת פוקימון תואם את התנועה ${move.name}.`,
+    imageUrl: entry.imagePath,
+    tmMoveId: entry.moveId,
+  };
+});
 
 export const SHOP_ITEMS: ShopItem[] = [
   {
@@ -364,4 +471,5 @@ export const SHOP_ITEMS: ShopItem[] = [
   ...EGG_SHOP_ITEMS,
   ...INCUBATOR_SHOP_ITEMS,
   ...CHEST_SHOP_ITEMS,
+  ...TM_SHOP_ITEMS,
 ];

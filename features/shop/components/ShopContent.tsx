@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ShopCategoryMenu } from "./ShopCategoryMenu";
 import { ShopItemGrid } from "./ShopItemGrid";
@@ -49,6 +49,15 @@ export function ShopContent() {
   const [purchaseSuccessMessage, setPurchaseSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // UI POLISH (pre-Phase 6) — the TM ("tms") category's grid is much
+  // taller than every other category's (54 items vs. a handful), so the
+  // purchase panel below it can land far under the fold, making a
+  // selection look like nothing happened. Scrolling it into view (centered
+  // in the viewport) fixes that specifically for TMs, without touching
+  // ShopPurchasePanel itself or any other category's behavior — the panel
+  // is still the exact same reused component, just brought on-screen.
+  const purchasePanelRef = useRef<HTMLDivElement>(null);
+
   // GAME TUTORIAL — PHASE 2. Spotlights the whole purchase flow (category
   // menu + item grid + purchase panel — never one specific item card,
   // which ShopItemGrid/ShopItemCard render generically for every category
@@ -65,6 +74,22 @@ export function ShopContent() {
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId);
   const items = selectedCategoryId ? getShopItemsByCategory(selectedCategoryId) : [];
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
+
+  // UI POLISH (pre-Phase 6) — brings the purchase panel to the
+  // upper-middle/center of the viewport the moment a TM is selected. Scoped
+  // to categoryId "tms" alone (never any other category, whose panel
+  // already appears close enough to the grid to need no help).
+  useEffect(() => {
+    if (selectedItem?.categoryId === "tms") {
+      purchasePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    // Deliberately keyed on selectedItemId alone (a stable primitive), not
+    // the freshly-derived `selectedItem` object above (a new reference on
+    // every render) — this must only ever re-run when the SELECTION
+    // itself changes, never on every quantity tick or re-render while the
+    // same item stays selected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItemId]);
 
   // A previously-selected item card belongs to whichever category was
   // showing before — it must never stay "highlighted" (or keep its
@@ -189,13 +214,15 @@ export function ShopContent() {
         </div>
 
         {selectedItem ? (
-          <ShopPurchasePanel
-            item={selectedItem}
-            quantity={quantity}
-            onQuantityChange={setQuantity}
-            onBuyClick={handleBuyClick}
-            disabled={isPending}
-          />
+          <div ref={purchasePanelRef}>
+            <ShopPurchasePanel
+              item={selectedItem}
+              quantity={quantity}
+              onQuantityChange={setQuantity}
+              onBuyClick={handleBuyClick}
+              disabled={isPending}
+            />
+          </div>
         ) : null}
 
         {purchaseSuccessMessage ? (

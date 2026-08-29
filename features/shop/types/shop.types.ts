@@ -26,7 +26,14 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // somewhere to group owned chests; no ShopItem is added under "chests" in
 // this phase (no chest acquisition method exists yet), so it renders
 // correctly empty on the Shop screen for now.
-export type ShopCategoryId = "poke-balls" | "potions" | "stones" | "eggs" | "chests";
+// TM SYSTEM PHASE 2 — "tms" is its own category, holding the 54 TM products
+// (features/shop/data/shop-items.ts's TM_SHOP_ITEMS, built from
+// features/tm-system/data/tm-catalog.ts's TM_CATALOG). Deliberately never
+// merged into "potions" or any existing category: TMs are their own kind of
+// purchasable, and this id is also what a later phase's Inventory "use this
+// TM" panel keys its category check on (same "selectedView.item.categoryId
+// === X" pattern EvolutionItemPanel already establishes for "stones").
+export type ShopCategoryId = "poke-balls" | "potions" | "stones" | "eggs" | "chests" | "tms";
 
 export interface ShopCategory {
   id: ShopCategoryId;
@@ -105,4 +112,17 @@ export interface ShopItem {
   // chest product to its dedicated action, the same way eggRarity/
   // incubatorTypeId already route their own products.
   chestTypeId?: ChestTypeId;
+  // TM SYSTEM PHASE 2 — set only on the 54 TM products (categoryId "tms"),
+  // never on any other item. The one pointer into the TM catalog
+  // (features/tm-system/data/tm-catalog.ts) a purchase/use flow needs to
+  // know which move this TM teaches — resolved from TM_CATALOG by itemId,
+  // never re-parsed out of the id string itself. Name/imageUrl are still
+  // derived once here in shop-items.ts (from the move registry and the
+  // catalog entry's own imagePath, respectively), never re-typed by hand —
+  // same "definition module owns the facts, Shop only adds price/currency/
+  // description" split EGG_PRICES/INCUBATOR_PRICES/CHEST_PRICES already
+  // establish. TM usage (teaching the move to an owned Pokémon) is a later
+  // phase — this field only exists so a future Inventory "use this TM"
+  // panel can resolve the move without parsing itemId.
+  tmMoveId?: string;
 }

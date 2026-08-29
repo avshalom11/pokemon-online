@@ -20,6 +20,15 @@ interface ShopItemGridProps {
 // category is added to the data before any item references it yet) shows
 // an explicit empty state instead of silently rendering nothing.
 export function ShopItemGrid({ categoryName, categoryTip, items, selectedItemId, onSelectItem }: ShopItemGridProps) {
+  // UI POLISH (pre-Phase 6) — TM ("tms") cards show larger art (see
+  // ShopItemCard), so exactly 3 per row on desktop reads better than the
+  // default 4 — every other category keeps its existing grid untouched.
+  // Derived from `items` itself (every item here always shares one
+  // category — ShopContent only ever passes one category's items at a
+  // time) rather than a new prop, so no caller needs to change.
+  const isTmCategory = items.length > 0 && items.every((item) => item.categoryId === "tms");
+  const gridColsClassName = isTmCategory ? "grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3" : "grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
+
   return (
     <div dir="rtl" className="min-w-0 flex-1">
       {categoryName ? (
@@ -37,7 +46,7 @@ export function ShopItemGrid({ categoryName, categoryTip, items, selectedItemId,
           אין פריטים בקטגוריה זו כרגע.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className={`grid ${gridColsClassName}`}>
           {items.map((item) => (
             <ShopItemCard
               key={item.id}
