@@ -1,67 +1,87 @@
+// EGG HATCH REBALANCE — rollHatchLevel is now player-level-based (never
+// species-based, see this file's own hatch-level.service.ts doc comment).
+// Covers every approved player-level bracket, both boundaries, and
+// deterministic rolling at the extremes of the injected [0,1) source.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { determineEvolutionStage, getHatchLevelRange, rollHatchLevel } from "./hatch-level.service.ts";
+import { rollHatchLevel } from "./hatch-level.service.ts";
 
-test("first-stage level range: base Pokémon that evolves at level 16 uses [10, 15]", () => {
-  // charmander -> charmeleon @16 (data/pokemon/pokemon-evolutions.ts) — the
-  // task's own worked example.
-  assert.equal(determineEvolutionStage("charmander"), "first");
-  assert.deepEqual(getHatchLevelRange("charmander"), { minimumLevel: 10, maximumLevel: 15 });
+const APPROVED_BRACKETS: Array<{ playerLevel: number; minimumLevel: number; maximumLevel: number }> = [
+  { playerLevel: 1, minimumLevel: 5, maximumLevel: 11 },
+  { playerLevel: 5, minimumLevel: 5, maximumLevel: 11 },
+  { playerLevel: 6, minimumLevel: 9, maximumLevel: 17 },
+  { playerLevel: 10, minimumLevel: 9, maximumLevel: 17 },
+  { playerLevel: 11, minimumLevel: 13, maximumLevel: 23 },
+  { playerLevel: 15, minimumLevel: 13, maximumLevel: 23 },
+  { playerLevel: 16, minimumLevel: 17, maximumLevel: 29 },
+  { playerLevel: 20, minimumLevel: 17, maximumLevel: 29 },
+  { playerLevel: 21, minimumLevel: 21, maximumLevel: 35 },
+  { playerLevel: 25, minimumLevel: 21, maximumLevel: 35 },
+  { playerLevel: 26, minimumLevel: 25, maximumLevel: 41 },
+  { playerLevel: 30, minimumLevel: 25, maximumLevel: 41 },
+  { playerLevel: 31, minimumLevel: 29, maximumLevel: 47 },
+  { playerLevel: 35, minimumLevel: 29, maximumLevel: 47 },
+  { playerLevel: 36, minimumLevel: 33, maximumLevel: 53 },
+  { playerLevel: 40, minimumLevel: 33, maximumLevel: 53 },
+  { playerLevel: 41, minimumLevel: 37, maximumLevel: 59 },
+  { playerLevel: 45, minimumLevel: 37, maximumLevel: 59 },
+  { playerLevel: 46, minimumLevel: 41, maximumLevel: 65 },
+  { playerLevel: 50, minimumLevel: 41, maximumLevel: 65 },
+  { playerLevel: 51, minimumLevel: 45, maximumLevel: 70 },
+  { playerLevel: 55, minimumLevel: 45, maximumLevel: 70 },
+  { playerLevel: 56, minimumLevel: 47, maximumLevel: 73 },
+  { playerLevel: 99, minimumLevel: 47, maximumLevel: 73 },
+];
+
+for (const { playerLevel, minimumLevel, maximumLevel } of APPROVED_BRACKETS) {
+  test(`player level ${playerLevel} rolls a hatch level in [${minimumLevel}, ${maximumLevel}]`, () => {
+    assert.equal(rollHatchLevel(playerLevel, () => 0), minimumLevel, "roll()=0 must hit the bracket's own minimum");
+    assert.equal(rollHatchLevel(playerLevel, () => 0.999999), maximumLevel, "roll()~1 must hit the bracket's own maximum");
+  });
+}
+
+test("player level 5 -> hatch range 5-11 (task's own worked boundary)", () => {
+  assert.equal(rollHatchLevel(5, () => 0), 5);
+  assert.equal(rollHatchLevel(5, () => 0.999999), 11);
 });
 
-test("middle-stage level range: reached at 16, evolves at 36, uses [17, 35]", () => {
-  // charmeleon: charmander -> charmeleon @16, charmeleon -> charizard @36 —
-  // the task's own worked example.
-  assert.equal(determineEvolutionStage("charmeleon"), "middle");
-  assert.deepEqual(getHatchLevelRange("charmeleon"), { minimumLevel: 17, maximumLevel: 35 });
+test("player level 6 -> hatch range 9-17 (task's own worked boundary)", () => {
+  assert.equal(rollHatchLevel(6, () => 0), 9);
+  assert.equal(rollHatchLevel(6, () => 0.999999), 17);
 });
 
-test("final-stage level range: reached at 36 with no further evolution uses [37, 45]", () => {
-  assert.equal(determineEvolutionStage("charizard"), "final");
-  assert.deepEqual(getHatchLevelRange("charizard"), { minimumLevel: 37, maximumLevel: 45 });
+test("player level 15 -> hatch range 13-23 (task's own worked boundary)", () => {
+  assert.equal(rollHatchLevel(15, () => 0), 13);
+  assert.equal(rollHatchLevel(15, () => 0.999999), 23);
 });
 
-test("standalone (no evolution family at all) always uses [15, 45]", () => {
-  // ditto has no entry in any evolution table, in either direction.
-  assert.equal(determineEvolutionStage("ditto"), "standalone");
-  assert.deepEqual(getHatchLevelRange("ditto"), { minimumLevel: 15, maximumLevel: 45 });
+test("player level 16 -> hatch range 17-29 (task's own worked boundary)", () => {
+  assert.equal(rollHatchLevel(16, () => 0), 17);
+  assert.equal(rollHatchLevel(16, () => 0.999999), 29);
 });
 
-test("fallback: a first-stage species whose only evolution is item-based (no level threshold) uses [10, 25]", () => {
-  // vulpix -> ninetales is Fire-Stone-only, no level anywhere.
-  assert.equal(determineEvolutionStage("vulpix"), "first");
-  assert.deepEqual(getHatchLevelRange("vulpix"), { minimumLevel: 10, maximumLevel: 25 });
+test("player level 56+ -> hatch range 47-73, and every higher level shares the same open-ended bracket", () => {
+  assert.equal(rollHatchLevel(56, () => 0), 47);
+  assert.equal(rollHatchLevel(56, () => 0.999999), 73);
+  assert.equal(rollHatchLevel(1000, () => 0), 47);
+  assert.equal(rollHatchLevel(1000, () => 0.999999), 73);
 });
 
-test("fallback: a final-stage species reached only via an item (no clean predecessor level) uses [35, 45]", () => {
-  assert.equal(determineEvolutionStage("ninetales"), "final");
-  assert.deepEqual(getHatchLevelRange("ninetales"), { minimumLevel: 35, maximumLevel: 45 });
+test("a rolled level always stays inside the correct bracket across the full [0,1) domain, never spilling into a neighboring bracket", () => {
+  for (const { playerLevel, minimumLevel, maximumLevel } of APPROVED_BRACKETS) {
+    for (const roll of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.999999]) {
+      const level = rollHatchLevel(playerLevel, () => roll);
+      assert.ok(
+        level >= minimumLevel && level <= maximumLevel,
+        `player level ${playerLevel}, roll ${roll} produced ${level}, expected within [${minimumLevel}, ${maximumLevel}]`
+      );
+    }
+  }
 });
 
-test("fallback: a first-stage species whose evolution is an ambiguous branch (Eevee) uses [10, 25]", () => {
-  // eevee has no LEVEL_EVOLUTIONS entry of its own — only branch (Espeon/
-  // Umbreon) and evolution-item (Flareon/Vaporeon/Jolteon/Leafeon/Glaceon/
-  // Sylveon) targets, neither of which produces a single clean level.
-  assert.equal(determineEvolutionStage("eevee"), "first");
-  assert.deepEqual(getHatchLevelRange("eevee"), { minimumLevel: 10, maximumLevel: 25 });
-});
-
-test("fallback: a final-stage species reached only via a branch (Espeon) uses [35, 45]", () => {
-  assert.equal(determineEvolutionStage("espeon"), "final");
-  assert.deepEqual(getHatchLevelRange("espeon"), { minimumLevel: 35, maximumLevel: 45 });
-});
-
-test("fallback: a final-stage species whose real threshold is above 45 uses [35, 45], never [56, 45]", () => {
-  // dragonair -> dragonite @55 — a clean level, but too high for the
-  // normal rule to produce a valid range.
-  assert.equal(determineEvolutionStage("dragonite"), "final");
-  assert.deepEqual(getHatchLevelRange("dragonite"), { minimumLevel: 35, maximumLevel: 45 });
-});
-
-test("rollHatchLevel returns a level uniformly within the computed range, deterministic under an injected roll", () => {
-  assert.equal(rollHatchLevel("charmander", () => 0), 10);
-  assert.equal(rollHatchLevel("charmander", () => 0.999999), 15);
-  assert.equal(rollHatchLevel("ditto", () => 0), 15);
-  assert.equal(rollHatchLevel("ditto", () => 0.999999), 45);
+test("an invalid/fractional/sub-1 player level is clamped to at least level 1's own bracket, never throwing", () => {
+  assert.equal(rollHatchLevel(0, () => 0), 5);
+  assert.equal(rollHatchLevel(-5, () => 0), 5);
+  assert.equal(rollHatchLevel(Number.NaN, () => 0), 5);
 });

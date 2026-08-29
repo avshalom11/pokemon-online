@@ -205,6 +205,7 @@ export function LeagueMatchContent({ matchId, initialData }: LeagueMatchContentP
           maxHealth: data.opponent.activeMaxHp,
           spriteUrl: data.opponent.activeSpriteUrl,
           status: data.opponent.activeStatus,
+          types: data.opponent.activeTypes,
         }}
         player={{
           name: data.self.activeName,
@@ -214,6 +215,7 @@ export function LeagueMatchContent({ matchId, initialData }: LeagueMatchContentP
           spriteUrl: data.self.activeBackSpriteUrl ?? data.self.activeSpriteUrl,
           fallbackSpriteUrl: data.self.activeSpriteUrl,
           status: data.self.activeStatus,
+          types: data.self.activeTypes,
         }}
         message={needsReplacement ? forcedReplacementMessage(data.self.activeName) : (message ?? "הקרב החל!")}
         attacks={needsReplacement ? [] : attacks}

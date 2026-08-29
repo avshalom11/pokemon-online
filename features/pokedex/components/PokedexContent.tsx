@@ -6,21 +6,18 @@ import { PokedexCard } from "./PokedexCard";
 import { PokedexDetailPanel } from "./PokedexDetailPanel";
 import { PokedexUnseenPanel } from "./PokedexUnseenPanel";
 import { BackButton } from "@/components/layout/BackButton";
+import { REGION_DISPLAY_NAMES_HE } from "@/features/gyms/data/gym-labels";
 import { POKEMON_RARITY_LABELS, POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
 import type { PokemonRarity, PokemonType } from "@/shared/types/pokemon";
-import type { PokedexEntryView, PokedexStatus } from "../types/pokedex.types";
+import type { RegionId } from "@/shared/types/region";
+import type { PokedexEntryView } from "../types/pokedex.types";
+import { filterPokedexEntries, type PokedexStatusFilter } from "../utils/pokedex-filters";
 
 interface PokedexContentProps {
   entries: PokedexEntryView[];
 }
 
-// "Seen" (real Pokédex convention this filter follows) means "encountered
-// at all" — caught species are a subset of seen, never excluded from it;
-// "Caught" is the strictly narrower filter. "Not seen" is the complement of
-// both.
-type StatusFilter = "all" | "seen" | "caught" | "not-seen";
-
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+const STATUS_FILTERS: { id: PokedexStatusFilter; label: string }[] = [
   { id: "all", label: "הכל" },
   { id: "seen", label: "נצפו" },
   { id: "caught", label: "נתפסו" },
@@ -32,19 +29,12 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 // hand-typed list of types/rarities.
 const TYPE_OPTIONS = Object.keys(POKEMON_TYPE_LABELS) as PokemonType[];
 const RARITY_OPTIONS = Object.keys(POKEMON_RARITY_LABELS) as PokemonRarity[];
-
-function matchesStatusFilter(status: PokedexStatus, filter: StatusFilter): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "seen":
-      return status !== "unseen";
-    case "caught":
-      return status === "caught";
-    case "not-seen":
-      return status === "unseen";
-  }
-}
+// Same bare-name Hebrew region labels (קאנטו/ג'וטו/הואן/...) the Pokédex's
+// own location hints already use (features/pokedex/messages/
+// pokedex-location-messages.ts) — REGION_DISPLAY_NAMES_HE
+// (features/gyms/data/gym-labels.ts), never shared/types/region-labels.ts's
+// "מחוז X"-prefixed/differently-spelled table.
+const REGION_OPTIONS = Object.keys(REGION_DISPLAY_NAMES_HE) as RegionId[];
 
 // Page composition root for /pokedex — same shell/flow convention as
 // MyPokemonContent (gradient background, radial overlay, BackButton,
@@ -57,9 +47,10 @@ function matchesStatusFilter(status: PokedexStatus, filter: StatusFilter): boole
 // whether an unseen entry matches.
 export function PokedexContent({ entries }: PokedexContentProps) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<PokedexStatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<PokemonType | "all">("all");
   const [rarityFilter, setRarityFilter] = useState<PokemonRarity | "all">("all");
+  const [regionFilter, setRegionFilter] = useState<RegionId | "all">("all");
   const [selectedSpeciesId, setSelectedSpeciesId] = useState<string | null>(null);
 
   // POKÉDEX — LOCATION HINTS FOR UNSEEN POKÉMON. An "unseen" entry is now
@@ -68,23 +59,23 @@ export function PokedexContent({ entries }: PokedexContentProps) {
   // PokedexDetailPanel, which stays reserved for "seen"/"caught" entries.
   const selectedEntry = entries.find((entry) => entry.species.id === selectedSpeciesId) ?? null;
 
-  const filteredEntries = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return entries.filter((entry) => {
-      if (!matchesStatusFilter(entry.status, statusFilter)) return false;
-      if (typeFilter !== "all" && !entry.species.types.includes(typeFilter)) return false;
-      if (rarityFilter !== "all" && entry.species.rarity !== rarityFilter) return false;
-
-      if (normalizedSearch) {
-        const dexMatch = String(entry.species.dexNumber).includes(normalizedSearch);
-        const nameMatch = entry.status !== "unseen" && entry.species.name.toLowerCase().includes(normalizedSearch);
-        if (!dexMatch && !nameMatch) return false;
-      }
-
-      return true;
-    });
-  }, [entries, search, statusFilter, typeFilter, rarityFilter]);
+  // POKÉDEX FILTERS — pure predicate extracted to utils/pokedex-filters.ts
+  // (filterPokedexEntries) so it's directly unit-testable; this stays a
+  // thin useMemo wrapper. The region filter (new) matches if the selected
+  // region is ANY one of an entry's forms' valid regions — see that
+  // function's own doc comment for why a whole entry, not just its
+  // headline species, can genuinely span more than one region.
+  const filteredEntries = useMemo(
+    () =>
+      filterPokedexEntries(entries, {
+        search,
+        status: statusFilter,
+        type: typeFilter,
+        rarity: rarityFilter,
+        region: regionFilter,
+      }),
+    [entries, search, statusFilter, typeFilter, rarityFilter, regionFilter]
+  );
 
   const seenCount = entries.filter((entry) => entry.status !== "unseen").length;
   const caughtCount = entries.filter((entry) => entry.status === "caught").length;
@@ -158,6 +149,19 @@ export function PokedexContent({ entries }: PokedexContentProps) {
               {RARITY_OPTIONS.map((rarity) => (
                 <option key={rarity} value={rarity}>
                   {POKEMON_RARITY_LABELS[rarity]}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={regionFilter}
+              onChange={(event) => setRegionFilter(event.target.value as RegionId | "all")}
+              className="rounded-full border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-300 focus:border-indigo-400/50 focus:outline-none"
+            >
+              <option value="all">כל המחוזות</option>
+              {REGION_OPTIONS.map((region) => (
+                <option key={region} value={region}>
+                  {REGION_DISPLAY_NAMES_HE[region]}
                 </option>
               ))}
             </select>

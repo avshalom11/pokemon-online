@@ -8,6 +8,7 @@ import { resolveKnownMoveSlots, type BattleKnownMoveSlot } from "@/features/batt
 import { GYM_BATTLE_SLOT_LABELS_HE, REGION_DISPLAY_NAMES_HE, regionalChampionLabelHe } from "../data/gym-labels";
 import { getGymTrainerName, getRegionalChampionTrainerName } from "../data/gym-trainer-names";
 import { toRegionId, type RegionId } from "@/shared/types/region";
+import type { PokemonType } from "@/shared/types/pokemon";
 import type { GymBattleSlotId } from "../types/gym.types";
 import {
   getNpcBattleSession,
@@ -74,6 +75,9 @@ export interface GymBattleViewData {
     readonly currentHp: number;
     readonly maxHp: number;
     readonly status: MajorStatus | null;
+    // BATTLE UI — TYPE DISPLAY. This species' own canonical types, in data
+    // order — see components/battle/BattleHUD.tsx's own doc comment.
+    readonly types: readonly PokemonType[];
   };
   readonly player: {
     readonly id: string;
@@ -84,6 +88,7 @@ export interface GymBattleViewData {
     readonly currentHp: number;
     readonly maxHp: number;
     readonly status: MajorStatus | null;
+    readonly types: readonly PokemonType[];
   };
   readonly participants: readonly GymBattleParticipantView[];
   readonly knownMoves: readonly BattleKnownMoveSlot[];
@@ -152,6 +157,7 @@ export async function getGymBattleViewData(playerId: string, playerName: string)
         currentHp: session.npcCurrentHp,
         maxHp: npcMaxHp,
         status: (session.npcStatus as MajorStatus | null) ?? null,
+        types: npcSpecies.types,
       },
       player: {
         id: activePokemon.id,
@@ -162,6 +168,7 @@ export async function getGymBattleViewData(playerId: string, playerName: string)
         currentHp: playerBattleHp[activePokemon.id] ?? 0,
         maxHp: activePokemon.maxHp,
         status: statusFor(playerStatusMap, activePokemon.id).status,
+        types: activePokemon.species.types,
       },
       participants: participants.map((pokemon) => ({
         id: pokemon.id,

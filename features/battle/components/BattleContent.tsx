@@ -25,6 +25,7 @@ import { applyMedicineItemAction } from "@/features/battle/actions/use-medicine.
 import type { BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { endBattleSessionAction } from "@/features/battle-session/actions/end-battle-session.action";
 import { getActiveBattleStatusAction } from "@/features/battle-session/actions/get-active-battle-status.action";
+import { getLivePartyAction } from "@/features/battle-session/actions/get-live-party.action";
 import { syncActivePokemonAction } from "@/features/battle-session/actions/sync-active-pokemon.action";
 import { useActiveBattle } from "@/features/battle-session/context/active-battle-context";
 import type { BattleVictoryReward } from "@/features/battle-session/services/battle-session.service";
@@ -943,6 +944,62 @@ export function BattleContent({
     setPhase("playerTurn");
   }
 
+  // FIELD BATTLE STALE-HP / FORCED-REPLACEMENT FIX. Called whenever an
+  // attack's outcome is uncertain from the client's own point of view — the
+  // request threw/was rejected entirely, or the server came back with
+  // "invalid-active-pokemon" — because in BOTH cases executeBattleAction may
+  // already have durably persisted this turn's fatal blow to the active
+  // Pokémon's currentHp before the client ever learned about it (the HP
+  // write happens well before several later awaits that can still fail —
+  // reward granting, next-encounter promotion, session-ending — and a
+  // network drop can just as easily lose an otherwise-successful response).
+  // partyHpMap can never be trusted to already reflect that in this
+  // situation, so this re-reads the party straight from the database
+  // (getLivePartyAction — the same authoritative source every other
+  // party read in this project uses) and applies the EXACT SAME
+  // determineNextPhaseAfterFaint decision the already-working success path
+  // (below) and resolveCounterAttackAgainstActive (above) both use — never
+  // a second, parallel forced-switch implementation, and never an
+  // auto-selected replacement.
+  async function resyncAfterUncertainAttackOutcome() {
+    const freshParty = await getLivePartyAction();
+
+    if (freshParty.length === 0) {
+      // No session/profile to resync against (should not happen mid-battle)
+      // — nothing authoritative to act on; fall back to the previous safe
+      // default rather than getting stuck on a state we can't verify.
+      setPhase("playerTurn");
+      return;
+    }
+
+    setPartyHpMap((prev) => {
+      const next = { ...prev };
+      for (const pokemon of freshParty) next[pokemon.id] = pokemon.currentHp;
+      return next;
+    });
+
+    const freshActive = freshParty.find((pokemon) => pokemon.id === activeId);
+
+    if (freshActive && freshActive.currentHp > 0) {
+      // The active Pokémon is genuinely still usable — the earlier failure
+      // was never actually fatal (or was already reflected some other way);
+      // safe to resume normal play with the now-confirmed real HP.
+      setPhase("playerTurn");
+      return;
+    }
+
+    const nextPhase = determineNextPhaseAfterFaint(freshParty);
+    setPhase(nextPhase);
+    setMessage(nextPhase === "selectingForcedReplacement" ? forcedReplacementMessage(playerDisplayName) : partyDefeatedMessage());
+
+    if (nextPhase === "partyDefeated") {
+      confirmedEndedRef.current = true;
+      startSessionSyncTransition(() => {
+        endSessionPromiseRef.current = endBattleSessionAction();
+      });
+    }
+  }
+
   // Phase 4F: orchestration only — no damage/HP math happens in this
   // component anymore. handleAttack locks the UI, shows the player's own
   // attack line, then asks the Battle Action Service (via
@@ -974,22 +1031,43 @@ export function BattleContent({
       // handler in this component guards on `phase !== "playerTurn"` at
       // its own top, so a permanently-stuck phase means EVERY future
       // action (attack, capture, switch, bag, run) silently no-ops with no
-      // recovery path short of a full reload. Same recovery as an explicit
-      // non-success status below — never trust the client's own belief
-      // that the request actually landed.
+      // recovery path short of a full reload.
+      //
+      // FIELD BATTLE STALE-HP / FORCED-REPLACEMENT FIX — a thrown/rejected
+      // request is NOT necessarily one where nothing happened server-side:
+      // executeBattleAction persists the active Pokémon's fatal HP well
+      // before several later awaits that can still fail, so the request
+      // that just threw may have already fainted it in the database. Never
+      // blindly resets to "playerTurn" here — resyncAfterUncertainAttackOutcome
+      // re-reads the true party state first and only returns to "playerTurn"
+      // once that's actually confirmed safe.
       let result: Awaited<ReturnType<typeof executeBattleActionAction>>;
       try {
         result = await executeBattleActionAction(zoneId, "attack", moveId);
       } catch {
-        setPhase("playerTurn");
+        await resyncAfterUncertainAttackOutcome();
+        return;
+      }
+
+      if (result.status === "invalid-active-pokemon") {
+        // Proof positive the active Pokémon is already fainted server-side
+        // (see executeBattleAction's own guard) — never a generic failure.
+        // partyHpMap is very likely still showing its stale pre-faint HP
+        // (exactly the "shows 1-5 HP but is treated as fainted" bug this
+        // fix addresses), so this resyncs the real HP and routes into the
+        // same forced-replacement/party-defeated decision every other
+        // faint path already uses, rather than just re-enabling the same
+        // attack buttons that will only be rejected again.
+        await resyncAfterUncertainAttackOutcome();
         return;
       }
 
       if (result.status !== "success") {
-        // The server rejected the action (stale phase, a race, an already-
-        // concluded battle, ...) — never trust the client's own belief that
-        // it was still the player's turn. Recover to a safe, interactive
-        // state rather than leaving the UI stuck on "enemyTurn".
+        // Every other rejection (stale phase, a race, an already-concluded
+        // battle, an invalid move, ...) is returned by executeBattleAction
+        // BEFORE any HP-mutating code ever runs, so there is genuinely
+        // nothing new to resync — safe to just recover to the interactive
+        // state, exactly as before.
         setPhase("playerTurn");
         return;
       }
@@ -1550,6 +1628,7 @@ export function BattleContent({
           status: wildStatusState,
           volatileBadges: volatileBadges(enemyVolatile),
           rarity: wildState.pokemon.rarity,
+          types: wildState.pokemon.types,
         }}
         player={{
           name: playerDisplayName,
@@ -1560,6 +1639,7 @@ export function BattleContent({
           fallbackSpriteUrl: getFrontSpritePath(activePokemon.species),
           status: activePokemon.status,
           volatileBadges: volatileBadges(playerVolatile),
+          types: activePokemon.species.types,
           // Already the live value — activePokemon comes from livePartyList,
           // which merges in partyProgressMap's overrides the instant a
           // victory reward resolves (see applyPokemonRewards below), so this
