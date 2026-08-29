@@ -19,15 +19,18 @@ test("buildMoveRegistry on an empty list produces an empty map", () => {
 });
 
 test("the real registry loads the full move database (every generation) without throwing", () => {
-  // 165 Generation 1 moves + 36 Generation 2 moves + 102 Generation 3 moves
-  // + 113 Generation 4 moves (Sinnoh Moves & Learnsets Phase 3) + 87
-  // Generation 5 moves (Unova Moves & Learnsets Phase 3) + 60 Generation 6
-  // moves (Kalos Moves & Learnsets Phase 3) + 54 Generation 7 moves (Alola
-  // Moves & Learnsets Phase 3) + 65 Generation 8 moves (Galar Moves &
-  // Learnsets Phase 3) + 33 Generation 9 moves (Paldea Moves & Learnsets
-  // Phase 3) = 715. Update this number deliberately whenever a new
-  // generation's move data is registered — see engine/moves/data/index.ts.
-  assert.equal(getAllMoves().length, 715);
+  // 165 Generation 1 moves + 36 Generation 2 moves + 103 Generation 3 moves
+  // (102 Hoenn Moves & Learnsets Phase 3 total, plus Sludge Bomb — a
+  // canonical Generation 3 move discovered missing during TM SYSTEM PHASE 1
+  // and added to generation-3/poison.moves.ts) + 113 Generation 4 moves
+  // (Sinnoh Moves & Learnsets Phase 3) + 87 Generation 5 moves (Unova Moves
+  // & Learnsets Phase 3) + 60 Generation 6 moves (Kalos Moves & Learnsets
+  // Phase 3) + 54 Generation 7 moves (Alola Moves & Learnsets Phase 3) + 65
+  // Generation 8 moves (Galar Moves & Learnsets Phase 3) + 33 Generation 9
+  // moves (Paldea Moves & Learnsets Phase 3) = 716. Update this number
+  // deliberately whenever a new generation's move data is registered — see
+  // engine/moves/data/index.ts.
+  assert.equal(getAllMoves().length, 716);
 });
 
 test("getMoveById finds a real Generation 1 move by its permanent id", () => {

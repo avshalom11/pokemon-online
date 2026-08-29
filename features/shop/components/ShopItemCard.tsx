@@ -3,6 +3,7 @@ import { useState } from "react";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
 import { EvolutionItemInfoDialog } from "@/features/evolution/components/EvolutionItemInfoDialog";
+import { TmInfoDialog } from "@/features/tm-system/components/TmInfoDialog";
 import type { ShopItem } from "@/features/shop/types/shop.types";
 
 interface ShopItemCardProps {
@@ -35,6 +36,12 @@ interface ShopItemCardProps {
 export function ShopItemCard({ item, isSelected, onSelect }: ShopItemCardProps) {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const isEvolutionProduct = item.categoryId === "stones";
+  // UI POLISH (pre-Phase 6) — TM ("tms") cards show a larger image than
+  // every other category, per this task's own explicit spec. Gated on
+  // categoryId alone (never a class-level default change) so no other
+  // category's card is affected.
+  const isTmProduct = item.categoryId === "tms";
+  const imageSizeClassName = isTmProduct ? "h-24 w-24 sm:h-28 sm:w-28" : "h-16 w-16 sm:h-20 sm:w-20";
 
   return (
     <div className="relative">
@@ -49,8 +56,8 @@ export function ShopItemCard({ item, isSelected, onSelect }: ShopItemCardProps) 
         <SpriteImage
           src={item.imageUrl}
           alt={item.name}
-          className="h-16 w-16 object-contain sm:h-20 sm:w-20"
-          fallbackClassName="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500 sm:h-20 sm:w-20"
+          className={`object-contain ${imageSizeClassName}`}
+          fallbackClassName={`flex items-center justify-center rounded-lg border border-dashed border-white/20 bg-slate-800/60 text-slate-500 ${imageSizeClassName}`}
         />
 
         <span className="text-sm font-semibold text-slate-100">{item.name}</span>
@@ -67,14 +74,14 @@ export function ShopItemCard({ item, isSelected, onSelect }: ShopItemCardProps) 
         <span className="text-[11px] leading-snug text-slate-400">{item.description}</span>
       </button>
 
-      {isEvolutionProduct ? (
+      {isEvolutionProduct || isTmProduct ? (
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             setIsInfoOpen(true);
           }}
-          aria-label="הצג פוקימונים שניתן לפתח באמצעות מוצר זה"
+          aria-label={isTmProduct ? "הצג פוקימונים שיכולים ללמוד את המתקפה" : "הצג פוקימונים שניתן לפתח באמצעות מוצר זה"}
           className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-slate-900/80 text-xs font-bold text-slate-300 transition-colors hover:border-indigo-400/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
         >
           ?
@@ -88,6 +95,10 @@ export function ShopItemCard({ item, isSelected, onSelect }: ShopItemCardProps) 
           itemImageUrl={item.imageUrl}
           onClose={() => setIsInfoOpen(false)}
         />
+      ) : null}
+
+      {isTmProduct && isInfoOpen ? (
+        <TmInfoDialog itemId={item.id} itemName={item.name} itemImageUrl={item.imageUrl} onClose={() => setIsInfoOpen(false)} />
       ) : null}
     </div>
   );

@@ -26,20 +26,29 @@ test("every evolution product (stones category) gets a question-mark info button
 });
 
 test("the info button is visually circular and positioned at the card's top-right corner", () => {
-  const ariaLabelIndex = cardSource.indexOf('aria-label="הצג פוקימונים שניתן לפתח באמצעות מוצר זה"');
+  // TM SYSTEM UI POLISH — evolution and TM products now share ONE info
+  // button element with a conditional (ternary) aria-label, so the anchor
+  // is the attribute itself (`aria-label={`) rather than a fully-quoted
+  // literal string.
+  const ariaLabelIndex = cardSource.indexOf("aria-label={");
   const classNameIndex = cardSource.indexOf("className=", ariaLabelIndex);
   const classNameValue = cardSource.slice(classNameIndex, cardSource.indexOf('"', classNameIndex + 'className="'.length) + 1);
 
+  assert.ok(ariaLabelIndex > -1, "the info button's conditional aria-label must exist");
   assert.ok(classNameValue.includes("rounded-full"), "the info button must be circular (rounded-full)");
   assert.ok(classNameValue.includes("top-1.5") || classNameValue.includes("top-2"), "the info button must be pinned to the top");
   assert.ok(classNameValue.includes("right-1.5") || classNameValue.includes("right-2"), "the info button must be pinned to the right (physical, RTL-safe) edge");
   assert.ok(classNameValue.includes("absolute"), "the info button must be absolutely positioned within its relative card wrapper");
 });
 
-test("the info button has the required accessible Hebrew aria-label", () => {
+test("the info button has the required accessible Hebrew aria-label for both evolution and TM products", () => {
   assert.ok(
-    cardSource.includes('aria-label="הצג פוקימונים שניתן לפתח באמצעות מוצר זה"'),
-    "the info button must carry this exact Hebrew aria-label"
+    cardSource.includes('"הצג פוקימונים שניתן לפתח באמצעות מוצר זה"'),
+    "the info button must carry this exact Hebrew aria-label for evolution products"
+  );
+  assert.ok(
+    cardSource.includes('"הצג פוקימונים שיכולים ללמוד את המתקפה"'),
+    "the info button must carry this exact Hebrew aria-label for TM products"
   );
 });
 
@@ -56,7 +65,7 @@ test("clicking the info button never triggers the card's own onSelect (stopPropa
 test("the info button and the card's own selectable button are siblings, not nested (no <button> inside <button>)", () => {
   const cardButtonIndex = cardSource.indexOf("onClick={onSelect}");
   const cardButtonCloseIndex = cardSource.indexOf("</button>", cardButtonIndex);
-  const infoButtonIndex = cardSource.indexOf('aria-label="הצג פוקימונים שניתן לפתח באמצעות מוצר זה"');
+  const infoButtonIndex = cardSource.indexOf("aria-label={");
 
   assert.ok(cardButtonIndex > -1 && cardButtonCloseIndex > -1 && infoButtonIndex > -1);
   assert.ok(infoButtonIndex > cardButtonCloseIndex, "the info button must be declared after the card's own <button> has already closed");
@@ -68,13 +77,22 @@ test("clicking the info button opens EvolutionItemInfoDialog, derived from the i
   assert.ok(cardSource.includes("itemId={item.id}"), "the dialog must receive the real item id, not a hardcoded one");
 });
 
-test("non-evolution items (poke-balls/potions) never render the info button", () => {
-  // The gate is the single `isEvolutionProduct` flag derived from
-  // item.categoryId === "stones" — asserted structurally above. This test
-  // guards against a future edit accidentally rendering the button
-  // unconditionally (e.g. removing the `isEvolutionProduct ? ... : null`
-  // wrapper).
-  assert.ok(/isEvolutionProduct \? \(\s*\n\s*<button/.test(cardSource), "the info button must be conditionally rendered behind isEvolutionProduct");
+test("non-evolution, non-TM items (poke-balls/potions) never render the info button", () => {
+  // TM SYSTEM UI POLISH — the same info button is now also shown for TM
+  // ("tms") products (opening TmInfoDialog instead of
+  // EvolutionItemInfoDialog), so the gate is `isEvolutionProduct ||
+  // isTmProduct` rather than isEvolutionProduct alone. This test guards
+  // against a future edit accidentally rendering the button
+  // unconditionally (e.g. removing this wrapper).
+  assert.ok(
+    /isEvolutionProduct \|\| isTmProduct \? \(\s*\n\s*<button/.test(cardSource),
+    "the info button must be conditionally rendered behind isEvolutionProduct || isTmProduct"
+  );
+});
+
+test("the TM info button opens TmInfoDialog, gated on isTmProduct, never the evolution dialog", () => {
+  assert.ok(cardSource.includes("import { TmInfoDialog }"), "ShopItemCard must import TmInfoDialog");
+  assert.ok(cardSource.includes("isTmProduct && isInfoOpen"), "TmInfoDialog must only render once opened, and only for a TM product");
 });
 
 test("the card never changes prices or triggers purchase logic itself", () => {

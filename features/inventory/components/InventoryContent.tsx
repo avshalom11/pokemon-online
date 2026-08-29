@@ -22,6 +22,7 @@ import { sellIncubatorAction } from "@/features/inventory/actions/sell-incubator
 import { sellInventoryItemAction } from "@/features/inventory/actions/sell-inventory-item.action";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { EvolutionItemPanel } from "@/features/evolution/components/EvolutionItemPanel";
+import { TmUsePanel } from "@/features/tm-system/components/TmUsePanel";
 import { ShopCategoryMenu } from "@/features/shop/components/ShopCategoryMenu";
 import { getDefaultShopCategoryId, getShopCategories } from "@/features/shop/services/shop-catalog.service";
 import type { ShopCategoryId } from "@/features/shop/types/shop.types";
@@ -448,6 +449,16 @@ export function InventoryContent({
 
             {!isEggsCategorySelected && !isChestsCategorySelected && selectedView && selectedView.item.categoryId === "stones" ? (
               <EvolutionItemPanel item={selectedView.item} ownedPokemon={ownedPokemon} />
+            ) : null}
+
+            {/* TM SYSTEM PHASE 5 — same "appears under the sell panel while
+                this specific category is selected" wiring as
+                EvolutionItemPanel above, keyed by item.id so switching
+                between two different TMs (or back to the same one) always
+                refetches eligibility fresh rather than reusing stale
+                candidates/dialog state from a previously selected TM. */}
+            {!isEggsCategorySelected && !isChestsCategorySelected && selectedView && selectedView.item.categoryId === "tms" ? (
+              <TmUsePanel key={selectedView.item.id} item={selectedView.item} />
             ) : null}
 
             {isChestsCategorySelected && openChestError ? (

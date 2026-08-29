@@ -15,6 +15,13 @@ interface InventoryItemGridProps {
 // than the Shop's generic empty state, since the two mean different things
 // here (never stocked vs. never purchased).
 export function InventoryItemGrid({ categoryName, views, selectedItemId, onSelectItem }: InventoryItemGridProps) {
+  // UI POLISH (pre-Phase 6) — same TM-specific 3-per-row-on-desktop
+  // treatment ShopItemGrid already applies, kept in sync so a TM's grid
+  // looks the same whether seen in the Shop or in Inventory. Every other
+  // category keeps its existing grid untouched.
+  const isTmCategory = views.length > 0 && views.every((view) => view.item.categoryId === "tms");
+  const gridColsClassName = isTmCategory ? "grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3" : "grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
+
   return (
     <div dir="rtl" className="min-w-0 flex-1">
       {categoryName ? (
@@ -26,7 +33,7 @@ export function InventoryItemGrid({ categoryName, views, selectedItemId, onSelec
           אין לך פריטים בקטגוריה זו כרגע.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className={`grid ${gridColsClassName}`}>
           {views.map((view) => (
             <InventoryItemCard
               key={view.item.id}

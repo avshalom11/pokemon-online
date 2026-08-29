@@ -10,10 +10,16 @@ import { getMoveById, getAllMoves } from "../../registry/move-registry.ts";
 // deliberately excluded from this count — it already exists as a
 // Generation 2 entry in this project's own catalog (engine/moves/data/
 // generation-2/bug.moves.ts), and this database never defines the same
-// move id twice — so this file's own total is 102, not 103.
-const EXPECTED_GENERATION_3_MOVE_COUNT = 102;
+// move id twice.
+//
+// TM SYSTEM PHASE 1 — Sludge Bomb (#188) was discovered missing from this
+// catalog while auditing the planned TM catalog against the real move
+// registry (this file's own total was 102 without it, one short of what
+// "103 canonical minus Silver Wind" should be). It has been added to
+// poison.moves.ts, bringing this file's own total to the correct 103.
+const EXPECTED_GENERATION_3_MOVE_COUNT = 103;
 
-test("exactly 102 Generation 3 moves are loaded (103 canonical minus Silver Wind, already Generation 2)", () => {
+test("exactly 103 Generation 3 moves are loaded (103 canonical minus Silver Wind, already Generation 2; Sludge Bomb restored in TM Phase 1)", () => {
   assert.equal(GENERATION_3_MOVES.length, EXPECTED_GENERATION_3_MOVE_COUNT);
 });
 

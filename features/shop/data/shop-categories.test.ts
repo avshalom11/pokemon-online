@@ -13,11 +13,25 @@ test('a dedicated "תיבות" (chests) category exists, distinct from "eggs"', 
   assert.notEqual(chests?.id, "eggs", "chests must never be merged into the eggs category");
 });
 
-test("no new category was accidentally added or removed alongside chests", () => {
+test("no new category was accidentally added or removed alongside chests/tms", () => {
   assert.deepEqual(
     SHOP_CATEGORIES.map((category) => category.id),
-    ["poke-balls", "potions", "stones", "eggs", "chests"]
+    ["poke-balls", "potions", "stones", "eggs", "chests", "tms"]
   );
+});
+
+// TM SYSTEM PHASE 2 — same coverage shape as the chests category above.
+// UI POLISH (pre-Phase 6) — renamed to "מתקפות"; the category id ("tms")
+// itself is unchanged.
+test('a dedicated "מתקפות" (tms) category exists', () => {
+  const tms = SHOP_CATEGORIES.find((category) => category.id === "tms");
+  assert.ok(tms, "a tms category must exist");
+  assert.equal(tms?.name, "מתקפות");
+});
+
+test("the tms category holds real Shop products (Phase 2's own Shop integration)", () => {
+  const tmItems = SHOP_ITEMS.filter((item) => item.categoryId === "tms");
+  assert.ok(tmItems.length > 0, "TM products exist under this category as of Phase 2");
 });
 
 // CHESTS PHASE 5 — Shop acquisition now exists (superseding Phase 1's own
