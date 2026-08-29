@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run dev:play",
-    "dev:play": "dotenv -e .env -- next dev",
-    "dev:dev": "node scripts/require-env-file.mjs .env.development && dotenv -e .env.development -- next dev",
+    "dev": "npm run dev:dev",
+    "dev:play": "node scripts/require-env-file.mjs .env && dotenv -e .env -- next dev --port 3000",
+    "dev:dev": "node scripts/require-env-file.mjs .env.development && dotenv -e .env.development -- next dev --port 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -13,7 +13,7 @@
     "validate:map-regions": "node scripts/validate-map-regions.mjs",
     "generate:gym-npc-teams": "node --conditions=react-server --experimental-strip-types --import ./test/support/register.mjs scripts/generate-gym-npc-teams.ts",
     "prisma:dev:migrate": "node scripts/require-env-file.mjs .env.development && dotenv -e .env.development -- prisma migrate dev",
-    "prisma:play:deploy": "dotenv -e .env -- prisma migrate deploy"
+    "prisma:play:deploy": "node scripts/require-env-file.mjs .env && dotenv -e .env -- prisma migrate deploy"
   },
   "dependencies": {
     "@better-auth/core": "^1.6.24",
