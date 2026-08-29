@@ -27,6 +27,7 @@ interface PokemonCardProps {
 // larger, "hero" section of the page.
 export function PokemonCard({ pokemon, onClick, isSelected = false }: PokemonCardProps) {
   const displayName = pokemon.nickname ?? pokemon.species.name;
+  const isInParty = pokemon.partySlot !== null;
 
   return (
     <button
@@ -36,14 +37,21 @@ export function PokemonCard({ pokemon, onClick, isSelected = false }: PokemonCar
       className={`group relative flex flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-[0_0_14px_rgba(99,102,241,0.25)] ${
         isSelected
           ? "border-indigo-400/70 bg-indigo-500/10 hover:border-indigo-400/70"
-          : "border-white/10 bg-slate-900/60 hover:border-indigo-400/50 hover:bg-slate-900/80"
+          : isInParty
+            ? "border-emerald-400/70 bg-emerald-500/10 hover:border-emerald-400/70"
+            : "border-white/10 bg-slate-900/60 hover:border-indigo-400/50 hover:bg-slate-900/80"
       }`}
     >
-      {pokemon.isStarter ? (
-        <span className="absolute right-1 top-1 rounded-full bg-amber-400/90 px-1.5 py-0 text-[8px] font-bold text-slate-950">
-          מקורי
-        </span>
-      ) : null}
+      <div className="absolute right-1 top-1 flex flex-col items-end gap-0.5">
+        {isInParty ? (
+          <span className="rounded-full bg-emerald-400/90 px-1.5 py-0 text-[8px] font-bold text-slate-950">
+            בשישייה
+          </span>
+        ) : null}
+        {pokemon.isStarter ? (
+          <span className="rounded-full bg-amber-400/90 px-1.5 py-0 text-[8px] font-bold text-slate-950">מקורי</span>
+        ) : null}
+      </div>
 
       {/* Never true today — no shiny-capture system exists yet (see
           OwnedPokemon.isShiny). The badge is ready for when it does. */}
