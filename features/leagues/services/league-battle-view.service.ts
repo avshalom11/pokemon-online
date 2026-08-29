@@ -5,6 +5,7 @@ import type { MajorStatus } from "@/features/battle/status/major-status";
 import { resolveKnownMoveSlots, type BattleKnownMoveSlot } from "@/features/battle/services/battle-view.service";
 import { getFrontSpritePath, getBackSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
+import type { PokemonType } from "@/shared/types/pokemon";
 import {
   getLeagueBattleSession,
   leagueStatusFor,
@@ -46,6 +47,11 @@ export interface LeagueBattleSideView {
   readonly activeCurrentHp: number;
   readonly activeMaxHp: number;
   readonly activeStatus: MajorStatus | null;
+  // BATTLE UI — TYPE DISPLAY. The active Pokémon's own canonical types, in
+  // data order — see components/battle/BattleHUD.tsx's own doc comment.
+  // Empty whenever the active species can't be resolved (mirrors every
+  // other activeXxx field's own "safe empty default" shape here).
+  readonly activeTypes: readonly PokemonType[];
   readonly participants: readonly LeagueBattleParticipantView[];
 }
 
@@ -113,6 +119,7 @@ function buildSideView(
     activeCurrentHp: active?.currentHp ?? 0,
     activeMaxHp: active?.maxHp ?? 0,
     activeStatus: activeSlotId ? leagueStatusFor(statusMap, activeSlotId).status : null,
+    activeTypes: activeSpecies?.types ?? [],
     participants,
   };
 }
@@ -146,6 +153,7 @@ export async function getLeagueBattleViewData(matchId: string, playerId: string,
       activeCurrentHp: 0,
       activeMaxHp: 0,
       activeStatus: null,
+      activeTypes: [],
       participants: [],
     });
 

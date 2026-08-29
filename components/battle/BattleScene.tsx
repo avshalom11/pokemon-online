@@ -145,7 +145,7 @@ export function BattleScene({
           (lib/battle/battleLayout.ts) for why an arena-relative offset
           couldn't reliably clear the wild Pokémon in every zone. */}
       <div className={PLAYER_HUD_SIDE_CLASS} style={{ top: `${PLAYER_HUD_TOP_PERCENT}%` }}>
-        <BattleHUD theme={theme} participant={player} experience={player.experience} footer={playerHudFooter} />
+        <BattleHUD theme={theme} participant={player} side="player" experience={player.experience} footer={playerHudFooter} />
       </div>
 
       {/* Enemy HUD — corner-anchored within the space above the footer.
@@ -154,7 +154,7 @@ export function BattleScene({
           never ends up covered by it regardless of screen size. */}
       <div className="relative min-h-0 flex-1 p-3 sm:p-6 lg:p-8">
         <div className={ENEMY_HUD_POSITION_CLASS}>
-          <BattleHUD theme={theme} participant={enemy} footer={enemyHudFooter} />
+          <BattleHUD theme={theme} participant={enemy} side="enemy" footer={enemyHudFooter} />
         </div>
       </div>
 

@@ -1,8 +1,15 @@
-import type { PokemonRarity } from "./pokemon";
+import type { PokemonRarity, PokemonType } from "./pokemon";
 
 export interface BattleParticipantDisplay {
   name: string;
   level: number;
+  // BATTLE UI — TYPE DISPLAY. This participant's own canonical
+  // PokemonSpecies.types, in their existing data order — BattleHUD renders
+  // this as an English label under the name (lib/battle/pokemonTypeLabel.ts),
+  // never a per-species hardcoded string. Optional so a caller with no
+  // species data on hand yet simply renders no type line, same convention
+  // `rarity` below already uses.
+  types?: readonly PokemonType[];
   currentHealth: number;
   maxHealth: number;
   // Optional so existing/future placeholder-only callers keep working

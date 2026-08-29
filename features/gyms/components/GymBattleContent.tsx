@@ -462,6 +462,7 @@ export function GymBattleContent({ initialData }: GymBattleContentProps) {
           maxHealth: data.npc.maxHp,
           spriteUrl: data.npc.spriteUrl,
           status: data.npc.status,
+          types: data.npc.types,
         }}
         player={{
           name: data.player.name,
@@ -471,6 +472,7 @@ export function GymBattleContent({ initialData }: GymBattleContentProps) {
           spriteUrl: data.player.spriteUrl,
           fallbackSpriteUrl: data.player.fallbackSpriteUrl,
           status: data.player.status,
+          types: data.player.types,
         }}
         message={outcome?.kind === "defeat" ? partyDefeatedMessage() : needsReplacement ? forcedReplacementMessage(data.player.name) : message}
         attacks={actionsLocked ? [] : attacks}

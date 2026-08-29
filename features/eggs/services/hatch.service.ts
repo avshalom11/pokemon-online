@@ -1,6 +1,7 @@
 import "server-only";
 
 import { calculatePokemonHpStat } from "@/engine/battle/pokemon-stat-calculations";
+import { resolveSpeciesIdForLevel } from "@/engine/evolution-stage-scaling/family-level-resolution";
 import { rollHatchLevel } from "@/features/eggs/services/hatch-level.service";
 import { rollHatchSpecies } from "@/features/eggs/services/hatch-pool.service";
 import { isIncubatorPermanent } from "@/features/eggs/services/incubator.service";
@@ -8,7 +9,9 @@ import { isIncubationReady } from "@/features/eggs/services/incubation.service";
 import { getFirstEmptyPartySlot } from "@/features/party/utils/party-rules";
 import { createOwnedPokemon } from "@/features/pokemon/services/create-owned-pokemon.service";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
+import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { getTotalXpRequiredForPokemonLevel } from "@/features/pokemon-progression/pokemon-progression-calculations";
+import { getPlayerLevel } from "@/features/player-progression/progression-service";
 import { prisma } from "@/lib/db/prisma";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 import { toRegionId, type RegionId } from "@/shared/types/region";
@@ -38,12 +41,27 @@ export type HatchIncubationResult =
 // progressActiveIncubations already established "ready eggs just sit ready
 // until consumed."
 //
-// Species/level selection (rollHatchSpecies/rollHatchLevel — both pure,
-// randomSource-injectable, same convention every other production roll in
-// this project already uses) happens BEFORE the consuming transaction
-// starts: an empty region+rarity pool must fail with nothing at all
-// consumed, never a partial write followed by a rollback that still leaves
-// ambiguity about what almost happened.
+// Species/level selection happens BEFORE the consuming transaction starts:
+// an empty region+rarity pool must fail with nothing at all consumed, never
+// a partial write followed by a rollback that still leaves ambiguity about
+// what almost happened.
+//
+// EGG HATCH REBALANCE — the level is now rolled FIRST, from the real
+// player's own level bracket (getPlayerLevel — the exact same canonical
+// PlayerProfile.level read features/battle-session/services/
+// battle-session.service.ts already uses for wild-encounter scaling), never
+// from the rolled species. rollHatchSpecies (hatch-pool.service.ts) is
+// completely unchanged — it still performs the one and only region+rarity
+// pool draw, exactly as before this rebalance — but its result is now only
+// a "family seed": resolveSpeciesIdForLevel (engine/evolution-stage-
+// scaling/family-level-resolution.ts) walks that seed's real evolution
+// family and returns whichever stage the rolled level actually qualifies
+// for, using only the canonical LEVEL_EVOLUTIONS data — never a hardcoded
+// per-family case, and never a species/level combination the evolution data
+// doesn't already support. A species with no level-evolution family at all
+// (standalone, or Stone/Item/Branch-only) is returned unchanged regardless
+// of level. Both rolls stay pure and randomSource-injectable, same
+// convention every other production roll in this project already uses.
 export async function hatchIncubation(
   playerId: string,
   incubationId: string,
@@ -63,10 +81,18 @@ export async function hatchIncubation(
   const regionId = toRegionId(egg.regionId);
   const rarity = egg.rarity as PokemonRarity;
 
-  const species = rollHatchSpecies(regionId, rarity, randomSource);
-  if (!species) return { status: "empty-pool" };
+  const seedSpecies = rollHatchSpecies(regionId, rarity, randomSource);
+  if (!seedSpecies) return { status: "empty-pool" };
 
-  const level = rollHatchLevel(species.id, randomSource);
+  const playerLevel = await getPlayerLevel(playerId);
+  const level = rollHatchLevel(playerLevel, randomSource);
+
+  // Guaranteed to exist: resolveSpeciesIdForLevel only ever returns a
+  // species already present in seedSpecies' own real evolution family, and
+  // every family member is itself a real POKEMON_DATA entry by construction
+  // (data/pokemon/pokemon-evolutions.ts's own top-of-file invariant).
+  const species = getSpeciesById(resolveSpeciesIdForLevel(seedSpecies.id, level))!;
+
   const currentHp = calculatePokemonHpStat(species.baseStats.health, level);
 
   return prisma.$transaction(async (tx) => {

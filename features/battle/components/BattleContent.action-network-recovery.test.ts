@@ -42,12 +42,30 @@ function bodyOf(startMarker: string, endMarker: string): string {
   return source.slice(start, end);
 }
 
-test("handleAttack: a thrown/rejected executeBattleActionAction call is caught and recovers phase to playerTurn", () => {
+test("handleAttack: a thrown/rejected executeBattleActionAction call is caught and resynced, never blindly reset to playerTurn", () => {
+  // FIELD BATTLE STALE-HP / FORCED-REPLACEMENT FIX — superseded the original
+  // "just setPhase('playerTurn')" recovery for THIS one call site.
+  // executeBattleAction persists the active Pokémon's fatal HP well before
+  // several later awaits that can still fail, so a thrown/rejected request
+  // may already have fainted it server-side; blindly resetting to
+  // "playerTurn" would silently re-enable attack buttons that only get
+  // rejected again (the exact stuck-loop bug this fix addresses). See
+  // BattleContent.forced-replacement-resync.test.ts for full coverage of
+  // resyncAfterUncertainAttackOutcome itself. Capture/medicine's own catch
+  // blocks are untouched by this fix and still recover directly, covered by
+  // the tests below.
   const body = bodyOf("function handleAttack(moveId: string) {", "function proceedCapture(ballItemId: string) {");
   assert.ok(body.includes("try {"), "the Server Action call must be wrapped in a try block");
   assert.ok(body.includes("result = await executeBattleActionAction(zoneId, \"attack\", moveId);"));
-  const catchBody = body.slice(body.indexOf("} catch {"), body.indexOf("} catch {") + 120);
-  assert.ok(catchBody.includes('setPhase("playerTurn");'), "the catch branch must recover phase back to playerTurn, never leave it stuck on enemyTurn");
+  const catchBody = body.slice(body.indexOf("} catch {"), body.indexOf("} catch {") + 160);
+  assert.ok(
+    catchBody.includes("await resyncAfterUncertainAttackOutcome();"),
+    "the catch branch must resync authoritative party state before deciding the next phase"
+  );
+  assert.ok(
+    !catchBody.includes('setPhase("playerTurn");'),
+    "the catch branch must never blindly reset to playerTurn without resyncing first — the server may already have persisted a faint"
+  );
 });
 
 test("proceedCapture: a thrown/rejected attemptCaptureAction call is caught and recovers phase to playerTurn", () => {

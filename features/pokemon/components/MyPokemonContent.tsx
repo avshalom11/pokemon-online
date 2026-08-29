@@ -1,20 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { PartySection } from "./PartySection";
 import { PokemonDetailsPanel } from "./PokemonDetailsPanel";
 import { PokemonGrid } from "./PokemonGrid";
 import { BackButton } from "@/components/layout/BackButton";
+import { REGION_DISPLAY_NAMES_HE } from "@/features/gyms/data/gym-labels";
 import { CollectionPicker } from "@/features/party/components/CollectionPicker";
 import { assignPartySlotAction, swapPartySlotsAction } from "@/features/party/actions/party.actions";
 import type { MyPokemonViewData } from "@/features/pokemon/services/my-pokemon-view.service";
+import { ALL_MY_POKEMON_FILTERS, filterMyPokemonCollection, type MyPokemonFilterState } from "@/features/pokemon/utils/my-pokemon-filters";
 import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
+import { formatPokemonTypesLabel } from "@/lib/battle/pokemonTypeLabel";
 import { MAX_ACTIVE_TEAM_SIZE } from "@/shared/types/player";
+import { POKEMON_RARITY_LABELS, POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
+import type { PokemonRarity, PokemonType } from "@/shared/types/pokemon";
+import type { RegionId } from "@/shared/types/region";
 
 interface MyPokemonContentProps {
   data: MyPokemonViewData;
 }
+
+// MY POKÉMON — REGION / RARITY / TYPE FILTERS. Same bare-name Hebrew region
+// labels the Pokédex's own region filter uses (REGION_DISPLAY_NAMES_HE,
+// features/gyms/data/gym-labels.ts) and the same canonical rarity label map
+// every other rarity UI in this project already reads
+// (shared/types/pokemon-labels.ts) — never a second, hand-typed list.
+const REGION_OPTIONS = Object.keys(REGION_DISPLAY_NAMES_HE) as RegionId[];
+const RARITY_OPTIONS = Object.keys(POKEMON_RARITY_LABELS) as PokemonRarity[];
+// Same canonical type list the Pokédex's own type filter already derives
+// from POKEMON_TYPE_LABELS' keys — never a second, hand-typed enumeration.
+// Labels themselves are deliberately ENGLISH here (unlike the Pokédex's own
+// type filter, which stays Hebrew per that page's existing convention) —
+// reuses the exact same English-type-label formatter the battle UI already
+// established (lib/battle/pokemonTypeLabel.ts) rather than a second
+// type-label table. formatPokemonTypesLabel joins multiple types with
+// " / ", but each option here is always exactly one type, so this simply
+// capitalizes it.
+const TYPE_OPTIONS = Object.keys(POKEMON_TYPE_LABELS) as PokemonType[];
 
 // Page composition root for /my-pokemon — mirrors HomeContent's role for
 // Home (same background/atmosphere treatment for visual continuity).
@@ -34,6 +58,15 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
   const [releaseNotice, setReleaseNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const releaseNoticeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // MY POKÉMON — REGION / RARITY / TYPE FILTERS. One combined state object
+  // (rather than three separate useState calls) so changing one filter via
+  // its own setter spread (see the three onChange handlers below) can never
+  // accidentally reset the other two — each stays "all" until the player
+  // explicitly changes it. Pure client-side filtering over data.collection
+  // (already the page's own once-loaded, Daycare-excluded list — see
+  // my-pokemon-view.service.ts) — never a re-fetch.
+  const [filters, setFilters] = useState<MyPokemonFilterState>(ALL_MY_POKEMON_FILTERS);
+  const filteredCollection = useMemo(() => filterMyPokemonCollection(data.collection, filters), [data.collection, filters]);
 
   // GAME TUTORIAL — PHASE 1. Spotlights the whole party section (never a
   // single card pulled out of PartySlot/PartySection — both are reused on
@@ -167,7 +200,66 @@ export function MyPokemonContent({ data }: MyPokemonContentProps) {
 
         <section>
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">האוסף שלי</h2>
-          <PokemonGrid pokemon={data.collection} onSelect={setSelectedId} />
+
+          {/* MY POKÉMON — REGION / RARITY / TYPE FILTERS. Same compact
+              rounded-pill <select> styling the Pokédex's own filters
+              already use, for visual consistency across both screens.
+              Each select's own descriptive "all" option ("כל המחוזות" /
+              "כל הנדירויות" / "כל הסוגים") is the easy way back to
+              unfiltered for that one filter — no separate reset button
+              needed, and changing one never touches the other two (see
+              `filters`' own doc comment above). */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <select
+              value={filters.region}
+              onChange={(event) => setFilters((current) => ({ ...current, region: event.target.value as RegionId | "all" }))}
+              className="rounded-full border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-300 focus:border-indigo-400/50 focus:outline-none"
+            >
+              <option value="all">כל המחוזות</option>
+              {REGION_OPTIONS.map((region) => (
+                <option key={region} value={region}>
+                  {REGION_DISPLAY_NAMES_HE[region]}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.rarity}
+              onChange={(event) => setFilters((current) => ({ ...current, rarity: event.target.value as PokemonRarity | "all" }))}
+              className="rounded-full border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-300 focus:border-indigo-400/50 focus:outline-none"
+            >
+              <option value="all">כל הנדירויות</option>
+              {RARITY_OPTIONS.map((rarity) => (
+                <option key={rarity} value={rarity}>
+                  {POKEMON_RARITY_LABELS[rarity]}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.type}
+              onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value as PokemonType | "all" }))}
+              className="rounded-full border border-white/10 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-300 focus:border-indigo-400/50 focus:outline-none"
+              dir="ltr"
+            >
+              <option value="all">כל הסוגים</option>
+              {TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>
+                  {formatPokemonTypesLabel([type])}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <PokemonGrid
+            pokemon={filteredCollection}
+            onSelect={setSelectedId}
+            emptyMessage={
+              filters.region !== "all" || filters.rarity !== "all" || filters.type !== "all"
+                ? "לא נמצאו פוקימונים התואמים את הסינון שנבחר."
+                : undefined
+            }
+          />
         </section>
       </div>
 
