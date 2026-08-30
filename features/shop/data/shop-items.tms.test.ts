@@ -72,9 +72,12 @@ test("every TM product's image is the shared per-type path, matching its TM_CATA
 test("TM prices exactly match the four-tier spec (Basic 1,000 / Advanced 2,500 / Premium 4,000 / Elite 5,500)", () => {
   const byMoveId = Object.fromEntries(tmShopItems().map((item) => [item.tmMoveId, item.price]));
 
-  const basic = ["fire-punch", "thunder-punch", "ice-punch", "zen-headbutt", "hex", "draining-kiss", "bulldoze", "rock-tomb", "brick-break", "venoshock", "steel-wing", "aerial-ace", "facade"];
+  const basic = ["fire-punch", "thunder-punch", "ice-punch", "zen-headbutt", "hex", "draining-kiss", "bulldoze", "rock-tomb", "brick-break", "venoshock", "steel-wing", "facade"];
   const advanced = ["waterfall", "giga-drain", "psyshock", "shadow-claw", "dark-pulse", "dragon-claw", "dazzling-gleam", "dig", "rock-slide", "drain-punch", "poison-jab", "x-scissor", "air-slash", "body-slam"];
-  const premium = ["flamethrower", "surf", "liquidation", "thunderbolt", "energy-ball", "ice-beam", "psychic", "shadow-ball", "crunch", "dragon-pulse", "play-rough", "sludge-bomb", "bug-buzz", "flash-cannon"];
+  // TM CATALOG SWAP — Fly replaced Aerial Ace (retired), priced at Premium
+  // (4,000), not Aerial Ace's old Basic (1,000) tier — see tm-catalog.ts's
+  // own TM_MOVE_IDS_BY_TYPE and this file's shop-items.ts TM_PRICES.
+  const premium = ["flamethrower", "surf", "fly", "liquidation", "thunderbolt", "energy-ball", "ice-beam", "psychic", "shadow-ball", "crunch", "dragon-pulse", "play-rough", "sludge-bomb", "bug-buzz", "flash-cannon"];
   const elite = ["fire-blast", "thunder", "solar-beam", "blizzard", "foul-play", "draco-meteor", "earthquake", "stone-edge", "close-combat", "u-turn", "iron-head", "hurricane", "hyper-beam"];
 
   assert.equal(basic.length + advanced.length + premium.length + elite.length, 54);
@@ -83,6 +86,17 @@ test("TM prices exactly match the four-tier spec (Basic 1,000 / Advanced 2,500 /
   for (const moveId of advanced) assert.equal(byMoveId[moveId], 2500, `${moveId} must be 2,500`);
   for (const moveId of premium) assert.equal(byMoveId[moveId], 4000, `${moveId} must be 4,000`);
   for (const moveId of elite) assert.equal(byMoveId[moveId], 5500, `${moveId} must be 5,500`);
+});
+
+test("tm-aerial-ace no longer exists as a Shop item; tm-fly exists, costs exactly 4,000 Money, and Surf/Air Slash/Hurricane are unchanged", () => {
+  const shopIds = new Set(SHOP_ITEMS.map((item) => item.id));
+  assert.equal(shopIds.has("tm-aerial-ace"), false, "tm-aerial-ace must no longer be a purchasable Shop item");
+
+  const byMoveId = Object.fromEntries(tmShopItems().map((item) => [item.tmMoveId, item.price]));
+  assert.equal(byMoveId.fly, 4000, "tm-fly must cost exactly 4,000 Money");
+  assert.equal(byMoveId.surf, 4000, "Surf's price must be unchanged");
+  assert.equal(byMoveId["air-slash"], 2500, "Air Slash's price must be unchanged");
+  assert.equal(byMoveId.hurricane, 5500, "Hurricane's price must be unchanged");
 });
 
 // TASK 6 — no TM-specific sell logic exists (nor should it): the existing

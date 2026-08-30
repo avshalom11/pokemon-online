@@ -126,3 +126,40 @@ test("the confirm dialog shows the price via the shared CurrencyIcon and the cen
   assert.ok(dialogSrc.includes('<CurrencyIcon type="money"'));
   assert.ok(!/\b\d{3,4}\b/.test(dialogSrc.replace(/className="[^"]*"/g, "")), "no literal 3-4 digit price may be hardcoded in the dialog outside className strings");
 });
+
+// FREE FLY/SURF TRAVEL
+test("selectRegionFreeAction's only client-supplied input is the destination regionId — never an eligibility flag — and it delegates to travelToRegionFree", () => {
+  assert.ok(actionSrc.includes("export async function selectRegionFreeAction(regionId: string): Promise<SelectRegionActionResult> {"));
+  assert.ok(
+    actionSrc.includes("await travelToRegionFree(profile.id, regionId)"),
+    "travelToRegionFree must only ever be called with (playerId, regionId) — never a third, caller-suppliable eligibility argument"
+  );
+});
+
+test("the paid selectRegionAction's own signature is completely unchanged by the free-travel feature existing", () => {
+  assert.ok(actionSrc.includes("export async function selectRegionAction(regionId: string): Promise<SelectRegionActionResult> {"));
+  assert.ok(actionSrc.includes("await travelToRegion(profile.id, regionId)"));
+});
+
+test("the free-travel confirm handler calls selectRegionFreeAction, never selectRegionAction, and vice versa", () => {
+  const handleConfirmFreeBody = worldContentSrc.slice(worldContentSrc.indexOf("function handleConfirmFreeTravel"));
+  assert.ok(handleConfirmFreeBody.includes("await selectRegionFreeAction(regionId)"));
+  assert.ok(!handleConfirmFreeBody.includes("await selectRegionAction(regionId)"));
+});
+
+test("TravelConfirmDialog is wired with canTravelFree and both onConfirm/onConfirmFree callbacks from WorldContent", () => {
+  assert.ok(worldContentSrc.includes("canTravelFree={canTravelFree}"));
+  assert.ok(worldContentSrc.includes("onConfirm={handleConfirmTravel}"));
+  assert.ok(worldContentSrc.includes("onConfirmFree={handleConfirmFreeTravel}"));
+});
+
+test("the dialog only renders the free-travel button when canTravelFree is true, with the exact required Hebrew label", () => {
+  assert.ok(dialogSrc.includes("{canTravelFree ? ("), "the free button must be conditionally rendered on canTravelFree");
+  assert.ok(dialogSrc.includes('"מעבר באמצעות Fly / Surf – חינם"'));
+  assert.ok(dialogSrc.includes("onClick={onConfirmFree}"));
+});
+
+test("the paid button's own onConfirm handler is always wired regardless of canTravelFree — the paid path never disappears when free travel is available", () => {
+  const buttonsSection = dialogSrc.slice(dialogSrc.indexOf("<div className=\"mt-5"));
+  assert.ok(buttonsSection.includes("onClick={onConfirm}"));
+});

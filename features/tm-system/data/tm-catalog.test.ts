@@ -62,6 +62,27 @@ test("Sludge Bomb (added in this phase) is present and correctly typed as Poison
   assert.equal(getMoveById("sludge-bomb")?.type, "poison");
 });
 
+// TM CATALOG SWAP — Fly replaced Aerial Ace in the Flying category (only 1-2
+// evolutions/uses justified keeping a whole item around for Aerial Ace's own
+// unrelated evolution-item context; here it's simply the least iconic of the
+// 3 Flying TMs). Total count and per-type count are both preserved — pure
+// 1-for-1 swap, no new slot.
+test("Aerial Ace is retired as a TM; Fly replaced it in the Flying category", () => {
+  assert.equal(getTmCatalogEntryByMoveId("aerial-ace"), undefined, "tm-aerial-ace must no longer exist in the catalog");
+  assert.equal(getTmCatalogEntryByItemId("tm-aerial-ace"), undefined);
+
+  const flyEntry = getTmCatalogEntryByMoveId("fly");
+  assert.ok(flyEntry, "tm-fly must exist in the catalog");
+  assert.equal(flyEntry!.itemId, "tm-fly");
+  assert.equal(flyEntry!.type, "flying");
+  assert.equal(getMoveById("fly")?.type, "flying");
+});
+
+test("Air Slash and Hurricane are unchanged by the Aerial Ace -> Fly swap", () => {
+  assert.ok(getTmCatalogEntryByMoveId("air-slash"));
+  assert.ok(getTmCatalogEntryByMoveId("hurricane"));
+});
+
 test("getTmCatalogEntryByItemId / getTmCatalogEntryByMoveId resolve consistently", () => {
   for (const entry of TM_CATALOG) {
     assert.deepEqual(getTmCatalogEntryByItemId(entry.itemId), entry);

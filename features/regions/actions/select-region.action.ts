@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { isValidRegionId } from "@/features/regions/data/region-registry";
-import { travelToRegion } from "@/features/regions/services/region.service";
+import { travelToRegion, travelToRegionFree } from "@/features/regions/services/region.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import type { RegionId } from "@/shared/types/region";
@@ -13,6 +13,7 @@ export type SelectRegionActionResult =
   | { status: "error"; message: string };
 
 const INSUFFICIENT_FUNDS_MESSAGE = "אין לך מספיק כסף כדי לעבור למחוז הזה.";
+const NOT_ELIGIBLE_FOR_FREE_TRAVEL_MESSAGE = "אין לך פוקימון בשישייה הפעילה שיודע לעוף (Fly) או לשחות (Surf).";
 
 // Thin Server Action — same shape as every other action in this codebase
 // (resolve session, validate input, delegate to the service; see
@@ -55,6 +56,39 @@ export async function selectRegionAction(regionId: string): Promise<SelectRegion
   // action resolves, which re-runs the whole current route's server tree —
   // see that component's own doc comment for why revalidatePath alone
   // wouldn't reliably do that for a shared layout.
+  revalidatePath("/world");
+  revalidatePath("/map");
+  revalidatePath("/home");
+
+  return { status: "success", regionId };
+}
+
+// FREE FLY/SURF TRAVEL — the free counterpart to selectRegionAction above,
+// same thin-action shape (resolve session, validate input, delegate to the
+// service). A separate exported action rather than a boolean parameter on
+// selectRegionAction: keeps that existing action's signature exactly as it
+// was (still pinned by region-travel-cost.ui-wiring.boundary.test.ts) and
+// keeps each action's own single result type unambiguous about which
+// travel path actually ran. travelToRegionFree is the sole authority on
+// eligibility — this action never itself decides whether the player
+// qualifies, and never accepts an eligibility flag from the client.
+export async function selectRegionFreeAction(regionId: string): Promise<SelectRegionActionResult> {
+  const session = await getCurrentSession();
+  if (!session) return { status: "error", message: "יש להתחבר מחדש." };
+
+  if (!isValidRegionId(regionId)) {
+    return { status: "error", message: "אזור לא תקין." };
+  }
+
+  const profile = await getPlayerProfile(session.user.id);
+
+  if (profile.regionId !== regionId) {
+    const result = await travelToRegionFree(profile.id, regionId);
+    if (result === "not-eligible") {
+      return { status: "error", message: NOT_ELIGIBLE_FOR_FREE_TRAVEL_MESSAGE };
+    }
+  }
+
   revalidatePath("/world");
   revalidatePath("/map");
   revalidatePath("/home");
