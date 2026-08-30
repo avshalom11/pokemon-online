@@ -16,8 +16,8 @@ const POKE_BALL_IDS = ["poke-ball", "great-ball", "ultra-ball", "master-ball"];
 const POTION_IDS = ["potion", "super-potion", "hyper-potion", "max-potion"];
 const REVIVE_IDS = ["revive", "max-revive"];
 
-test("the evolution-item catalog reused by this feature is exactly the existing 16-item catalog, never a chest-specific list", () => {
-  assert.equal(EVOLUTION_ITEM_CATALOG.length, 16);
+test("the evolution-item catalog reused by this feature is exactly the existing 12-item catalog, never a chest-specific list", () => {
+  assert.equal(EVOLUTION_ITEM_CATALOG.length, 12);
   for (const itemId of EVOLUTION_ITEM_CATALOG) {
     assert.ok(isEvolutionItemId(itemId), `${itemId} must be a real, recognized EvolutionItemId`);
     assert.ok(getShopItemById(itemId), `${itemId} must resolve as a real Shop catalog entry`);

@@ -145,9 +145,9 @@ test("Petilil's Sun Stone branch is shown as two disambiguated 'Species → Targ
   assert.ok(mappings.some((row) => row.sourceName === "Petilil" && row.targetName === "Hisuian Lilligant"));
 });
 
-test("every one of the Shop's 16 evolution products has at least one mapping row", () => {
+test("every one of the Shop's 12 evolution products has at least one mapping row", () => {
   const evolutionProductIds = SHOP_ITEMS.filter((item) => item.categoryId === "stones").map((item) => item.id);
-  assert.equal(evolutionProductIds.length, 16);
+  assert.equal(evolutionProductIds.length, 12);
 
   for (const itemId of evolutionProductIds) {
     const mappings = getEvolutionItemMappings(itemId);

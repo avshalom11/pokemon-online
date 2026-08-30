@@ -202,9 +202,9 @@ test("the full exact reward set at the deterministic all-0.999999 (minimum, 5-ca
     {
       category: "evolution-item",
       items: [
-        { itemId: "reaper-cloth", quantity: 1 },
-        { itemId: "protector", quantity: 1 },
         { itemId: "shiny-stone", quantity: 1 },
+        { itemId: "dusk-stone", quantity: 1 },
+        { itemId: "ice-stone", quantity: 1 },
       ],
     },
   ]);

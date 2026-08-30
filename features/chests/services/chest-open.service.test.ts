@@ -217,7 +217,7 @@ test("an evolution-item bundle grants EVERY distinct rolled item, each its own i
   await seedChests("owner-1", "diamond", 1);
 
   // Diamond all-0.999999 path's own mandatory extras are incubator +
-  // evolution-item (3 items: reaper-cloth, protector, shiny-stone) — see
+  // evolution-item (3 items: shiny-stone, dusk-stone, ice-stone) — see
   // Phase 2's own exact-vector test.
   const result = await openChest("owner-1", "diamond", { randomSource: paddedRandom([], 0.999999) });
   assert.equal(result.status, "success");
