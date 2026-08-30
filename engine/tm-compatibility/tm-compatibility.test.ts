@@ -12,12 +12,18 @@ import {
   TmCompatibilityValidationError,
 } from "./index.ts";
 
+// TM CATALOG SWAP (Aerial Ace -> Fly) — 362 aerial-ace entries were removed
+// and 116 fly entries were added (each backed by raw PokeAPI machine-learn
+// -method data, see generation-*/index.ts's own doc comments), so the
+// total pair count moved from 13361 to 13361 - 362 + 116 = 13115. Species
+// count itself (1079) is unaffected — no entry was added or removed, only
+// existing entries' own moveIds arrays changed.
 test("the registry loads without throwing and reports the expected totals", () => {
   const entries = getAllTmCompatibilityEntries();
   assert.equal(entries.length, 1079);
 
   const totalPairs = entries.reduce((sum, entry) => sum + entry.moveIds.length, 0);
-  assert.equal(totalPairs, 13361);
+  assert.equal(totalPairs, 13115);
 });
 
 test("canLearnTm is true for a real, verified machine-compatibility fact", () => {
@@ -56,6 +62,26 @@ test("toTmMachineId always builds \"tm-<moveId>\", never a numeric TM slot", () 
   assert.equal(toTmMachineId("thunderbolt"), "tm-thunderbolt");
   assert.equal(toTmMachineId("sludge-bomb"), "tm-sludge-bomb");
   assert.ok(!/\d/.test(toTmMachineId("thunderbolt")));
+});
+
+// TM CATALOG SWAP (Aerial Ace -> Fly)
+test("Fly is a real, verified machine-compatibility fact for at least one species, sourced from raw PokeAPI data", () => {
+  assert.equal(canLearnTm("charizard", "fly"), true);
+  assert.equal(canLearnTm("pidgeot", "fly"), true);
+});
+
+test("no aerial-ace compatibility reference remains anywhere in the registry — it was retired as a TM, replaced by fly", () => {
+  const entries = getAllTmCompatibilityEntries();
+  for (const entry of entries) {
+    assert.ok(!entry.moveIds.includes("aerial-ace"), `${entry.pokemonId} still references retired TM moveId "aerial-ace"`);
+  }
+  assert.equal(canLearnTm("charmander", "aerial-ace"), false, "aerial-ace must no longer resolve as a compatibility fact for any species");
+});
+
+test("DENY-BY-DEFAULT still holds for Fly: a species with no verified Fly compatibility fact stays incompatible, never inferred from Flying type or level-up learnset", () => {
+  // Bulbasaur is not Flying-type and has no verified Fly compatibility
+  // entry — must stay false regardless of any other fact about it.
+  assert.equal(canLearnTm("bulbasaur", "fly"), false);
 });
 
 test("no duplicate pokemonId exists across the whole registry", () => {

@@ -6,8 +6,15 @@ import type { RegionId } from "@/shared/types/region";
 interface TravelConfirmDialogProps {
   regionId: RegionId;
   isPending: boolean;
+  // FREE FLY/SURF TRAVEL — when false, this dialog renders EXACTLY as it
+  // did before this feature existed (single paid button, unchanged text).
+  // When true, a second free-travel button is offered alongside the
+  // existing paid one — the player still explicitly picks one; eligibility
+  // alone never auto-selects the free path.
+  canTravelFree: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  onConfirmFree: () => void;
 }
 
 // REGION TRAVEL COST — shown BEFORE anything is charged, opened by
@@ -21,7 +28,7 @@ interface TravelConfirmDialogProps {
 // closes this dialog (onCancel is a plain state setter in the parent, no
 // server call reachable from it at all) — no Money is ever deducted and
 // no region change happens unless "עבור למחוז" is explicitly pressed.
-export function TravelConfirmDialog({ regionId, isPending, onCancel, onConfirm }: TravelConfirmDialogProps) {
+export function TravelConfirmDialog({ regionId, isPending, canTravelFree, onCancel, onConfirm, onConfirmFree }: TravelConfirmDialogProps) {
   const cost = getRegionTravelCost(regionId);
   const label = REGION_LABELS[regionId];
 
@@ -49,7 +56,7 @@ export function TravelConfirmDialog({ regionId, isPending, onCancel, onConfirm }
         </p>
         <p className="mt-1 text-center text-sm text-slate-300">האם ברצונך לעבור?</p>
 
-        <div className="mt-5 flex justify-center gap-3">
+        <div className="mt-5 flex flex-wrap justify-center gap-3">
           <button
             type="button"
             onClick={onCancel}
@@ -64,8 +71,26 @@ export function TravelConfirmDialog({ regionId, isPending, onCancel, onConfirm }
             disabled={isPending}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors enabled:hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPending ? "מעביר..." : "עבור למחוז"}
+            {isPending
+              ? "מעביר..."
+              : canTravelFree
+                ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      מעבר בתשלום – <CurrencyIcon type="money" className="h-4 w-4" /> {cost.toLocaleString("he-IL")} כסף
+                    </span>
+                  )
+                : "עבור למחוז"}
           </button>
+          {canTravelFree ? (
+            <button
+              type="button"
+              onClick={onConfirmFree}
+              disabled={isPending}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors enabled:hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isPending ? "מעביר..." : "מעבר באמצעות Fly / Surf – חינם"}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

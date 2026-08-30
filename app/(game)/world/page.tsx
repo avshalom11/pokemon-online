@@ -4,8 +4,9 @@ import { GameScreen } from "@/components/layout/GameScreen";
 import { getRegionTravelCost } from "@/features/regions/config/region-travel-cost.config";
 import { WorldContent, type WorldRegionView } from "@/features/regions/components/WorldContent";
 import { REGION_REGISTRY } from "@/features/regions/data/region-registry";
-import { getActiveRegionId } from "@/features/regions/services/region.service";
+import { getActiveRegionId, hasFreeTravelEligibility } from "@/features/regions/services/region.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
+import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { REGION_LABELS } from "@/shared/types/region-labels";
 import type { RegionId } from "@/shared/types/region";
 
@@ -34,6 +35,8 @@ export default async function WorldPage() {
   }
 
   const activeRegionId = await getActiveRegionId(session.user.id);
+  const profile = await getPlayerProfile(session.user.id);
+  const canTravelFree = await hasFreeTravelEligibility(profile.id);
   const regions: WorldRegionView[] = REGION_REGISTRY.map(({ id, cardImageSrc }) => ({
     id,
     hebrewName: bareRegionName(id),
@@ -43,7 +46,7 @@ export default async function WorldPage() {
 
   return (
     <GameScreen>
-      <WorldContent regions={regions} activeRegionId={activeRegionId} />
+      <WorldContent regions={regions} activeRegionId={activeRegionId} canTravelFree={canTravelFree} />
     </GameScreen>
   );
 }

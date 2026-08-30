@@ -41,7 +41,7 @@ const TM_MOVE_IDS_BY_TYPE: Record<MoveType, readonly string[]> = {
   poison: ["sludge-bomb", "poison-jab", "venoshock"],
   bug: ["x-scissor", "bug-buzz", "u-turn"],
   steel: ["flash-cannon", "iron-head", "steel-wing"],
-  flying: ["air-slash", "aerial-ace", "hurricane"],
+  flying: ["air-slash", "fly", "hurricane"],
   normal: ["body-slam", "hyper-beam", "facade"],
 };
 

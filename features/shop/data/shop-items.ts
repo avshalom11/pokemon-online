@@ -129,7 +129,6 @@ const TM_PRICES: Record<string, number> = {
   "brick-break": 1000,
   venoshock: 1000,
   "steel-wing": 1000,
-  "aerial-ace": 1000,
   facade: 1000,
 
   // Advanced — 2,500
@@ -151,6 +150,7 @@ const TM_PRICES: Record<string, number> = {
   // Premium — 4,000
   flamethrower: 4000,
   surf: 4000,
+  fly: 4000,
   liquidation: 4000,
   thunderbolt: 4000,
   "energy-ball": 4000,
