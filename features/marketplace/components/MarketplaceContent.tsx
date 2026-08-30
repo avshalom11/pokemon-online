@@ -8,11 +8,18 @@ import { cancelEditListingAction } from "@/features/marketplace/actions/cancel-e
 import { CreateListingModal, type ListingInitialSelection } from "@/features/marketplace/components/CreateListingModal";
 import { MarketplaceListingCard } from "@/features/marketplace/components/MarketplaceListingCard";
 import { MarketplaceListingDetailModal } from "@/features/marketplace/components/MarketplaceListingDetailModal";
+import { MARKETPLACE_LOCKED_MESSAGE_HE } from "@/features/marketplace/data/marketplace-labels";
 import type { EligibleMarketplaceItem } from "@/features/marketplace/services/eligible-assets-view.service";
 import type { MarketplaceListingView } from "@/features/marketplace/services/marketplace-view.service";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 interface MarketplaceContentProps {
+  // PLAYER LEVEL ACCESS REQUIREMENTS — mirrors the server-side gate
+  // MarketplacePage itself already applied before ever fetching real data:
+  // when false, every other prop below is a deliberately empty placeholder
+  // (see MarketplacePage's own locked branch) and this component renders
+  // ONLY the locked explanation, never the browse/create UI.
+  marketplaceUnlocked: boolean;
   listings: MarketplaceListingView[];
   eligiblePokemon: OwnedPokemon[];
   eligibleItems: EligibleMarketplaceItem[];
@@ -82,6 +89,7 @@ function mergeEligibleItemsForEdit(
 // that turned out stale mid-action (MarketplaceListingDetailModal's own
 // onListingStale) refreshes the exact same way.
 export function MarketplaceContent({
+  marketplaceUnlocked,
   listings,
   eligiblePokemon,
   eligibleItems,
@@ -180,6 +188,26 @@ export function MarketplaceContent({
       setSuccessMessage("העריכה בוטלה בהצלחה.");
       router.refresh();
     });
+  }
+
+  // PLAYER LEVEL ACCESS REQUIREMENTS — a below-level viewer sees ONLY this
+  // explanation, never the browse grid/create button/modals: the "must not
+  // silently hide the feature without explanation" requirement, satisfied
+  // by always showing the real reason rather than an empty market or a
+  // missing nav entry. All hooks above are still declared unconditionally
+  // regardless of this branch, per the rules of hooks.
+  if (!marketplaceUnlocked) {
+    return (
+      <div dir="rtl" className="relative h-full w-full overflow-y-auto bg-slate-950">
+        <div className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6 lg:p-8">
+          <BackButton />
+          <h1 className="text-lg font-bold text-slate-100">שוק</h1>
+          <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-6 py-10 text-center text-sm font-semibold text-amber-200">
+            {MARKETPLACE_LOCKED_MESSAGE_HE}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const editInitialSelection: ListingInitialSelection | null = editingListing

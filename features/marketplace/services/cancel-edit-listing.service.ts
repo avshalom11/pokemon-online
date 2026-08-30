@@ -1,8 +1,19 @@
 import "server-only";
 
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { prisma } from "@/lib/db/prisma";
 
-export type CancelEditListingResult = { status: "success" } | { status: "not-owner" } | { status: "listing-unavailable" };
+export type CancelEditListingResult =
+  | { status: "success" }
+  | { status: "not-owner" }
+  | { status: "listing-unavailable" }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the seller is below
+  // MIN_MARKETPLACE_PLAYER_LEVEL. Checked even here (backing out of an
+  // edit) for consistency with every other Marketplace mutation — a
+  // below-level seller should never reach "editing" in the first place
+  // (enterEditListing itself is gated), but this keeps the guard uniform
+  // rather than special-casing this one path as exempt.
+  | { status: "level-locked" };
 
 // MARKETPLACE PHASE 6 — the seller backs out of editing without saving:
 // flips "editing" back to "active". Since enterEditListing never touched
@@ -18,6 +29,10 @@ export type CancelEditListingResult = { status: "success" } | { status: "not-own
 // what makes this safe against a stale/already-resolved edit session (e.g.
 // the seller already saved or cancelled from another tab).
 export async function cancelEditListing(sellerId: string, listingId: string): Promise<CancelEditListingResult> {
+  if (!(await isMarketplaceUnlockedForPlayer(sellerId))) {
+    return { status: "level-locked" };
+  }
+
   return prisma.$transaction(async (tx) => {
     const listing = await tx.marketplaceListing.findUnique({ where: { id: listingId } });
     if (!listing) {

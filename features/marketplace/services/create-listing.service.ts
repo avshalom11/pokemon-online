@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { lockInventoryQuantity } from "@/features/marketplace/services/inventory-lock.service";
 import { getPokemonMarketAvailability, type PokemonMarketUnavailableReason } from "@/features/marketplace/services/pokemon-availability.service";
 import { createListingSchema, type CreateListingInput } from "@/features/marketplace/validation/create-listing.schema";
@@ -9,7 +10,11 @@ export type CreateListingResult =
   | { status: "success"; listingId: string }
   | { status: "invalid-input"; message: string }
   | { status: "pokemon-unavailable"; playerPokemonId: string; reason: PokemonMarketUnavailableReason }
-  | { status: "insufficient-item-quantity"; itemId: string };
+  | { status: "insufficient-item-quantity"; itemId: string }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the seller is below
+  // MIN_MARKETPLACE_PLAYER_LEVEL. Checked before any input parsing or asset
+  // validation, via the one shared isMarketplaceUnlockedForPlayer helper.
+  | { status: "level-locked" };
 
 // Never exported — a pure internal control-flow signal thrown from inside
 // the one prisma.$transaction below to abort it (rolling back every write
@@ -60,6 +65,10 @@ function isUniqueConstraintError(error: unknown): boolean {
 // commits, the other hits a real constraint/CAS failure in pass 2, throws,
 // and rolls back cleanly with nothing partially locked.
 export async function createMarketplaceListing(sellerId: string, input: CreateListingInput): Promise<CreateListingResult> {
+  if (!(await isMarketplaceUnlockedForPlayer(sellerId))) {
+    return { status: "level-locked" };
+  }
+
   const parsed = createListingSchema.safeParse(input);
   if (!parsed.success) {
     return { status: "invalid-input", message: parsed.error.issues[0]?.message ?? "קלט לא תקין" };

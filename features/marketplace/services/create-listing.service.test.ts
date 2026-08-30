@@ -35,7 +35,7 @@ const SELLER_ID = "seller-1";
 
 beforeEach(() => {
   resetFakeDb();
-  seedPlayerProfile({ id: SELLER_ID });
+  seedPlayerProfile({ id: SELLER_ID, level: 5 });
 });
 
 test("success: a single Pokémon (currently in party) plus a single item stack, priced in both currencies", async () => {

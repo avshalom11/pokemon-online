@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { GameScreen } from "@/components/layout/GameScreen";
 import { MarketplaceContent } from "@/features/marketplace/components/MarketplaceContent";
 import { getEligibleMarketplaceItems, getEligibleMarketplacePokemon } from "@/features/marketplace/services/eligible-assets-view.service";
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { getActiveMarketplaceListings, getOwnEditingListings } from "@/features/marketplace/services/marketplace-view.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -28,6 +29,30 @@ export default async function MarketplacePage() {
 
   const profile = await getPlayerProfile(session.user.id);
 
+  // PLAYER LEVEL ACCESS REQUIREMENTS — checked before any listing/
+  // eligibility data is fetched at all: a below-level viewer never receives
+  // real Marketplace data in this page's own server-rendered payload, not
+  // just a client-side hidden view of it. The mutating services below stay
+  // authoritative regardless (defense in depth, same "server is the real
+  // gate" posture as Gyms), but this is what makes "viewing" itself
+  // actually gated server-side rather than merely covered by a UI overlay.
+  const marketplaceUnlocked = await isMarketplaceUnlockedForPlayer(profile.id);
+
+  if (!marketplaceUnlocked) {
+    return (
+      <GameScreen>
+        <MarketplaceContent
+          marketplaceUnlocked={false}
+          listings={[]}
+          eligiblePokemon={[]}
+          eligibleItems={[]}
+          viewerPlayerId={profile.id}
+          ownEditingListings={[]}
+        />
+      </GameScreen>
+    );
+  }
+
   const [listings, eligiblePokemon, eligibleItems, ownEditingListings] = await Promise.all([
     getActiveMarketplaceListings(),
     getEligibleMarketplacePokemon(profile.id),
@@ -40,6 +65,7 @@ export default async function MarketplacePage() {
   return (
     <GameScreen>
       <MarketplaceContent
+        marketplaceUnlocked={true}
         listings={listings}
         eligiblePokemon={eligiblePokemon}
         eligibleItems={eligibleItems}

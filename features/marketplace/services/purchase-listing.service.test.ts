@@ -44,8 +44,8 @@ const BUYER_ID = "buyer-1";
 
 beforeEach(() => {
   resetFakeDb();
-  seedPlayerProfile({ id: SELLER_ID, coins: 0, gold: 0 });
-  seedPlayerProfile({ id: BUYER_ID, coins: 1000, gold: 100 });
+  seedPlayerProfile({ id: SELLER_ID, level: 5, coins: 0, gold: 0 });
+  seedPlayerProfile({ id: BUYER_ID, level: 5, coins: 1000, gold: 100 });
 });
 
 async function seedListingItem(listingId: string, itemId: string, quantity: number) {
@@ -236,7 +236,7 @@ test("insufficient-funds: not enough Gold (even with enough Money) leaves everyt
 
 test("concurrency: two buyers racing for the same listing never both succeed", async () => {
   const listing = seedMarketplaceListing({ sellerId: SELLER_ID, status: "active", priceMoney: 100 });
-  seedPlayerProfile({ id: "buyer-2", coins: 1000, gold: 0 });
+  seedPlayerProfile({ id: "buyer-2", level: 5, coins: 1000, gold: 0 });
 
   const [first, second] = await Promise.all([
     purchaseMarketplaceListing(BUYER_ID, listing.id),

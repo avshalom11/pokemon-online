@@ -3,6 +3,7 @@ import "server-only";
 import { addInventoryItem } from "@/features/inventory/services/inventory.service";
 import { getFirstEmptyPartySlot } from "@/features/party/utils/party-rules";
 import { grantCurrencyRewards, spendCurrency } from "@/features/currency/services/currency-reward.service";
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { marketplaceSaleNotificationMessage } from "@/features/marketplace/messages/marketplace-purchase-messages";
 import { MARKETPLACE_LISTING_BUYABLE_STATUS } from "@/features/marketplace/types/marketplace.types";
 import { createNotification } from "@/features/notifications/services/notification-service";
@@ -18,7 +19,10 @@ export type PurchaseListingResult =
   // buyer's view of this listing is stale either way; they must re-fetch
   // and re-review before trying again, never silently retried here.
   | { status: "listing-unavailable" }
-  | { status: "insufficient-funds" };
+  | { status: "insufficient-funds" }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the buyer is below
+  // MIN_MARKETPLACE_PLAYER_LEVEL. Checked before the listing is even read.
+  | { status: "level-locked" };
 
 // Never exported — same "throw to abort a multi-step transaction, never a
 // plain early return once something has already been written" idiom
@@ -83,6 +87,10 @@ class PurchaseAbort extends Error {
 //      why this step alone is what gives "no notification on a failed/
 //      rolled-back purchase" for free).
 export async function purchaseMarketplaceListing(buyerId: string, listingId: string): Promise<PurchaseListingResult> {
+  if (!(await isMarketplaceUnlockedForPlayer(buyerId))) {
+    return { status: "level-locked" };
+  }
+
   try {
     return await prisma.$transaction(async (tx) => {
       const listing = await tx.marketplaceListing.findUnique({ where: { id: listingId } });

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getPlayerLevel } from "@/features/player-progression/progression-service";
+import { MIN_LEAGUE_PLAYER_LEVEL } from "../config/league-access-rules.config";
 import { CHAMPIONS_LEAGUE, REGIONAL_LEAGUES } from "../data/league-registry";
 import type { LeagueId, RegionalLeagueId } from "../types/league.types";
 import { getCurrentLeagueChampion } from "./league-achievement.service";
@@ -85,12 +87,21 @@ export interface LeaguesOverviewView {
   readonly regionalLeagues: readonly RegionalLeagueView[];
   readonly championsLeague: ChampionsLeagueView;
   readonly cycle: LeagueCycleView;
+  // PLAYER LEVEL ACCESS REQUIREMENTS — a single global flag (never
+  // per-League: MIN_LEAGUE_PLAYER_LEVEL applies uniformly, same as Gyms'
+  // own MIN_GYM_PLAYER_LEVEL) so the UI can show the lock proactively —
+  // before any registration attempt — rather than only reactively after a
+  // rejected Register click. Purely a display hint: registerForLeague
+  // re-derives this exact same check server-side regardless.
+  readonly levelUnlocked: boolean;
 }
 
 export async function getLeaguesOverview(playerId: string, now: Date = new Date()): Promise<LeaguesOverviewView> {
   const window = getCurrentLeagueTournamentOccurrenceWindow(now);
   const withinRegistrationWindow = isLeagueRegistrationOpen(window, now);
   const cycle = getCurrentLeagueCycle(now);
+  const playerLevel = await getPlayerLevel(playerId);
+  const levelUnlocked = playerLevel >= MIN_LEAGUE_PLAYER_LEVEL;
 
   const regionalLeagues = await Promise.all(
     REGIONAL_LEAGUES.map(async (league): Promise<RegionalLeagueView> => {
@@ -153,5 +164,6 @@ export async function getLeaguesOverview(playerId: string, now: Date = new Date(
       activeLeagueId: cycle.activeLeagueId as LeagueId,
       weekIndexInCycle: getCycleWeekIndex(cycle.weekKey),
     },
+    levelUnlocked,
   };
 }

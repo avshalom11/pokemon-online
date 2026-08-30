@@ -1,5 +1,6 @@
 "use server";
 
+import { MARKETPLACE_LOCKED_MESSAGE_HE } from "@/features/marketplace/data/marketplace-labels";
 import { purchaseMarketplaceListing } from "@/features/marketplace/services/purchase-listing.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -9,12 +10,14 @@ export type PurchaseMarketplaceListingActionResult =
   | { status: "own-listing"; message: string }
   | { status: "listing-unavailable"; message: string }
   | { status: "insufficient-funds"; message: string }
-  | { status: "unauthenticated"; message: string };
+  | { status: "unauthenticated"; message: string }
+  | { status: "level-locked"; message: string };
 
 const ERROR_MESSAGES = {
   "own-listing": "לא ניתן לקנות מכירה שפרסמת בעצמך.",
   "listing-unavailable": "המכירה השתנתה או כבר אינה זמינה. נא לבדוק את הפרטים המעודכנים לפני קנייה חוזרת.",
   "insufficient-funds": "אין לך מספיק כסף ו/או זהב לרכישה זו.",
+  "level-locked": MARKETPLACE_LOCKED_MESSAGE_HE,
 } as const;
 
 // MARKETPLACE PHASE 4 — the one entry point the listing detail UI's Buy

@@ -91,3 +91,15 @@ test("hasDuplicateQualifier is false when qualifiers aren't ready yet (no region
   assert.equal(overview.championsLeague.hasDuplicateQualifier, false);
   assert.equal(overview.championsLeague.qualifiersReady, false);
 });
+
+// PLAYER LEVEL ACCESS REQUIREMENTS — the single global proactive-lock flag,
+// so the UI can show the League lock before any registration attempt.
+test("levelUnlocked reflects MIN_LEAGUE_PLAYER_LEVEL (7): true at level 50, false below 7", async () => {
+  const unlocked = await getLeaguesOverview(PLAYER_ID, NOW);
+  assert.equal(unlocked.levelUnlocked, true);
+
+  resetFakeDb();
+  seedPlayerProfile({ id: PLAYER_ID, level: 6, experience: 0 });
+  const locked = await getLeaguesOverview(PLAYER_ID, NOW);
+  assert.equal(locked.levelUnlocked, false);
+});

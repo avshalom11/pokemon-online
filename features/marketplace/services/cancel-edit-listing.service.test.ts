@@ -14,8 +14,8 @@ const OTHER_PLAYER_ID = "other-1";
 
 beforeEach(() => {
   resetFakeDb();
-  seedPlayerProfile({ id: SELLER_ID });
-  seedPlayerProfile({ id: OTHER_PLAYER_ID });
+  seedPlayerProfile({ id: SELLER_ID, level: 5 });
+  seedPlayerProfile({ id: OTHER_PLAYER_ID, level: 5 });
 });
 
 test("success: an editing listing is restored to active, price and locks completely unchanged", async () => {

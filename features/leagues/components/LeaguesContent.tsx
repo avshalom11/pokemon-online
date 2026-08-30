@@ -8,6 +8,7 @@ import { getChestDefinition } from "@/features/chests/data/chest-definitions";
 import { getEggDefinition } from "@/features/eggs/data/egg-definitions";
 import { cancelLeagueRegistrationAction, registerForLeagueAction } from "@/features/leagues/actions/register-for-league.action";
 import { HowLeaguesWorkDialog } from "./HowLeaguesWorkDialog";
+import { MIN_LEAGUE_PLAYER_LEVEL } from "@/features/leagues/config/league-access-rules.config";
 import { CYCLE_WEEK_LABELS } from "@/features/leagues/data/league-cycle-labels";
 import { leagueMatchStatusLabelHe } from "@/features/leagues/data/league-match-labels";
 import { getLeaguePlacementRewardDefinition, getLeagueParticipationRewardDefinition } from "@/features/leagues/data/league-reward-registry";
@@ -25,6 +26,11 @@ interface LeaguesContentProps {
 
 const CHAMPIONS_LEAGUE_NOTICE = "ההעפלה לליגת האלופים מתבצעת לפי תוצאות הליגות האזוריות — מקום 1 בכל ליגה אזורית, ומקום 2 בליגה III";
 const DUPLICATE_QUALIFIER_MESSAGE = "לא ניתן ליצור כרגע את ליגת האלופים עקב כפילות בין המעפילים.";
+// PLAYER LEVEL ACCESS REQUIREMENTS — interpolated from MIN_LEAGUE_PLAYER_LEVEL
+// rather than a second hardcoded "7", reused by both the proactive banner
+// below AND registerResultMessageHe's own "below-min-level" case, so the
+// two can never drift apart.
+const LEAGUES_LOCKED_MESSAGE_HE = `הליגות זמינות החל מרמה ${MIN_LEAGUE_PLAYER_LEVEL}.`;
 
 
 function registrationDeadlineHe(closesAt: Date): string {
@@ -37,6 +43,8 @@ function registerResultMessageHe(status: string): string {
       return "כבר נרשמת לליגה זו";
     case "ineligible":
       return "אינך עומד בדרישות הליגה";
+    case "below-min-level":
+      return LEAGUES_LOCKED_MESSAGE_HE;
     case "registration-closed":
       return "ההרשמה נסגרה";
     case "champions-league-not-registerable":
@@ -137,11 +145,23 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
           <span className="font-semibold text-indigo-300">{CYCLE_WEEK_LABELS[overview.cycle.weekIndexInCycle]}</span>
         </div>
 
+        {/* PLAYER LEVEL ACCESS REQUIREMENTS — shown proactively, before any
+            registration attempt, so a below-level player never has to click
+            Register first to learn why. Registration itself stays blocked
+            regardless (registerForLeagueAction re-derives this exact same
+            check server-side) — this is purely the explanation. */}
+        {!overview.levelUnlocked ? (
+          <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm font-semibold text-amber-200">
+            {LEAGUES_LOCKED_MESSAGE_HE}
+          </p>
+        ) : null}
+
         <div className="flex flex-col gap-3">
           {overview.regionalLeagues.map((league) => (
             <RegionalLeagueCard
               key={league.leagueId}
               league={league}
+              levelUnlocked={overview.levelUnlocked}
               isPending={isPending}
               override={statusByLeague[league.leagueId]}
               onRegister={() => handleRegister(league.leagueId)}
@@ -209,6 +229,10 @@ function CancelRegistrationConfirmDialog({ isPending, onConfirm, onCancel }: { i
 
 interface RegionalLeagueCardProps {
   league: RegionalLeagueView;
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the same global overview.levelUnlocked
+  // flag every card receives; a below-level player never sees a Register
+  // button on any League, regardless of that League's own badge eligibility.
+  levelUnlocked: boolean;
   isPending: boolean;
   override?: { registered: boolean; message: string | null };
   onRegister: () => void;
@@ -219,9 +243,9 @@ interface RegionalLeagueCardProps {
   onToggle: () => void;
 }
 
-function RegionalLeagueCard({ league, isPending, override, onRegister, onRequestCancel, championName, bracket, isExpanded, onToggle }: RegionalLeagueCardProps) {
+function RegionalLeagueCard({ league, levelUnlocked, isPending, override, onRegister, onRequestCancel, championName, bracket, isExpanded, onToggle }: RegionalLeagueCardProps) {
   const registered = override?.registered ?? league.registered;
-  const canRegister = league.eligible && league.registrationOpen && !registered;
+  const canRegister = levelUnlocked && league.eligible && league.registrationOpen && !registered;
   // LEAGUE LEGACY REGISTRATION — CANCEL BUTTON FIX (later task) — cancel
   // visibility is now driven ENTIRELY by the server-computed
   // canCancelRegistration (the real tournament's own deadline/status),

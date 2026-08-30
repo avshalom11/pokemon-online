@@ -1,9 +1,16 @@
 import "server-only";
 
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { MARKETPLACE_LISTING_BUYABLE_STATUS } from "@/features/marketplace/types/marketplace.types";
 import { prisma } from "@/lib/db/prisma";
 
-export type EnterEditListingResult = { status: "success" } | { status: "not-owner" } | { status: "listing-unavailable" };
+export type EnterEditListingResult =
+  | { status: "success" }
+  | { status: "not-owner" }
+  | { status: "listing-unavailable" }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the seller is below
+  // MIN_MARKETPLACE_PLAYER_LEVEL.
+  | { status: "level-locked" };
 
 // MARKETPLACE PHASE 6 — flips the seller's own active listing to "editing".
 // Deliberately touches nothing else: no Pokémon/item lock changes, no price
@@ -32,6 +39,10 @@ export type EnterEditListingResult = { status: "success" } | { status: "not-owne
 // single UPDATE row-safe. Matching the established convention here avoids
 // that gap entirely rather than relying on a real-vs-fake distinction.
 export async function enterEditListing(sellerId: string, listingId: string): Promise<EnterEditListingResult> {
+  if (!(await isMarketplaceUnlockedForPlayer(sellerId))) {
+    return { status: "level-locked" };
+  }
+
   return prisma.$transaction(async (tx) => {
     const listing = await tx.marketplaceListing.findUnique({ where: { id: listingId } });
     if (!listing) {
