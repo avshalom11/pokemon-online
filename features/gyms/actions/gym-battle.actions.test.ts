@@ -103,7 +103,11 @@ test("a Gym Leader victory still grants the Badge/reward exactly once — deferr
 // drive deterministically.
 test("a defeat (loss) also never calls revalidatePath — it never did, and this fix must not change that (source check: no revalidatePath call exists anywhere in executeGymBattleActionAction)", async () => {
   const fs = await import("node:fs");
-  const src = fs.readFileSync("features/gyms/actions/gym-battle.actions.ts", "utf8");
+  // LINE-ENDING AGNOSTIC — normalized to LF right after reading, so this
+  // substring check passes regardless of whether the source file is
+  // checked out with LF or CRLF line endings (Windows checkouts commonly
+  // use CRLF; the literal patterns below are always written as LF).
+  const src = fs.readFileSync("features/gyms/actions/gym-battle.actions.ts", "utf8").replace(/\r\n/g, "\n");
   const actionBody = src.slice(src.indexOf("export async function executeGymBattleActionAction"), src.indexOf("export async function getGymBattleViewDataAction"));
   // Checked as an actual call (with the opening paren) rather than a bare
   // substring match, so this doesn't false-positive on this very
@@ -119,7 +123,9 @@ test("a defeat (loss) also never calls revalidatePath — it never did, and this
 // only ever happens after the player's own "אישור" click.
 test("client wiring: confirmVictory calls confirmGymBattleResultAction before navigating away", async () => {
   const fs = await import("node:fs");
-  const src = fs.readFileSync("features/gyms/components/GymBattleContent.tsx", "utf8");
+  // LINE-ENDING AGNOSTIC — see the doc comment above this file's other
+  // readFileSync call for why this normalization is needed.
+  const src = fs.readFileSync("features/gyms/components/GymBattleContent.tsx", "utf8").replace(/\r\n/g, "\n");
   assert.ok(src.includes("import {\n  abandonGymBattleAction,\n  confirmGymBattleResultAction,"), "confirmGymBattleResultAction must be imported");
   const confirmVictoryBody = src.match(/function confirmVictory\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
   const awaitIndex = confirmVictoryBody.indexOf("await confirmGymBattleResultAction();");

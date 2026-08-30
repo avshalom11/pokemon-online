@@ -49,7 +49,11 @@ async function earnAllThreeBadges(regionId: RegionId) {
 // 1. Kanto Champion produces a valid, existing battle route.
 test("Kanto Champion: GymsContent's Champion row navigates to the exact same literal route ('/gyms/battle') a Gym battle uses — never a template/region-scoped URL", async () => {
   const fs = await import("node:fs");
-  const src = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8");
+  // LINE-ENDING AGNOSTIC — normalized to LF right after reading, so this
+  // substring/regex check passes regardless of whether the source file is
+  // checked out with LF or CRLF line endings (Windows checkouts commonly
+  // use CRLF; the literal patterns below are always written as LF).
+  const src = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8").replace(/\r\n/g, "\n");
 
   // The Champion row's onStart now opens the Champion intro dialog first
   // (REGIONAL CHAMPION — INTRO + VICTORY DIALOG POLISH task); confirming
@@ -82,7 +86,11 @@ test("Kanto Champion: GymsContent's Champion row navigates to the exact same lit
 // is shared, parameterized only by data, never by a region-specific URL).
 test("all 9 Regional Champions share one navigation path — no region-specific battle URL branch exists", async () => {
   const fs = await import("node:fs");
-  const src = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8");
+  // LINE-ENDING AGNOSTIC — normalized to LF right after reading, so this
+  // substring/regex check passes regardless of whether the source file is
+  // checked out with LF or CRLF line endings (Windows checkouts commonly
+  // use CRLF; the literal patterns below are always written as LF).
+  const src = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8").replace(/\r\n/g, "\n");
 
   assert.equal(REGION_GYM_SEQUENCE.length, 9);
   // There is exactly one ChampionRow render site (one JSX call), not one
@@ -109,7 +117,11 @@ test("all 9 Regional Champions share one navigation path — no region-specific 
 // check in test 1 already covering both call sites unconditionally).
 test("Gym battles still resolve through the same shared navigation path as Champion battles (GymRow also wires into openSelection, not a separate flow)", async () => {
   const fs = await import("node:fs");
-  const src = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8");
+  // LINE-ENDING AGNOSTIC — normalized to LF right after reading, so this
+  // substring/regex check passes regardless of whether the source file is
+  // checked out with LF or CRLF line endings (Windows checkouts commonly
+  // use CRLF; the literal patterns below are always written as LF).
+  const src = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8").replace(/\r\n/g, "\n");
   assert.ok(src.includes("onStart={(battleSlot) => handleGymStart(region.regionId, gym.gymNumber, battleSlot)}"), "GymRow must still call handleGymStart");
   assert.ok(src.includes("openSelection({ source: \"gym\", regionId, gymNumber, battleSlot })"), "handleGymStart must still route into the shared openSelection function");
 });

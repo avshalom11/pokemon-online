@@ -85,8 +85,12 @@ test("Regional Champion win: real reward (Medal) -> victory.mp3 branch", async (
 });
 
 // The actual UI-side selection (source-level).
-const gymBattleContentSrc = fs.readFileSync("features/gyms/components/GymBattleContent.tsx", "utf8");
-const resultSoundSrc = fs.readFileSync("features/battle/utils/battle-result-sound.ts", "utf8");
+// LINE-ENDING AGNOSTIC — normalized to LF right after reading, so the
+// substring checks below pass regardless of whether these files are
+// checked out with LF or CRLF line endings (Windows checkouts commonly use
+// CRLF; every literal pattern in this file is always written as LF).
+const gymBattleContentSrc = fs.readFileSync("features/gyms/components/GymBattleContent.tsx", "utf8").replace(/\r\n/g, "\n");
+const resultSoundSrc = fs.readFileSync("features/battle/utils/battle-result-sound.ts", "utf8").replace(/\r\n/g, "\n");
 
 test("(source) the detected filename small_victory.mp3 is used exactly, and the file exists on disk", () => {
   assert.ok(resultSoundSrc.includes('export const SMALL_VICTORY_SOUND_PATH = "/sounds/battle/small_victory.mp3";'));
