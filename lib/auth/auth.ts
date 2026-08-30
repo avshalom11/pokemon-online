@@ -28,6 +28,17 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
 
+  // DEV/PLAY ISOLATION — localhost cookies are host-only, never port-scoped
+  // (RFC 6265), so DEV (:3001) and PLAY (:3000) would otherwise share the
+  // exact same "better-auth.*" cookie names and clobber each other's
+  // session on every login. This prefix gives DEV its own cookie
+  // namespace; PLAY keeps the library default. Must stay in sync with
+  // proxy.ts's own getSessionCookie() call, which can't read this config
+  // object directly.
+  advanced: {
+    cookiePrefix: "monster-dev",
+  },
+
   database: prismaAdapter(prisma, {
     provider: "postgresql",
     // Keep Better Auth's own multi-model writes (e.g. user + account

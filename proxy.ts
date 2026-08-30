@@ -16,7 +16,10 @@ const PROTECTED_PATHS = ["/home", "/my-pokemon", "/map", "/battle", "/pokemon-ce
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = getSessionCookie(request);
+  // Must stay aligned with lib/auth/auth.ts's advanced.cookiePrefix — this
+  // standalone helper doesn't read that config, it only takes an explicit
+  // override (see better-auth/dist/cookies/index.mjs's getSessionCookie).
+  const sessionCookie = getSessionCookie(request, { cookiePrefix: "monster-dev" });
 
   const isProtectedPath = PROTECTED_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`)
