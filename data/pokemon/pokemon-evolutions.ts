@@ -328,7 +328,7 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   //   - Eevee's own Leafeon/Glaceon (real-game Location evolution near a
   //     Moss Rock/Icy Rock) and Kirlia/Snorunt's Gender-restricted second
   //     targets (Gallade/Froslass) are NOT here — all four are direct
-  //     evolution-item evolutions (Leaf Stone/Ice Stone/Dawn Stone) — see
+  //     evolution-item evolutions (Leaf Stone/Ice Stone/Moon Stone) — see
   //     EVOLUTION_ITEM_EVOLUTIONS below, never this table or
   //     BRANCH_EVOLUTIONS.
   //   - Piloswine's real Move-Known (Ancient Power) target level isn't
@@ -926,7 +926,7 @@ const LEVEL_EVOLUTIONS: Record<string, LevelEvolution> = {
   // Coat evolution-item branch into Scizor (EVOLUTION_ITEM_EVOLUTIONS
   // below) — same "one species, level AND evolution-item together" shape
   // Slowpoke (-> Slowbro by level, -> Slowking by King's Rock) and
-  // Kirlia/Snorunt (level AND an independent Dawn Stone branch) already
+  // Kirlia/Snorunt (level AND an independent Moon Stone branch) already
   // established; Kleavor's real canonical item (Black Augurite) has no
   // natural existing-catalog analog, so — same "no unmapped-item value"
   // rule Applin already established (BRANCH_EVOLUTIONS below) — it becomes
@@ -1152,6 +1152,14 @@ export function getAllLevelEvolutionEntries(): LevelEvolutionEntry[] {
 // Deep Sea Tooth, Deep Sea Scale, Oval Stone) was remapped onto one of these
 // 16 shared items instead — see EVOLUTION_ITEM_EVOLUTIONS below for exactly
 // which species uses which item now.
+//
+// Evolution Item Consolidation phase — Dragon Scale, Protector, Reaper
+// Cloth, and Dawn Stone were each used by only 1-2 evolutions and are
+// removed from the catalog entirely; their evolutions are remapped onto an
+// existing, higher-usage item instead (never a new item): Seadra -> Kingdra
+// now uses Water Stone, Rhydon -> Rhyperior now uses Metal Coat, Dusclops ->
+// Dusknoir now uses Dusk Stone, and Kirlia -> Gallade / Snorunt -> Froslass
+// now use Moon Stone. 12 items remain.
 export type EvolutionItemId =
   | "fire-stone"
   | "water-stone"
@@ -1160,15 +1168,11 @@ export type EvolutionItemId =
   | "sun-stone"
   | "moon-stone"
   | "ice-stone"
-  | "dawn-stone"
   | "dusk-stone"
   | "shiny-stone"
   | "kings-rock"
   | "metal-coat"
-  | "dragon-scale"
-  | "upgrade"
-  | "protector"
-  | "reaper-cloth";
+  | "upgrade";
 
 export interface EvolutionItemEvolution {
   method: "evolution-item";
@@ -1259,7 +1263,10 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // PRE-PALDEA STEP — Scyther also independently evolves into Kleavor at
   // level 40 (LEVEL_EVOLUTIONS above); this Metal Coat branch is unchanged.
   scyther: [{ method: "evolution-item", evolvesToSpeciesId: "scizor", itemId: "metal-coat" }],
-  seadra: [{ method: "evolution-item", evolvesToSpeciesId: "kingdra", itemId: "dragon-scale" }],
+  // Evolution Item Consolidation phase — Dragon Scale removed from the
+  // catalog (only 1 evolution used it); remapped onto Water Stone, which
+  // Seadra's own Water typing already fits.
+  seadra: [{ method: "evolution-item", evolvesToSpeciesId: "kingdra", itemId: "water-stone" }],
   porygon: [{ method: "evolution-item", evolvesToSpeciesId: "porygon2", itemId: "upgrade" }],
 
   // Generation III (Hoenn, Phase 2) — lombre/nuzleaf keep their real-game
@@ -1308,8 +1315,9 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // Cleanup phase remaps it onto Ice Stone (Razor Claw removed).
   sneasel: [{ method: "evolution-item", evolvesToSpeciesId: "weavile", itemId: "ice-stone" }],
   // Rhydon (Kanto, #112) -> Rhyperior: former Trade-while-holding-Protector
-  // evolution — Protector is one of the six kept Evolution Items, unchanged.
-  rhydon: [{ method: "evolution-item", evolvesToSpeciesId: "rhyperior", itemId: "protector" }],
+  // evolution — Evolution Item Consolidation phase remaps it onto Metal
+  // Coat (Protector removed from the catalog, only 1 evolution used it).
+  rhydon: [{ method: "evolution-item", evolvesToSpeciesId: "rhyperior", itemId: "metal-coat" }],
   // Electabuzz (Kanto, #125) -> Electivire: former
   // Trade-while-holding-Electirizer evolution — Evolution Item Cleanup phase
   // remaps it onto Thunder Stone (Electirizer removed).
@@ -1334,23 +1342,33 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // species, one stage at a time, per this file's own top-of-file rule).
   porygon2: [{ method: "evolution-item", evolvesToSpeciesId: "porygon-z", itemId: "upgrade" }],
   // Kirlia (Hoenn, #281) -> Gallade: real-game Gender-restricted second
-  // target (Dawn Stone, male only) — Gender evolution is forbidden, so
-  // this becomes an independent evolution-item branch that exists
-  // alongside Kirlia's own pre-existing level-30 evolution into Gardevoir,
-  // same "one species, level AND evolution-item together" precedent
-  // Slowpoke already established (slowpoke -> slowbro @37 level, AND
-  // slowpoke -> slowking via kings-rock). The player, not a hidden gender
-  // value, decides which one their Kirlia becomes.
-  kirlia: [{ method: "evolution-item", evolvesToSpeciesId: "gallade", itemId: "dawn-stone" }],
+  // target (originally Dawn Stone, male only) — Gender evolution is
+  // forbidden, so this becomes an independent evolution-item branch that
+  // exists alongside Kirlia's own pre-existing level-30 evolution into
+  // Gardevoir, same "one species, level AND evolution-item together"
+  // precedent Slowpoke already established (slowpoke -> slowbro @37 level,
+  // AND slowpoke -> slowking via kings-rock). The player, not a hidden
+  // gender value, decides which one their Kirlia becomes. Evolution Item
+  // Consolidation phase remaps it onto Moon Stone (Dawn Stone removed from
+  // the catalog, only 2 evolutions used it) — same target as Snorunt's own
+  // branch below.
+  kirlia: [{ method: "evolution-item", evolvesToSpeciesId: "gallade", itemId: "moon-stone" }],
   // Dusclops (Hoenn, #356) -> Dusknoir: former
   // Trade-while-holding-Reaper-Cloth evolution — same precedent as Sneasel
   // above. Dusclops's own pre-existing evolution FROM Duskull is untouched.
-  dusclops: [{ method: "evolution-item", evolvesToSpeciesId: "dusknoir", itemId: "reaper-cloth" }],
+  // Evolution Item Consolidation phase remaps it onto Dusk Stone (Reaper
+  // Cloth removed from the catalog, only 1 evolution used it) — Dusclops's
+  // own Ghost typing already fits Dusk Stone's existing Ghost-leaning uses
+  // (Misdreavus, Lampent).
+  dusclops: [{ method: "evolution-item", evolvesToSpeciesId: "dusknoir", itemId: "dusk-stone" }],
   // Snorunt (Hoenn, #361) -> Froslass: real-game Gender-restricted second
-  // target (Dawn Stone, female only) — same "level AND evolution-item
-  // together" simplification as Kirlia -> Gallade above. Snorunt's own
-  // pre-existing level-42 evolution into Glalie is untouched.
-  snorunt: [{ method: "evolution-item", evolvesToSpeciesId: "froslass", itemId: "dawn-stone" }],
+  // target (originally Dawn Stone, female only) — same "level AND
+  // evolution-item together" simplification as Kirlia -> Gallade above.
+  // Snorunt's own pre-existing level-42 evolution into Glalie is untouched.
+  // Evolution Item Consolidation phase remaps it onto Moon Stone (Dawn
+  // Stone removed from the catalog) — same target as Kirlia's own branch
+  // above.
+  snorunt: [{ method: "evolution-item", evolvesToSpeciesId: "froslass", itemId: "moon-stone" }],
   // Misdreavus (Johto, #200) -> Mismagius: real-game Dusk Stone evolution.
   misdreavus: [{ method: "evolution-item", evolvesToSpeciesId: "mismagius", itemId: "dusk-stone" }],
   // Murkrow (Johto, #198) -> Honchkrow: real-game Dusk Stone evolution —
@@ -1538,11 +1556,13 @@ export function getAllEvolutionItemEvolutionEntries(): EvolutionItemEvolutionEnt
 }
 
 // Every evolution-item id this game's evolution data knows about — exactly
-// the 16 values EvolutionItemId allows, every one of them a real,
+// the 12 values EvolutionItemId allows, every one of them a real,
 // purchasable Shop item (features/shop/data/shop-items.ts) at the same
 // 70/35 buy/sell price (Evolution Item Cleanup phase: no more
 // registry-only/not-yet-purchasable items — that in-between state was
-// removed along with the eight retired item ids).
+// removed along with the eight retired item ids; Evolution Item
+// Consolidation phase later retired four more — Dragon Scale, Protector,
+// Reaper Cloth, Dawn Stone — each used by only 1-2 evolutions).
 const EVOLUTION_ITEM_IDS: readonly EvolutionItemId[] = [
   "fire-stone",
   "water-stone",
@@ -1551,15 +1571,11 @@ const EVOLUTION_ITEM_IDS: readonly EvolutionItemId[] = [
   "sun-stone",
   "moon-stone",
   "ice-stone",
-  "dawn-stone",
   "dusk-stone",
   "shiny-stone",
   "kings-rock",
   "metal-coat",
-  "dragon-scale",
   "upgrade",
-  "protector",
-  "reaper-cloth",
 ];
 
 // Narrows an arbitrary Shop/Inventory itemId to the EvolutionItemId union —

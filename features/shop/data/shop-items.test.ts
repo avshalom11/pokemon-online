@@ -1,22 +1,24 @@
 // Focused regression test for the Shop's evolution-item ("stones" category)
-// catalog — Evolution Item Cleanup phase's final, single source of truth:
-// exactly 16 evolution products (10 Evolution Stones + 6 Evolution Items),
-// each at the same 70-gold price, none of the eight retired item ids
-// present anywhere.
+// catalog. Evolution Item Cleanup phase's original catalog had 16 evolution
+// products (10 Evolution Stones + 6 Evolution Items); Evolution Item
+// Consolidation phase retired Dragon Scale, Protector, Reaper Cloth, and
+// Dawn Stone (each used by only 1-2 evolutions, remapped onto an existing
+// item instead), leaving exactly 12, each still at the same 70-gold price,
+// with none of the retired item ids present anywhere.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { SHOP_ITEMS } from "./shop-items.ts";
 import { isEvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
 
-const EVOLUTION_STONES = ["fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone", "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone"];
-const EVOLUTION_ITEMS = ["kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth"];
+const EVOLUTION_STONES = ["fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone", "moon-stone", "ice-stone", "dusk-stone", "shiny-stone"];
+const EVOLUTION_ITEMS = ["kings-rock", "metal-coat", "upgrade"];
 
-test("the Shop's stones category contains exactly the 16 canonical evolution products, no more, no fewer", () => {
+test("the Shop's stones category contains exactly the 12 canonical evolution products, no more, no fewer", () => {
   const stoneIds = SHOP_ITEMS.filter((item) => item.categoryId === "stones").map((item) => item.id);
   const expected = [...EVOLUTION_STONES, ...EVOLUTION_ITEMS];
 
-  assert.equal(stoneIds.length, 16);
+  assert.equal(stoneIds.length, 12);
   assert.deepEqual([...stoneIds].sort(), [...expected].sort());
 });
 
@@ -34,8 +36,21 @@ test("every Shop item id is a recognized EvolutionItemId whenever it's in the st
   }
 });
 
-test("none of the eight retired evolution items exist in the Shop catalog", () => {
-  const retiredIds = ["deep-sea-tooth", "deep-sea-scale", "dubious-disc", "razor-claw", "razor-fang", "electirizer", "magmarizer", "oval-stone"];
+test("none of the twelve retired evolution items exist in the Shop catalog", () => {
+  const retiredIds = [
+    "deep-sea-tooth",
+    "deep-sea-scale",
+    "dubious-disc",
+    "razor-claw",
+    "razor-fang",
+    "electirizer",
+    "magmarizer",
+    "oval-stone",
+    "dragon-scale",
+    "protector",
+    "reaper-cloth",
+    "dawn-stone",
+  ];
   const shopIds = new Set(SHOP_ITEMS.map((item) => item.id));
   for (const itemId of retiredIds) {
     assert.equal(shopIds.has(itemId), false, `${itemId} must not exist in the Shop catalog`);

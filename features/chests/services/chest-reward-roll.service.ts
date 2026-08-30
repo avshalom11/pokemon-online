@@ -34,7 +34,7 @@ import type { IncubatorTypeId } from "@/features/eggs/data/incubator-definitions
 import { SHOP_ITEMS } from "@/features/shop/data/shop-items";
 
 // The existing, canonical evolution-item catalog (features/shop/data/
-// shop-items.ts's own "stones" category — the exact same 16 ids
+// shop-items.ts's own "stones" category — the exact same ids
 // features/evolution/services/evolution-item-catalog.ts and
 // data/pokemon/pokemon-evolutions.ts's own EvolutionItemId type already
 // treat as canonical) — reused exactly as-is, never a separate

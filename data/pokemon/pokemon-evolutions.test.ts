@@ -63,24 +63,28 @@ test("evolution-item species are never also present in the Level Evolution table
   }
 });
 
-test("isEvolutionItemId recognizes exactly the sixteen canonical evolution-item ids (Evolution Item Cleanup phase's final catalog)", () => {
+test("isEvolutionItemId recognizes exactly the twelve canonical evolution-item ids (Evolution Item Consolidation phase's final catalog)", () => {
   const canonicalIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
-    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
-    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+    "moon-stone", "ice-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "upgrade",
   ];
   for (const itemId of canonicalIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must be a recognized EvolutionItemId`);
   }
-  assert.equal(canonicalIds.length, 16, "exactly 16 evolution products: 10 stones + 6 items");
+  assert.equal(canonicalIds.length, 12, "exactly 12 evolution products after Evolution Item Consolidation");
   assert.equal(isEvolutionItemId("poke-ball"), false);
 
-  // Retired items (Evolution Item Cleanup phase) must never be recognized
-  // again — each species that used to need one of these now shares a
-  // kept/general item instead (see this file's own remapping tests below).
+  // Retired items must never be recognized again — each species that used
+  // to need one of these now shares a kept/general item instead (see this
+  // file's own remapping tests below). Evolution Item Cleanup phase retired
+  // the first eight (Trade-held-item substitutes); Evolution Item
+  // Consolidation phase retired the last four (each used by only 1-2
+  // evolutions).
   const retiredIds = [
     "deep-sea-tooth", "deep-sea-scale", "dubious-disc", "razor-claw",
     "razor-fang", "electirizer", "magmarizer", "oval-stone",
+    "dragon-scale", "protector", "reaper-cloth", "dawn-stone",
   ];
   for (const itemId of retiredIds) {
     assert.equal(isEvolutionItemId(itemId), false, `${itemId} must no longer be a recognized EvolutionItemId`);
@@ -97,7 +101,7 @@ test("Gloom has two independent Sun/Leaf Stone branches; Sunkern is Sun-Stone-on
 test("former Trade-item evolutions now evolve directly from their item, no trade involved", () => {
   assert.equal(getEvolutionItemEvolutionByItem("onix", "metal-coat")?.evolvesToSpeciesId, "steelix");
   assert.equal(getEvolutionItemEvolutionByItem("scyther", "metal-coat")?.evolvesToSpeciesId, "scizor");
-  assert.equal(getEvolutionItemEvolutionByItem("seadra", "dragon-scale")?.evolvesToSpeciesId, "kingdra");
+  assert.equal(getEvolutionItemEvolutionByItem("seadra", "water-stone")?.evolvesToSpeciesId, "kingdra");
   assert.equal(getEvolutionItemEvolutionByItem("porygon", "upgrade")?.evolvesToSpeciesId, "porygon2");
   assert.equal(getEvolutionItemEvolutionByItem("slowpoke", "kings-rock")?.evolvesToSpeciesId, "slowking");
 
@@ -532,8 +536,8 @@ test("former Location (special magnetic field) Sinnoh evolutions are now plain l
   assert.deepEqual(getLevelEvolution("nosepass"), { evolvesToSpeciesId: "probopass", requiredLevel: 42 });
 });
 
-test("isEvolutionItemId recognizes the six new Sinnoh evolution items kept after Evolution Item Cleanup", () => {
-  for (const itemId of ["dawn-stone", "dusk-stone", "shiny-stone", "protector", "reaper-cloth"]) {
+test("isEvolutionItemId recognizes the Sinnoh evolution items kept after Evolution Item Cleanup", () => {
+  for (const itemId of ["dusk-stone", "shiny-stone"]) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must be a recognized EvolutionItemId`);
   }
 });
@@ -541,23 +545,30 @@ test("isEvolutionItemId recognizes the six new Sinnoh evolution items kept after
 // Evolution Item Cleanup phase — every former Trade-with-held-item Sinnoh
 // evolution that used to need its OWN unique item (Razor Claw, Electirizer,
 // Magmarizer, Razor Fang, Dubious Disc, Oval Stone) is remapped onto one of
-// the 16 kept/general items instead. Rhydon/Dusclops (Protector/Reaper
-// Cloth) were never remapped — those two items were kept as-is.
+// the kept/general items instead. Evolution Item Consolidation phase later
+// remapped Rhydon and Dusclops again, off Protector/Reaper Cloth (each used
+// by only 1 evolution, both now retired) onto Metal Coat/Dusk Stone.
 test("former Trade-with-held-item Sinnoh evolutions now evolve directly from a kept/remapped item, no trade involved", () => {
   assert.equal(getEvolutionItemEvolutionByItem("sneasel", "ice-stone")?.evolvesToSpeciesId, "weavile");
-  assert.equal(getEvolutionItemEvolutionByItem("rhydon", "protector")?.evolvesToSpeciesId, "rhyperior");
+  assert.equal(getEvolutionItemEvolutionByItem("rhydon", "metal-coat")?.evolvesToSpeciesId, "rhyperior");
   assert.equal(getEvolutionItemEvolutionByItem("electabuzz", "thunder-stone")?.evolvesToSpeciesId, "electivire");
   assert.equal(getEvolutionItemEvolutionByItem("magmar", "fire-stone")?.evolvesToSpeciesId, "magmortar");
   assert.equal(getEvolutionItemEvolutionByItem("gligar", "dusk-stone")?.evolvesToSpeciesId, "gliscor");
   assert.equal(getEvolutionItemEvolutionByItem("porygon2", "upgrade")?.evolvesToSpeciesId, "porygon-z");
-  assert.equal(getEvolutionItemEvolutionByItem("dusclops", "reaper-cloth")?.evolvesToSpeciesId, "dusknoir");
+  assert.equal(getEvolutionItemEvolutionByItem("dusclops", "dusk-stone")?.evolvesToSpeciesId, "dusknoir");
 
-  // The eight retired item ids must never resolve any evolution anymore.
+  // The eight Evolution Item Cleanup-retired item ids must never resolve
+  // any evolution anymore.
   assert.equal(getEvolutionItemEvolutionByItem("sneasel", "razor-claw"), undefined);
   assert.equal(getEvolutionItemEvolutionByItem("electabuzz", "electirizer"), undefined);
   assert.equal(getEvolutionItemEvolutionByItem("magmar", "magmarizer"), undefined);
   assert.equal(getEvolutionItemEvolutionByItem("gligar", "razor-fang"), undefined);
   assert.equal(getEvolutionItemEvolutionByItem("porygon2", "dubious-disc"), undefined);
+
+  // The four Evolution Item Consolidation-retired item ids must never
+  // resolve any evolution anymore either.
+  assert.equal(getEvolutionItemEvolutionByItem("rhydon", "protector"), undefined);
+  assert.equal(getEvolutionItemEvolutionByItem("dusclops", "reaper-cloth"), undefined);
 });
 
 test("Roselia -> Roserade (Shiny Stone) and Happiny -> Chansey (remapped to Moon Stone) are direct evolution-item evolutions", () => {
@@ -572,14 +583,16 @@ test("Misdreavus -> Mismagius and Murkrow -> Honchkrow each evolve via Dusk Ston
   assert.equal(getEvolutionItemEvolutionByItem("murkrow", "dusk-stone")?.evolvesToSpeciesId, "honchkrow");
 });
 
-test("Kirlia keeps its level-30 evolution into Gardevoir AND gains an independent Dawn Stone branch into Gallade (real-game Gender restriction dropped)", () => {
+test("Kirlia keeps its level-30 evolution into Gardevoir AND gains an independent Moon Stone branch into Gallade (real-game Gender restriction dropped; remapped from the now-retired Dawn Stone)", () => {
   assert.deepEqual(getLevelEvolution("kirlia"), { evolvesToSpeciesId: "gardevoir", requiredLevel: 30 });
-  assert.equal(getEvolutionItemEvolutionByItem("kirlia", "dawn-stone")?.evolvesToSpeciesId, "gallade");
+  assert.equal(getEvolutionItemEvolutionByItem("kirlia", "moon-stone")?.evolvesToSpeciesId, "gallade");
+  assert.equal(getEvolutionItemEvolutionByItem("kirlia", "dawn-stone"), undefined, "Dawn Stone is retired");
 });
 
-test("Snorunt keeps its level-42 evolution into Glalie AND gains an independent Dawn Stone branch into Froslass (real-game Gender restriction dropped)", () => {
+test("Snorunt keeps its level-42 evolution into Glalie AND gains an independent Moon Stone branch into Froslass (real-game Gender restriction dropped; remapped from the now-retired Dawn Stone)", () => {
   assert.deepEqual(getLevelEvolution("snorunt"), { evolvesToSpeciesId: "glalie", requiredLevel: 42 });
-  assert.equal(getEvolutionItemEvolutionByItem("snorunt", "dawn-stone")?.evolvesToSpeciesId, "froslass");
+  assert.equal(getEvolutionItemEvolutionByItem("snorunt", "moon-stone")?.evolvesToSpeciesId, "froslass");
+  assert.equal(getEvolutionItemEvolutionByItem("snorunt", "dawn-stone"), undefined, "Dawn Stone is retired");
 });
 
 test("every Sinnoh legendary/mythical species (lake trio, Dialga/Palkia, Heatran, Regigigas, Cresselia, Phione/Manaphy, Darkrai, Shaymin, Arceus) has no evolution", () => {
@@ -777,13 +790,13 @@ test("Eelektrik and Lampent each keep their own pre-existing level evolution (fr
   assert.equal(getEvolutionItemEvolutionByItem("lampent", "dusk-stone")?.evolvesToSpeciesId, "chandelure");
 });
 
-test("the evolution-item catalog is unchanged by Unova: still exactly the same 16 EvolutionItemId values, no new evolution product introduced", () => {
+test("the evolution-item catalog is unchanged by Unova: still exactly the same 12 EvolutionItemId values, no new evolution product introduced", () => {
   const canonicalIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
-    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
-    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+    "moon-stone", "ice-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "upgrade",
   ];
-  assert.equal(canonicalIds.length, 16);
+  assert.equal(canonicalIds.length, 12);
   for (const itemId of canonicalIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
   }
@@ -1057,13 +1070,13 @@ test("Floette and Doublade each keep their own pre-existing level evolution (fro
   assert.equal(getEvolutionItemEvolutionByItem("doublade", "dusk-stone")?.evolvesToSpeciesId, "aegislash");
 });
 
-test("the evolution-item catalog is unchanged by Kalos: still exactly the same 16 EvolutionItemId values, no new evolution product introduced", () => {
+test("the evolution-item catalog is unchanged by Kalos: still exactly the same 12 EvolutionItemId values, no new evolution product introduced", () => {
   const canonicalIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
-    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
-    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+    "moon-stone", "ice-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "upgrade",
   ];
-  assert.equal(canonicalIds.length, 16);
+  assert.equal(canonicalIds.length, 12);
   for (const itemId of canonicalIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
   }
@@ -1072,6 +1085,7 @@ test("the evolution-item catalog is unchanged by Kalos: still exactly the same 1
   for (const fakeOrRetiredItem of [
     "mega-stone", "prison-bottle", "sachet", "whipped-dream",
     "deep-sea-tooth", "deep-sea-scale", "dubious-disc", "razor-claw", "razor-fang", "electirizer", "magmarizer", "oval-stone",
+    "dragon-scale", "protector", "reaper-cloth", "dawn-stone",
   ]) {
     assert.equal(isEvolutionItemId(fakeOrRetiredItem), false, `${fakeOrRetiredItem} must never be a recognized EvolutionItemId`);
   }
@@ -1441,13 +1455,13 @@ test("normal Raichu/Exeggutor/Marowak remain reachable exactly as before, alongs
   assert.ok(cuboneBranch.targets.includes("marowak-alola"), "Alolan Marowak must also be reachable");
 });
 
-test("no new evolution item was introduced for Alola: still exactly the same 16 EvolutionItemId values", () => {
+test("no new evolution item was introduced for Alola: still exactly the same 12 EvolutionItemId values", () => {
   const canonicalIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
-    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
-    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+    "moon-stone", "ice-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "upgrade",
   ];
-  assert.equal(canonicalIds.length, 16);
+  assert.equal(canonicalIds.length, 12);
   for (const itemId of canonicalIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
   }
@@ -1845,13 +1859,13 @@ test("no Calyrex fusion/rider form (Ice Rider/Shadow Rider) or Gigantamax form a
   }
 });
 
-test("no new evolution item was introduced for Galar: still exactly the same 16 EvolutionItemId values", () => {
+test("no new evolution item was introduced for Galar: still exactly the same 12 EvolutionItemId values", () => {
   const canonicalIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
-    "moon-stone", "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone",
-    "kings-rock", "metal-coat", "dragon-scale", "upgrade", "protector", "reaper-cloth",
+    "moon-stone", "ice-stone", "dusk-stone", "shiny-stone",
+    "kings-rock", "metal-coat", "upgrade",
   ];
-  assert.equal(canonicalIds.length, 16);
+  assert.equal(canonicalIds.length, 12);
   for (const itemId of canonicalIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
   }
@@ -2301,11 +2315,10 @@ test("Charcadet is an explicit level-40 Branch choice between Armarouge and Ceru
   }
 });
 
-test("no Auspicious Armor or Malicious Armor was added to the evolution item catalog: still exactly the same 16 EvolutionItemId values", () => {
+test("no Auspicious Armor or Malicious Armor was added to the evolution item catalog: still exactly the same 12 EvolutionItemId values", () => {
   const expectedItemIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone", "moon-stone",
-    "ice-stone", "dawn-stone", "dusk-stone", "shiny-stone", "kings-rock", "metal-coat",
-    "dragon-scale", "upgrade", "protector", "reaper-cloth",
+    "ice-stone", "dusk-stone", "shiny-stone", "kings-rock", "metal-coat", "upgrade",
   ];
   for (const itemId of expectedItemIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must remain a recognized EvolutionItemId`);
