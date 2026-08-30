@@ -316,6 +316,78 @@ export const SHOP_ITEMS: ShopItem[] = [
     medicineEffectKind: "revive",
     healPercent: 1,
   },
+  // STATUS-HEALING ITEMS — the 5 single-status cures plus Full Heal, all
+  // under the existing "potions" category (never a new one — see
+  // shop-categories.ts). Each of the 5 sets curesStatus to exactly one
+  // MajorStatus (features/battle/status/major-status.ts); Full Heal alone
+  // sets it to "all". None of the six ever sets healPercent — that field is
+  // exclusively a heal/revive concept. Priced in Money only, per spec.
+  {
+    id: "antidote",
+    categoryId: "potions",
+    name: "מרפא הרעלה",
+    price: 500,
+    currency: "money",
+    description: "מרפא מצב הרעלה מפוקימון אחד.",
+    imageUrl: getShopItemImagePath("potions", "antidote"),
+    medicineEffectKind: "cure-status",
+    curesStatus: "poison",
+  },
+  {
+    id: "burn-heal",
+    categoryId: "potions",
+    name: "מרפא כוויות",
+    price: 500,
+    currency: "money",
+    description: "מרפא מצב כוויה מפוקימון אחד.",
+    imageUrl: getShopItemImagePath("potions", "burn-heal"),
+    medicineEffectKind: "cure-status",
+    curesStatus: "burn",
+  },
+  {
+    id: "paralyze-heal",
+    categoryId: "potions",
+    name: "מרפא שיתוק",
+    price: 500,
+    currency: "money",
+    description: "מרפא מצב שיתוק מפוקימון אחד.",
+    imageUrl: getShopItemImagePath("potions", "paralyze-heal"),
+    medicineEffectKind: "cure-status",
+    curesStatus: "paralysis",
+  },
+  {
+    id: "awakening",
+    categoryId: "potions",
+    name: "מרפא שינה",
+    price: 500,
+    currency: "money",
+    description: "מעיר פוקימון ישן ומרפא את מצב השינה שלו.",
+    imageUrl: getShopItemImagePath("potions", "awakening"),
+    medicineEffectKind: "cure-status",
+    curesStatus: "sleep",
+  },
+  {
+    id: "ice-heal",
+    categoryId: "potions",
+    name: "מרפא הקפאה",
+    price: 500,
+    currency: "money",
+    description: "מפשיר פוקימון קפוא ומרפא את מצב ההקפאה שלו.",
+    imageUrl: getShopItemImagePath("potions", "ice-heal"),
+    medicineEffectKind: "cure-status",
+    curesStatus: "freeze",
+  },
+  {
+    id: "full-heal",
+    categoryId: "potions",
+    name: "ריפוי מלא",
+    price: 1200,
+    currency: "money",
+    description: "מרפא כל מצב סטטוס עיקרי מפוקימון אחד — הרעלה, כוויה, שיתוק, שינה או הקפאה.",
+    imageUrl: getShopItemImagePath("potions", "full-heal"),
+    medicineEffectKind: "cure-status",
+    curesStatus: "all",
+  },
   // Shop UI Redesign phase — every evolution product's description below is
   // a short thematic sentence (never a Pokémon list, never derived from
   // Pokémon names) that replaces the previous permanent inline "Evolves:"

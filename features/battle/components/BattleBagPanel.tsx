@@ -4,9 +4,12 @@ import { useState } from "react";
 
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { PartySlot } from "@/features/pokemon/components/PartySlot";
+import { MAJOR_STATUS_LABELS } from "@/features/battle/status/major-status-labels";
+import { isMedicineTargetEligible } from "@/features/battle/services/medicine-target-eligibility";
 import { getBallCapturePercent } from "@/lib/battle/ballCaptureDisplay";
 import type { CaptureChanceParams } from "@/engine/battle/capture";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
+import type { MajorStatus } from "@/features/battle/status/major-status";
 import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 
 // A completed medicine use, shown by MedicineResultScreen below instead of
@@ -24,6 +27,11 @@ export interface MedicineResultView {
   itemImageUrl: string;
   pokemonId: string;
   previousHp: number;
+  // STATUS-HEALING ITEMS — the MajorStatus this use actually cleared, or
+  // null for an ordinary heal/revive. Drives MedicineResultScreen's own
+  // message branch below (a status cure never shows "restored X HP" — that
+  // would misleadingly read as 0 for an item that changed no HP at all).
+  curedStatus: MajorStatus | null;
 }
 
 interface BattleBagPanelProps {
@@ -271,15 +279,19 @@ interface MedicineTargetPickerProps {
 }
 
 // Inline step-2 view within the same Bag panel — never a second overlay.
-// Eligibility mirrors use-medicine.service.ts's own fainted/non-fainted
-// rule (server re-validates regardless): Revive items only enable fainted
-// party members, every other medicine item only enables non-fainted ones.
-// Read straight off the item's own canonical medicineEffectKind
-// (features/shop/types/shop.types.ts) — never a hardcoded item id/name
-// check, so a future Medicine item works correctly here with zero code
-// change as long as its catalog entry sets the right kind.
+// Eligibility mirrors use-medicine.service.ts's own rules exactly (server
+// re-validates regardless): Revive items only enable fainted party members;
+// a status-curing item ("cure-status") only enables a non-fainted party
+// member currently carrying the exact status it cures (or ANY MajorStatus,
+// for Full Heal's curesStatus === "all"); every other medicine item (plain
+// heal) only enables non-fainted ones. Read straight off the item's own
+// canonical medicineEffectKind/curesStatus (features/shop/types/
+// shop.types.ts) — never a hardcoded item id/name check, so a future
+// Medicine item works correctly here with zero code change as long as its
+// catalog entry sets the right kind.
 function MedicineTargetPicker({ item, party, pending, onBack, onSelect }: MedicineTargetPickerProps) {
   const isRevive = item.item.medicineEffectKind === "revive";
+  const isCureStatus = item.item.medicineEffectKind === "cure-status";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -305,13 +317,14 @@ function MedicineTargetPicker({ item, party, pending, onBack, onSelect }: Medici
         </div>
       </div>
 
-      <p className="mb-2 text-xs text-slate-500">{isRevive ? "בחר פוקימון שהתעלף" : "בחר פוקימון לריפוי"}</p>
+      <p className="mb-2 text-xs text-slate-500">
+        {isRevive ? "בחר פוקימון שהתעלף" : isCureStatus ? "בחר פוקימון לריפוי ממצב הסטטוס שלו" : "בחר פוקימון לריפוי"}
+      </p>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {party.map((pokemon) => {
-            const isFainted = pokemon.currentHp <= 0;
-            const eligible = isRevive ? isFainted : !isFainted;
+            const eligible = isMedicineTargetEligible(item.item, pokemon);
 
             return (
               <PartySlot
@@ -368,9 +381,18 @@ function MedicineResultScreen({ result, party, onConfirm }: MedicineResultScreen
         />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-100">{result.itemName}</p>
-          <p dir="rtl" className="text-xs font-semibold text-emerald-300">
-            שוחזרו <span dir="ltr">{restoredAmount}</span> נקודות חיים
-          </p>
+          {/* STATUS-HEALING ITEMS — a status cure changes no HP at all, so
+              "restored 0 HP" would be actively misleading here; show which
+              status was cured instead. */}
+          {result.curedStatus ? (
+            <p dir="rtl" className="text-xs font-semibold text-emerald-300">
+              רופא ממצב {MAJOR_STATUS_LABELS[result.curedStatus]}
+            </p>
+          ) : (
+            <p dir="rtl" className="text-xs font-semibold text-emerald-300">
+              שוחזרו <span dir="ltr">{restoredAmount}</span> נקודות חיים
+            </p>
+          )}
         </div>
       </div>
 

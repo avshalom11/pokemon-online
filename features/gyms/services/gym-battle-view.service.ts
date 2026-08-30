@@ -37,6 +37,13 @@ export interface GymBattleParticipantView {
   readonly maxHp: number;
   readonly fainted: boolean;
   readonly isActive: boolean;
+  // COMPLETE STATUS-MEDICINE BATTLE SUPPORT — the participant's LIVE
+  // in-battle status (session.playerBattleStatus via statusFor, never the
+  // possibly-stale PlayerPokemon.status row — same reasoning
+  // gym-battle-item.service.ts's own doc comment gives). Lets the Bag's
+  // target picker (GymBagPanel.tsx) both filter eligible targets for a
+  // cure-status item and show WHY a given participant is eligible.
+  readonly status: MajorStatus | null;
 }
 
 export interface GymBattleViewData {
@@ -180,6 +187,7 @@ export async function getGymBattleViewData(playerId: string, playerName: string)
         maxHp: pokemon.maxHp,
         fainted: (playerBattleHp[pokemon.id] ?? 0) <= 0,
         isActive: pokemon.id === session.activePlayerPokemonId,
+        status: statusFor(playerStatusMap, pokemon.id).status,
       })),
       knownMoves,
       playerName,

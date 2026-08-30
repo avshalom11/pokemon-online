@@ -22,6 +22,7 @@ import { sellIncubatorAction } from "@/features/inventory/actions/sell-incubator
 import { sellInventoryItemAction } from "@/features/inventory/actions/sell-inventory-item.action";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { EvolutionItemPanel } from "@/features/evolution/components/EvolutionItemPanel";
+import { MedicineStatusPanel } from "@/features/inventory/components/MedicineStatusPanel";
 import { TmUsePanel } from "@/features/tm-system/components/TmUsePanel";
 import { ShopCategoryMenu } from "@/features/shop/components/ShopCategoryMenu";
 import { getDefaultShopCategoryId, getShopCategories } from "@/features/shop/services/shop-catalog.service";
@@ -449,6 +450,23 @@ export function InventoryContent({
 
             {!isEggsCategorySelected && !isChestsCategorySelected && selectedView && selectedView.item.categoryId === "stones" ? (
               <EvolutionItemPanel item={selectedView.item} ownedPokemon={ownedPokemon} />
+            ) : null}
+
+            {/* STATUS-HEALING ITEMS — same "appears under the sell panel
+                while this specific item is selected" wiring as
+                EvolutionItemPanel above, but keyed on medicineEffectKind
+                rather than categoryId: "potions" also holds the ordinary
+                heal/revive items, which deliberately get no Inventory panel
+                at all (they stay battle-only). Keyed by item.id so
+                switching between two different status items always shows
+                fresh candidates rather than stale state from a previous
+                selection. */}
+            {!isEggsCategorySelected &&
+            !isChestsCategorySelected &&
+            selectedView &&
+            selectedView.item.categoryId === "potions" &&
+            selectedView.item.medicineEffectKind === "cure-status" ? (
+              <MedicineStatusPanel key={selectedView.item.id} item={selectedView.item} ownedPokemon={ownedPokemon} />
             ) : null}
 
             {/* TM SYSTEM PHASE 5 — same "appears under the sell panel while
