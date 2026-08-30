@@ -9,10 +9,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { test } from "node:test";
 
-const gymsContentSrc = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8");
-const gymIntroDialogSrc = fs.readFileSync("features/gyms/components/GymIntroDialog.tsx", "utf8");
-const gymChampionIntroDialogSrc = fs.readFileSync("features/gyms/components/GymChampionIntroDialog.tsx", "utf8");
-const gymVictoryRewardDialogSrc = fs.readFileSync("features/gyms/components/GymVictoryRewardDialog.tsx", "utf8");
+// LINE-ENDING AGNOSTIC — normalized to LF right after reading, so the
+// substring/regex checks below pass regardless of whether these files are
+// checked out with LF or CRLF line endings (Windows checkouts commonly use
+// CRLF; every literal pattern in this file is always written as LF).
+const gymsContentSrc = fs.readFileSync("features/gyms/components/GymsContent.tsx", "utf8").replace(/\r\n/g, "\n");
+const gymIntroDialogSrc = fs.readFileSync("features/gyms/components/GymIntroDialog.tsx", "utf8").replace(/\r\n/g, "\n");
+const gymChampionIntroDialogSrc = fs.readFileSync("features/gyms/components/GymChampionIntroDialog.tsx", "utf8").replace(/\r\n/g, "\n");
+const gymVictoryRewardDialogSrc = fs.readFileSync("features/gyms/components/GymVictoryRewardDialog.tsx", "utf8").replace(/\r\n/g, "\n");
 
 test("MEDAL IMAGE SIZE: the victory dialog shows the Regional Medal image slightly larger than a Gym Badge (h-28 w-28 vs the unchanged h-24 w-24), never affecting dialog text/logic/rewards", () => {
   assert.ok(
