@@ -1,5 +1,6 @@
 "use server";
 
+import { MARKETPLACE_LOCKED_MESSAGE_HE } from "@/features/marketplace/data/marketplace-labels";
 import { cancelMarketplaceListing } from "@/features/marketplace/services/cancel-listing.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -8,11 +9,13 @@ export type CancelMarketplaceListingActionResult =
   | { status: "success" }
   | { status: "not-owner"; message: string }
   | { status: "listing-unavailable"; message: string }
-  | { status: "unauthenticated"; message: string };
+  | { status: "unauthenticated"; message: string }
+  | { status: "level-locked"; message: string };
 
 const ERROR_MESSAGES = {
   "not-owner": "ניתן לבטל רק מכירה שפרסמת בעצמך.",
   "listing-unavailable": "המכירה כבר השתנתה או אינה זמינה לביטול.",
+  "level-locked": MARKETPLACE_LOCKED_MESSAGE_HE,
 } as const;
 
 // MARKETPLACE PHASE 5 — the one entry point the listing detail UI's "בטל

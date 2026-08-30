@@ -1,7 +1,9 @@
 import "server-only";
 
+import { getPlayerLevel } from "@/features/player-progression/progression-service";
 import { prisma } from "@/lib/db/prisma";
 import type { LeagueTournament, LeagueTournamentMatch, LeagueTournamentParticipant } from "@/lib/generated/prisma/client";
+import { MIN_LEAGUE_PLAYER_LEVEL } from "../config/league-access-rules.config";
 import { CHAMPIONS_LEAGUE, REGIONAL_LEAGUES } from "../data/league-registry";
 import type { LeagueId, RegionalLeagueId } from "../types/league.types";
 import { getLeagueEligibility } from "./league-eligibility.service";
@@ -69,6 +71,11 @@ export type RegisterForLeagueResult =
   | { status: "registered"; tournamentId: string }
   | { status: "already-registered"; tournamentId: string }
   | { status: "ineligible"; badgeCount: number; regionalChampionCount: number }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — below MIN_LEAGUE_PLAYER_LEVEL. Kept
+  // distinct from "ineligible" (badge/regional-champion based) — these are
+  // two different reasons a player can't register, same way Gyms keeps
+  // "locked-level" distinct from "locked-previous-region".
+  | { status: "below-min-level" }
   | { status: "registration-closed" }
   | { status: "champions-league-not-registerable" }
   // GYMS & LEAGUES PHASE 8 — the 4-week rotation gate (section 1/2): this
@@ -94,6 +101,15 @@ export async function registerForLeague(playerId: string, leagueId: LeagueId, no
   const league = REGIONAL_LEAGUES.find((candidate) => candidate.id === leagueId);
   if (!league) {
     return { status: "invalid-league" };
+  }
+
+  // PLAYER LEVEL ACCESS REQUIREMENTS — checked before badge/champion
+  // eligibility, so a below-level player always sees the level reason
+  // first regardless of their own badge progress (mirrors Gyms' own
+  // level-gate-first ordering in startNpcBattle).
+  const playerLevel = await getPlayerLevel(playerId);
+  if (playerLevel < MIN_LEAGUE_PLAYER_LEVEL) {
+    return { status: "below-min-level" };
   }
 
   const eligibility = await getLeagueEligibility(playerId, league);

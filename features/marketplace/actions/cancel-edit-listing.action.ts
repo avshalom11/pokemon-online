@@ -1,5 +1,6 @@
 "use server";
 
+import { MARKETPLACE_LOCKED_MESSAGE_HE } from "@/features/marketplace/data/marketplace-labels";
 import { cancelEditListing } from "@/features/marketplace/services/cancel-edit-listing.service";
 import { getCurrentSession } from "@/lib/auth/auth-session";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
@@ -8,11 +9,13 @@ export type CancelEditListingActionResult =
   | { status: "success" }
   | { status: "not-owner"; message: string }
   | { status: "listing-unavailable"; message: string }
-  | { status: "unauthenticated"; message: string };
+  | { status: "unauthenticated"; message: string }
+  | { status: "level-locked"; message: string };
 
 const ERROR_MESSAGES = {
   "not-owner": "ניתן לבטל עריכה רק של מכירה שפרסמת בעצמך.",
   "listing-unavailable": "המכירה כבר אינה במצב עריכה.",
+  "level-locked": MARKETPLACE_LOCKED_MESSAGE_HE,
 } as const;
 
 // MARKETPLACE PHASE 6 — called when the seller backs out of the edit UI

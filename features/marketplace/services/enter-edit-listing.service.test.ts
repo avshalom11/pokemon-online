@@ -15,8 +15,8 @@ const OTHER_PLAYER_ID = "other-1";
 
 beforeEach(() => {
   resetFakeDb();
-  seedPlayerProfile({ id: SELLER_ID });
-  seedPlayerProfile({ id: OTHER_PLAYER_ID, coins: 1000, gold: 100 });
+  seedPlayerProfile({ id: SELLER_ID, level: 5 });
+  seedPlayerProfile({ id: OTHER_PLAYER_ID, level: 5, coins: 1000, gold: 100 });
 });
 
 test("success: an active listing flips to editing", async () => {

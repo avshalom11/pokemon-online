@@ -21,8 +21,8 @@ const OTHER_PLAYER_ID = "other-1";
 
 beforeEach(() => {
   resetFakeDb();
-  seedPlayerProfile({ id: SELLER_ID });
-  seedPlayerProfile({ id: OTHER_PLAYER_ID });
+  seedPlayerProfile({ id: SELLER_ID, level: 5 });
+  seedPlayerProfile({ id: OTHER_PLAYER_ID, level: 5 });
 });
 
 async function seedListingItem(listingId: string, itemId: string, quantity: number) {

@@ -1,5 +1,6 @@
 "use server";
 
+import { MARKETPLACE_LOCKED_MESSAGE_HE } from "@/features/marketplace/data/marketplace-labels";
 import { createMarketplaceListing, type CreateListingResult } from "@/features/marketplace/services/create-listing.service";
 import type { PokemonMarketUnavailableReason } from "@/features/marketplace/services/pokemon-availability.service";
 import type { CreateListingInput } from "@/features/marketplace/validation/create-listing.schema";
@@ -21,6 +22,7 @@ const POKEMON_UNAVAILABLE_MESSAGES: Record<PokemonMarketUnavailableReason, strin
 function getCreateListingErrorMessage(result: Exclude<CreateListingResult, { status: "success" }>): string {
   if (result.status === "invalid-input") return result.message;
   if (result.status === "pokemon-unavailable") return POKEMON_UNAVAILABLE_MESSAGES[result.reason];
+  if (result.status === "level-locked") return MARKETPLACE_LOCKED_MESSAGE_HE;
   return "אין מספיק כמות פנויה מהפריט שנבחר.";
 }
 

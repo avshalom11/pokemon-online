@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { lockInventoryQuantity, releaseInventoryQuantity } from "@/features/marketplace/services/inventory-lock.service";
 import { getPokemonMarketAvailability, type PokemonMarketUnavailableReason } from "@/features/marketplace/services/pokemon-availability.service";
 import { createListingSchema, type CreateListingInput } from "@/features/marketplace/validation/create-listing.schema";
@@ -11,7 +12,10 @@ export type SaveEditListingResult =
   | { status: "listing-unavailable" }
   | { status: "invalid-input"; message: string }
   | { status: "pokemon-unavailable"; playerPokemonId: string; reason: PokemonMarketUnavailableReason }
-  | { status: "insufficient-item-quantity"; itemId: string };
+  | { status: "insufficient-item-quantity"; itemId: string }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the seller is below
+  // MIN_MARKETPLACE_PLAYER_LEVEL.
+  | { status: "level-locked" };
 
 // Never exported — same "throw to abort a multi-step transaction, never a
 // plain early return once something has already been written" idiom every
@@ -68,6 +72,10 @@ function isUniqueConstraintError(error: unknown): boolean {
 //   uses, so a stale/already-resolved edit session (count 0) throws and
 //   rolls back this entire save, keeping the listing as it was.
 export async function saveEditListing(sellerId: string, listingId: string, input: CreateListingInput): Promise<SaveEditListingResult> {
+  if (!(await isMarketplaceUnlockedForPlayer(sellerId))) {
+    return { status: "level-locked" };
+  }
+
   const parsed = createListingSchema.safeParse(input);
   if (!parsed.success) {
     return { status: "invalid-input", message: parsed.error.issues[0]?.message ?? "קלט לא תקין" };

@@ -30,8 +30,8 @@ const OTHER_PLAYER_ID = "other-1";
 
 beforeEach(() => {
   resetFakeDb();
-  seedPlayerProfile({ id: SELLER_ID, coins: 500, gold: 20 });
-  seedPlayerProfile({ id: OTHER_PLAYER_ID, coins: 1000, gold: 100 });
+  seedPlayerProfile({ id: SELLER_ID, level: 5, coins: 500, gold: 20 });
+  seedPlayerProfile({ id: OTHER_PLAYER_ID, level: 5, coins: 1000, gold: 100 });
 });
 
 async function seedListingItem(listingId: string, itemId: string, quantity: number) {

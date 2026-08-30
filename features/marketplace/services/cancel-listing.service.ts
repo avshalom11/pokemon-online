@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isMarketplaceUnlockedForPlayer } from "@/features/marketplace/services/marketplace-access.service";
 import { releaseInventoryQuantity } from "@/features/marketplace/services/inventory-lock.service";
 import { MARKETPLACE_LISTING_BUYABLE_STATUS } from "@/features/marketplace/types/marketplace.types";
 import { prisma } from "@/lib/db/prisma";
@@ -10,7 +11,10 @@ export type CancelListingResult =
   // Not found, already sold, already cancelled, or currently being edited
   // — same "stale view, must re-review" bucket purchase-listing.service.ts
   // already establishes for the identical set of non-active states.
-  | { status: "listing-unavailable" };
+  | { status: "listing-unavailable" }
+  // PLAYER LEVEL ACCESS REQUIREMENTS — the seller is below
+  // MIN_MARKETPLACE_PLAYER_LEVEL.
+  | { status: "level-locked" };
 
 // Never exported — same "throw to abort a multi-step transaction, never a
 // plain early return once something has already been written" idiom
@@ -61,6 +65,10 @@ class CancelAbort extends Error {
 //      never lost it), then delete the MarketplaceListingItem rows. No
 //      currency changes anywhere in this function.
 export async function cancelMarketplaceListing(sellerId: string, listingId: string): Promise<CancelListingResult> {
+  if (!(await isMarketplaceUnlockedForPlayer(sellerId))) {
+    return { status: "level-locked" };
+  }
+
   try {
     return await prisma.$transaction(async (tx) => {
       const listing = await tx.marketplaceListing.findUnique({ where: { id: listingId } });

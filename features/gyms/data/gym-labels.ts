@@ -3,6 +3,7 @@ import { MAJOR_STATUS_LABELS } from "@/features/battle/status/major-status-label
 import type { PokemonType } from "@/shared/types/pokemon";
 import type { RegionId } from "@/shared/types/region";
 import type { ShopItem } from "@/features/shop/types/shop.types";
+import { MIN_GYM_PLAYER_LEVEL } from "../config/gym-access-rules.config";
 import { GYM_BATTLE_FORMATS } from "./gym-registry";
 import type { GymBattleSlotId } from "../types/gym.types";
 import type { RegionStatus } from "../services/gym-overview-view.service";
@@ -66,7 +67,12 @@ export function regionalChampionLabelHe(regionId: RegionId): string {
 // "locked-level".
 export function regionGymLockMessageHe(reason: "locked-level" | "locked-previous-region", regionId: RegionId, previousRegionId?: RegionId | null): string {
   if (reason === "locked-level") {
-    return "מערכת המכונים נפתחת ברמה 10";
+    // PLAYER LEVEL ACCESS REQUIREMENTS — interpolated from
+    // MIN_GYM_PLAYER_LEVEL rather than a second hardcoded number, so this
+    // text can never drift from the real threshold the way it previously
+    // did (this string used to read a hardcoded "10" even after nothing
+    // else here changed).
+    return `המכונים זמינים החל מרמה ${MIN_GYM_PLAYER_LEVEL}.`;
   }
   const previousName = previousRegionId ? REGION_DISPLAY_NAMES_HE[previousRegionId] : "";
   return `יש להשלים את מנהל מחוז ${previousName} כדי לפתוח את מכוני ${REGION_DISPLAY_NAMES_HE[regionId]}`;
@@ -85,7 +91,7 @@ export function gymTypeLabelHe(type: PokemonType): string {
 export function regionStatusLabelHe(status: RegionStatus): string {
   switch (status) {
     case "locked-level":
-      return "נעול — נדרשת רמה 10";
+      return `נעול — נדרשת רמה ${MIN_GYM_PLAYER_LEVEL}`;
     case "locked-previous-region":
       return "נעול";
     case "available":
@@ -180,7 +186,7 @@ export function gymBagItemEffectLabelHe(item: Pick<ShopItem, "medicineEffectKind
 export function gymStartResultMessageHe(status: StartGymBattleStatus): string {
   switch (status) {
     case "locked-level":
-      return "מערכת המכונים נפתחת ברמה 10";
+      return `המכונים זמינים החל מרמה ${MIN_GYM_PLAYER_LEVEL}.`;
     case "locked-previous-region":
       return "יש להשלים קודם את מנהל המחוז הקודם";
     case "locked":

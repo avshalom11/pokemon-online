@@ -9,8 +9,11 @@ import { test } from "node:test";
 
 const contentSrc = fs.readFileSync("features/leagues/components/LeaguesContent.tsx", "utf8");
 
-test("the register button only ever shows for eligible + open + unregistered (canRegister), unchanged by this task", () => {
-  assert.ok(contentSrc.includes("const canRegister = league.eligible && league.registrationOpen && !registered;"));
+test("the register button only ever shows for level-unlocked + eligible + open + unregistered (canRegister)", () => {
+  // PLAYER LEVEL ACCESS REQUIREMENTS — levelUnlocked was added as the
+  // first condition; the eligible/registrationOpen/!registered chain this
+  // test originally proved is otherwise unchanged.
+  assert.ok(contentSrc.includes("const canRegister = levelUnlocked && league.eligible && league.registrationOpen && !registered;"));
 });
 
 // LEAGUE LEGACY REGISTRATION — CANCEL BUTTON FIX (later task) — canCancel

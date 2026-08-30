@@ -1,5 +1,6 @@
 "use server";
 
+import { MARKETPLACE_LOCKED_MESSAGE_HE } from "@/features/marketplace/data/marketplace-labels";
 import type { PokemonMarketUnavailableReason } from "@/features/marketplace/services/pokemon-availability.service";
 import { saveEditListing } from "@/features/marketplace/services/save-edit-listing.service";
 import type { CreateListingInput } from "@/features/marketplace/validation/create-listing.schema";
@@ -23,6 +24,7 @@ function getSaveEditErrorMessage(result: Exclude<Awaited<ReturnType<typeof saveE
   if (result.status === "pokemon-unavailable") return POKEMON_UNAVAILABLE_MESSAGES[result.reason];
   if (result.status === "insufficient-item-quantity") return "אין מספיק כמות פנויה מהפריט שנבחר.";
   if (result.status === "not-owner") return "ניתן לשמור עריכה רק של מכירה שפרסמת בעצמך.";
+  if (result.status === "level-locked") return MARKETPLACE_LOCKED_MESSAGE_HE;
   return "המכירה כבר אינה במצב עריכה — יש לבדוק את הפרטים המעודכנים.";
 }
 
