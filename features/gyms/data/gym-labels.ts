@@ -1,4 +1,5 @@
 import { POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
+import { MAJOR_STATUS_LABELS } from "@/features/battle/status/major-status-labels";
 import type { PokemonType } from "@/shared/types/pokemon";
 import type { RegionId } from "@/shared/types/region";
 import type { ShopItem } from "@/features/shop/types/shop.types";
@@ -150,17 +151,25 @@ export function gymBagItemErrorMessageHe(status: GymBagItemErrorStatus): string 
 // GYM BATTLE COPY + ITEM EFFECT DISPLAY (later task, section 4) — the
 // Bag panel's own "what does this item actually do" label, derived
 // EXCLUSIVELY from the item's own real catalog fields
-// (medicineEffectKind/healPercent — features/shop/data/shop-items.ts,
-// the SAME single source of truth use-medicine.service.ts/
+// (medicineEffectKind/healPercent/curesStatus — features/shop/data/
+// shop-items.ts, the SAME single source of truth use-medicine.service.ts/
 // gym-battle-item.service.ts actually apply the effect from) — never a
-// hardcoded percentage table here. Both fields are always set together for
-// every Medicine item currently in the catalog (see shop-items.ts), and
-// every one of them is percent-of-max-HP-based (healPercent, a 0..1
-// fraction) — there is no fixed-HP-amount item to special-case today; if
-// one is ever added without a healPercent, this returns null and the
-// caller simply omits the effect line rather than showing a wrong number.
-export function gymBagItemEffectLabelHe(item: Pick<ShopItem, "medicineEffectKind" | "healPercent">): string | null {
-  if (!item.medicineEffectKind || item.healPercent === undefined) return null;
+// hardcoded percentage table here. heal/revive are percent-of-max-HP-based
+// (healPercent, a 0..1 fraction); cure-status items instead set
+// curesStatus (a MajorStatus, or "all" for Full Heal) — exactly one of the
+// two field pairs is ever set per item, never both. Returns null only for
+// a genuinely malformed catalog entry (missing the field its own declared
+// kind requires), in which case the caller simply omits the effect line
+// rather than showing a wrong value.
+export function gymBagItemEffectLabelHe(item: Pick<ShopItem, "medicineEffectKind" | "healPercent" | "curesStatus">): string | null {
+  if (!item.medicineEffectKind) return null;
+
+  if (item.medicineEffectKind === "cure-status") {
+    if (!item.curesStatus) return null;
+    return item.curesStatus === "all" ? "ריפוי: כל מצב סטטוס" : `ריפוי: ${MAJOR_STATUS_LABELS[item.curesStatus]}`;
+  }
+
+  if (item.healPercent === undefined) return null;
   const percent = Math.round(item.healPercent * 100);
   return item.medicineEffectKind === "revive" ? `החייאה: ${percent}% חיים` : `ריפוי: ${percent}%`;
 }

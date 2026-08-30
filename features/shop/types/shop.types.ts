@@ -8,6 +8,7 @@
 import type { ChestTypeId } from "@/features/chests/data/chest-definitions";
 import type { CurrencyType } from "@/features/currency/types/currency.types";
 import type { IncubatorTypeId } from "@/features/eggs/data/incubator-definitions";
+import type { MajorStatus } from "@/features/battle/status/major-status";
 import type { PokemonRarity } from "@/shared/types/pokemon";
 
 // EGGS PHASE 6 — "eggs" deliberately named for the whole category rather
@@ -59,7 +60,12 @@ export interface ShopCategory {
 // HP, since a fainted Pokémon's current HP is always 0). Undefined on
 // every non-Medicine item (Poké Balls, Stones) — those have no in-battle
 // use of this kind.
-export type MedicineEffectKind = "heal" | "revive";
+// STATUS-HEALING ITEMS — "cure-status" added alongside the original "heal"/
+// "revive". Every Medicine item still sets exactly the fields its own kind
+// needs and no others: heal/revive keep using healPercent (curesStatus stays
+// undefined for both); cure-status items set curesStatus instead
+// (healPercent stays undefined for them) — see ShopItem.curesStatus below.
+export type MedicineEffectKind = "heal" | "revive" | "cure-status";
 
 export interface ShopItem {
   id: string;
@@ -83,6 +89,15 @@ export interface ShopItem {
   // a 20%-of-max-HP Potion. Never a flat HP amount: the same item always
   // scales with whichever Pokémon it's used on.
   healPercent?: number;
+  // STATUS-HEALING ITEMS — set only on Medicine items whose
+  // medicineEffectKind is "cure-status" (Antidote/Burn Heal/Paralyze Heal/
+  // Awakening/Ice Heal/Full Heal), never alongside healPercent on the same
+  // item. A single MajorStatus for the five single-status items, or "all"
+  // for Full Heal — features/battle/services/use-medicine.service.ts and
+  // features/battle/services/medicine-status-eligibility.ts are the only
+  // two places this is ever read, both driven entirely by this field
+  // rather than any hardcoded item id.
+  curesStatus?: MajorStatus | "all";
   // EGGS PHASE 6 — set only on the 4 egg products (categoryId "eggs"),
   // never on any other item. This is the ONE pointer into the existing
   // Phase 1 egg catalog (features/eggs/data/egg-definitions.ts) a purchase

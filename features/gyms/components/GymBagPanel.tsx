@@ -5,6 +5,8 @@ import { useState } from "react";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { gymBagItemEffectLabelHe, gymBagItemErrorMessageHe } from "@/features/gyms/data/gym-labels";
+import { MAJOR_STATUS_LABELS } from "@/features/battle/status/major-status-labels";
+import { isMedicineTargetEligible } from "@/features/battle/services/medicine-target-eligibility";
 import type { GymBattleViewData } from "@/features/gyms/services/gym-battle-view.service";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 
@@ -118,12 +120,16 @@ interface TargetPickerProps {
   onSelect: (targetPlayerPokemonId: string) => void;
 }
 
-// Eligibility mirrors useGymBattleItem's own server-side rule exactly
-// (medicineEffectKind==="revive" only targets a fainted participant, every
-// other kind only a living one) — read off the same catalog field, never a
-// hardcoded item check; the server re-validates regardless.
+// Eligibility reuses isMedicineTargetEligible — the SAME shared rule
+// useGymBattleItem's own server-side (re-)check applies, Field Battle's Bag
+// applies, and Inventory-outside-battle applies: medicineEffectKind===
+// "revive" only targets a fainted participant, "cure-status" only a
+// non-fainted one whose CURRENT status matches curesStatus (or any status,
+// for Full Heal), every other kind only a living one. Never a hardcoded
+// item check here — the server always re-validates regardless.
 function TargetPicker({ item, participants, pending, onBack, onSelect }: TargetPickerProps) {
   const isRevive = item.item.medicineEffectKind === "revive";
+  const isCureStatus = item.item.medicineEffectKind === "cure-status";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -149,11 +155,13 @@ function TargetPicker({ item, participants, pending, onBack, onSelect }: TargetP
         </div>
       </div>
 
-      <p className="mb-2 text-xs text-slate-500">{isRevive ? "בחר פוקימון שהתעלף" : "בחר פוקימון לריפוי"}</p>
+      <p className="mb-2 text-xs text-slate-500">
+        {isRevive ? "בחר פוקימון שהתעלף" : isCureStatus ? "בחר פוקימון לריפוי ממצב הסטטוס שלו" : "בחר פוקימון לריפוי"}
+      </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {participants.map((pokemon) => {
-          const eligible = isRevive ? pokemon.fainted : !pokemon.fainted;
+          const eligible = isMedicineTargetEligible(item.item, { currentHp: pokemon.currentHp, status: pokemon.status });
           return (
             <button
               key={pokemon.id}
@@ -169,7 +177,16 @@ function TargetPicker({ item, participants, pending, onBack, onSelect }: TargetP
                 </p>
                 <HealthBar current={Math.max(0, pokemon.currentHp)} max={pokemon.maxHp} />
               </div>
-              {pokemon.fainted ? <span className="text-xs text-red-400">התעלף</span> : null}
+              {pokemon.fainted ? (
+                <span className="text-xs text-red-400">התעלף</span>
+              ) : pokemon.status ? (
+                // The one explicit reason this participant is/isn't
+                // eligible for a cure-status item — required so the player
+                // can see WHY, not just that it is.
+                <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+                  {MAJOR_STATUS_LABELS[pokemon.status]}
+                </span>
+              ) : null}
             </button>
           );
         })}

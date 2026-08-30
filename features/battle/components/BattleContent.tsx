@@ -1357,6 +1357,7 @@ export function BattleContent({
         itemImageUrl: itemView?.item.imageUrl ?? "",
         pokemonId: playerPokemonId,
         previousHp,
+        curedStatus: result.curedStatus,
       });
     });
   }
