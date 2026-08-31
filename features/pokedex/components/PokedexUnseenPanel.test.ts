@@ -7,19 +7,16 @@ import { test } from "node:test";
 
 const panelSrc = readFileSync(new URL("./PokedexUnseenPanel.tsx", import.meta.url), "utf8");
 
-test("the location hint is derived from the real zone/encounter data — never a hardcoded per-species string", () => {
-  assert.ok(panelSrc.includes('import { getSpeciesEncounterLocations } from "@/data/zones/zone-data";'));
-  assert.ok(panelSrc.includes("getSpeciesEncounterLocations(species.id)"));
-});
-
-test("the rarity-specific copy comes from pokedex-location-messages.ts — no inline/duplicated Hebrew wording", () => {
-  assert.ok(
-    panelSrc.includes(
-      'import { pokedexLocationHint, pokedexNoKnownLocationMessage } from "../messages/pokedex-location-messages";'
-    )
-  );
-  assert.ok(panelSrc.includes("pokedexLocationHint(species.rarity, locations)"));
-  assert.ok(panelSrc.includes("pokedexNoKnownLocationMessage"), "a species with no real zone match must fall back, never show a broken/empty hint");
+// POKÉDEX — FORM VISIBILITY + ACQUISITION HINT FIX — the actual hint
+// derivation (zone/encounter data vs. the Mega-specific hint vs. the
+// "not yet known" fallback) now lives in the single shared
+// getPokedexUnseenFormHint helper (features/pokedex/utils/pokedex-form-hints.ts,
+// covered by its own dedicated test file) so PokedexDetailPanel and this
+// panel can never drift on the rule — this panel just calls it per the
+// currently selected form.
+test("the location hint is derived from the shared getPokedexUnseenFormHint helper — never a hardcoded per-species string, never duplicated logic", () => {
+  assert.ok(panelSrc.includes('import { getPokedexUnseenFormHint } from "../utils/pokedex-form-hints";'));
+  assert.ok(panelSrc.includes("getPokedexUnseenFormHint(species)"));
 });
 
 test("the species' real name is never rendered — always the \"???\" placeholder", () => {
@@ -36,4 +33,31 @@ test("no stats, moves, description, or evolution info is ever rendered here — 
   assert.ok(!panelSrc.includes("baseStats"));
   assert.ok(!panelSrc.includes("Evolution"));
   assert.ok(!panelSrc.includes("species.types"));
+});
+
+// ============================================================================
+// POKÉDEX + INVENTORY UI IMPROVEMENTS — form navigation arrows, reusing
+// entry.forms directly (never a second/hardcoded form list).
+// ============================================================================
+
+test("form navigation is driven by entry.forms, never a second/hardcoded list", () => {
+  assert.ok(panelSrc.includes("entry.forms[selectedFormIndex]"), "the displayed species must come from entry.forms by index");
+  assert.ok(panelSrc.includes("entry.forms.findIndex"), "the current index must be derived from entry.forms, not a separate list");
+});
+
+test("arrows only render when the entry has more than one form", () => {
+  assert.ok(/entry\.forms\.length > 1\s*\?\s*\(/.test(panelSrc), "the arrow row must be conditionally rendered behind forms.length > 1");
+});
+
+test("goToForm wraps around in both directions (modulo arithmetic over entry.forms.length)", () => {
+  assert.ok(
+    /const nextIndex = \(selectedFormIndex \+ offset \+ entry\.forms\.length\) % entry\.forms\.length;/.test(panelSrc),
+    "navigation must wrap using modulo arithmetic, not clamp at the ends"
+  );
+  assert.ok(panelSrc.includes("goToForm(-1)"), "a previous-form control must exist");
+  assert.ok(panelSrc.includes("goToForm(1)"), "a next-form control must exist");
+});
+
+test("every form shown here still gets the same silhouette treatment — no per-form isFormUnseen branch (every form is unseen when this panel is reached)", () => {
+  assert.ok(!panelSrc.includes("isFormUnseen"), "PokedexUnseenPanel must never need a per-form unseen check — the whole entry is already unseen");
 });

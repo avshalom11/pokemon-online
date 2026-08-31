@@ -40,11 +40,24 @@ import { SHOP_ITEMS } from "@/features/shop/data/shop-items";
 // treat as canonical) — reused exactly as-is, never a separate
 // chest-specific list. `isEvolutionItemId` (the existing catalog's own
 // narrowing guard) is what proves every entry here is real.
+//
+// MEGA EVOLUTION PHASE 2 — Mega Stone is deliberately excluded here even
+// though it's a real "stones"-category EvolutionItemId. This filter feeds
+// goldEvolutionItem/diamondEvolutionItem below, which already draw
+// uniformly from every id in this array with no per-item design/probability
+// review — Mega Stone becoming reachable through that pre-existing,
+// generic mechanism would BE a chest-drop implementation (an unreviewed
+// one), which that phase's own explicit scope excludes ("do not implement
+// chest drops yet"). Remove this exclusion only when a chest-drop phase
+// deliberately decides Mega Stone's own chest odds — see this project's own
+// Mega Evolution Phase 0 audit for the recommended design (an independent,
+// dedicated roll, never folded into this uniform pool).
 export const EVOLUTION_ITEM_CATALOG: readonly EvolutionItemId[] = SHOP_ITEMS.filter(
   (item) => item.categoryId === "stones"
 )
   .map((item) => item.id)
-  .filter(isEvolutionItemId);
+  .filter(isEvolutionItemId)
+  .filter((itemId) => itemId !== "mega-stone");
 
 // ============================================================================
 // Small, generic, independently-testable randomness primitives — every one
@@ -368,6 +381,21 @@ export function rollChestReward(chestTypeId: ChestTypeId, random: () => number =
   const bonusCategories = rollBonusCategories(remaining, config.bonusCap, random);
   for (const category of bonusCategories) {
     results.push(builders[category]!(random));
+  }
+
+  // MEGA EVOLUTION PHASE 5 — the dedicated, independent Mega Stone roll.
+  // Deliberately the LAST thing this function ever does: every roll above
+  // (egg, money, gold, mandatory extras, bonus categories) has already
+  // fully consumed its own random() calls by this point, so adding this
+  // one extra call here can never shift which value any earlier roll
+  // reads — every existing reward's own probability is provably unaffected.
+  // Entirely outside the optionalCategories/mandatoryExtraCount/bonusCap
+  // pool above (never selected as a mandatory extra or a bonus category,
+  // never competes with them for a "slot") — Silver's own
+  // config.megaStoneChance is undefined, so this branch is skipped
+  // entirely for Silver, consuming zero extra random() calls.
+  if (config.megaStoneChance && random() < config.megaStoneChance) {
+    results.push({ category: "mega-stone", itemId: "mega-stone", quantity: 1 });
   }
 
   return results;

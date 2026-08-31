@@ -76,3 +76,79 @@ test("rollChestReward is a pure function: calling it twice with the same determi
   const second = rollChestReward("diamond", paddedRandom([], 0));
   assert.deepEqual(first, second);
 });
+
+// ============================================================================
+// MEGA EVOLUTION PHASE 5 — the dedicated, independent Mega Stone roll.
+// ============================================================================
+
+function megaStoneReward(results: ReturnType<typeof rollChestReward>) {
+  return results.find((reward) => reward.category === "mega-stone");
+}
+
+test("Mega Stone is deliberately excluded from the generic evolution-item catalog/pool — still exactly the same 12 items, unaffected by this phase", () => {
+  assert.equal(EVOLUTION_ITEM_CATALOG.length, 12);
+  assert.ok(!EVOLUTION_ITEM_CATALOG.includes("mega-stone" as never), "mega-stone must never be drawn by the generic evolution-item pool");
+});
+
+test("Silver never grants Mega Stone, at any deterministic path including the always-succeed extreme", () => {
+  for (const random of [paddedRandom([], 0), paddedRandom([], 0.5), paddedRandom([], 0.999999)]) {
+    const results = rollChestReward("silver", random);
+    assert.equal(megaStoneReward(results), undefined, "Silver has no Mega Stone chance at all — never even rolled");
+  }
+});
+
+test("Gold's dedicated Mega Stone roll is exactly 10%, verified at its precise boundary", () => {
+  // An EMPTY explicit prefix (paddedRandom's `pad` then answers every call,
+  // including every earlier roll's own unrelated calls) sidesteps needing
+  // to hand-count exactly how many calls precede the trailing Mega Stone
+  // roll — since every call in the whole run returns the identical pad
+  // value, the final Mega Stone check necessarily sees that same value
+  // regardless of its exact position. Below 0.1 succeeds; 0.1 exactly (and
+  // above) fails — same "[0, chance) succeeds" convention this file's own
+  // egg-weight boundary tests already use elsewhere.
+  const justBelow = rollChestReward("gold", paddedRandom([], 0.09999));
+  const atBoundary = rollChestReward("gold", paddedRandom([], 0.1));
+  assert.ok(megaStoneReward(justBelow), "0.09999 must succeed the 10% roll");
+  assert.equal(megaStoneReward(atBoundary), undefined, "0.1 exactly must fail the 10% roll");
+});
+
+test("Diamond's dedicated Mega Stone roll is exactly 20%, verified at its precise boundary", () => {
+  const justBelow = rollChestReward("diamond", paddedRandom([], 0.19999));
+  const atBoundary = rollChestReward("diamond", paddedRandom([], 0.2));
+  assert.ok(megaStoneReward(justBelow), "0.19999 must succeed the 20% roll");
+  assert.equal(megaStoneReward(atBoundary), undefined, "0.2 exactly must fail the 20% roll");
+});
+
+test("a successful Mega Stone roll grants exactly 1 stone — never more, never a quantity range", () => {
+  for (const chestTypeId of ["gold", "diamond"] as const) {
+    const results = rollChestReward(chestTypeId, paddedRandom([], 0));
+    const reward = megaStoneReward(results);
+    assert.ok(reward);
+    if (reward?.category !== "mega-stone") return;
+    assert.equal(reward.itemId, "mega-stone");
+    assert.equal(reward.quantity, 1);
+    assert.equal(results.filter((r) => r.category === "mega-stone").length, 1, "never more than one mega-stone entry in a single opening");
+  }
+});
+
+// Structural source check (same technique this file's own "pure,
+// framework-free module" test above already uses) — deliberately NOT a
+// black-box call-count proof: hand-tracing exactly how many random() calls
+// egg/money/gold/mandatory-extras/bonus-categories consume (each builder
+// itself consumes a variable, data-dependent number of calls) would be
+// fragile and easy to get subtly wrong. Reading the source directly proves
+// the actual, load-bearing guarantee instead: the Mega Stone roll is
+// physically the last statement in the function, strictly after every
+// other roll and appended (never inserted/spliced) into `results` — so it
+// can only ever ADD a trailing entry, never alter or reorder anything
+// already rolled before it.
+test("the Mega Stone roll is the last statement in rollChestReward, strictly after every existing roll, and only ever appends to results", () => {
+  const source = readFileSync(new URL("./chest-reward-roll.service.ts", import.meta.url), "utf8");
+  const bonusLoopIndex = source.indexOf("for (const category of bonusCategories)");
+  const megaStoneIndex = source.indexOf('results.push({ category: "mega-stone"');
+  const returnIndex = source.indexOf("return results;", megaStoneIndex);
+
+  assert.ok(bonusLoopIndex !== -1 && megaStoneIndex !== -1 && returnIndex !== -1, "all three anchors must be found in the source");
+  assert.ok(bonusLoopIndex < megaStoneIndex, "the Mega Stone roll must come after the existing bonus-category loop");
+  assert.ok(megaStoneIndex < returnIndex, "the Mega Stone roll must be the last thing before the function returns");
+});

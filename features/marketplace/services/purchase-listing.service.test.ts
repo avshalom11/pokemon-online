@@ -19,6 +19,7 @@ import { test, beforeEach } from "node:test";
 import { purchaseMarketplaceListing } from "@/features/marketplace/services/purchase-listing.service";
 import { prisma } from "@/lib/db/prisma";
 import {
+  getInventoryItemRow,
   getNotificationsFor,
   resetFakeDb,
   seedInventoryItem,
@@ -330,4 +331,27 @@ test("notification: an all-Pokémon listing (no items) and an all-items listing 
   await purchaseMarketplaceListing(BUYER_ID, itemsOnlyListing.id);
   const itemsOnlyMessage = getNotificationsFor("seller-2")[0]?.message;
   assert.match(itemsOnlyMessage ?? "", /^המשתמש kanto_master קנה ממך:\n3× .*כסף$/);
+});
+
+// ============================================================================
+// MEGA EVOLUTION PHASE 4 — confirms the existing generic Marketplace flow
+// (unmodified, no Mega-specific code anywhere) already handles both a Mega
+// Stone item stack and an already-evolved Mega Pokémon exactly like any
+// other item/Pokémon. No production code change was needed for this; this
+// test exists purely to prove that generic behavior end to end.
+// ============================================================================
+test("Mega Stone and a Mega Pokémon both trade through the plain generic Marketplace flow — no special-casing anywhere", async () => {
+  seedPlayerPokemon({ id: "mon-mewtwo-x", playerId: SELLER_ID, speciesId: "mewtwo-mega-x", nickname: null });
+  const listing = seedMarketplaceListing({ sellerId: SELLER_ID, status: "active", priceMoney: 100, priceGold: 5 });
+  seedMarketplaceListingPokemon({ playerPokemonId: "mon-mewtwo-x", listingId: listing.id });
+  await seedListingItemWithLock(SELLER_ID, listing.id, "mega-stone", 2);
+
+  const result = await purchaseMarketplaceListing(BUYER_ID, listing.id);
+  assert.deepEqual(result, { status: "success" }, "buying a Mega Pokémon + Mega Stone requires no special handling to succeed");
+
+  const mon = await prisma.playerPokemon.findUnique({ where: { id: "mon-mewtwo-x" } });
+  assert.equal(mon?.playerId, BUYER_ID, "a Mega Pokémon's ownership transfers exactly like any other Pokémon's — never blocked for being Mega");
+
+  assert.equal(getInventoryItemRow(BUYER_ID, "mega-stone")?.quantity, 2, "the Mega Stone stack lands back in the buyer's normal PlayerInventoryItem storage");
+  assert.equal(getInventoryItemRow(SELLER_ID, "mega-stone"), undefined, "the seller's own locked stack is fully removed, same as any other sold item");
 });

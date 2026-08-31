@@ -13,19 +13,23 @@ import { isEvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
 
 const EVOLUTION_STONES = ["fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone", "moon-stone", "ice-stone", "dusk-stone", "shiny-stone"];
 const EVOLUTION_ITEMS = ["kings-rock", "metal-coat", "upgrade"];
+// MEGA EVOLUTION PHASE 2 — the 13th evolution product, priced above the
+// other 12 per that phase's own explicit spec (150 vs. their shared 70).
+const MEGA_EVOLUTION_ITEMS = ["mega-stone"];
 
-test("the Shop's stones category contains exactly the 12 canonical evolution products, no more, no fewer", () => {
+test("the Shop's stones category contains exactly the 13 canonical evolution products, no more, no fewer", () => {
   const stoneIds = SHOP_ITEMS.filter((item) => item.categoryId === "stones").map((item) => item.id);
-  const expected = [...EVOLUTION_STONES, ...EVOLUTION_ITEMS];
+  const expected = [...EVOLUTION_STONES, ...EVOLUTION_ITEMS, ...MEGA_EVOLUTION_ITEMS];
 
-  assert.equal(stoneIds.length, 12);
+  assert.equal(stoneIds.length, 13);
   assert.deepEqual([...stoneIds].sort(), [...expected].sort());
 });
 
-test("every evolution product costs 70 gold (the generic buy price the 50% sell rule derives from)", () => {
+test("every evolution product costs 70 gold, except Mega Stone at 150 (the generic buy price the 50% sell rule derives from either way)", () => {
   const stoneItems = SHOP_ITEMS.filter((item) => item.categoryId === "stones");
   for (const item of stoneItems) {
-    assert.equal(item.price, 70, `${item.id} must cost 70 gold`);
+    const expectedPrice = item.id === "mega-stone" ? 150 : 70;
+    assert.equal(item.price, expectedPrice, `${item.id} must cost ${expectedPrice} gold`);
     assert.equal(item.currency, "gold", `${item.id} must use gold currency`);
   }
 });

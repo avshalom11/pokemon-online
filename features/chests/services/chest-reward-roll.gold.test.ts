@@ -70,18 +70,23 @@ test("zero optional bonuses beyond the mandatory extra is possible — exactly 4
 
 test("at most 3 bonus categories are ever awarded, even when all 4 remaining candidates pass", () => {
   // All 0s -> mandatory extra picks pool[0] ("poke-balls"), all 4
-  // remaining pass, cap(3) triggers a uniform choice among the 4.
+  // remaining pass, cap(3) triggers a uniform choice among the 4. This same
+  // pad also succeeds the independent Mega Stone roll (0 < 0.1) — excluded
+  // from `optional` below since it's outside the optionalCategories pool
+  // entirely (see chest-reward.types.ts's own ChestRewardCategory doc
+  // comment).
   const results = rollChestReward("gold", paddedRandom([], 0));
-  const optional = categoriesOf(results).filter((category) => !["egg", "money", "gold"].includes(category));
+  const optional = categoriesOf(results).filter((category) => !["egg", "money", "gold", "mega-stone"].includes(category));
   assert.ok(optional.length <= 4, "1 mandatory extra + at most 3 bonus = at most 4 optional categories");
-  assert.equal(results.length, 7, "3 mandatory + 1 mandatory-extra + exactly 3 bonus = 7, Gold's own documented maximum");
+  assert.ok(categoriesOf(results).includes("mega-stone"), "pad 0 also succeeds the independent Mega Stone roll (0 < 0.1)");
+  assert.equal(results.length, 8, "3 mandatory + 1 mandatory-extra + exactly 3 bonus + Mega Stone = 8, Gold's own documented maximum");
 });
 
-test("Gold awards between 4 and 7 total reward categories across both boundary paths", () => {
+test("Gold awards between 4 and 8 total reward categories across both boundary paths", () => {
   const minPath = rollChestReward("gold", paddedRandom([], 0.9));
   const maxPath = rollChestReward("gold", paddedRandom([], 0));
   assert.equal(minPath.length, 4);
-  assert.equal(maxPath.length, 7);
+  assert.equal(maxPath.length, 8, "3 mandatory + 1 mandatory-extra + 3 bonus + Mega Stone (0 < 0.1 at this pad)");
 });
 
 test("an evolution-item reward always gives exactly 1 item", () => {
@@ -117,6 +122,9 @@ test("the full exact reward set at the deterministic all-0 (maximum) path", () =
     { category: "potions", itemId: "super-potion", quantity: 2 },
     { category: "revive", itemId: "revive", quantity: 1 },
     { category: "evolution-item", items: [{ itemId: "fire-stone", quantity: 1 }] },
+    // MEGA EVOLUTION PHASE 5 — the independent Mega Stone roll (10% on
+    // Gold) also succeeds at this pad (0 < 0.1), always last.
+    { category: "mega-stone", itemId: "mega-stone", quantity: 1 },
   ]);
 });
 

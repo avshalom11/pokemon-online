@@ -504,6 +504,26 @@ export const SHOP_ITEMS: ShopItem[] = [
     description: "אבן נוצצת ומבריקה שמעוררת התפתחות מרהיבה.",
     imageUrl: getShopItemImagePath("stones", "shiny-stone"),
   },
+  // MEGA EVOLUTION PHASE 2 — the universal Mega Stone, the 13th "stones"-
+  // category evolution item (data/pokemon/pokemon-evolutions.ts's own
+  // EvolutionItemId union and EVOLUTION_ITEM_EVOLUTIONS table — mapped from
+  // all 87 Mega-eligible base species). Deliberately priced above the other
+  // 12 (150 gold vs. their shared 70) per this phase's own explicit spec —
+  // every other field/behavior (stackable PlayerInventoryItem quantity row,
+  // single-use consumption on a successful evolution, generic Marketplace
+  // tradeability, the generic sellInventoryItem floor(price*0.5) sell-back)
+  // is already fully generic over any Shop item and needs no Mega-specific
+  // code anywhere. Image asset already exists on disk (not provisioned by
+  // this phase).
+  {
+    id: "mega-stone",
+    categoryId: "stones",
+    name: "אבן מגה",
+    price: 150,
+    currency: "gold",
+    description: "אבן נדירה ואוניברסלית שמעוררת התפתחות מגה קבועה בפוקימונים המסוגלים לכך.",
+    imageUrl: getShopItemImagePath("stones", "mega-stone"),
+  },
   ...EGG_SHOP_ITEMS,
   ...INCUBATOR_SHOP_ITEMS,
   ...CHEST_SHOP_ITEMS,

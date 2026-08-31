@@ -52,13 +52,21 @@ import type { PokemonRarity, PokemonSpecies } from "@/shared/types/pokemon";
 //     zero new dex numbers (each shares its own ordinary counterpart's
 //     existing dex number via formOf), so this count is unaffected by
 //     them.
-//   - EXPECTED_TOTAL_SPECIES_COUNT (1102): every PokemonSpecies row in
-//     POKEMON_DATA, including all 77 alternate forms — what "every id is
+//   - EXPECTED_TOTAL_SPECIES_COUNT (1195): every PokemonSpecies row in
+//     POKEMON_DATA, including all 170 alternate forms — what "every id is
 //     present exactly once" is checked against. 978 + 120 Paldea base
 //     species (none are alternate forms) + 4 Paldean Forms (all 4 are
-//     alternate forms) = 1102.
+//     alternate forms) = 1102, plus 93 Mega Evolution forms (MEGA
+//     EVOLUTION PHASE 1 + PHASE 2 — data/pokemon/generation-6-pokemon-
+//     data.ts's own Mega Evolution sections; Kalos-owned regardless of
+//     each base species' own home generation, same convention as Alolan/
+//     Galarian/Hisuian/Paldean Forms — see those sections' own doc
+//     comments; 93 matches the CURRENT canonical Mega Evolution Pokédex,
+//     i.e. Pokémon Legends: Z-A plus its Mega Dimension DLC) = 1195.
+//     Every Mega form shares its base's existing dexNumber via formOf, so
+//     EXPECTED_BASE_DEX_COUNT (below) is unaffected by them.
 const EXPECTED_BASE_DEX_COUNT = 1025;
-const EXPECTED_TOTAL_SPECIES_COUNT = 1102;
+const EXPECTED_TOTAL_SPECIES_COUNT = 1195;
 
 const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legendary"];
 
@@ -155,11 +163,49 @@ const VALID_RARITIES: PokemonRarity[] = ["common", "rare", "very-rare", "legenda
 // generation-9-pokemon-data.ts's own header comment for the full
 // species-by-species list). See generation-9-pokemon-data.ts's own
 // per-species rarity fields for the single source of truth.
+//
+// MEGA EVOLUTION PHASE 1 — the 48 original Mega forms (generation-6-
+// pokemon-data.ts's own Mega Evolution Phase 1 section) each inherit their
+// own base species' exact live rarity, same "a form always shares its
+// base's rarity" rule every other form group in this file already
+// follows: 1 common (slowbro-mega), 30 rare (beedrill/pidgeot/alakazam/
+// gengar/kangaskhan/pinsir/gyarados/aerodactyl/ampharos/steelix/scizor/
+// heracross/houndoom/gardevoir/sableye/mawile/aggron/medicham/manectric/
+// sharpedo/camerupt/altaria/banette/absol/glalie/lopunny/lucario/
+// abomasnow/gallade/audino), 11 very-rare (venusaur/charizard-x/
+// charizard-y/blastoise/tyranitar/sceptile/blaziken/swampert/salamence/
+// metagross/garchomp), and 6 legendary (mewtwo-x/mewtwo-y/latias/latios/
+// rayquaza/diancie).
+//
+// MEGA EVOLUTION PHASE 2 — the 45 new Mega forms that closed the gap to the
+// canonical 93 total (generation-6-pokemon-data.ts's own Mega Evolution
+// Phase 2 section), same inherit-the-base's-rarity rule: 1 common
+// (floette-mega), 28 rare (barbaracle/starmie/pyroar/clefable/scolipede/
+// victreebel/excadrill/eelektross/malamar/dragalge/froslass/hawlucha/
+// scrafty/chandelure/falinks/skarmory/drampa/meowstic/scovillain/glimmora/
+// tatsugiri-mega-curly/-droopy/-stretchy/chimecho/golisopod/golurk/
+// staraptor/crabominable), 10 very-rare (meganium/emboar/feraligatr/
+// dragonite/greninja/chesnaught/delphox/baxcalibur/raichu-mega-x/
+// raichu-mega-y), and 6 legendary (zygarde/heatran/darkrai/magearna-mega/
+// magearna-mega-original/zeraora).
+//
+// PHASE 1 FINAL ADJUSTMENT — REMOVED tatsugiri-mega-droopy (rare, -1 rare)
+// and magearna-mega-original (legendary, -1 legendary); ADDED
+// garchomp-mega-z (very-rare, +1 very-rare) and lucario-mega-z (rare, +1
+// rare, netting rare back to unchanged). Net: rare +-0, very-rare +1,
+// legendary -1.
+//
+// FINAL ROSTER UPDATE — the game's truly final Mega roster (see
+// generation-6-pokemon-data.ts's own doc comment for the full naming-
+// convention rationale): REMOVED tatsugiri-mega-stretchy (rare, -1 rare);
+// tatsugiri-mega-curly was renamed to tatsugiri-mega (no rarity change);
+// ADDED absol-mega-z (inherits Absol's rare, +1 rare, netting rare back to
+// unchanged). common/very-rare/legendary unaffected by this round.
 const EXPECTED_RARITY_COUNTS: Record<PokemonRarity, number> = {
-  common: 401,
-  rare: 415,
-  "very-rare": 156,
-  legendary: 130,
+  common: 403,
+  rare: 473,
+  "very-rare": 178,
+  legendary: 141,
 };
 
 test("exactly 846 Pokémon species rows are loaded (809 base Dex entries + 37 alternate forms)", () => {
@@ -579,18 +625,54 @@ test("Hoopa form sprite ids resolve to the real on-disk sprite filenames (0720/0
   assert.equal(byId.get("hoopa-unbound")!.spriteId, "0720U");
 });
 
-test("Xerneas, Yveltal, Zygarde, Diancie, and Volcanion are single-entry (no alternate forms implemented for them in this phase)", () => {
-  for (const id of ["xerneas", "yveltal", "zygarde", "diancie", "volcanion"]) {
+test("Xerneas, Yveltal, and Volcanion are single-entry (no alternate forms implemented for them, and none of the three has a canonical Mega form)", () => {
+  for (const id of ["xerneas", "yveltal", "volcanion"]) {
     const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
     assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
   }
 });
 
-test("no unapproved Kalos form groups exist (Aegislash, Pumpkaboo, Gourgeist, Vivillon, Flabébé/Floette/Florges, and Xerneas Active Mode are all deliberately single-entry)", () => {
-  for (const id of ["aegislash", "pumpkaboo", "gourgeist", "vivillon", "flabebe", "floette", "florges"]) {
+// Diancie and Zygarde are deliberately no longer covered by the single-entry
+// test above — MEGA EVOLUTION PHASE 1 gives Diancie its one canonical Mega
+// form (diancie-mega) and PHASE 2 gives Zygarde its one canonical Mega form
+// (zygarde-mega, generation-6-pokemon-data.ts's own Mega Evolution
+// sections); these are the intentional exceptions the Mega Evolution
+// addition carves out.
+test("Diancie has exactly one alternate form: diancie-mega", () => {
+  const group = POKEMON_DATA.filter((species) => species.id === "diancie" || species.formOf === "diancie");
+  assert.deepEqual(
+    group.map((species) => species.id),
+    ["diancie", "diancie-mega"]
+  );
+});
+
+test("Zygarde has exactly one alternate form: zygarde-mega", () => {
+  const group = POKEMON_DATA.filter((species) => species.id === "zygarde" || species.formOf === "zygarde");
+  assert.deepEqual(
+    group.map((species) => species.id),
+    ["zygarde", "zygarde-mega"]
+  );
+});
+
+test("no unapproved Kalos form groups exist (Aegislash, Pumpkaboo, Gourgeist, Vivillon, Flabébé/Florges, and Xerneas Active Mode are all deliberately single-entry)", () => {
+  for (const id of ["aegislash", "pumpkaboo", "gourgeist", "vivillon", "flabebe", "florges"]) {
     const group = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
     assert.deepEqual(group.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
   }
+});
+
+// Floette is deliberately no longer covered by the single-entry test above —
+// MEGA EVOLUTION PHASE 2 gives it its one canonical Mega form (floette-mega,
+// generation-6-pokemon-data.ts's own Mega Evolution Phase 2 section, the
+// same "Legends: Z-A's own uniquely highest-BST Mega" entry that section's
+// own doc comment calls out) — the intentional exception the Mega Evolution
+// addition carves out, same shape as Diancie/Zygarde above.
+test("Floette has exactly one alternate form: floette-mega", () => {
+  const group = POKEMON_DATA.filter((species) => species.id === "floette" || species.formOf === "floette");
+  assert.deepEqual(
+    group.map((species) => species.id),
+    ["floette", "floette-mega"]
+  );
 });
 
 test("Deerling and Sawsbuck have no alternate-form entries (their real forms are explicitly out of this phase's scope)", () => {
@@ -634,7 +716,7 @@ test("Darmanitan has exactly two internal form entries (Kanto/base + Galarian), 
   }
 });
 
-test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, the 18 Alolan Form base species, the 19 Galarian Form base species, the 17 Pre-Paldea Hisuian Form base species, and the 2 Paldean Form base species", () => {
+test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornadus, Thundurus, Landorus, Kyurem, Keldeo, Meloetta, Hoopa, Lycanroc, the 18 Alolan Form base species, the 19 Galarian Form base species, the 17 Pre-Paldea Hisuian Form base species, the 2 Paldean Form base species, and the 87 distinct Mega Evolution base species (93 Mega forms total)", () => {
   const formGroupBases = new Set(
     POKEMON_DATA.filter((species) => species.formOf !== undefined).map((species) => species.formOf)
   );
@@ -650,13 +732,181 @@ test("no unexpected alternate forms exist beyond Deoxys, Rotom, Giratina, Tornad
       "samurott", "sandshrew", "sandslash", "sliggoo", "slowbro", "slowking", "slowpoke", "sneasel", "stunfisk",
       "tauros", "thundurus", "tornadus", "typhlosion", "voltorb", "vulpix", "weezing", "wooper", "yamask",
       "zapdos", "zigzagoon", "zoroark", "zorua",
+      // MEGA EVOLUTION PHASE 1 — 46 base species that gain a Mega form
+      // (48 Mega forms total: Charizard and Mewtwo each have X/Y — see
+      // generation-6-pokemon-data.ts's own Mega Evolution section doc
+      // comment). "slowbro" above already covers Mega Slowbro (it already
+      // has a Galarian Form sibling), so only 45 new base ids are added
+      // here.
+      "abomasnow", "absol", "aerodactyl", "aggron", "alakazam", "altaria", "ampharos", "audino",
+      "banette", "beedrill", "blastoise", "blaziken", "camerupt", "charizard", "diancie", "gallade",
+      "garchomp", "gardevoir", "gengar", "glalie", "gyarados", "heracross", "houndoom", "kangaskhan",
+      "latias", "latios", "lopunny", "lucario", "manectric", "mawile", "medicham", "metagross", "mewtwo",
+      "pidgeot", "pinsir", "rayquaza", "sableye", "salamence", "sceptile", "scizor", "sharpedo", "steelix",
+      "swampert", "tyranitar", "venusaur",
+      // MEGA EVOLUTION PHASE 2 — 41 further base species that gain a Mega
+      // form, closing the gap to the CURRENT canonical 93-entry Mega
+      // Evolution Pokédex (Pokémon Legends: Z-A + Mega Dimension DLC) — see
+      // generation-6-pokemon-data.ts's own Mega Evolution Phase 2 doc
+      // comment. "raichu" above already covers Mega Raichu X/Y (it already
+      // has an Alolan Form sibling), so only 40 new base ids are added here.
+      "barbaracle", "baxcalibur", "chandelure", "chesnaught", "chimecho", "clefable", "crabominable",
+      "darkrai", "delphox", "dragalge", "dragonite", "drampa", "eelektross", "emboar", "excadrill",
+      "falinks", "feraligatr", "floette", "froslass", "glimmora", "golisopod", "golurk", "greninja",
+      "hawlucha", "heatran", "magearna", "malamar", "meganium", "meowstic", "pyroar", "scolipede",
+      "scovillain", "scrafty", "skarmory", "starmie", "staraptor", "tatsugiri", "victreebel", "zeraora",
+      "zygarde",
     ].sort()
   );
 });
 
-test("exactly 77 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms + 19 Galarian Forms + 17 Pre-Paldea Hisuian Forms + 4 Paldean Forms)", () => {
+test("exactly 170 alternate-form rows exist in total (3 Deoxys + 5 Rotom + 1 Giratina + 1 Tornadus + 1 Thundurus + 1 Landorus + 2 Kyurem + 1 Keldeo + 1 Meloetta + 1 Hoopa + 2 Lycanroc + 18 Alolan Forms + 19 Galarian Forms + 17 Pre-Paldea Hisuian Forms + 4 Paldean Forms + 93 Mega Evolutions)", () => {
   const formRows = POKEMON_DATA.filter((species) => species.formOf !== undefined);
-  assert.equal(formRows.length, 77);
+  assert.equal(formRows.length, 170);
+});
+
+// MEGA EVOLUTION PHASE 1 + PHASE 2 — dedicated structural coverage for all
+// 93 Mega form rows (generation-6-pokemon-data.ts's own Mega Evolution
+// Phase 1 + Phase 2 sections), matching the CURRENT canonical 93-entry Mega
+// Evolution Pokédex (Pokémon Legends: Z-A + Mega Dimension DLC), same "one
+// focused block per new form group" precedent every prior form-group
+// addition in this file already establishes (see the Alolan/Galarian/
+// Hisuian/Paldean Forms blocks above).
+test("exactly 93 Mega Evolution forms exist in the catalog, matching the canonical Mega Evolution Pokédex total", () => {
+  const megaForms = POKEMON_DATA.filter((species) => species.id.includes("-mega"));
+  assert.equal(megaForms.length, 93);
+});
+
+test("every Mega Evolution form shares its base species' exact dexNumber and rarity, has a valid formOf, and a spriteId of the shape <dexNumber><suffix>", () => {
+  const megaForms = POKEMON_DATA.filter((species) => species.id.includes("-mega"));
+
+  for (const mega of megaForms) {
+    assert.ok(mega.formOf, `${mega.id} must have a formOf`);
+    const base = POKEMON_DATA.find((species) => species.id === mega.formOf);
+    assert.ok(base, `${mega.id}'s formOf "${mega.formOf}" must resolve to a real base species`);
+    assert.equal(mega.dexNumber, base!.dexNumber, `${mega.id} must share its base's dexNumber`);
+    assert.equal(mega.rarity, base!.rarity, `${mega.id} must inherit its base species' rarity`);
+    // M: single Mega — the default, used by the overwhelming majority,
+    // including Tatsugiri and Magearna (both collapsed to one Mega row
+    // each by the FINAL ROSTER UPDATE). MX/MY: a genuinely different-
+    // stats/types player-chosen branch (Charizard/Mewtwo/Raichu only). MZ:
+    // a second, separate, PERMANENT Mega form for a species that already
+    // has a plain Mega (Garchomp/Lucario/Absol only — this game's own
+    // explicit product decision) — see generation-6-pokemon-data.ts's own
+    // Mega Evolution doc comments for the full naming convention. No MC/
+    // MD/MS/MO suffix is used anywhere in this catalog any more.
+    assert.ok(
+      /^\d{4}(MX|MY|MZ|M)$/.test(mega.spriteId ?? ""),
+      `${mega.id}'s spriteId "${mega.spriteId}" must be a 4-digit dex number followed by M, MX, MY, or MZ`
+    );
+    const expectedSuffix = mega.id.endsWith("-mega-x")
+      ? "MX"
+      : mega.id.endsWith("-mega-y")
+        ? "MY"
+        : mega.id.endsWith("-mega-z")
+          ? "MZ"
+          : "M";
+    assert.equal(mega.spriteId, `${String(base!.dexNumber).padStart(4, "0")}${expectedSuffix}`);
+  }
+});
+
+test("Charizard, Mewtwo, and Raichu each have exactly two Mega forms (X/Y); Garchomp, Lucario, and Absol each have exactly two Mega forms (plain + Z); every other Mega-eligible species, including Tatsugiri and Magearna, has exactly one", () => {
+  const megaForms = POKEMON_DATA.filter((species) => species.id.includes("-mega"));
+  const countsByBase = new Map<string, number>();
+  for (const mega of megaForms) {
+    countsByBase.set(mega.formOf!, (countsByBase.get(mega.formOf!) ?? 0) + 1);
+  }
+
+  assert.equal(countsByBase.get("charizard"), 2);
+  assert.equal(countsByBase.get("mewtwo"), 2);
+  assert.equal(countsByBase.get("raichu"), 2);
+  assert.equal(countsByBase.get("garchomp"), 2);
+  assert.equal(countsByBase.get("lucario"), 2);
+  assert.equal(countsByBase.get("absol"), 2);
+  assert.equal(countsByBase.get("tatsugiri"), 1);
+  assert.equal(countsByBase.get("magearna"), 1);
+  assert.equal(countsByBase.size, 87);
+  const multiFormBases = new Set(["charizard", "mewtwo", "raichu", "garchomp", "lucario", "absol"]);
+  for (const [baseId, count] of countsByBase) {
+    if (multiFormBases.has(baseId)) continue;
+    assert.equal(count, 1, `${baseId} should have exactly one Mega form`);
+  }
+});
+
+// MEGA DISPLAY NAMES — audits all 93 approved Mega forms against the
+// approved "Mega <Base Name>" / "Mega <Base Name> X/Y/Z" convention. Both
+// `name` (the field almost every UI surface reads — My Pokémon, Marketplace,
+// evolution dialogs/notifications, battle) and `formLabel` (the Pokédex's
+// own per-form tab label) are asserted identical, so no surface can ever
+// show a stale "Mega Evolution"-style label while another shows the new
+// name. id/formOf/spriteId/baseStats/types/rarity are untouched by this
+// change — verified by the existing structural tests elsewhere in this file
+// still passing unmodified.
+test("every one of the 93 Mega forms' name and formLabel follow the approved 'Mega <Base Name>[ X/Y/Z]' convention exactly", () => {
+  const megaForms = POKEMON_DATA.filter((species) => species.id.includes("-mega"));
+  assert.equal(megaForms.length, 93);
+
+  for (const mega of megaForms) {
+    const base = POKEMON_DATA.find((species) => species.id === mega.formOf)!;
+    const suffix = mega.id.endsWith("-mega-x")
+      ? " X"
+      : mega.id.endsWith("-mega-y")
+        ? " Y"
+        : mega.id.endsWith("-mega-z")
+          ? " Z"
+          : "";
+    const expected = `Mega ${base.name}${suffix}`;
+
+    assert.equal(mega.name, expected, `${mega.id}'s name must be "${expected}"`);
+    assert.equal(mega.formLabel, expected, `${mega.id}'s formLabel must be "${expected}"`);
+  }
+});
+
+test("no Mega Evolution form id, name+formLabel pair, or spriteId is duplicated", () => {
+  const megaForms = POKEMON_DATA.filter((species) => species.id.includes("-mega"));
+  const ids = megaForms.map((species) => species.id);
+  const spriteIds = megaForms.map((species) => species.spriteId);
+  const nameLabelPairs = megaForms.map((species) => `${species.name}::${species.formLabel}`);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.equal(new Set(spriteIds).size, spriteIds.length);
+  assert.equal(new Set(nameLabelPairs).size, nameLabelPairs.length);
+});
+
+test("Tatsugiri has exactly one Mega form: tatsugiri-mega (its Curly/Droopy/Stretchy forms were collapsed to one standard Mega by the FINAL ROSTER UPDATE)", () => {
+  const tatsugiriMegas = POKEMON_DATA.filter((species) => species.formOf === "tatsugiri" && species.id.includes("-mega"));
+  assert.deepEqual(tatsugiriMegas.map((species) => species.id), ["tatsugiri-mega"]);
+  assert.equal(tatsugiriMegas[0].spriteId, "0978M");
+  // MEGA DISPLAY NAMES — formLabel/name follow "Mega <Base Name>" now.
+  assert.equal(tatsugiriMegas[0].formLabel, "Mega Tatsugiri");
+  assert.equal(tatsugiriMegas[0].name, "Mega Tatsugiri");
+});
+
+test("Magearna has exactly one Mega form: magearna-mega (its Original Color variant was removed)", () => {
+  const magearnaMegas = POKEMON_DATA.filter((species) => species.formOf === "magearna" && species.id.includes("-mega"));
+  assert.deepEqual(magearnaMegas.map((species) => species.id), ["magearna-mega"]);
+});
+
+test("Mega Garchomp Z, Mega Lucario Z, and Mega Absol Z are separate, permanent Mega forms alongside their own plain Mega sibling, each with its own distinct types/stats", () => {
+  const cases: Array<{ base: string; plainId: string; zId: string; zSpriteId: string; sameTypes: boolean }> = [
+    { base: "garchomp", plainId: "garchomp-mega", zId: "garchomp-mega-z", zSpriteId: "0445MZ", sameTypes: false },
+    { base: "lucario", plainId: "lucario-mega", zId: "lucario-mega-z", zSpriteId: "0448MZ", sameTypes: true },
+    { base: "absol", plainId: "absol-mega", zId: "absol-mega-z", zSpriteId: "0359MZ", sameTypes: false },
+  ];
+
+  for (const { base, plainId, zId, zSpriteId, sameTypes } of cases) {
+    const megas = POKEMON_DATA.filter((species) => species.formOf === base && species.id.includes("-mega"));
+    assert.deepEqual(megas.map((species) => species.id).sort(), [plainId, zId].sort());
+    const plain = megas.find((species) => species.id === plainId)!;
+    const z = megas.find((species) => species.id === zId)!;
+    if (sameTypes) {
+      assert.deepEqual(z.types, plain.types, `${zId} keeps the same typing as ${plainId}`);
+    } else {
+      assert.notDeepEqual(z.types, plain.types, `${zId} must have different typing from ${plainId}`);
+    }
+    assert.notDeepEqual(z.baseStats, plain.baseStats, `${zId} must have different base stats from ${plainId}`);
+    assert.equal(z.spriteId, zSpriteId);
+    assert.equal(z.rarity, plain.rarity, `${zId} must inherit the same base rarity as ${plainId}`);
+  }
 });
 
 test("no Hoenn starter-line species (Treecko/Torchic/Mudkip lines) is marked isStarter", () => {

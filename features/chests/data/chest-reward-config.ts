@@ -46,6 +46,17 @@ export interface ChestRewardConfig {
   // independently pass, with no "choose N of the successes" step at all)
   // for Diamond.
   bonusCap: number | null;
+  // MEGA EVOLUTION PHASE 5 — the dedicated, independent Mega Stone roll's
+  // own chance, entirely separate from optionalCategories/
+  // mandatoryExtraCount/bonusCap above (mega-stone is never part of that
+  // pool — see chest-reward.types.ts's own ChestRewardCategory doc
+  // comment). Rolled LAST, strictly after every category above has already
+  // been resolved (chest-reward-roll.service.ts's own rollChestReward) —
+  // this field's presence/absence changes nothing about any earlier roll's
+  // own random() call. Undefined (Silver) means "never rolled at all," not
+  // "rolled but always 0%" — Silver consumes zero extra random() calls for
+  // this, same as it would for a category it doesn't offer.
+  megaStoneChance?: number;
 }
 
 export const SILVER_CHEST_REWARD_CONFIG: ChestRewardConfig = {
@@ -58,6 +69,9 @@ export const SILVER_CHEST_REWARD_CONFIG: ChestRewardConfig = {
   optionalCategories: ["poke-balls", "potions", "revive", "incubator"],
   mandatoryExtraCount: 0,
   bonusCap: 2,
+  // MEGA EVOLUTION PHASE 5 — 0% Mega Stone: megaStoneChance deliberately
+  // left unset rather than `megaStoneChance: 0`, so Silver skips that roll
+  // entirely (zero extra random() calls) instead of always-failing one.
 };
 
 export const GOLD_CHEST_REWARD_CONFIG: ChestRewardConfig = {
@@ -70,6 +84,8 @@ export const GOLD_CHEST_REWARD_CONFIG: ChestRewardConfig = {
   optionalCategories: ["poke-balls", "potions", "revive", "evolution-item", "incubator"],
   mandatoryExtraCount: 1,
   bonusCap: 3,
+  // MEGA EVOLUTION PHASE 5 — 10% independent chance at 1 Mega Stone.
+  megaStoneChance: 0.1,
 };
 
 export const DIAMOND_CHEST_REWARD_CONFIG: ChestRewardConfig = {
@@ -81,6 +97,8 @@ export const DIAMOND_CHEST_REWARD_CONFIG: ChestRewardConfig = {
   optionalCategories: ["poke-balls", "potions", "revive", "evolution-item", "incubator"],
   mandatoryExtraCount: 2,
   bonusCap: null,
+  // MEGA EVOLUTION PHASE 5 — 20% independent chance at 1 Mega Stone.
+  megaStoneChance: 0.2,
 };
 
 export const CHEST_REWARD_CONFIGS: Record<ChestTypeId, ChestRewardConfig> = {

@@ -80,6 +80,11 @@ function RewardRows({ reward }: { reward: OpenChestRewardView }) {
           ))}
         </>
       );
+
+    // MEGA EVOLUTION PHASE 5 — same generic item-reward row as
+    // poke-balls/potions/revive above.
+    case "mega-stone":
+      return <RewardRow label={reward.displayName} valueText={`×${reward.quantity}`} imageUrl={reward.imageUrl} />;
   }
 }
 

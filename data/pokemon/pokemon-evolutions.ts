@@ -1160,6 +1160,15 @@ export function getAllLevelEvolutionEntries(): LevelEvolutionEntry[] {
 // now uses Water Stone, Rhydon -> Rhyperior now uses Metal Coat, Dusclops ->
 // Dusknoir now uses Dusk Stone, and Kirlia -> Gallade / Snorunt -> Froslass
 // now use Moon Stone. 12 items remain.
+//
+// MEGA EVOLUTION PHASE 2 — "mega-stone" added as the 13th value: one
+// universal item, deliberately unlike every other EvolutionItemId (each of
+// which targets only 1-2 specific species). Mega Stone is used across all
+// 87 Mega-eligible base species (93 Mega Evolution targets total) via the
+// exact same "one item, multiple entries" shape this file already
+// establishes for a single-species multi-target branch (Clamperl's Water
+// Stone, Pikachu/Exeggcute's Alolan branches) — see the MEGA EVOLUTION
+// block at the end of EVOLUTION_ITEM_EVOLUTIONS below. No new mechanism.
 export type EvolutionItemId =
   | "fire-stone"
   | "water-stone"
@@ -1172,7 +1181,8 @@ export type EvolutionItemId =
   | "shiny-stone"
   | "kings-rock"
   | "metal-coat"
-  | "upgrade";
+  | "upgrade"
+  | "mega-stone";
 
 export interface EvolutionItemEvolution {
   method: "evolution-item";
@@ -1420,7 +1430,15 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   // Floette's own pre-existing level evolution FROM Flabébé (LEVEL_EVOLUTIONS
   // above) is untouched, same "mutually exclusive per species" rule as
   // Eelektrik/Lampent above.
-  floette: [{ method: "evolution-item", evolvesToSpeciesId: "florges", itemId: "shiny-stone" }],
+  // MEGA EVOLUTION PHASE 2 — Floette's own second, independent branch:
+  // Mega Stone, fully independent of its pre-existing Shiny Stone -> Florges
+  // branch above (same "one species, multiple evolution-item branches"
+  // precedent Gloom's Leaf Stone/Sun Stone pair already established) — not
+  // redeclared as a second `floette:` key (would be a duplicate object key).
+  floette: [
+    { method: "evolution-item", evolvesToSpeciesId: "florges", itemId: "shiny-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "floette-mega", itemId: "mega-stone" },
+  ],
   // Doublade (Kalos, #680) -> Aegislash: real-game Dusk Stone evolution —
   // Doublade's own pre-existing level evolution FROM Honedge (LEVEL_EVOLUTIONS
   // above) is untouched.
@@ -1502,6 +1520,137 @@ const EVOLUTION_ITEM_EVOLUTIONS: Record<string, EvolutionItemEvolution[]> = {
   tadbulb: [{ method: "evolution-item", evolvesToSpeciesId: "bellibolt", itemId: "thunder-stone" }],
   capsakid: [{ method: "evolution-item", evolvesToSpeciesId: "scovillain", itemId: "fire-stone" }],
   cetoddle: [{ method: "evolution-item", evolvesToSpeciesId: "cetitan", itemId: "ice-stone" }],
+
+  // ============================================================================
+  // MEGA EVOLUTION — MEGA STONE (Phase 2). One universal item (mega-stone,
+  // EvolutionItemId's 13th value) mapped from every one of the 87 Mega-
+  // eligible base species (generation-6-pokemon-data.ts's own Mega
+  // Evolution catalog rows, formOf-grouped) to its approved permanent Mega
+  // form(s) — 93 targets total, matching the catalog exactly. Every base
+  // below already has zero LEVEL_EVOLUTIONS/BRANCH_EVOLUTIONS entry of its
+  // own (verified: every one is a final-stage/standalone species), so none
+  // of this collides with this file's "no duplicate evolution definitions"
+  // invariant. Floette's own mega-stone branch is NOT here — it's a SECOND
+  // branch on Floette's PRE-EXISTING key further up this table (see that
+  // entry's own comment) to avoid a duplicate object key, same precedent
+  // Gloom/Petilil/Kirlia/Snorunt already establish for a species with more
+  // than one independent evolution-item branch.
+  //
+  // Six species get TWO mega-stone entries — a genuine player-choice BRANCH
+  // under one shared item, the exact same shape Clamperl/Pikachu/Exeggcute
+  // already establish elsewhere in this table (see getEvolutionItemEvolutionsByItem):
+  // Charizard (X/Y, different types+stats), Mewtwo (X/Y, different
+  // types+stats), Raichu (X/Y, different types+stats — this game's own new
+  // addition, mirroring the Charizard/Mewtwo shape), and Garchomp/Lucario/
+  // Absol (plain + Z — this game's own explicit design decision that a "Z"
+  // Mega is a second, independent, permanent target, not merely an
+  // alternate in-battle activation of the plain Mega — see
+  // generation-6-pokemon-data.ts's own Mega Evolution doc comments for the
+  // full rationale). Every other base below has exactly one target.
+  venusaur: [{ method: "evolution-item", evolvesToSpeciesId: "venusaur-mega", itemId: "mega-stone" }],
+  charizard: [
+    { method: "evolution-item", evolvesToSpeciesId: "charizard-mega-x", itemId: "mega-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "charizard-mega-y", itemId: "mega-stone" },
+  ],
+  blastoise: [{ method: "evolution-item", evolvesToSpeciesId: "blastoise-mega", itemId: "mega-stone" }],
+  beedrill: [{ method: "evolution-item", evolvesToSpeciesId: "beedrill-mega", itemId: "mega-stone" }],
+  pidgeot: [{ method: "evolution-item", evolvesToSpeciesId: "pidgeot-mega", itemId: "mega-stone" }],
+  alakazam: [{ method: "evolution-item", evolvesToSpeciesId: "alakazam-mega", itemId: "mega-stone" }],
+  slowbro: [{ method: "evolution-item", evolvesToSpeciesId: "slowbro-mega", itemId: "mega-stone" }],
+  gengar: [{ method: "evolution-item", evolvesToSpeciesId: "gengar-mega", itemId: "mega-stone" }],
+  kangaskhan: [{ method: "evolution-item", evolvesToSpeciesId: "kangaskhan-mega", itemId: "mega-stone" }],
+  pinsir: [{ method: "evolution-item", evolvesToSpeciesId: "pinsir-mega", itemId: "mega-stone" }],
+  gyarados: [{ method: "evolution-item", evolvesToSpeciesId: "gyarados-mega", itemId: "mega-stone" }],
+  aerodactyl: [{ method: "evolution-item", evolvesToSpeciesId: "aerodactyl-mega", itemId: "mega-stone" }],
+  mewtwo: [
+    { method: "evolution-item", evolvesToSpeciesId: "mewtwo-mega-x", itemId: "mega-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "mewtwo-mega-y", itemId: "mega-stone" },
+  ],
+  ampharos: [{ method: "evolution-item", evolvesToSpeciesId: "ampharos-mega", itemId: "mega-stone" }],
+  steelix: [{ method: "evolution-item", evolvesToSpeciesId: "steelix-mega", itemId: "mega-stone" }],
+  scizor: [{ method: "evolution-item", evolvesToSpeciesId: "scizor-mega", itemId: "mega-stone" }],
+  heracross: [{ method: "evolution-item", evolvesToSpeciesId: "heracross-mega", itemId: "mega-stone" }],
+  houndoom: [{ method: "evolution-item", evolvesToSpeciesId: "houndoom-mega", itemId: "mega-stone" }],
+  tyranitar: [{ method: "evolution-item", evolvesToSpeciesId: "tyranitar-mega", itemId: "mega-stone" }],
+  sceptile: [{ method: "evolution-item", evolvesToSpeciesId: "sceptile-mega", itemId: "mega-stone" }],
+  blaziken: [{ method: "evolution-item", evolvesToSpeciesId: "blaziken-mega", itemId: "mega-stone" }],
+  swampert: [{ method: "evolution-item", evolvesToSpeciesId: "swampert-mega", itemId: "mega-stone" }],
+  gardevoir: [{ method: "evolution-item", evolvesToSpeciesId: "gardevoir-mega", itemId: "mega-stone" }],
+  sableye: [{ method: "evolution-item", evolvesToSpeciesId: "sableye-mega", itemId: "mega-stone" }],
+  mawile: [{ method: "evolution-item", evolvesToSpeciesId: "mawile-mega", itemId: "mega-stone" }],
+  aggron: [{ method: "evolution-item", evolvesToSpeciesId: "aggron-mega", itemId: "mega-stone" }],
+  medicham: [{ method: "evolution-item", evolvesToSpeciesId: "medicham-mega", itemId: "mega-stone" }],
+  manectric: [{ method: "evolution-item", evolvesToSpeciesId: "manectric-mega", itemId: "mega-stone" }],
+  sharpedo: [{ method: "evolution-item", evolvesToSpeciesId: "sharpedo-mega", itemId: "mega-stone" }],
+  camerupt: [{ method: "evolution-item", evolvesToSpeciesId: "camerupt-mega", itemId: "mega-stone" }],
+  altaria: [{ method: "evolution-item", evolvesToSpeciesId: "altaria-mega", itemId: "mega-stone" }],
+  banette: [{ method: "evolution-item", evolvesToSpeciesId: "banette-mega", itemId: "mega-stone" }],
+  absol: [
+    { method: "evolution-item", evolvesToSpeciesId: "absol-mega", itemId: "mega-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "absol-mega-z", itemId: "mega-stone" },
+  ],
+  glalie: [{ method: "evolution-item", evolvesToSpeciesId: "glalie-mega", itemId: "mega-stone" }],
+  salamence: [{ method: "evolution-item", evolvesToSpeciesId: "salamence-mega", itemId: "mega-stone" }],
+  metagross: [{ method: "evolution-item", evolvesToSpeciesId: "metagross-mega", itemId: "mega-stone" }],
+  latias: [{ method: "evolution-item", evolvesToSpeciesId: "latias-mega", itemId: "mega-stone" }],
+  latios: [{ method: "evolution-item", evolvesToSpeciesId: "latios-mega", itemId: "mega-stone" }],
+  rayquaza: [{ method: "evolution-item", evolvesToSpeciesId: "rayquaza-mega", itemId: "mega-stone" }],
+  lopunny: [{ method: "evolution-item", evolvesToSpeciesId: "lopunny-mega", itemId: "mega-stone" }],
+  garchomp: [
+    { method: "evolution-item", evolvesToSpeciesId: "garchomp-mega", itemId: "mega-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "garchomp-mega-z", itemId: "mega-stone" },
+  ],
+  lucario: [
+    { method: "evolution-item", evolvesToSpeciesId: "lucario-mega", itemId: "mega-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "lucario-mega-z", itemId: "mega-stone" },
+  ],
+  abomasnow: [{ method: "evolution-item", evolvesToSpeciesId: "abomasnow-mega", itemId: "mega-stone" }],
+  gallade: [{ method: "evolution-item", evolvesToSpeciesId: "gallade-mega", itemId: "mega-stone" }],
+  audino: [{ method: "evolution-item", evolvesToSpeciesId: "audino-mega", itemId: "mega-stone" }],
+  diancie: [{ method: "evolution-item", evolvesToSpeciesId: "diancie-mega", itemId: "mega-stone" }],
+  meganium: [{ method: "evolution-item", evolvesToSpeciesId: "meganium-mega", itemId: "mega-stone" }],
+  emboar: [{ method: "evolution-item", evolvesToSpeciesId: "emboar-mega", itemId: "mega-stone" }],
+  feraligatr: [{ method: "evolution-item", evolvesToSpeciesId: "feraligatr-mega", itemId: "mega-stone" }],
+  barbaracle: [{ method: "evolution-item", evolvesToSpeciesId: "barbaracle-mega", itemId: "mega-stone" }],
+  starmie: [{ method: "evolution-item", evolvesToSpeciesId: "starmie-mega", itemId: "mega-stone" }],
+  pyroar: [{ method: "evolution-item", evolvesToSpeciesId: "pyroar-mega", itemId: "mega-stone" }],
+  clefable: [{ method: "evolution-item", evolvesToSpeciesId: "clefable-mega", itemId: "mega-stone" }],
+  scolipede: [{ method: "evolution-item", evolvesToSpeciesId: "scolipede-mega", itemId: "mega-stone" }],
+  victreebel: [{ method: "evolution-item", evolvesToSpeciesId: "victreebel-mega", itemId: "mega-stone" }],
+  excadrill: [{ method: "evolution-item", evolvesToSpeciesId: "excadrill-mega", itemId: "mega-stone" }],
+  eelektross: [{ method: "evolution-item", evolvesToSpeciesId: "eelektross-mega", itemId: "mega-stone" }],
+  dragonite: [{ method: "evolution-item", evolvesToSpeciesId: "dragonite-mega", itemId: "mega-stone" }],
+  malamar: [{ method: "evolution-item", evolvesToSpeciesId: "malamar-mega", itemId: "mega-stone" }],
+  dragalge: [{ method: "evolution-item", evolvesToSpeciesId: "dragalge-mega", itemId: "mega-stone" }],
+  froslass: [{ method: "evolution-item", evolvesToSpeciesId: "froslass-mega", itemId: "mega-stone" }],
+  hawlucha: [{ method: "evolution-item", evolvesToSpeciesId: "hawlucha-mega", itemId: "mega-stone" }],
+  scrafty: [{ method: "evolution-item", evolvesToSpeciesId: "scrafty-mega", itemId: "mega-stone" }],
+  chandelure: [{ method: "evolution-item", evolvesToSpeciesId: "chandelure-mega", itemId: "mega-stone" }],
+  greninja: [{ method: "evolution-item", evolvesToSpeciesId: "greninja-mega", itemId: "mega-stone" }],
+  falinks: [{ method: "evolution-item", evolvesToSpeciesId: "falinks-mega", itemId: "mega-stone" }],
+  chesnaught: [{ method: "evolution-item", evolvesToSpeciesId: "chesnaught-mega", itemId: "mega-stone" }],
+  skarmory: [{ method: "evolution-item", evolvesToSpeciesId: "skarmory-mega", itemId: "mega-stone" }],
+  delphox: [{ method: "evolution-item", evolvesToSpeciesId: "delphox-mega", itemId: "mega-stone" }],
+  drampa: [{ method: "evolution-item", evolvesToSpeciesId: "drampa-mega", itemId: "mega-stone" }],
+  zygarde: [{ method: "evolution-item", evolvesToSpeciesId: "zygarde-mega", itemId: "mega-stone" }],
+  meowstic: [{ method: "evolution-item", evolvesToSpeciesId: "meowstic-mega", itemId: "mega-stone" }],
+  raichu: [
+    { method: "evolution-item", evolvesToSpeciesId: "raichu-mega-x", itemId: "mega-stone" },
+    { method: "evolution-item", evolvesToSpeciesId: "raichu-mega-y", itemId: "mega-stone" },
+  ],
+  scovillain: [{ method: "evolution-item", evolvesToSpeciesId: "scovillain-mega", itemId: "mega-stone" }],
+  glimmora: [{ method: "evolution-item", evolvesToSpeciesId: "glimmora-mega", itemId: "mega-stone" }],
+  tatsugiri: [{ method: "evolution-item", evolvesToSpeciesId: "tatsugiri-mega", itemId: "mega-stone" }],
+  baxcalibur: [{ method: "evolution-item", evolvesToSpeciesId: "baxcalibur-mega", itemId: "mega-stone" }],
+  chimecho: [{ method: "evolution-item", evolvesToSpeciesId: "chimecho-mega", itemId: "mega-stone" }],
+  golisopod: [{ method: "evolution-item", evolvesToSpeciesId: "golisopod-mega", itemId: "mega-stone" }],
+  golurk: [{ method: "evolution-item", evolvesToSpeciesId: "golurk-mega", itemId: "mega-stone" }],
+  staraptor: [{ method: "evolution-item", evolvesToSpeciesId: "staraptor-mega", itemId: "mega-stone" }],
+  crabominable: [{ method: "evolution-item", evolvesToSpeciesId: "crabominable-mega", itemId: "mega-stone" }],
+  heatran: [{ method: "evolution-item", evolvesToSpeciesId: "heatran-mega", itemId: "mega-stone" }],
+  darkrai: [{ method: "evolution-item", evolvesToSpeciesId: "darkrai-mega", itemId: "mega-stone" }],
+  magearna: [{ method: "evolution-item", evolvesToSpeciesId: "magearna-mega", itemId: "mega-stone" }],
+  zeraora: [{ method: "evolution-item", evolvesToSpeciesId: "zeraora-mega", itemId: "mega-stone" }],
 };
 
 // Every evolution-item branch a species has, regardless of which item —
@@ -1556,13 +1705,15 @@ export function getAllEvolutionItemEvolutionEntries(): EvolutionItemEvolutionEnt
 }
 
 // Every evolution-item id this game's evolution data knows about — exactly
-// the 12 values EvolutionItemId allows, every one of them a real,
+// the 13 values EvolutionItemId allows, every one of them a real,
 // purchasable Shop item (features/shop/data/shop-items.ts) at the same
 // 70/35 buy/sell price (Evolution Item Cleanup phase: no more
 // registry-only/not-yet-purchasable items — that in-between state was
 // removed along with the eight retired item ids; Evolution Item
 // Consolidation phase later retired four more — Dragon Scale, Protector,
-// Reaper Cloth, Dawn Stone — each used by only 1-2 evolutions).
+// Reaper Cloth, Dawn Stone — each used by only 1-2 evolutions). Mega Stone
+// (MEGA EVOLUTION PHASE 2) is the 13th and only exception to the "70/35"
+// price — it's 150/75 (see shop-items.ts's own mega-stone entry).
 const EVOLUTION_ITEM_IDS: readonly EvolutionItemId[] = [
   "fire-stone",
   "water-stone",
@@ -1576,6 +1727,7 @@ const EVOLUTION_ITEM_IDS: readonly EvolutionItemId[] = [
   "kings-rock",
   "metal-coat",
   "upgrade",
+  "mega-stone",
 ];
 
 // Narrows an arbitrary Shop/Inventory itemId to the EvolutionItemId union —

@@ -41,16 +41,19 @@ const REGION_OPTIONS = Object.keys(REGION_DISPLAY_NAMES_HE) as RegionId[];
 // centered max-width column). All entries are fetched ONCE, server-side
 // (see app/(game)/pokedex/page.tsx); every filter/search/sort below is pure
 // client-side array filtering over that single already-loaded list — never
-// a re-fetch, never a per-keystroke server round trip. Search only ever
-// matches text a card already shows (dex number always, name only once
-// seen) — never a hidden species' real name, so typing a guess can't leak
-// whether an unseen entry matches.
+// a re-fetch, never a per-keystroke server round trip. Search matches the
+// real catalog name of the base species OR any of its alternate forms
+// (regional, Mega, ...), even for a species nobody has personally
+// encountered yet — it only decides which cards appear in the grid; every
+// card still independently renders as an unseen silhouette per its own
+// status (see utils/pokedex-filters.ts's own doc comment).
 export function PokedexContent({ entries }: PokedexContentProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<PokedexStatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<PokemonType | "all">("all");
   const [rarityFilter, setRarityFilter] = useState<PokemonRarity | "all">("all");
   const [regionFilter, setRegionFilter] = useState<RegionId | "all">("all");
+  const [megaFilter, setMegaFilter] = useState(false);
   const [selectedSpeciesId, setSelectedSpeciesId] = useState<string | null>(null);
 
   // POKÉDEX — LOCATION HINTS FOR UNSEEN POKÉMON. An "unseen" entry is now
@@ -73,8 +76,9 @@ export function PokedexContent({ entries }: PokedexContentProps) {
         type: typeFilter,
         rarity: rarityFilter,
         region: regionFilter,
+        mega: megaFilter,
       }),
-    [entries, search, statusFilter, typeFilter, rarityFilter, regionFilter]
+    [entries, search, statusFilter, typeFilter, rarityFilter, regionFilter, megaFilter]
   );
 
   const seenCount = entries.filter((entry) => entry.status !== "unseen").length;
@@ -165,6 +169,19 @@ export function PokedexContent({ entries }: PokedexContentProps) {
                 </option>
               ))}
             </select>
+
+            <button
+              type="button"
+              onClick={() => setMegaFilter((current) => !current)}
+              aria-pressed={megaFilter}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                megaFilter
+                  ? "border-indigo-400/70 bg-indigo-500/20 text-indigo-200"
+                  : "border-white/10 bg-slate-900/60 text-slate-300 hover:border-indigo-400/40"
+              }`}
+            >
+              מגה
+            </button>
           </div>
         </div>
 

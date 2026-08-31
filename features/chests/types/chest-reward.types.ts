@@ -10,7 +10,15 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // additionally pass an independent bonus roll — see chest-reward-config.ts
 // and chest-reward-roll.service.ts.
 export type OptionalChestRewardCategory = "poke-balls" | "potions" | "revive" | "evolution-item" | "incubator";
-export type ChestRewardCategory = "egg" | "money" | "gold" | OptionalChestRewardCategory;
+// MEGA EVOLUTION PHASE 5 — "mega-stone" is deliberately NOT part of
+// OptionalChestRewardCategory: it never participates in the mandatory-
+// extra/bonus-cap POOL mechanism those categories share (chest-reward-
+// config.ts's own mandatoryExtraCount/bonusCap, chest-reward-roll.
+// service.ts's own rollBonusCategories). It's a wholly separate,
+// independently-rolled category — same "outside the pool, its own rule"
+// shape "egg"/"money"/"gold" already have, just optional per tier (0% on
+// Silver) rather than always-100%.
+export type ChestRewardCategory = "egg" | "money" | "gold" | "mega-stone" | OptionalChestRewardCategory;
 
 // The egg reward never carries a region — CHESTS PHASE 2 is pure reward
 // SELECTION only; the player's CURRENT region is read (and stamped onto
@@ -77,10 +85,27 @@ export interface EvolutionItemChestReward {
   items: readonly { itemId: EvolutionItemId; quantity: number }[];
 }
 
+// MEGA EVOLUTION PHASE 5 — a dedicated, independent extra roll (chest-
+// reward-config.ts's own ChestRewardConfig.megaStoneChance, rolled last in
+// chest-reward-roll.service.ts's own rollChestReward, strictly AFTER every
+// existing roll) — never part of the generic evolution-item pool
+// (EVOLUTION_ITEM_CATALOG in chest-reward-roll.service.ts deliberately
+// excludes "mega-stone", a Phase 2 exclusion this phase keeps unchanged).
+// Always exactly 1 unit when it appears at all — this reward either doesn't
+// exist in the result array (roll failed, or the tier has no chance at
+// all), or exists exactly once with quantity 1; never a range, never more
+// than one.
+export interface MegaStoneChestReward {
+  category: "mega-stone";
+  itemId: "mega-stone";
+  quantity: 1;
+}
+
 export type ChestRewardResult =
   | EggChestReward
   | MoneyChestReward
   | GoldChestReward
   | ItemBundleChestReward
   | IncubatorChestReward
-  | EvolutionItemChestReward;
+  | EvolutionItemChestReward
+  | MegaStoneChestReward;

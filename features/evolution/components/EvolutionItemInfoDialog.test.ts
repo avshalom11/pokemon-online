@@ -48,8 +48,17 @@ test("the dialog shows the product image and Hebrew name", () => {
   assert.ok(dialogSource.includes("{itemName}"));
 });
 
-test("each row shows source, an arrow, and the evolved target — never collapsed", () => {
-  assert.ok(dialogSource.includes("{mapping.sourceName}"));
-  assert.ok(dialogSource.includes("{mapping.targetName}"));
+test("each row shows the source, an arrow, and every one of its own evolved target(s)", () => {
+  assert.ok(dialogSource.includes("{group.sourceName}"));
+  assert.ok(dialogSource.includes("{target.targetName}"));
   assert.ok(dialogSource.includes("→"), "rows must use an explicit arrow between source and target");
+});
+
+// MEGA EVOLUTION — UI/NAMING FIXES — a source species with more than one
+// branch for this item (Clamperl + Water Stone; Mega Stone's six X/Y/Z
+// bases) is shown as ONE row listing all its own targets, never one
+// duplicated row per target.
+test("rows are grouped by source species — a multi-target source is never repeated as a separate row just because it has multiple targets", () => {
+  assert.ok(dialogSource.includes("groupedBySource"), "rendering must be driven by a source-grouped list, not the raw per-mapping list");
+  assert.ok(!/mappings\.map/.test(dialogSource), "must never render one row per raw mapping (that would duplicate a multi-target source)");
 });

@@ -32,10 +32,20 @@ import type { OwnedPokemon } from "@/shared/types/player-pokemon";
 interface InventoryContentProps {
   views: InventoryItemView[];
   // Party AND storage (features/pokemon/services/player-pokemon.ts's
-  // getAllOwnedPokemon) — only ever read by EvolutionItemPanel below, to
-  // filter down to which owned Pokémon a selected Stone can evolve. Every
-  // other Inventory flow (selling) never touches this.
+  // getAllOwnedPokemon) — read by both EvolutionItemPanel (to filter down
+  // to which owned Pokémon a selected Stone can evolve) and
+  // MedicineStatusPanel below. Every other Inventory flow (selling) never
+  // touches this.
   ownedPokemon: OwnedPokemon[];
+  // EVOLUTION ITEM LOCK SAFETY FIX — every playerPokemonId currently
+  // Marketplace-listed or battle-locked (app/(game)/inventory/page.tsx's
+  // own getLockedPlayerPokemonIds call — features/marketplace/services/
+  // pokemon-availability.service.ts's authoritative check). Filtered OUT of
+  // the array passed to EvolutionItemPanel specifically (see its own call
+  // site below) — never out of `ownedPokemon` itself, which
+  // MedicineStatusPanel above also reads unfiltered (a locked Pokémon can
+  // still have its status cured; it just can't evolve).
+  lockedPlayerPokemonIds: string[];
   // EGGS PHASE 6 — every owned egg NOT currently incubating (features/
   // inventory/services/inventory-view.service.ts's getOwnedEggViews,
   // itself backed by Phase 1's listOwnedEggs). INVENTORY CATEGORY FIX —
@@ -99,10 +109,18 @@ type PendingSellTarget =
 export function InventoryContent({
   views,
   ownedPokemon,
+  lockedPlayerPokemonIds,
   eggs: initialEggs,
   incubators: initialIncubators,
   chests: initialChests,
 }: InventoryContentProps) {
+  // EVOLUTION ITEM LOCK SAFETY FIX — a Marketplace-listed or battle-locked
+  // Pokémon must never appear as an evolution-item candidate (see this
+  // prop's own doc comment above). A plain Set built from the server-
+  // provided id list, never a second lock-detection mechanism.
+  const lockedPlayerPokemonIdSet = new Set(lockedPlayerPokemonIds);
+  const evolvableOwnedPokemon = ownedPokemon.filter((pokemon) => !lockedPlayerPokemonIdSet.has(pokemon.id));
+
   const categories = getShopCategories();
   const [selectedCategoryId, setSelectedCategoryId] = useState<ShopCategoryId | undefined>(
     getDefaultShopCategoryId()
@@ -449,7 +467,7 @@ export function InventoryContent({
             ) : null}
 
             {!isEggsCategorySelected && !isChestsCategorySelected && selectedView && selectedView.item.categoryId === "stones" ? (
-              <EvolutionItemPanel item={selectedView.item} ownedPokemon={ownedPokemon} />
+              <EvolutionItemPanel item={selectedView.item} ownedPokemon={evolvableOwnedPokemon} />
             ) : null}
 
             {/* STATUS-HEALING ITEMS — same "appears under the sell panel

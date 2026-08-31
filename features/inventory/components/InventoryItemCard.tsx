@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { CurrencyIcon } from "@/features/currency/components/CurrencyIcon";
-import { getEvolutionItemDisplayLabels } from "@/features/evolution/services/evolution-item-catalog";
+import { EvolutionItemInfoDialog } from "@/features/evolution/components/EvolutionItemInfoDialog";
 import type { InventoryItemView } from "@/features/inventory/types/inventory.types";
 import { TmInfoDialog } from "@/features/tm-system/components/TmInfoDialog";
 
@@ -19,12 +19,24 @@ interface InventoryItemCardProps {
 // confirm dialog) lives in InventorySellPanel/InventorySellConfirmDialog,
 // triggered once an item is selected here — same division of
 // responsibility ShopItemCard already establishes for buying.
-// Evolution-item ("stones" category) cards additionally show which
-// Pokémon this exact item evolves — same live-derived rule ShopItemCard
-// uses (getEvolutionItemDisplayLabels), never hardcoded per item.
+// INVENTORY — EVOLUTION STONE INFO — the same small "?" button + info
+// dialog ShopItemCard already offers for evolution products (Mega Stone
+// included, since it's just another "stones"-category EvolutionItemId as
+// of Mega Evolution Phase 2) — same component (EvolutionItemInfoDialog),
+// same live data source, never a second/hardcoded compatibility list. This
+// is purely informational; the authoritative eligibility check when an
+// item is actually USED still lives entirely in the existing server-side
+// evolution flow (features/evolution/services/accept-evolution-item.
+// service.ts), untouched by this addition.
+//
+// POKÉDEX + INVENTORY UI IMPROVEMENTS — the card used to also show an
+// inline evolution-compatibility summary directly on the card; that's now
+// shown ONLY inside the "?" dialog above, never duplicated inline here —
+// ShopItemCard never had this inline summary to begin with, so this brings
+// Inventory's card in line with it.
 export function InventoryItemCard({ view, isSelected, onSelect }: InventoryItemCardProps) {
   const { item, quantity, sellUnitPrice } = view;
-  const evolvesLabels = item.categoryId === "stones" ? getEvolutionItemDisplayLabels(item.id) : [];
+  const isEvolutionProduct = item.categoryId === "stones";
   // UI POLISH (pre-Phase 6) — TM ("tms") cards show a larger image than
   // every other category, matching ShopItemCard's own treatment, so a TM
   // looks the same size whether seen in the Shop or in Inventory. Gated on
@@ -80,26 +92,24 @@ export function InventoryItemCard({ view, isSelected, onSelect }: InventoryItemC
         </span>
 
         <span className="text-[11px] leading-snug text-slate-400">{item.description}</span>
-
-        {evolvesLabels.length > 0 ? (
-          <div className="mt-1 w-full text-right text-[10px] leading-snug text-indigo-300/80">
-            <span className="font-semibold text-indigo-200">מתפתחים:</span> {evolvesLabels.join(", ")}
-          </div>
-        ) : null}
       </button>
 
-      {isTmProduct ? (
+      {isEvolutionProduct || isTmProduct ? (
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             setIsInfoOpen(true);
           }}
-          aria-label="הצג פוקימונים שיכולים ללמוד את המתקפה"
+          aria-label={isTmProduct ? "הצג פוקימונים שיכולים ללמוד את המתקפה" : "הצג פוקימונים שניתן לפתח באמצעות פריט זה"}
           className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-slate-900/80 text-xs font-bold text-slate-300 transition-colors hover:border-indigo-400/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
         >
           ?
         </button>
+      ) : null}
+
+      {isEvolutionProduct && isInfoOpen ? (
+        <EvolutionItemInfoDialog itemId={item.id} itemName={item.name} itemImageUrl={item.imageUrl} onClose={() => setIsInfoOpen(false)} />
       ) : null}
 
       {isTmProduct && isInfoOpen ? (
