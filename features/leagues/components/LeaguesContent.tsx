@@ -8,12 +8,14 @@ import { getChestDefinition } from "@/features/chests/data/chest-definitions";
 import { getEggDefinition } from "@/features/eggs/data/egg-definitions";
 import { cancelLeagueRegistrationAction, registerForLeagueAction } from "@/features/leagues/actions/register-for-league.action";
 import { HowLeaguesWorkDialog } from "./HowLeaguesWorkDialog";
+import { LeaguePlacementCelebrationModal } from "./LeaguePlacementCelebrationModal";
 import { MIN_LEAGUE_PLAYER_LEVEL } from "@/features/leagues/config/league-access-rules.config";
 import { CYCLE_WEEK_LABELS } from "@/features/leagues/data/league-cycle-labels";
 import { leagueMatchStatusLabelHe } from "@/features/leagues/data/league-match-labels";
 import { getLeaguePlacementRewardDefinition, getLeagueParticipationRewardDefinition } from "@/features/leagues/data/league-reward-registry";
 import type { LeaguePlayerAchievement } from "@/features/leagues/services/league-achievement.service";
 import type { LeagueTournamentBracketView } from "@/features/leagues/services/league-bracket-view.service";
+import type { PendingLeaguePlacementCelebration } from "@/features/leagues/services/league-placement-celebration.service";
 import type { LeaguesOverviewView, RegionalLeagueView } from "@/features/leagues/services/league-view.service";
 import type { LeagueId } from "@/features/leagues/types/league.types";
 
@@ -22,6 +24,13 @@ interface LeaguesContentProps {
   achievements: readonly LeaguePlayerAchievement[];
   brackets: Record<LeagueId, LeagueTournamentBracketView | null>;
   championDisplayNames: Record<string, string>;
+  // LEAGUE — FINAL PLACEMENT CELEBRATION MODAL — every 1st/2nd/3rd
+  // placement this player has EARNED but never acknowledged yet, already
+  // resolved server-side (app/(game)/leagues/page.tsx via
+  // getPendingLeaguePlacementCelebrations), in the exact order they must be
+  // shown one at a time. Empty for an ordinary participation-only player —
+  // structurally, never a special-cased check here.
+  pendingCelebrations: readonly PendingLeaguePlacementCelebration[];
 }
 
 const CHAMPIONS_LEAGUE_NOTICE = "ההעפלה לליגת האלופים מתבצעת לפי תוצאות הליגות האזוריות — מקום 1 בכל ליגה אזורית, ומקום 2 בליגה III";
@@ -79,11 +88,19 @@ function cancelResultMessageHe(status: string): string {
 // (league-view.service.ts) and Phase 9's own new bracket-view/reward-
 // registry data — nothing here recomputes eligibility, the 4-week rotation,
 // a match's status, or a reward amount itself.
-export function LeaguesContent({ overview, achievements, brackets, championDisplayNames }: LeaguesContentProps) {
+export function LeaguesContent({ overview, achievements, brackets, championDisplayNames, pendingCelebrations }: LeaguesContentProps) {
   const [isPending, startTransition] = useTransition();
   const [statusByLeague, setStatusByLeague] = useState<Record<string, { registered: boolean; message: string | null }>>({});
   const [expandedLeagueId, setExpandedLeagueId] = useState<LeagueId | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  // LEAGUE — FINAL PLACEMENT CELEBRATION MODAL (section 8 of this task) —
+  // the server already resolved the full ordered list once at page load;
+  // this is purely a local "which have we already shown/acknowledged this
+  // visit" cursor. Acknowledging the current one (index 0) only ever
+  // advances this queue AFTER acknowledgeLeaguePlacementCelebrationAction
+  // confirms the server-side write succeeded (see onAcknowledged below) —
+  // never optimistically before that.
+  const [celebrationQueue, setCelebrationQueue] = useState(pendingCelebrations);
   // LEAGUE REGISTRATION — CANCEL (later task) — which regional League's
   // "האם אתה בטוח שברצונך לבטל..." confirmation is currently open, gated
   // exactly like GymsContent's own easy-intro/champion-intro state: nothing
@@ -189,6 +206,18 @@ export function LeaguesContent({ overview, achievements, brackets, championDispl
 
       {cancelConfirmLeagueId ? (
         <CancelRegistrationConfirmDialog isPending={isPending} onConfirm={confirmCancelRegistration} onCancel={() => setCancelConfirmLeagueId(null)} />
+      ) : null}
+
+      {/* LEAGUE — FINAL PLACEMENT CELEBRATION MODAL — mandatory, so it
+          renders above every other dialog on this page (z-[80] — see the
+          modal's own z-index) and only ever shows ONE at a time
+          (celebrationQueue[0]), never overlapping modals. */}
+      {celebrationQueue.length > 0 ? (
+        <LeaguePlacementCelebrationModal
+          key={celebrationQueue[0]!.tournamentId}
+          celebration={celebrationQueue[0]!}
+          onAcknowledged={() => setCelebrationQueue((current) => current.slice(1))}
+        />
       ) : null}
     </div>
   );

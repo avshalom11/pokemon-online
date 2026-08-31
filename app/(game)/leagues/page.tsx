@@ -5,6 +5,7 @@ import { LeaguesContent } from "@/features/leagues/components/LeaguesContent";
 import { getPlayerLeagueAchievements } from "@/features/leagues/services/league-achievement.service";
 import { getTournamentBracketView, type LeagueTournamentBracketView } from "@/features/leagues/services/league-bracket-view.service";
 import { createChampionsLeagueTournamentForCycle } from "@/features/leagues/services/champions-league.service";
+import { getPendingLeaguePlacementCelebrations } from "@/features/leagues/services/league-placement-celebration.service";
 import { getLeaguesOverview } from "@/features/leagues/services/league-view.service";
 import { ensureRound1GeneratedForActiveTournament, getCurrentTournamentForLeague } from "@/features/leagues/services/league-tournament.service";
 import { getCurrentLeagueCycle } from "@/features/leagues/utils/league-cycle";
@@ -57,6 +58,14 @@ export default async function LeaguesPage() {
   const overview = await getLeaguesOverview(profile.id, now);
   const achievements = await getPlayerLeagueAchievements(profile.id);
 
+  // LEAGUE — FINAL PLACEMENT CELEBRATION MODAL — resolved once here,
+  // read-only (never writes/creates anything — see that service's own doc
+  // comment), same "server computes the full view, client only renders and
+  // acknowledges" split every other piece of this page's data already
+  // follows. Empty for a participation-only player, structurally — no
+  // special-casing needed.
+  const pendingCelebrations = await getPendingLeaguePlacementCelebrations(profile.id);
+
   // BRACKET DATA (Phase 9, section 15) — for every League that currently has
   // a tournament instance, resolve its bracket. Deliberately read-only: this
   // never calls advanceCompletedLeagueRound itself — that remains the match
@@ -105,6 +114,7 @@ export default async function LeaguesPage() {
         achievements={achievements}
         brackets={brackets}
         championDisplayNames={Object.fromEntries(championDisplayNames)}
+        pendingCelebrations={pendingCelebrations}
       />
     </GameScreen>
   );
