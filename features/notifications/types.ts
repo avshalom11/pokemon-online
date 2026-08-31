@@ -63,6 +63,21 @@
 // once per lock window, with no separate dedup flag needed). Never carries
 // the attacker's IP or any other security detail in `message`/`metadata` —
 // only the fact that a lockout happened.
+//
+// LEAGUE_PLACEMENT_ACHIEVED: this type's ONLY job is being the persisted
+// "the player has acknowledged their League Placement Celebration modal for
+// this exact tournament" record (features/leagues/services/
+// league-placement-celebration.service.ts's own acknowledgeLeaguePlacementCelebration,
+// the ONLY place this is ever created) — its isRead state is never read or
+// relied on for this type (there is no separate unread/pending state to
+// track here: a PENDING celebration is derived instead, by finding a real
+// LeagueTournamentPlacement row with no matching notification of this type
+// yet — see that same file; ACKNOWLEDGED is this row's mere existence).
+// Always carries `{ tournamentId, leagueId,
+// place }` in `metadata` — `tournamentId` is what makes a specific
+// acknowledgement idempotent and tied to one specific earned placement, so
+// a future placement (a different tournament, even in the same League)
+// always produces its own, independent celebration.
 export type NotificationType =
   | "PLAYER_LEVEL_UP"
   | "CURRENCY_MONEY_REWARD"
@@ -74,7 +89,8 @@ export type NotificationType =
   | "FRIEND_REQUEST_RECEIVED"
   | "PRIVATE_MESSAGE_RECEIVED"
   | "SECURITY_LOGIN_LOCKOUT"
-  | "MARKETPLACE_LISTING_SOLD";
+  | "MARKETPLACE_LISTING_SOLD"
+  | "LEAGUE_PLACEMENT_ACHIEVED";
 
 export interface NotificationSummary {
   id: string;

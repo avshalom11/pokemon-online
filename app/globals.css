@@ -336,3 +336,32 @@ body {
 .animate-capture-ball-success {
   animation: capture-ball-success 0.5s ease-out forwards;
 }
+
+/* LEAGUE PLACEMENT CELEBRATION — FIREWORKS. One radial burst particle:
+   travels outward to a per-particle offset (--firework-dx/--firework-dy,
+   set inline — same "duration/delay set inline per-particle" convention
+   the battle-float/battle-rise/battle-twinkle set above already
+   establishes) while shrinking and fading. Played once per particle
+   (animation-fill-mode: forwards holds the faded-out end state until the
+   whole burst is removed from the DOM) — never infinite, unlike the
+   ambient battle-* set. See features/leagues/components/
+   LeagueCelebrationFireworks.tsx for how bursts are spawned/cleaned up. */
+@keyframes league-firework-particle {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--firework-dx, 0), var(--firework-dy, 0)) scale(0.15);
+    opacity: 0;
+  }
+}
+
+.animate-league-firework-particle {
+  animation-name: league-firework-particle;
+  animation-timing-function: cubic-bezier(0.15, 0.6, 0.35, 1);
+  animation-fill-mode: forwards;
+}

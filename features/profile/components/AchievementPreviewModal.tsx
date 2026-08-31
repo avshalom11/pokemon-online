@@ -6,9 +6,10 @@ interface AchievementPreviewModalProps {
   imageUrl: string;
   name: string;
   // MEDAL IMAGE SIZE (later task) — the ONLY thing this prop controls: a
-  // Regional Medal is shown slightly larger than a Gym Badge here (Badge
-  // sizing is untouched). Never affects imageUrl resolution/fetching.
-  kind: "badge" | "medal";
+  // Regional Medal (or LEAGUE AWARDS — a League award, same size) is shown
+  // slightly larger than a Gym Badge here (Badge sizing is untouched).
+  // Never affects imageUrl resolution/fetching.
+  kind: "badge" | "medal" | "league-award";
   onClose: () => void;
 }
 
@@ -28,7 +29,7 @@ interface AchievementPreviewModalProps {
 // exists in that list for a non-owner viewer in the first place, so there
 // is nothing here to gate a second time.
 export function AchievementPreviewModal({ imageUrl, name, kind, onClose }: AchievementPreviewModalProps) {
-  const isMedal = kind === "medal";
+  const isMedal = kind === "medal" || kind === "league-award";
 
   return (
     <div

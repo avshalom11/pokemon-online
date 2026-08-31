@@ -1,6 +1,7 @@
 import type { ProfileThemeId } from "../themes/profile-themes";
 import type { ProfileContentBlock } from "./profile-content.types";
 import type { FriendshipStatus } from "@/features/friends/types";
+import type { LeagueId } from "@/features/leagues/types/league.types";
 import type { RegionId } from "@/shared/types/region";
 
 // A single displayed party member on the PUBLIC profile — deliberately NOT
@@ -57,12 +58,32 @@ export interface PublicRegionalMedalView {
   imageUrl: string;
 }
 
+// LEAGUE AWARDS — one GROUPED (leagueId, place) trophy/medal, ready to
+// render. `imageUrl` is always read straight off the existing
+// LeaguePlayerAchievement the achievement history already computes
+// (features/leagues/services/league-achievement.service.ts, itself
+// resolved via league-achievement-media.ts's own canonical
+// leagueAwardImageUrl) — never a second image lookup here. `count` is the
+// number of times this exact (leagueId, place) was earned across every
+// tournament cycle — a player who won the same League/placement multiple
+// times shows ONE card with a quantity, never one duplicate card per win
+// (see profile-achievements-view.service.ts's own grouping doc comment).
+export interface PublicLeagueAwardView {
+  leagueId: LeagueId;
+  place: 1 | 2 | 3;
+  leagueDisplayName: string;
+  placementLabel: string;
+  imageUrl: string;
+  count: number;
+}
+
 // The generic "הישגים" (Achievements) container — deliberately not named
-// "GymAchievements" or scoped to Gyms in its own shape, so a future
+// "GymAchievements" or scoped to Gyms in its own shape, so a
 // League-trophy array (League I/II/III/Champions League Trophies, Silver/
-// Bronze Medals — see this feature's own spec, section 17) can be added as
-// one more sibling field here later without restructuring the profile
-// architecture or touching ProfileContent.tsx's own composition.
+// Bronze/Arad awards) could be added as one more sibling field here later
+// without restructuring the profile architecture or touching
+// ProfileContent.tsx's own composition — see `leagueAwards` below, which is
+// exactly that field, now populated.
 //
 // `visibleToViewer` is the ONE server-side privacy decision the profile UI
 // ever needs to branch on: true means `badges`/`regionalMedals` below are
@@ -83,6 +104,7 @@ export interface ProfileAchievementsView {
   hiddenFromOtherUsers: boolean;
   badges: readonly PublicBadgeView[];
   regionalMedals: readonly PublicRegionalMedalView[];
+  leagueAwards: readonly PublicLeagueAwardView[];
 }
 
 // The one shape both the public visitor view AND the owner's own view of
@@ -160,9 +182,9 @@ export interface ProfileEditViewModel {
   showPartyOnProfile: boolean;
   showStatsOnProfile: boolean;
   showAboutMeOnProfile: boolean;
-  // PROFILE ACHIEVEMENTS (later task) — the ONE setting that gates BOTH
-  // earned Gym Badges and Regional Medals (never a separate switch for
-  // each — see this feature's own spec).
+  // PROFILE ACHIEVEMENTS — the ONE setting that gates the whole "הישגים"
+  // section: earned Gym Badges, Regional Medals, AND League Awards (never a
+  // separate switch per achievement kind — see this feature's own spec).
   showGymAchievementsOnProfile: boolean;
   partyPreview: PublicPartyMemberView[];
   contentBlocks: ProfileContentBlock[];

@@ -1,6 +1,6 @@
 import type { ChestTypeId } from "@/features/chests/data/chest-definitions";
 import type { PokemonRarity } from "@/shared/types/pokemon";
-import { leagueMedalImageUrl, leagueTrophyImageUrl, type LeagueMedalTier } from "./league-achievement-media";
+import { leagueAwardImageUrl } from "./league-achievement-media";
 import { CHAMPIONS_LEAGUE, LEAGUE_I, LEAGUE_II, LEAGUE_III } from "./league-registry";
 import type { LeagueId } from "../types/league.types";
 
@@ -61,8 +61,6 @@ interface LeagueRewardTable {
   readonly participation: { readonly money: number; readonly eggRewards: readonly LeagueEggReward[] };
 }
 
-const MEDAL_TIER_FOR_PLACE: Record<2 | 3, LeagueMedalTier> = { 2: "silver", 3: "bronze" };
-
 const REWARD_TABLE: Record<LeagueId, LeagueRewardTable> = {
   "league-1": {
     displayName: LEAGUE_I.displayName,
@@ -121,7 +119,7 @@ export function getLeaguePlacementRewardDefinition(leagueId: LeagueId, place: 1 
   const table = REWARD_TABLE[leagueId];
   const row = table.places[place];
   const achievementLabel = place === 1 ? `${table.displayName} Trophy` : place === 2 ? "Silver Medal" : "Bronze Medal";
-  const achievementImageUrl = place === 1 ? leagueTrophyImageUrl(leagueId) : leagueMedalImageUrl(MEDAL_TIER_FOR_PLACE[place]);
+  const achievementImageUrl = leagueAwardImageUrl(leagueId, place);
 
   return {
     leagueId,

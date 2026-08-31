@@ -71,16 +71,47 @@ test("the modal shows the achievement's name and a close control, matching the p
   assert.ok(previewModalSrc.includes('aria-label="סגור"'), "an explicit close button must also exist");
 });
 
-test("24/25 (structural): the click-to-enlarge modal can only ever show an item already present in achievements.badges/achievements.regionalMedals — it never fetches or holds a second, broader achievement list, so it structurally cannot expose a hidden achievement the server-side privacy gate already excluded", () => {
+test("24/25 (structural): the click-to-enlarge modal can only ever show an item already present in achievements.badges/achievements.regionalMedals/achievements.leagueAwards — it never fetches or holds a second, broader achievement list, so it structurally cannot expose a hidden achievement the server-side privacy gate already excluded", () => {
   assert.ok(
     !achievementsSectionSrc.includes("getOwnedGymBadges") && !achievementsSectionSrc.includes("getOwnedRegionalMedals") && !achievementsSectionSrc.includes("fetch("),
     "the component must never independently fetch achievement data — only the already-privacy-filtered `achievements` prop"
   );
+  assert.ok(
+    !achievementsSectionSrc.includes("getPlayerLeagueAchievements"),
+    "the component must never independently fetch League award data either — only the already-privacy-filtered `achievements` prop"
+  );
   // previewItem is only ever set from an item already mapped out of the
-  // `achievements` prop (badgeToDisplayItem/medalToDisplayItem over
-  // achievements.badges/achievements.regionalMedals) — for a non-owner
-  // viewer with visibility OFF, those arrays are already genuinely empty
-  // (profile-achievements-view.service.ts), so there is no item to click in
-  // the first place.
+  // `achievements` prop (badgeToDisplayItem/medalToDisplayItem/
+  // leagueAwardToDisplayItem over achievements.badges/.regionalMedals/
+  // .leagueAwards) — for a non-owner viewer with visibility OFF, those
+  // arrays are already genuinely empty (profile-achievements-view.service.ts),
+  // so there is no item to click in the first place.
   assert.ok(achievementsSectionSrc.includes("setPreviewItem"), "previewItem must be settable only via the mapped achievement items");
+});
+
+// ============================================================================
+// LEAGUE AWARDS — the "פרסי ליגה" group: reuses the same AchievementGroup/
+// AchievementPreviewModal wiring as Badges/Medals, plus a quantity badge
+// for a (leagueId, place) earned more than once.
+// ============================================================================
+
+test("the League Awards group is wired through the exact same AchievementGroup/onSelect mechanism as Badges and Medals", () => {
+  assert.ok(
+    achievementsSectionSrc.includes('<AchievementGroup title="פרסי ליגה" items={achievements.leagueAwards.map(leagueAwardToDisplayItem)} onSelect={setPreviewItem} />'),
+    "the League Awards group must be wired to open the preview on click, through the exact same mechanism as Badges/Medals"
+  );
+});
+
+test("League award items never re-derive their own image — imageUrl is read straight off the already-grouped view model", () => {
+  assert.ok(achievementsSectionSrc.includes("imageUrl: award.imageUrl"));
+  assert.ok(!achievementsSectionSrc.includes("leagueAwardImageUrl"), "the component must never call the image resolver itself — only the server-side view model does");
+});
+
+test("a League award earned more than once shows a '×N' quantity badge; a single win never shows a redundant '×1'", () => {
+  assert.ok(achievementsSectionSrc.includes("item.quantity !== undefined && item.quantity > 1"), "the quantity badge must only render when earned more than once");
+  assert.ok(/×\{item\.quantity\}/.test(achievementsSectionSrc), "the visible quantity badge must show the real count");
+});
+
+test("MEDAL IMAGE SIZE: a League award is shown at the same enlarged size as a Regional Medal in the preview modal", () => {
+  assert.ok(previewModalSrc.includes('kind === "medal" || kind === "league-award"'), "league-award must share the Medal-sized branch, not the smaller Badge size");
 });
