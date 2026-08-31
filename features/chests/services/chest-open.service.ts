@@ -161,5 +161,14 @@ async function grantOneReward(
       }
       return { category: "evolution-item", items };
     }
+
+    // MEGA EVOLUTION PHASE 5 — same grant primitive as every other item
+    // reward (addInventoryItem), never a special-cased write path.
+    case "mega-stone": {
+      const shopItem = getShopItemById(reward.itemId);
+      if (!shopItem) throw new Error(`Chest reward references an unknown item id "${reward.itemId}"`);
+      await addInventoryItem(tx, playerId, reward.itemId, reward.quantity);
+      return { category: "mega-stone", itemId: reward.itemId, displayName: shopItem.name, imageUrl: shopItem.imageUrl, quantity: reward.quantity };
+    }
   }
 }

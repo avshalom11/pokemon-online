@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { getEvolutionItemDisplayLabels, getEvolutionItemMappings } from "./evolution-item-catalog.ts";
+import { getEvolutionItemDisplayLabels, getEvolutionItemMappings, groupEvolutionItemMappingsBySource, isMegaEvolutionTarget } from "./evolution-item-catalog.ts";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { SHOP_ITEMS } from "@/features/shop/data/shop-items";
 
@@ -145,12 +145,82 @@ test("Petilil's Sun Stone branch is shown as two disambiguated 'Species → Targ
   assert.ok(mappings.some((row) => row.sourceName === "Petilil" && row.targetName === "Hisuian Lilligant"));
 });
 
-test("every one of the Shop's 12 evolution products has at least one mapping row", () => {
+test("every one of the Shop's 13 evolution products has at least one mapping row", () => {
   const evolutionProductIds = SHOP_ITEMS.filter((item) => item.categoryId === "stones").map((item) => item.id);
-  assert.equal(evolutionProductIds.length, 12);
+  assert.equal(evolutionProductIds.length, 13);
 
   for (const itemId of evolutionProductIds) {
     const mappings = getEvolutionItemMappings(itemId);
     assert.ok(mappings.length > 0, `${itemId} must have at least one evolution mapping`);
   }
+});
+
+// ============================================================================
+// MEGA EVOLUTION — UI/NAMING FIXES — groupEvolutionItemMappingsBySource, the
+// pure grouping step behind EvolutionItemInfoDialog's "no duplicate base
+// species just because it has multiple targets" requirement.
+// ============================================================================
+
+test("Mega Stone's info shows exactly 87 distinct base species, never 93 — the six X/Y/Z-branching bases are each one group, not one row per target", () => {
+  const grouped = groupEvolutionItemMappingsBySource(getEvolutionItemMappings("mega-stone"));
+  assert.equal(grouped.length, 87);
+
+  const totalTargets = grouped.reduce((sum, group) => sum + group.targets.length, 0);
+  assert.equal(totalTargets, 93, "every one of the 93 Mega targets must still be represented somewhere");
+
+  const multiTargetCases: Array<{ sourceName: string; targetNames: string[] }> = [
+    { sourceName: "Charizard", targetNames: ["Mega Charizard X", "Mega Charizard Y"] },
+    { sourceName: "Mewtwo", targetNames: ["Mega Mewtwo X", "Mega Mewtwo Y"] },
+    { sourceName: "Raichu", targetNames: ["Mega Raichu X", "Mega Raichu Y"] },
+    { sourceName: "Garchomp", targetNames: ["Mega Garchomp", "Mega Garchomp Z"] },
+    { sourceName: "Lucario", targetNames: ["Mega Lucario", "Mega Lucario Z"] },
+    { sourceName: "Absol", targetNames: ["Mega Absol", "Mega Absol Z"] },
+  ];
+
+  for (const { sourceName, targetNames } of multiTargetCases) {
+    const matches = grouped.filter((group) => group.sourceName === sourceName);
+    assert.equal(matches.length, 1, `${sourceName} must appear as exactly one group, never duplicated`);
+    assert.deepEqual(
+      matches[0]!.targets.map((target) => target.targetName).sort(),
+      [...targetNames].sort()
+    );
+  }
+
+  const multiTargetSourceNames = new Set(multiTargetCases.map((entry) => entry.sourceName));
+  for (const group of grouped) {
+    if (multiTargetSourceNames.has(group.sourceName)) continue;
+    assert.equal(group.targets.length, 1, `${group.sourceName} should have exactly one Mega target`);
+  }
+});
+
+// ============================================================================
+// POKÉDEX — FORM VISIBILITY + ACQUISITION HINT FIX — isMegaEvolutionTarget,
+// the pure "is this species a Mega Evolution target" check the Pokédex's
+// unseen-form acquisition hint relies on, derived live from the same
+// canonical registry as everything else in this file.
+// ============================================================================
+
+test("isMegaEvolutionTarget is true for a real Mega target species and false for its own base/source species", () => {
+  assert.equal(isMegaEvolutionTarget("charizard-mega-x"), true);
+  assert.equal(isMegaEvolutionTarget("charizard-mega-y"), true);
+  assert.equal(isMegaEvolutionTarget("charizard"), false, "the base species that evolves INTO a Mega form is never itself a Mega target");
+});
+
+test("isMegaEvolutionTarget is false for a species with no Mega Evolution relationship at all", () => {
+  assert.equal(isMegaEvolutionTarget("bulbasaur"), false);
+  assert.equal(isMegaEvolutionTarget("poke-ball"), false);
+});
+
+test("groupEvolutionItemMappingsBySource preserves first-seen source order and never invents/drops a mapping", () => {
+  const mappings = getEvolutionItemMappings("mega-stone");
+  const grouped = groupEvolutionItemMappingsBySource(mappings);
+
+  const firstSeenOrder: string[] = [];
+  for (const mapping of mappings) {
+    if (!firstSeenOrder.includes(mapping.sourceSpeciesId)) firstSeenOrder.push(mapping.sourceSpeciesId);
+  }
+  assert.deepEqual(
+    grouped.map((group) => group.sourceSpeciesId),
+    firstSeenOrder
+  );
 });

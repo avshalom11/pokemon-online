@@ -118,3 +118,56 @@ test("Clamperl + Water Stone returns one candidate with BOTH branch targets, nev
   assert.equal(candidates.length, 1);
   assert.deepEqual(candidates[0]?.evolvedSpeciesOptions.map((s) => s.id).sort(), ["gorebyss", "huntail"]);
 });
+
+// MEGA EVOLUTION PHASE 3 — Mega Stone flows through this exact same generic
+// eligibility filter with zero code changes (data/pokemon/pokemon-
+// evolutions.ts's EVOLUTION_ITEM_EVOLUTIONS table is the only thing that
+// changed, in Phase 2). These tests exist to prove that integration, not to
+// add new eligibility logic.
+test("Mega Stone: a single-target base (Venusaur) is a candidate; its own Mega form is never a candidate for the same item", () => {
+  const owned = [makeOwned("mon-venusaur", "venusaur"), makeOwned("mon-venusaur-mega", "venusaur-mega")];
+
+  const candidates = getEvolutionItemCandidates("mega-stone", owned);
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.playerPokemonId, "mon-venusaur");
+  assert.deepEqual(candidates[0]?.evolvedSpeciesOptions.map((s) => s.id), ["venusaur-mega"]);
+});
+
+test("Mega Stone: Charizard, Mewtwo, Raichu, Garchomp, Lucario, and Absol each return one candidate with BOTH Mega targets, never auto-picking one", () => {
+  const cases: Array<{ speciesId: string; targets: string[] }> = [
+    { speciesId: "charizard", targets: ["charizard-mega-x", "charizard-mega-y"] },
+    { speciesId: "mewtwo", targets: ["mewtwo-mega-x", "mewtwo-mega-y"] },
+    { speciesId: "raichu", targets: ["raichu-mega-x", "raichu-mega-y"] },
+    { speciesId: "garchomp", targets: ["garchomp-mega", "garchomp-mega-z"] },
+    { speciesId: "lucario", targets: ["lucario-mega", "lucario-mega-z"] },
+    { speciesId: "absol", targets: ["absol-mega", "absol-mega-z"] },
+  ];
+
+  for (const { speciesId, targets } of cases) {
+    const owned = [makeOwned(`mon-${speciesId}`, speciesId)];
+    const candidates = getEvolutionItemCandidates("mega-stone", owned);
+
+    assert.equal(candidates.length, 1, `${speciesId} should be exactly one candidate`);
+    assert.deepEqual(
+      candidates[0]?.evolvedSpeciesOptions.map((s) => s.id).sort(),
+      [...targets].sort(),
+      `${speciesId}'s mega-stone options must be exactly ${targets.join("/")}`
+    );
+  }
+});
+
+test("Mega Stone: an already-Mega Pokémon is never a candidate for any of its own Mega siblings' items either", () => {
+  const owned = [
+    makeOwned("mon-charizard-x", "charizard-mega-x"),
+    makeOwned("mon-garchomp-z", "garchomp-mega-z"),
+  ];
+
+  assert.deepEqual(getEvolutionItemCandidates("mega-stone", owned), []);
+});
+
+test("Mega Stone: a non-Mega-eligible species is never a candidate", () => {
+  const owned = [makeOwned("mon-rattata", "rattata")];
+
+  assert.deepEqual(getEvolutionItemCandidates("mega-stone", owned), []);
+});

@@ -75,34 +75,91 @@ export async function getPokemonMarketAvailability(
     return { status: "unavailable", reason: "is-starter" };
   }
 
-  const [daycareStay, fieldBattleSession, npcBattleSession, existingListing] = await Promise.all([
-    client.playerDaycareStay.findUnique({ where: { playerPokemonId } }),
+  const daycareStay = await client.playerDaycareStay.findUnique({ where: { playerPokemonId } });
+  if (daycareStay) {
+    return { status: "unavailable", reason: "in-daycare" };
+  }
+
+  const mutationLockReason = await getPokemonMutationLockReason(client, playerId, playerPokemonId);
+  if (mutationLockReason) {
+    return { status: "unavailable", reason: mutationLockReason };
+  }
+
+  return { status: "available" };
+}
+
+// EVOLUTION ITEM LOCK SAFETY FIX — the authoritative "is this Pokémon
+// currently locked into a Marketplace listing or an active battle" check,
+// extracted out of getPokemonMarketAvailability above (same exact checks,
+// same relative order — already-listed, field battle, gym battle, league
+// battle) so a SECOND, unrelated consumer (features/evolution's own
+// evolution-item accept flow — a Pokémon must not permanently change
+// species while marketplace-locked or battle-locked, the exact same
+// "don't mutate a Pokémon out from under a system that's currently relying
+// on its stable identity/roster membership" reasoning this function
+// already encodes for Marketplace itself) can reuse the SAME authoritative
+// tables/queries rather than a second, parallel implementation. Deliberately
+// excludes is-starter (a Marketplace-only listing rule, irrelevant to
+// evolution — a starter Pokémon must still be able to use an evolution
+// item normally) and in-daycare (already enforced for evolution a different
+// way — see features/pokemon/services/player-pokemon.ts's own
+// getAllOwnedPokemon, which excludes deposited Pokémon from the owned-
+// Pokémon list every evolution-item consumer reads from; left unchanged by
+// this fix, per its own explicit scope).
+export type PokemonMutationLockReason = "already-listed" | "in-field-battle" | "in-gym-battle" | "in-league-battle";
+
+export async function getPokemonMutationLockReason(
+  client: Prisma.TransactionClient,
+  playerId: string,
+  playerPokemonId: string
+): Promise<PokemonMutationLockReason | null> {
+  const [fieldBattleSession, npcBattleSession, existingListing] = await Promise.all([
     client.fieldBattleSession.findFirst({ where: { playerId, activePlayerPokemonId: playerPokemonId } }),
     client.npcBattleSession.findUnique({ where: { playerId }, select: { playerPokemonIds: true } }),
     client.marketplaceListingPokemon.findUnique({ where: { playerPokemonId } }),
   ]);
 
-  if (daycareStay) {
-    return { status: "unavailable", reason: "in-daycare" };
-  }
-
   if (fieldBattleSession) {
-    return { status: "unavailable", reason: "in-field-battle" };
+    return "in-field-battle";
   }
 
   if (npcBattleSession && parseNpcBattleParticipantIds(npcBattleSession.playerPokemonIds).includes(playerPokemonId)) {
-    return { status: "unavailable", reason: "in-gym-battle" };
+    return "in-gym-battle";
   }
 
   if (existingListing) {
-    return { status: "unavailable", reason: "already-listed" };
+    return "already-listed";
   }
 
   if (await isInActiveLeagueBattle(client, playerId, playerPokemonId)) {
-    return { status: "unavailable", reason: "in-league-battle" };
+    return "in-league-battle";
   }
 
-  return { status: "available" };
+  return null;
+}
+
+// Bulk variant of getPokemonMutationLockReason above — used by any UI that
+// needs to filter a whole owned-Pokémon list down to "not currently
+// locked" up front (e.g. the Inventory's evolution-item candidate list),
+// rather than a per-row round trip. Reuses the exact same per-Pokémon
+// check, just fanned out with Promise.all; never a second/duplicated query
+// shape. Takes the bare `prisma` singleton at the caller (a plain read, not
+// part of any write transaction), same "bare prisma import for a
+// standalone call" precedent this file's own module doc comment already
+// establishes for getPokemonMarketAvailability.
+export async function getLockedPlayerPokemonIds(
+  client: Prisma.TransactionClient,
+  playerId: string,
+  playerPokemonIds: readonly string[]
+): Promise<Set<string>> {
+  const results = await Promise.all(
+    playerPokemonIds.map(async (playerPokemonId) => ({
+      playerPokemonId,
+      lockReason: await getPokemonMutationLockReason(client, playerId, playerPokemonId),
+    }))
+  );
+
+  return new Set(results.filter((result) => result.lockReason !== null).map((result) => result.playerPokemonId));
 }
 
 // A player's own League PvP roster isn't reachable by playerId directly —

@@ -81,6 +81,22 @@ test("selling more than owned is rejected and leaves currency/inventory unchange
   assert.equal(getNotificationsFor("owner-1").length, 0);
 });
 
+// MEGA EVOLUTION PHASE 4 — confirms the existing generic 50%-sell-back rule
+// (never a stored per-item field) already gives Mega Stone the correct
+// 75-Gold sell-back with zero Mega-specific code.
+test("Mega Stone sells back for exactly 75 Gold (150 Gold buy price × the generic 50% rule)", async () => {
+  seedPlayerProfile({ id: "owner-1", coins: 0, gold: 0 });
+  seedInventoryItem({ playerId: "owner-1", itemId: "mega-stone", quantity: 1 });
+
+  const result = await sellInventoryItem("owner-1", "mega-stone", 1);
+
+  assert.equal(result.status, "success");
+  if (result.status !== "success") return;
+  assert.equal(result.totalReturn, 75);
+  assert.equal(result.currency, "gold");
+  assert.equal(getPlayerProfileRow("owner-1")?.gold, 75);
+});
+
 test("selling the final quantity removes the inventory entry", async () => {
   seedPlayerProfile({ id: "owner-1", coins: 500, gold: 0 });
   seedInventoryItem({ playerId: "owner-1", itemId: "fire-stone", quantity: 1 });

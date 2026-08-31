@@ -54,13 +54,27 @@ export interface EvolutionItemOpenedReward {
   items: readonly { itemId: EvolutionItemId; displayName: string; imageUrl: string; quantity: number }[];
 }
 
+// MEGA EVOLUTION PHASE 5 — same enriched shape as ItemBundleOpenedReward
+// above, kept as its own type (not folded into that one) since it's a
+// distinct ChestRewardResult category (features/chests/types/chest-reward.
+// types.ts's own doc comment explains why "mega-stone" is never part of
+// the generic evolution-item pool).
+export interface MegaStoneOpenedReward {
+  category: "mega-stone";
+  itemId: string;
+  displayName: string;
+  imageUrl: string;
+  quantity: number;
+}
+
 export type OpenChestRewardView =
   | EggOpenedReward
   | MoneyOpenedReward
   | GoldOpenedReward
   | ItemBundleOpenedReward
   | IncubatorOpenedReward
-  | EvolutionItemOpenedReward;
+  | EvolutionItemOpenedReward
+  | MegaStoneOpenedReward;
 
 // The complete opening result — a discriminated union so a caller/UI never
 // has to guess whether `rewards` is meaningful. "not-enough-chests" is

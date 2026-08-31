@@ -364,11 +364,23 @@ test("Deoxys and all four of its forms have no evolution of any kind", () => {
   }
 });
 
-test("every Hoenn legendary/mythical species (Regis, Latias/Latios, Kyogre/Groudon/Rayquaza, Jirachi) has no evolution", () => {
-  const legendaryIds = ["regirock", "regice", "registeel", "latias", "latios", "kyogre", "groudon", "rayquaza", "jirachi"];
+test("every Hoenn legendary/mythical species (Regis, Kyogre/Groudon, Jirachi) has no evolution of any kind", () => {
+  const legendaryIds = ["regirock", "regice", "registeel", "kyogre", "groudon", "jirachi"];
   for (const id of legendaryIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+// MEGA EVOLUTION PHASE 2 — Latias, Latios, and Rayquaza are no longer
+// covered by the fully-zero-evolution test above: each now has exactly one
+// mega-stone evolution-item evolution (see the dedicated Mega registry
+// tests further down this file). They still have no level or branch
+// evolution of any kind.
+test("Latias, Latios, and Rayquaza have no level or branch evolution (only their mega-stone evolution-item evolution)", () => {
+  for (const id of ["latias", "latios", "rayquaza"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
 });
@@ -595,14 +607,24 @@ test("Snorunt keeps its level-42 evolution into Glalie AND gains an independent 
   assert.equal(getEvolutionItemEvolutionByItem("snorunt", "dawn-stone"), undefined, "Dawn Stone is retired");
 });
 
-test("every Sinnoh legendary/mythical species (lake trio, Dialga/Palkia, Heatran, Regigigas, Cresselia, Phione/Manaphy, Darkrai, Shaymin, Arceus) has no evolution", () => {
+test("every Sinnoh legendary/mythical species (lake trio, Dialga/Palkia, Regigigas, Cresselia, Phione/Manaphy, Shaymin, Arceus) has no evolution of any kind", () => {
   const legendaryIds = [
-    "uxie", "mesprit", "azelf", "dialga", "palkia", "heatran", "regigigas",
-    "cresselia", "phione", "manaphy", "darkrai", "shaymin", "arceus",
+    "uxie", "mesprit", "azelf", "dialga", "palkia", "regigigas",
+    "cresselia", "phione", "manaphy", "shaymin", "arceus",
   ];
   for (const id of legendaryIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+// MEGA EVOLUTION PHASE 2 — Heatran and Darkrai are no longer covered by the
+// fully-zero-evolution test above: each now has exactly one mega-stone
+// evolution-item evolution.
+test("Heatran and Darkrai have no level or branch evolution (only their mega-stone evolution-item evolution)", () => {
+  for (const id of ["heatran", "darkrai"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
 });
@@ -833,7 +855,7 @@ test("every genuinely standalone (non-evolving, non-legendary) Unova species has
   // STEP" block) — see this file's own dedicated Pre-Paldea tests further
   // down.
   const standaloneIds = [
-    "audino", "throh", "sawk", "maractus", "sigilyph",
+    "throh", "sawk", "maractus", "sigilyph",
     "emolga", "alomomola", "cryogonal", "stunfisk", "druddigon", "bouffalant", "heatmor", "durant",
   ];
   for (const id of standaloneIds) {
@@ -841,6 +863,13 @@ test("every genuinely standalone (non-evolving, non-legendary) Unova species has
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
+});
+
+// MEGA EVOLUTION PHASE 2 — Audino is no longer covered by the test above:
+// it now has exactly one mega-stone evolution-item evolution.
+test("Audino has no level or branch evolution (only its mega-stone evolution-item evolution)", () => {
+  assert.equal(getLevelEvolution("audino"), undefined);
+  assert.equal(getBranchEvolution("audino"), undefined);
 });
 
 test("every Unova legendary/mythical species (Victini, Swords of Justice, Forces of Nature incl. Therian forms, Reshiram/Zekrom, Kyurem incl. Black/White, Keldeo, Meloetta incl. Pirouette, Genesect) has no evolution of any kind", () => {
@@ -906,7 +935,11 @@ test("total evolution counts include exactly 65 new Unova level evolutions and 1
   // 9 -> 10: Petilil gained a second, independent Sun Stone branch into
   // Hisuian Lilligant (Pre-Paldea 17 Hisuian Forms step) — both of
   // Petilil's branches are counted here (same array, same speciesId key).
-  assert.equal(unovaItemEntries.length, 10);
+  // 10 -> 18: MEGA EVOLUTION PHASE 2 gave 8 Unova-range base species their
+  // own mega-stone evolution-item evolution — Emboar (#500), Excadrill
+  // (#530), Audino (#531), Scolipede (#545), Scrafty (#560), Eelektross
+  // (#604), Chandelure (#609), and Golurk (#623).
+  assert.equal(unovaItemEntries.length, 18);
 });
 
 test("deriveSpeciesWildLevelRange correctly derives the four former-Trade Unova chains with no gaps, no overlaps, and no empty ranges: Conkeldurr, Gigalith, Escavalier, Accelgor", () => {
@@ -1070,7 +1103,7 @@ test("Floette and Doublade each keep their own pre-existing level evolution (fro
   assert.equal(getEvolutionItemEvolutionByItem("doublade", "dusk-stone")?.evolvesToSpeciesId, "aegislash");
 });
 
-test("the evolution-item catalog is unchanged by Kalos: still exactly the same 12 EvolutionItemId values, no new evolution product introduced", () => {
+test("the evolution-item catalog was unchanged by the Kalos phase itself: still the same 12 pre-existing EvolutionItemId values (mega-stone, added later by MEGA EVOLUTION PHASE 2, is verified separately)", () => {
   const canonicalIds = [
     "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "sun-stone",
     "moon-stone", "ice-stone", "dusk-stone", "shiny-stone",
@@ -1080,10 +1113,12 @@ test("the evolution-item catalog is unchanged by Kalos: still exactly the same 1
   for (const itemId of canonicalIds) {
     assert.equal(isEvolutionItemId(itemId), true, `${itemId} must still be a recognized EvolutionItemId`);
   }
-  // No new item id (e.g. a Kalos-only stone) was ever introduced, and no
-  // retired item was ever reintroduced.
+  // No new item id (e.g. a Kalos-only stone) was ever introduced BY KALOS
+  // specifically, and no retired item was ever reintroduced. mega-stone is
+  // deliberately excluded from this fake-list — see the dedicated test
+  // above confirming it IS now a real, recognized EvolutionItemId.
   for (const fakeOrRetiredItem of [
-    "mega-stone", "prison-bottle", "sachet", "whipped-dream",
+    "prison-bottle", "sachet", "whipped-dream",
     "deep-sea-tooth", "deep-sea-scale", "dubious-disc", "razor-claw", "razor-fang", "electirizer", "magmarizer", "oval-stone",
     "dragon-scale", "protector", "reaper-cloth", "dawn-stone",
   ]) {
@@ -1110,7 +1145,7 @@ test("no Kalos species uses branch evolution — every real trade/party/orientat
 });
 
 test("every genuinely standalone (non-evolving, non-legendary) Kalos species has no evolution of any kind", () => {
-  const standaloneIds = ["furfrou", "hawlucha", "dedenne", "carbink", "klefki"];
+  const standaloneIds = ["furfrou", "dedenne", "carbink", "klefki"];
   for (const id of standaloneIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
@@ -1118,11 +1153,27 @@ test("every genuinely standalone (non-evolving, non-legendary) Kalos species has
   }
 });
 
-test("every Kalos legendary/mythical species (Xerneas, Yveltal, Zygarde, Diancie, Hoopa incl. Unbound Form, Volcanion) has no evolution of any kind", () => {
-  const legendaryIds = ["xerneas", "yveltal", "zygarde", "diancie", "hoopa", "hoopa-unbound", "volcanion"];
+// MEGA EVOLUTION PHASE 2 — Hawlucha is no longer covered by the test above:
+// it now has exactly one mega-stone evolution-item evolution.
+test("Hawlucha has no level or branch evolution (only its mega-stone evolution-item evolution)", () => {
+  assert.equal(getLevelEvolution("hawlucha"), undefined);
+  assert.equal(getBranchEvolution("hawlucha"), undefined);
+});
+
+test("every Kalos legendary/mythical species (Xerneas, Yveltal, Hoopa incl. Unbound Form, Volcanion) has no evolution of any kind", () => {
+  const legendaryIds = ["xerneas", "yveltal", "hoopa", "hoopa-unbound", "volcanion"];
   for (const id of legendaryIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+});
+
+// MEGA EVOLUTION PHASE 2 — Zygarde and Diancie are no longer covered by the
+// test above: each now has exactly one mega-stone evolution-item evolution.
+test("Zygarde and Diancie have no level or branch evolution (only their mega-stone evolution-item evolution)", () => {
+  for (const id of ["zygarde", "diancie"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
 });
@@ -1140,14 +1191,106 @@ test("Hoopa Unbound is a Form, not an evolution — no hoopa -> hoopa-unbound en
   }
 });
 
-test("no Mega Evolution appears anywhere in the evolution registry", () => {
-  const megaLikeLevelTargets = getAllLevelEvolutionEntries().filter((entry) => entry.evolution.evolvesToSpeciesId.startsWith("mega-"));
-  const megaLikeItemTargets = getAllEvolutionItemEvolutionEntries().filter((entry) => entry.evolution.evolvesToSpeciesId.startsWith("mega-"));
-  assert.deepEqual(megaLikeLevelTargets, []);
-  assert.deepEqual(megaLikeItemTargets, []);
+// MEGA EVOLUTION PHASE 2 — replaces the old negative boundary above (which
+// asserted Mega Evolution could never appear in this registry) now that the
+// approved game design has changed: Mega Evolution is real, permanent, and
+// driven by the universal "mega-stone" EvolutionItemId. This block is the
+// focused POSITIVE registry coverage per that phase's own instructions —
+// not exhaustive per-species stat/type assertions (that's
+// data/pokemon/pokemon-data.test.ts's own job), just "is every Mega form
+// actually reachable, correctly, and only the way it should be."
 
-  for (const fakeMegaItem of ["mega-stone", "mega-stone-x", "mega-stone-y", "key-stone"]) {
+test("mega-stone is a recognized EvolutionItemId; unrelated fake ids are not", () => {
+  assert.equal(isEvolutionItemId("mega-stone"), true);
+  for (const fakeMegaItem of ["mega-stone-x", "mega-stone-y", "key-stone"]) {
     assert.equal(isEvolutionItemId(fakeMegaItem), false, `${fakeMegaItem} must never be a recognized EvolutionItemId`);
+  }
+});
+
+test("every one of the 93 Mega Evolution forms in the species catalog is reachable from its base species via mega-stone, and vice versa (registry and catalog agree exactly)", () => {
+  const catalogMegaIds = new Set(POKEMON_DATA.filter((species) => species.id.includes("-mega")).map((species) => species.id));
+  assert.equal(catalogMegaIds.size, 93);
+
+  const registryMegaTargets = getAllEvolutionItemEvolutionEntries()
+    .filter((entry) => entry.evolution.itemId === "mega-stone")
+    .map((entry) => entry.evolution.evolvesToSpeciesId);
+  assert.equal(registryMegaTargets.length, 93, "the mega-stone registry must map to exactly 93 targets");
+  assert.equal(new Set(registryMegaTargets).size, 93, "no duplicate mega-stone target");
+
+  assert.deepEqual([...new Set(registryMegaTargets)].sort(), [...catalogMegaIds].sort());
+
+  // And the reverse direction: every registry target actually resolves to a
+  // real catalog row whose own formOf matches the base species this
+  // registry entry is keyed under.
+  for (const { speciesId, evolution } of getAllEvolutionItemEvolutionEntries()) {
+    if (evolution.itemId !== "mega-stone") continue;
+    const targetSpecies = POKEMON_DATA.find((species) => species.id === evolution.evolvesToSpeciesId);
+    assert.ok(targetSpecies, `${evolution.evolvesToSpeciesId} must exist in the species catalog`);
+    assert.equal(targetSpecies!.formOf, speciesId, `${evolution.evolvesToSpeciesId}'s formOf must be its evolution source "${speciesId}"`);
+  }
+});
+
+test("mega-stone maps from exactly 87 distinct base species", () => {
+  const megaStoneSourceIds = Object.entries(
+    Object.fromEntries(
+      getAllEvolutionItemEvolutionEntries()
+        .filter((entry) => entry.evolution.itemId === "mega-stone")
+        .map((entry) => [entry.speciesId, true])
+    )
+  ).map(([speciesId]) => speciesId);
+  assert.equal(megaStoneSourceIds.length, 87);
+});
+
+test("Charizard, Mewtwo, and Raichu each branch into two mega-stone targets (X/Y); Garchomp, Lucario, and Absol each branch into two mega-stone targets (plain + Z); every other Mega-eligible base has exactly one target", () => {
+  const multiTargetCases: Array<{ base: string; targets: string[] }> = [
+    { base: "charizard", targets: ["charizard-mega-x", "charizard-mega-y"] },
+    { base: "mewtwo", targets: ["mewtwo-mega-x", "mewtwo-mega-y"] },
+    { base: "raichu", targets: ["raichu-mega-x", "raichu-mega-y"] },
+    { base: "garchomp", targets: ["garchomp-mega", "garchomp-mega-z"] },
+    { base: "lucario", targets: ["lucario-mega", "lucario-mega-z"] },
+    { base: "absol", targets: ["absol-mega", "absol-mega-z"] },
+  ];
+
+  for (const { base, targets } of multiTargetCases) {
+    const branchTargets = getEvolutionItemEvolutionsByItem(base, "mega-stone").map((evolution) => evolution.evolvesToSpeciesId);
+    assert.deepEqual(branchTargets.sort(), [...targets].sort(), `${base}'s mega-stone branch must be exactly ${targets.join("/")}`);
+  }
+
+  const multiTargetBases = new Set(multiTargetCases.map((entry) => entry.base));
+  for (const { speciesId, evolution } of getAllEvolutionItemEvolutionEntries()) {
+    if (evolution.itemId !== "mega-stone" || multiTargetBases.has(speciesId)) continue;
+    assert.equal(
+      getEvolutionItemEvolutionsByItem(speciesId, "mega-stone").length,
+      1,
+      `${speciesId} should have exactly one mega-stone target`
+    );
+  }
+});
+
+test("Floette's mega-stone branch coexists with its pre-existing Shiny Stone branch (two independent evolution-item branches on one species, same precedent as Gloom's Leaf/Sun Stone pair)", () => {
+  const floetteEvolutions = getEvolutionItemEvolutions("floette");
+  assert.equal(floetteEvolutions.length, 2);
+  assert.equal(getEvolutionItemEvolutionByItem("floette", "shiny-stone")?.evolvesToSpeciesId, "florges");
+  assert.equal(getEvolutionItemEvolutionByItem("floette", "mega-stone")?.evolvesToSpeciesId, "floette-mega");
+});
+
+test("no already-Mega species is ever a mega-stone evolution source (a Mega Pokémon can never Mega Evolve again)", () => {
+  const catalogMegaIds = POKEMON_DATA.filter((species) => species.id.includes("-mega")).map((species) => species.id);
+  for (const megaId of catalogMegaIds) {
+    assert.deepEqual(getEvolutionItemEvolutionsByItem(megaId, "mega-stone"), [], `${megaId} must have no mega-stone evolution of its own`);
+    assert.deepEqual(getEvolutionItemEvolutions(megaId), [], `${megaId} must have no evolution-item evolution of any kind`);
+  }
+});
+
+test("no Mega-eligible base species has a competing LEVEL_EVOLUTIONS or BRANCH_EVOLUTIONS entry (mega-stone is its only evolution method)", () => {
+  const megaStoneSources = new Set(
+    getAllEvolutionItemEvolutionEntries()
+      .filter((entry) => entry.evolution.itemId === "mega-stone")
+      .map((entry) => entry.speciesId)
+  );
+  for (const speciesId of megaStoneSources) {
+    assert.equal(getLevelEvolution(speciesId), undefined, `${speciesId} must have no level evolution`);
+    assert.equal(getBranchEvolution(speciesId), undefined, `${speciesId} must have no branch evolution`);
   }
 });
 
@@ -1164,7 +1307,13 @@ test("total evolution counts include exactly 28 new Kalos level evolutions and 5
   const kalosItemEntries = getAllEvolutionItemEvolutionEntries().filter((entry) => kalosDexRange.has(entry.speciesId));
 
   assert.equal(kalosLevelEntries.length, 28);
-  assert.equal(kalosItemEntries.length, 5, "Kalos-native evolution-item species only — Eevee -> Sylveon is a Kanto-keyed entry and is verified separately");
+  // 5 -> 17: MEGA EVOLUTION PHASE 2 gave 12 Kalos-range base species their
+  // own mega-stone evolution-item evolution — Chesnaught, Delphox,
+  // Greninja, Pyroar, Meowstic, Malamar, Barbaracle, Dragalge, Hawlucha,
+  // Zygarde, and Diancie (one new entry each), plus Floette (a SECOND,
+  // independent branch alongside its pre-existing Shiny Stone entry — same
+  // speciesId key, one more array element, +1 to this count).
+  assert.equal(kalosItemEntries.length, 17, "Kalos-native evolution-item species only — Eevee -> Sylveon is a Kanto-keyed entry and is verified separately");
 });
 
 test("no duplicate evolution definitions and no conflicting level/item/branch outcome for any Kalos evolution target", () => {
@@ -1470,8 +1619,8 @@ test("no new evolution item was introduced for Alola: still exactly the same 12 
   }
 });
 
-test("no unapproved Gen VII form gets an evolution mapping: Oricorio, Wishiwashi, Minior, Silvally (its own memory-disc typing), Mimikyu, Necrozma, Magearna, and Totem forms have no form-specific evolution entries", () => {
-  for (const id of ["oricorio", "wishiwashi", "minior", "mimikyu", "necrozma", "magearna"]) {
+test("no unapproved Gen VII form gets an evolution mapping: Oricorio, Wishiwashi, Minior, Silvally (its own memory-disc typing), Mimikyu, Necrozma, and Totem forms have no form-specific evolution entries", () => {
+  for (const id of ["oricorio", "wishiwashi", "minior", "mimikyu", "necrozma"]) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
@@ -1482,10 +1631,17 @@ test("no unapproved Gen VII form gets an evolution mapping: Oricorio, Wishiwashi
   assert.equal(getLevelEvolution("silvally"), undefined);
 });
 
+// MEGA EVOLUTION PHASE 2 — Magearna is no longer covered by the test above:
+// it now has exactly one mega-stone evolution-item evolution.
+test("Magearna has no level or branch evolution (only its mega-stone evolution-item evolution)", () => {
+  assert.equal(getLevelEvolution("magearna"), undefined);
+  assert.equal(getBranchEvolution("magearna"), undefined);
+});
+
 test("every genuinely standalone (non-evolving, non-legendary) Alola species has no evolution of any kind", () => {
   const standaloneIds = [
     "oricorio", "wishiwashi", "comfey", "oranguru", "passimian", "pyukumuku",
-    "minior", "komala", "turtonator", "togedemaru", "mimikyu", "bruxish", "drampa", "dhelmise",
+    "minior", "komala", "turtonator", "togedemaru", "mimikyu", "bruxish", "dhelmise",
   ];
   for (const id of standaloneIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
@@ -1494,15 +1650,30 @@ test("every genuinely standalone (non-evolving, non-legendary) Alola species has
   }
 });
 
-test("every Alola legendary/mythical/Ultra Beast species has no evolution of any kind (Tapu, standalone Ultra Beasts, Necrozma, Magearna, Marshadow, Zeraora)", () => {
+// MEGA EVOLUTION PHASE 2 — Drampa is no longer covered by the test above:
+// it now has exactly one mega-stone evolution-item evolution.
+test("Drampa has no level or branch evolution (only its mega-stone evolution-item evolution)", () => {
+  assert.equal(getLevelEvolution("drampa"), undefined);
+  assert.equal(getBranchEvolution("drampa"), undefined);
+});
+
+test("every Alola legendary/mythical/Ultra Beast species has no evolution of any kind (Tapu, standalone Ultra Beasts, Necrozma, Marshadow)", () => {
   const legendaryIds = [
     "tapu-koko", "tapu-lele", "tapu-bulu", "tapu-fini",
     "nihilego", "buzzwole", "pheromosa", "xurkitree", "celesteela", "kartana", "guzzlord",
-    "necrozma", "magearna", "marshadow", "stakataka", "blacephalon", "zeraora",
+    "necrozma", "marshadow", "stakataka", "blacephalon",
   ];
   for (const id of legendaryIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
+    assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
+  }
+
+  // MEGA EVOLUTION PHASE 2 — Magearna (checked above) and Zeraora each now
+  // have exactly one mega-stone evolution-item evolution; both still have
+  // no level or branch evolution.
+  for (const id of ["magearna", "zeraora"]) {
+    assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
 
@@ -1816,12 +1987,19 @@ test("Weezing, Galarian Weezing, Stunfisk, Galarian Stunfisk, and the three Gala
 });
 
 test("every genuinely standalone (non-evolving, non-legendary, non-fossil) Galar species has no evolution of any kind", () => {
-  const standaloneIds = ["cramorant", "falinks", "stonjourner", "eiscue", "indeedee", "morpeko", "pincurchin", "duraludon"];
+  const standaloneIds = ["cramorant", "stonjourner", "eiscue", "indeedee", "morpeko", "pincurchin", "duraludon"];
   for (const id of standaloneIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
+});
+
+// MEGA EVOLUTION PHASE 2 — Falinks is no longer covered by the test above:
+// it now has exactly one mega-stone evolution-item evolution.
+test("Falinks has no level or branch evolution (only its mega-stone evolution-item evolution)", () => {
+  assert.equal(getLevelEvolution("falinks"), undefined);
+  assert.equal(getBranchEvolution("falinks"), undefined);
 });
 
 test("the four fossil combinations (Dracozolt/Arctozolt/Dracovish/Arctovish) never evolve into or from one another, or anything else", () => {
@@ -2367,13 +2545,20 @@ test("the three Paldean Tauros breeds remain standalone Forms — no evolution o
 test("every genuinely standalone Paldea species (no evolution family, non-Paradox, non-legendary) has no evolution of any kind", () => {
   const standaloneIds = [
     "squawkabilly", "klawf", "bombirdier", "cyclizar", "orthworm",
-    "veluza", "dondozo", "tatsugiri", "kingambit",
+    "veluza", "dondozo", "kingambit",
   ];
   for (const id of standaloneIds) {
     assert.equal(getLevelEvolution(id), undefined, `${id} must have no level evolution`);
     assert.deepEqual(getEvolutionItemEvolutions(id), [], `${id} must have no evolution-item evolution`);
     assert.equal(getBranchEvolution(id), undefined, `${id} must have no branch evolution`);
   }
+});
+
+// MEGA EVOLUTION PHASE 2 — Tatsugiri is no longer covered by the test
+// above: it now has exactly one mega-stone evolution-item evolution.
+test("Tatsugiri has no level or branch evolution (only its mega-stone evolution-item evolution)", () => {
+  assert.equal(getLevelEvolution("tatsugiri"), undefined);
+  assert.equal(getBranchEvolution("tatsugiri"), undefined);
 });
 
 test("every Paldea Paradox species has no evolution of any kind", () => {
@@ -2404,12 +2589,31 @@ test("every Paldea legendary/mythical species (Treasures of Ruin, Loyal Three, b
   }
 });
 
-test("no alternate/invented forms were created for standalone Paldea species: Maushold, Dudunsparce, Tatsugiri, Squawkabilly, Ogerpon, and Terapagos each remain single-entry in the catalog", () => {
-  const singleEntryIds = ["maushold", "dudunsparce", "tatsugiri", "squawkabilly", "ogerpon", "terapagos"];
+test("no alternate/invented forms were created for standalone Paldea species: Maushold, Dudunsparce, Squawkabilly, Ogerpon, and Terapagos each remain single-entry in the catalog", () => {
+  const singleEntryIds = ["maushold", "dudunsparce", "squawkabilly", "ogerpon", "terapagos"];
   for (const id of singleEntryIds) {
     const matches = POKEMON_DATA.filter((species) => species.id === id || species.formOf === id);
     assert.deepEqual(matches.map((species) => species.id), [id], `${id} must have no alternate-form entries`);
   }
+});
+
+// Tatsugiri is deliberately no longer covered by the single-entry test
+// above — MEGA EVOLUTION PHASE 2 gives it its three canonical Mega forms
+// (tatsugiri-mega-curly/-droopy/-stretchy, generation-6-pokemon-data.ts's
+// own Mega Evolution Phase 2 section, mirroring Tatsugiri's own three real
+// cosmetic forms), the intentional exception the Mega Evolution addition
+// carves out, same shape as Diancie/Zygarde/Floette in pokemon-data.test.ts.
+// PHASE 1 FINAL ADJUSTMENT — tatsugiri-mega-droopy was removed (this
+// game's finalized Mega roster keeps only Curly/Stretchy), so Tatsugiri now
+// has exactly two Mega forms rather than three.
+// FINAL ROSTER UPDATE — Tatsugiri's Curly/Droopy/Stretchy Mega forms were
+// collapsed to a single standard Mega form (tatsugiri-mega).
+test("Tatsugiri has exactly one alternate form: tatsugiri-mega", () => {
+  const matches = POKEMON_DATA.filter((species) => species.id === "tatsugiri" || species.formOf === "tatsugiri");
+  assert.deepEqual(
+    matches.map((species) => species.id).sort(),
+    ["tatsugiri", "tatsugiri-mega"].sort()
+  );
 });
 
 test("every Paldea evolution target references a valid species id in the live catalog", () => {

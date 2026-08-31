@@ -24,8 +24,17 @@ test("MedicineStatusPanel is rendered only for a selected 'potions' item whose m
   assert.ok(inventoryContentSrc.includes("<MedicineStatusPanel key={selectedView.item.id} item={selectedView.item} ownedPokemon={ownedPokemon} />"));
 });
 
-test("MedicineStatusPanel receives the SAME ownedPokemon prop (party AND storage) InventoryContent already threads into EvolutionItemPanel — no separate/duplicated data source", () => {
-  assert.ok(inventoryContentSrc.includes("<EvolutionItemPanel item={selectedView.item} ownedPokemon={ownedPokemon} />"));
+// EVOLUTION ITEM LOCK SAFETY FIX — EvolutionItemPanel and MedicineStatusPanel
+// deliberately no longer receive the exact same prop: a Marketplace-listed
+// or battle-locked Pokémon must be excluded from evolution-item candidates
+// (it can still have its status cured, so MedicineStatusPanel keeps the
+// full unfiltered list) — see InventoryContent.tsx's own
+// lockedPlayerPokemonIds prop doc comment. This still isn't a
+// separate/duplicated data source: evolvableOwnedPokemon is derived FROM
+// the same ownedPokemon array via a plain filter, never a second fetch.
+test("EvolutionItemPanel receives evolvableOwnedPokemon (ownedPokemon minus locked Pokémon); MedicineStatusPanel keeps the full unfiltered ownedPokemon — never a second/duplicated data source", () => {
+  assert.ok(inventoryContentSrc.includes("const evolvableOwnedPokemon = ownedPokemon.filter((pokemon) => !lockedPlayerPokemonIdSet.has(pokemon.id));"));
+  assert.ok(inventoryContentSrc.includes("<EvolutionItemPanel item={selectedView.item} ownedPokemon={evolvableOwnedPokemon} />"));
   assert.ok(inventoryContentSrc.includes("<MedicineStatusPanel key={selectedView.item.id} item={selectedView.item} ownedPokemon={ownedPokemon} />"));
 });
 

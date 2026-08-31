@@ -94,3 +94,13 @@ export function pokedexLocationHint(rarity: PokemonRarity, locations: readonly S
 // evolution-only form, ...) — getSpeciesEncounterLocations returns an
 // empty list for this, never a fabricated location.
 export const pokedexNoKnownLocationMessage = "טרם ידוע היכן ניתן למצוא פוקימון זה בטבע.";
+
+// POKÉDEX — FORM VISIBILITY + ACQUISITION HINT FIX. A Mega-form species is
+// never wild-encounterable (see data/pokemon/pokemon-evolutions.ts's own
+// Mega Stone registry — the only way to obtain one), so it must never get a
+// location hint, fabricated or otherwise. "התפתחות מגה" is this project's
+// own already-established Hebrew term for Mega Evolution (see
+// features/shop/data/shop-items.ts's Mega Stone description and every Mega
+// species' own generation-6-pokemon-data.ts description) — reused here
+// rather than inventing new wording.
+export const pokedexMegaAcquisitionHint = "צורת מגה של הפוקימון. ניתן להשיג באמצעות התפתחות מגה.";

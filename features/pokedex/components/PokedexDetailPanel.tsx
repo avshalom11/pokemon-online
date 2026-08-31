@@ -8,6 +8,7 @@ import { getShopItemById } from "@/features/shop/services/shop-catalog.service";
 import { POKEMON_RARITY_LABELS, POKEMON_TYPE_LABELS } from "@/shared/types/pokemon-labels";
 import type { PokemonBaseStats } from "@/shared/types/pokemon";
 import type { PokedexEntryView, PokedexFormView } from "../types/pokedex.types";
+import { getPokedexUnseenFormHint } from "../utils/pokedex-form-hints";
 
 interface PokedexDetailPanelProps {
   entry: PokedexEntryView;
@@ -37,8 +38,20 @@ export function PokedexDetailPanel({ entry, onClose }: PokedexDetailPanelProps) 
   // Only ever meaningful when entry.forms.length > 1; a single-form species
   // never renders the switcher below and this state is simply never touched.
   const [selectedFormSpeciesId, setSelectedFormSpeciesId] = useState(entry.forms[0]!.species.id);
-  const selectedForm = entry.forms.find((form) => form.species.id === selectedFormSpeciesId) ?? entry.forms[0]!;
+  const selectedFormIndex = Math.max(
+    0,
+    entry.forms.findIndex((form) => form.species.id === selectedFormSpeciesId)
+  );
+  const selectedForm = entry.forms[selectedFormIndex] ?? entry.forms[0]!;
   const { species, status } = selectedForm;
+  // POKÉDEX FORM NAVIGATION — left/right arrows cycling through entry.forms
+  // with wraparound (last -> first, first -> last), reusing the exact same
+  // form array/selection state the tab switcher below already drives — never
+  // a second/hardcoded form list.
+  function goToForm(offset: number) {
+    const nextIndex = (selectedFormIndex + offset + entry.forms.length) % entry.forms.length;
+    setSelectedFormSpeciesId(entry.forms[nextIndex]!.species.id);
+  }
   // A specific form the player has never personally encountered still gets
   // its own tab (its label alone isn't the kind of spoiler an unseen
   // species' real name/sprite is — see PokedexFormSwitcher below), but its
@@ -90,6 +103,30 @@ export function PokedexDetailPanel({ entry, onClose }: PokedexDetailPanelProps) 
           ) : null}
 
           <div className="flex flex-col items-center gap-3 text-center">
+            {entry.forms.length > 1 ? (
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => goToForm(-1)}
+                  aria-label="הצורה הקודמת"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 text-slate-300 hover:text-white"
+                >
+                  ‹
+                </button>
+                <span dir="ltr" className="text-xs text-slate-500">
+                  {selectedFormIndex + 1} / {entry.forms.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToForm(1)}
+                  aria-label="הצורה הבאה"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 text-slate-300 hover:text-white"
+                >
+                  ›
+                </button>
+              </div>
+            ) : null}
+
             <SpriteImage
               src={getFrontSpritePath(species)}
               alt={isFormUnseen ? "פוקימון שטרם התגלה" : species.name}
@@ -121,7 +158,12 @@ export function PokedexDetailPanel({ entry, onClose }: PokedexDetailPanelProps) 
                 </span>
               </div>
             ) : (
-              <p className="text-xs text-slate-500">טרם נצפתה צורה זו</p>
+              // POKÉDEX — FORM VISIBILITY + ACQUISITION HINT FIX — a sibling
+              // form left unseen (e.g. owning Mega Charizard X without ever
+              // having seen normal Charizard) shows its own real acquisition
+              // hint instead of a generic "not seen" placeholder — never
+              // reveals stats/types/description, only this one hint line.
+              <p className="text-xs text-slate-500">{getPokedexUnseenFormHint(species)}</p>
             )}
           </div>
 

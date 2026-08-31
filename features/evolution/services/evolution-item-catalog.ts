@@ -82,3 +82,58 @@ export function getEvolutionItemMappings(itemId: string): EvolutionItemMapping[]
     .sort((a, b) => a.sourceDexNumber - b.sourceDexNumber)
     .map(({ sourceSpeciesId, sourceName, targetSpeciesId, targetName }) => ({ sourceSpeciesId, sourceName, targetSpeciesId, targetName }));
 }
+
+// MEGA EVOLUTION — UI/NAMING FIXES — one row per SOURCE species, carrying
+// every one of its own targets together, rather than one row per raw
+// mapping. Used by EvolutionItemInfoDialog so a source with more than one
+// branch for the same item (Clamperl + Water Stone; Mega Stone's six X/Y/Z
+// bases — Charizard/Mewtwo/Raichu/Garchomp/Lucario/Absol) is represented
+// exactly once — the compatible BASE Pokémon is what this view
+// communicates, never inflated by how many target forms it happens to
+// have. A pure grouping step over getEvolutionItemMappings' own output
+// (order preserved — first-seen source order, which is already dex-number
+// sorted), never a second/hardcoded species list.
+export interface GroupedEvolutionItemMapping {
+  sourceSpeciesId: string;
+  sourceName: string;
+  targets: readonly { targetSpeciesId: string; targetName: string }[];
+}
+
+// POKÉDEX — FORM VISIBILITY + ACQUISITION HINT FIX — pure "is this species a
+// Mega Evolution target" check, derived live from the same canonical
+// registry every other view in this file already reads
+// (getAllEvolutionItemEvolutionEntries filtered to itemId === "mega-stone")
+// — never a second/hardcoded Mega species list, and never inferred from a
+// naming/spriteId convention that could silently drift from the real
+// registry. Used by the Pokédex's unseen-form acquisition hint (Mega
+// species are never wild-encounterable, so they never get a location hint
+// — see features/pokedex/utils/pokedex-form-hints.ts).
+export function isMegaEvolutionTarget(speciesId: string): boolean {
+  return getAllEvolutionItemEvolutionEntries().some(
+    (entry) => entry.evolution.itemId === "mega-stone" && entry.evolution.evolvesToSpeciesId === speciesId
+  );
+}
+
+export function groupEvolutionItemMappingsBySource(mappings: readonly EvolutionItemMapping[]): GroupedEvolutionItemMapping[] {
+  const grouped: GroupedEvolutionItemMapping[] = [];
+  const indexBySourceId = new Map<string, number>();
+
+  for (const mapping of mappings) {
+    const existingIndex = indexBySourceId.get(mapping.sourceSpeciesId);
+    if (existingIndex === undefined) {
+      indexBySourceId.set(mapping.sourceSpeciesId, grouped.length);
+      grouped.push({
+        sourceSpeciesId: mapping.sourceSpeciesId,
+        sourceName: mapping.sourceName,
+        targets: [{ targetSpeciesId: mapping.targetSpeciesId, targetName: mapping.targetName }],
+      });
+    } else {
+      (grouped[existingIndex]!.targets as { targetSpeciesId: string; targetName: string }[]).push({
+        targetSpeciesId: mapping.targetSpeciesId,
+        targetName: mapping.targetName,
+      });
+    }
+  }
+
+  return grouped;
+}

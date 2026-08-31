@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test, beforeEach } from "node:test";
 
 import { markSpeciesSeen } from "./mark-species-seen.service.ts";
-import { getPokedexView } from "./pokedex-view.service.ts";
+import { getPokedexCounts, getPokedexView } from "./pokedex-view.service.ts";
 import { POKEMON_DATA } from "@/data/pokemon/pokemon-data";
 import { isAlternateForm } from "@/features/pokemon/forms/pokemon-forms";
 import { prisma } from "@/lib/db/prisma";
@@ -125,4 +125,128 @@ test("Hoopa (Kalos, Generation 6) groups under exactly one Pokédex row (#720) w
   assert.equal(volcanionRows.length, 1, "Volcanion must appear as its own separate Pokédex row");
   assert.equal(volcanionRows[0]!.species.id, "volcanion");
   assert.deepEqual(volcanionRows[0]!.forms.map((form) => form.species.id), ["volcanion"]);
+});
+
+// ============================================================================
+// MEGA EVOLUTION PHASE 5 — verifying (not reimplementing) that the existing
+// formOf/form-grouping architecture already handles all 93 Mega forms
+// correctly, with zero production changes required. Same "one row per dex
+// number, alternate forms grouped underneath it" behavior Deoxys/Rotom/Hoopa
+// above already prove generically — these tests just exercise it for Mega
+// specifically, per this phase's own explicit requirement.
+// ============================================================================
+
+test("a single-target Mega (Venusaur, #3) groups under its base's Pokédex row with both forms listed", async () => {
+  const view = await getPokedexView("owner-1");
+  const venusaurRows = view.filter((entry) => entry.species.dexNumber === 3);
+
+  assert.equal(venusaurRows.length, 1, "Venusaur must appear as exactly one Pokédex row — Mega never adds a second dex-number entry");
+  assert.equal(venusaurRows[0]!.species.id, "venusaur");
+  assert.deepEqual(venusaurRows[0]!.forms.map((form) => form.species.id).sort(), ["venusaur", "venusaur-mega"]);
+});
+
+test("X/Y Mega branches (Charizard #6, Mewtwo #150, Raichu #26) each group under their own single Pokédex row with both targets listed", async () => {
+  const view = await getPokedexView("owner-1");
+
+  const cases: Array<{ dexNumber: number; baseId: string; forms: string[] }> = [
+    { dexNumber: 6, baseId: "charizard", forms: ["charizard", "charizard-mega-x", "charizard-mega-y"] },
+    { dexNumber: 150, baseId: "mewtwo", forms: ["mewtwo", "mewtwo-mega-x", "mewtwo-mega-y"] },
+    { dexNumber: 26, baseId: "raichu", forms: ["raichu", "raichu-alola", "raichu-mega-x", "raichu-mega-y"] },
+  ];
+
+  for (const { dexNumber, baseId, forms } of cases) {
+    const rows = view.filter((entry) => entry.species.dexNumber === dexNumber);
+    assert.equal(rows.length, 1, `${baseId} must appear as exactly one Pokédex row`);
+    assert.equal(rows[0]!.species.id, baseId);
+    assert.deepEqual(rows[0]!.forms.map((form) => form.species.id).sort(), forms.sort());
+  }
+});
+
+test("plain-vs-Z Mega branches (Mega Absol Z, Mega Garchomp Z, Mega Lucario Z) each group under their correct base Pokédex row alongside the plain Mega form", async () => {
+  const view = await getPokedexView("owner-1");
+
+  const cases: Array<{ dexNumber: number; baseId: string; forms: string[] }> = [
+    { dexNumber: 359, baseId: "absol", forms: ["absol", "absol-mega", "absol-mega-z"] },
+    { dexNumber: 445, baseId: "garchomp", forms: ["garchomp", "garchomp-mega", "garchomp-mega-z"] },
+    { dexNumber: 448, baseId: "lucario", forms: ["lucario", "lucario-mega", "lucario-mega-z"] },
+  ];
+
+  for (const { dexNumber, baseId, forms } of cases) {
+    const rows = view.filter((entry) => entry.species.dexNumber === dexNumber);
+    assert.equal(rows.length, 1, `${baseId} must appear as exactly one Pokédex row`);
+    assert.equal(rows[0]!.species.id, baseId);
+    assert.deepEqual(rows[0]!.forms.map((form) => form.species.id).sort(), forms.sort());
+  }
+});
+
+test("Tatsugiri (#978) groups under exactly one Pokédex row with ONLY the final approved Mega form (tatsugiri-mega) — no Curly/Droopy/Stretchy remnants", async () => {
+  const view = await getPokedexView("owner-1");
+  const tatsugiriRows = view.filter((entry) => entry.species.dexNumber === 978);
+
+  assert.equal(tatsugiriRows.length, 1, "Tatsugiri must appear as exactly one Pokédex row");
+  assert.equal(tatsugiriRows[0]!.species.id, "tatsugiri");
+  assert.deepEqual(tatsugiriRows[0]!.forms.map((form) => form.species.id).sort(), ["tatsugiri", "tatsugiri-mega"]);
+
+  const megaForm = tatsugiriRows[0]!.forms.find((form) => form.species.id === "tatsugiri-mega")!;
+  assert.equal(megaForm.species.spriteId, "0978M");
+});
+
+test("catching only a Mega form (Tatsugiri Mega) unlocks its Pokédex entry as caught, while the ordinary base form stays individually unseen", async () => {
+  seedPlayerPokemon({ id: "mon-tatsu-mega", playerId: "owner-1", speciesId: "tatsugiri-mega" });
+
+  const view = await getPokedexView("owner-1");
+  const entry = view.find((e) => e.species.dexNumber === 978)!;
+
+  assert.equal(entry.status, "caught", "the Dex entry unlocks the moment the Mega form alone is caught");
+
+  const megaForm = entry.forms.find((form) => form.species.id === "tatsugiri-mega")!;
+  const baseForm = entry.forms.find((form) => form.species.id === "tatsugiri")!;
+  assert.equal(megaForm.status, "caught");
+  assert.equal(baseForm.status, "unseen", "the ordinary base form must stay individually unseen even though the Dex entry itself unlocked");
+});
+
+test("owning both a base species and its Mega form counts as exactly ONE caught Pokédex entry, never two — Mega never inflates the dex total", async () => {
+  seedPlayerPokemon({ id: "mon-venusaur", playerId: "owner-1", speciesId: "venusaur" });
+  const before = await getPokedexCounts("owner-1");
+
+  seedPlayerPokemon({ id: "mon-venusaur-mega", playerId: "owner-1", speciesId: "venusaur-mega" });
+  const after = await getPokedexCounts("owner-1");
+
+  assert.equal(after.caughtCount, before.caughtCount, "catching the Mega form of an ALREADY-caught species must not increase caughtCount");
+});
+
+// ============================================================================
+// POKÉDEX — FORM VISIBILITY + ACQUISITION HINT FIX — the exact reported
+// scenario: owning Mega Charizard X (e.g. via trade) without ever having
+// personally seen or caught normal Charizard or Mega Charizard Y. Each
+// sibling form's seen/caught state must stay fully independent — never
+// propagated from an owned/seen sibling.
+// ============================================================================
+
+test("owning only Mega Charizard X leaves normal Charizard and Mega Charizard Y individually unseen — no sibling-form propagation", async () => {
+  seedPlayerPokemon({ id: "mon-mega-charizard-x", playerId: "owner-1", speciesId: "charizard-mega-x" });
+
+  const view = await getPokedexView("owner-1");
+  const entry = view.find((e) => e.species.dexNumber === 6)!;
+
+  assert.equal(entry.status, "caught", "the Dex entry unlocks the moment Mega Charizard X alone is caught");
+
+  const megaX = entry.forms.find((form) => form.species.id === "charizard-mega-x")!;
+  const base = entry.forms.find((form) => form.species.id === "charizard")!;
+  const megaY = entry.forms.find((form) => form.species.id === "charizard-mega-y")!;
+
+  assert.equal(megaX.status, "caught");
+  assert.equal(base.status, "unseen", "normal Charizard must stay unseen — owning the Mega form must never mark the base as caught/seen");
+  assert.equal(megaY.status, "unseen", "the sibling Mega Y form must stay unseen too — never propagated from Mega X");
+});
+
+test("the Pokédex's total row count is unaffected by all 93 Mega forms existing in the catalog — still exactly one row per the 1025 real National Dex numbers", async () => {
+  const view = await getPokedexView("owner-1");
+  const expectedBaseCount = POKEMON_DATA.filter((species) => !isAlternateForm(species)).length;
+
+  assert.equal(view.length, 1025, "the Pokédex total is dex-number-based, not raw species-row-based — all 93 Mega forms (each an alternate form) contribute zero extra rows");
+  assert.equal(view.length, expectedBaseCount);
+
+  const megaFormCount = POKEMON_DATA.filter((species) => species.id.includes("-mega")).length;
+  assert.equal(megaFormCount, 93, "sanity check: the approved 93-form Mega roster is exactly what's in the catalog right now");
 });

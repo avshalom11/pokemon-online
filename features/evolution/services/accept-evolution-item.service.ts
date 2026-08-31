@@ -3,6 +3,7 @@ import "server-only";
 import { getEvolutionItemEvolutionsByItem, isEvolutionItemId, type EvolutionItemId } from "@/data/pokemon/pokemon-evolutions";
 import { applyEvolutionToPlayerPokemon, calculateEvolutionHpOutcome } from "@/features/evolution/services/apply-evolution.service";
 import { getInventoryItemQuantity, removeInventoryItem } from "@/features/inventory/services/inventory.service";
+import { getPokemonMutationLockReason, type PokemonMutationLockReason } from "@/features/marketplace/services/pokemon-availability.service";
 import { getSpeciesById } from "@/features/pokemon/services/species-catalog";
 import { prisma } from "@/lib/db/prisma";
 
@@ -24,7 +25,20 @@ export type AcceptEvolutionItemResult =
   | { status: "invalid-item" }
   | { status: "invalid-target" }
   | { status: "insufficient-item" }
-  | { status: "already-evolved" };
+  | { status: "already-evolved" }
+  // EVOLUTION ITEM LOCK SAFETY FIX — a Pokémon currently listed on the
+  // Marketplace, or the active/roster participant of a Field/Gym/League
+  // battle, must never permanently change species out from under whichever
+  // system is currently relying on its stable identity. Re-validated inside
+  // the same transaction as the item-consumption/species-change guards
+  // below (features/marketplace/services/pokemon-availability.service.ts's
+  // getPokemonMutationLockReason — the same authoritative check
+  // getPokemonMarketAvailability itself uses for listing eligibility, never
+  // a second/parallel lock system), so a lock that appears between the
+  // Inventory rendering this Pokémon as a candidate and the player
+  // confirming is still caught, and — critically — the item is never
+  // consumed when this fires (the check runs before removeInventoryItem).
+  | { status: "pokemon-locked"; reason: PokemonMutationLockReason };
 
 // Thrown only to unwind prisma.$transaction below when a racing/duplicate
 // confirmation loses — never surfaced past this file. See its one throw
@@ -106,6 +120,16 @@ export async function acceptEvolutionItem(
 
   try {
     const applied = await prisma.$transaction(async (tx) => {
+      // EVOLUTION ITEM LOCK SAFETY FIX — re-validated here, inside the same
+      // transaction, immediately before any consumption/mutation: a
+      // Marketplace-listed or battle-locked Pokémon must never evolve, and
+      // this check running first is what guarantees the item is never
+      // spent when it fires.
+      const lockReason = await getPokemonMutationLockReason(tx, playerId, playerPokemonId);
+      if (lockReason) {
+        return { status: "pokemon-locked" as const, reason: lockReason };
+      }
+
       const consumed = await removeInventoryItem(tx, playerId, itemId, 1);
       if (!consumed) {
         return { status: "insufficient-item" as const };
@@ -142,6 +166,10 @@ export async function acceptEvolutionItem(
 
     if (applied.status === "insufficient-item") {
       return { status: "insufficient-item" };
+    }
+
+    if (applied.status === "pokemon-locked") {
+      return { status: "pokemon-locked", reason: applied.reason };
     }
 
     return {

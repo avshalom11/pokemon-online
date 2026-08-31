@@ -79,17 +79,26 @@ test("Diamond always has at least 5 reward categories (3 mandatory + 2 mandatory
 
 test("EVERY remaining category can independently appear as a bonus — no cap — up to all 5 optional categories total", () => {
   const results = rollChestReward("diamond", paddedRandom([], 0));
-  const optional = categoriesOf(results).filter((category) => !["egg", "money", "gold"].includes(category));
+  // "mega-stone" is deliberately excluded from this filter — it's outside
+  // the optionalCategories pool entirely (see chest-reward.types.ts's own
+  // ChestRewardCategory doc comment) and is asserted separately below; a
+  // pad of 0 also makes its own independent 20% roll succeed (0 < 0.2), so
+  // it's expected in `results` but must never be counted as one of the 5
+  // pool categories.
+  const optional = categoriesOf(results).filter((category) => !["egg", "money", "gold", "mega-stone"].includes(category));
   assert.equal(new Set(optional).size, 5, "all 5 optional categories (poke-balls, potions, revive, evolution-item, incubator) present");
-  assert.equal(results.length, 8, "3 mandatory + all 5 optional = 8, Diamond's own documented maximum — every available category");
+  assert.ok(categoriesOf(results).includes("mega-stone"), "pad 0 also succeeds the independent Mega Stone roll (0 < 0.2)");
+  assert.equal(results.length, 9, "3 mandatory + all 5 optional + Mega Stone = 9, Diamond's own documented maximum — every available category");
 });
 
 test("it is valid for none of the remaining (non-mandatory-extra) categories to pass their bonus roll", () => {
   // All-0.999999 path: 2 mandatory extras are forced, but the 3 remaining
-  // candidates all fail their independent 50% check.
+  // candidates all fail their independent 50% check, and the independent
+  // Mega Stone roll (20% on Diamond) also fails at this pad.
   const results = rollChestReward("diamond", paddedRandom([], 0.999999));
-  const optional = categoriesOf(results).filter((category) => !["egg", "money", "gold"].includes(category));
+  const optional = categoriesOf(results).filter((category) => !["egg", "money", "gold", "mega-stone"].includes(category));
   assert.equal(optional.length, 2, "only the 2 mandatory extras — zero of the 3 remaining passed");
+  assert.ok(!categoriesOf(results).includes("mega-stone"), "0.999999 fails the independent 20% Mega Stone roll");
 });
 
 test("Diamond's Poké Ball weights are exactly 40/40/20, verified at every boundary", () => {
@@ -189,6 +198,9 @@ test("the full exact reward set at the deterministic all-0 (maximum, every categ
       ],
     },
     { category: "incubator", incubatorTypeId: "ultra" },
+    // MEGA EVOLUTION PHASE 5 — the independent Mega Stone roll (20% on
+    // Diamond) also succeeds at this pad (0 < 0.2), always last.
+    { category: "mega-stone", itemId: "mega-stone", quantity: 1 },
   ]);
 });
 
