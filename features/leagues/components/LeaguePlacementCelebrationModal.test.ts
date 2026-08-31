@@ -29,7 +29,8 @@ test("there is no ✕ / close button — the only actionable button is אישו�
 });
 
 test("the single button reads אישור and calls the acknowledge handler, disabled while a request is in flight", () => {
-  assert.ok(modalSrc.includes(">אישור<") || modalSrc.includes(">\n          אישור\n"), "the confirm button must read אישור");
+  const buttonReadsConfirm = modalSrc.includes(">אישור<") || /\r?\n\s+אישור\r?\n/.test(modalSrc);
+  assert.ok(buttonReadsConfirm, "the confirm button must read אישור");
   assert.ok(modalSrc.includes("onClick={handleAcknowledge}"));
   assert.ok(modalSrc.includes("disabled={isPending}"), "the button must disable itself while a submission is in flight, preventing a duplicate double-click submission");
 });
