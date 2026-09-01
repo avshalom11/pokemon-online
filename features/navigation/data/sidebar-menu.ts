@@ -117,6 +117,24 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
   },
 ];
 
+// STAFF / MODERATION — PHASE 6 — the OWNER-only admin category, appended
+// only when `isOwner` is true — GameSidebar.tsx passes
+// `useViewerStaffRole() === "OWNER"` for this. Purely a visibility HINT:
+// both routes re-check OWNER server-side themselves (app/(game)/admin/
+// staff/page.tsx, app/(game)/admin/moderation-history/page.tsx) and
+// redirect a non-OWNER away regardless of whether this item was ever
+// rendered — same "client-side show/hide is never the real gate" rule
+// this codebase's other staff-only UI (features/moderation/components/
+// ChatModerationMenu.tsx) already establishes.
+const ADMIN_CATEGORY: SidebarCategory = {
+  id: "admin",
+  label: "ניהול",
+  items: [
+    { id: "staff-admin", label: "ניהול צוות", icon: "🛡️", href: "/admin/staff" },
+    { id: "moderation-history", label: "היסטוריית ניהול", icon: "📜", href: "/admin/moderation-history" },
+  ],
+};
+
 // Fills in the one genuinely dynamic route (/profile/[username], same
 // pattern features/profile/components/PlayerProfileLink.tsx already
 // established) — everything else passes through untouched. `username` null
@@ -124,11 +142,13 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
 // Profile item is simply left without an href in that case, same
 // "coming-soon, never a broken link" rule NavigationGrid's own Profile card
 // already follows.
-export function buildSidebarCategories(username: string | null): SidebarCategory[] {
-  return SIDEBAR_CATEGORIES.map((category) => ({
+export function buildSidebarCategories(username: string | null, isOwner: boolean = false): SidebarCategory[] {
+  const categories = SIDEBAR_CATEGORIES.map((category) => ({
     ...category,
     items: category.items.map((item) =>
       item.id === "profile" ? { ...item, href: username ? `/profile/${encodeURIComponent(username)}` : undefined } : item
     ),
   }));
+
+  return isOwner ? [...categories, ADMIN_CATEGORY] : categories;
 }

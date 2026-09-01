@@ -484,6 +484,66 @@ interface MarketplaceListingItemRow {
   quantity: number;
 }
 
+// STAFF / MODERATION — PHASE 1 — mirrors prisma/schema.prisma's
+// StaffMember/StaffRosterCounter/PlayerModerationCounters/ModerationAction
+// exactly (see each model's own doc comment).
+interface StaffMemberRow {
+  id: string;
+  playerId: string;
+  role: string;
+  appointedByPlayerId: string | null;
+  appointedAt: Date;
+  updatedAt: Date;
+}
+
+interface StaffRosterCounterRow {
+  id: string;
+  deputyCount: number;
+  supportCount: number;
+  updatedAt: Date;
+}
+
+interface PlayerModerationCountersRow {
+  playerId: string;
+  chatBanCount: number;
+  siteBanCount: number;
+  updatedAt: Date;
+}
+
+interface ModerationActionRow {
+  id: string;
+  targetPlayerId: string;
+  actorPlayerId: string;
+  actionType: string;
+  reason: string | null;
+  durationMinutes: number | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  revokedByPlayerId: string | null;
+  revocationReason: string | null;
+  targetResourceId: string | null;
+  metadata: unknown;
+  createdAt: Date;
+}
+
+// STAFF / MODERATION — PHASE 4 — mirrors prisma/schema.prisma's own
+// Better-Auth-owned Session model exactly (id/expiresAt/token/createdAt/
+// updatedAt/ipAddress/userAgent/userId) — needed only for
+// lib/auth/session-revocation.ts's revokeAllSessionsForUser, the one
+// place this project ever deletes from this table outside Better Auth's
+// own internals. Named `authSessions` (never `sessions`, already taken by
+// FieldBattleSession's own Map above) to avoid a collision.
+interface AuthSessionRow {
+  id: string;
+  userId: string;
+  token: string;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
 let pokemons = new Map<string, PlayerPokemonRow>();
 let knownMoves = new Map<string, PlayerKnownMoveRow>();
 let pending = new Map<string, PlayerPendingMoveLearningRow>();
@@ -532,6 +592,13 @@ let leagueTournamentPlacements = new Map<string, LeagueTournamentPlacementRow>()
 let marketplaceListings = new Map<string, MarketplaceListingRow>();
 let marketplaceListingPokemon = new Map<string, MarketplaceListingPokemonRow>();
 let marketplaceListingItems = new Map<string, MarketplaceListingItemRow>();
+// STAFF / MODERATION — PHASE 1
+let staffMembers = new Map<string, StaffMemberRow>();
+let staffRosterCounters = new Map<string, StaffRosterCounterRow>();
+let playerModerationCounters = new Map<string, PlayerModerationCountersRow>();
+let moderationActions = new Map<string, ModerationActionRow>();
+// STAFF / MODERATION — PHASE 4
+let authSessions = new Map<string, AuthSessionRow>();
 let idCounter = 0;
 // POKÉMON DAYCARE — PHASE 2 (5 SLOTS + DEPOSIT FEE) — a simple async mutex
 // so concurrent $transaction calls never interleave their bodies (see
@@ -657,6 +724,11 @@ function cloneState() {
     marketplaceListings: new Map([...marketplaceListings].map(([id, row]) => [id, { ...row }])),
     marketplaceListingPokemon: new Map([...marketplaceListingPokemon].map(([id, row]) => [id, { ...row }])),
     marketplaceListingItems: new Map([...marketplaceListingItems].map(([id, row]) => [id, { ...row }])),
+    staffMembers: new Map([...staffMembers].map(([id, row]) => [id, { ...row }])),
+    staffRosterCounters: new Map([...staffRosterCounters].map(([id, row]) => [id, { ...row }])),
+    playerModerationCounters: new Map([...playerModerationCounters].map(([id, row]) => [id, { ...row }])),
+    moderationActions: new Map([...moderationActions].map(([id, row]) => [id, { ...row }])),
+    authSessions: new Map([...authSessions].map(([id, row]) => [id, { ...row }])),
   };
 }
 
@@ -695,6 +767,11 @@ function restoreState(snapshot: ReturnType<typeof cloneState>) {
   marketplaceListings = snapshot.marketplaceListings;
   marketplaceListingPokemon = snapshot.marketplaceListingPokemon;
   marketplaceListingItems = snapshot.marketplaceListingItems;
+  staffMembers = snapshot.staffMembers;
+  staffRosterCounters = snapshot.staffRosterCounters;
+  playerModerationCounters = snapshot.playerModerationCounters;
+  moderationActions = snapshot.moderationActions;
+  authSessions = snapshot.authSessions;
 }
 
 export function resetFakeDb() {
@@ -732,6 +809,11 @@ export function resetFakeDb() {
   marketplaceListings = new Map();
   marketplaceListingPokemon = new Map();
   marketplaceListingItems = new Map();
+  staffMembers = new Map();
+  staffRosterCounters = new Map();
+  playerModerationCounters = new Map();
+  moderationActions = new Map();
+  authSessions = new Map();
   idCounter = 0;
   transactionQueue = Promise.resolve();
   playerPokemonUpdateCallCount = 0;
@@ -1129,6 +1211,136 @@ export function seedMarketplaceListingPokemon(row: { playerPokemonId: string; li
   return full;
 }
 
+// STAFF / MODERATION — PHASE 1 — same "seed + read-only getter" pair
+// every other fake table here already provides. Bypasses
+// appointStaffRole's own cap-guard/counter entirely, so a test can seed a
+// specific staff roster directly (e.g. "this player is already OWNER")
+// without needing to route through the real appointment flow first — same
+// precedent seedGlobalChatMessage/seedFriendship already establish for
+// their own features.
+export function seedStaffMember(row: { playerId: string; role: string; appointedByPlayerId?: string | null; appointedAt?: Date }) {
+  const now = new Date();
+  const full: StaffMemberRow = {
+    id: nextId("staff_member"),
+    playerId: row.playerId,
+    role: row.role,
+    appointedByPlayerId: row.appointedByPlayerId ?? null,
+    appointedAt: row.appointedAt ?? now,
+    updatedAt: now,
+  };
+  staffMembers.set(row.playerId, full);
+  return full;
+}
+
+export function getStaffMemberRow(playerId: string) {
+  const row = staffMembers.get(playerId);
+  return row ? { ...row } : undefined;
+}
+
+export function getStaffRosterCounterRow() {
+  const row = staffRosterCounters.get("global");
+  return row ? { ...row } : undefined;
+}
+
+export function seedPlayerModerationCounters(row: { playerId: string; chatBanCount?: number; siteBanCount?: number }) {
+  const full: PlayerModerationCountersRow = {
+    playerId: row.playerId,
+    chatBanCount: row.chatBanCount ?? 0,
+    siteBanCount: row.siteBanCount ?? 0,
+    updatedAt: new Date(),
+  };
+  playerModerationCounters.set(row.playerId, full);
+  return full;
+}
+
+export function getPlayerModerationCountersRow(playerId: string) {
+  const row = playerModerationCounters.get(playerId);
+  return row ? { ...row } : undefined;
+}
+
+// Bypasses recordProgressiveChatBan/recordManualChatBan/etc.'s own
+// transactional counter bump entirely — for tests that need to seed prior
+// punishment HISTORY rows directly (e.g. "this player already has 2 past
+// chat bans") without also caring what the counter itself says, or that
+// want to construct a specific active/expired/revoked row shape by hand.
+export function seedModerationAction(row: {
+  id?: string;
+  targetPlayerId: string;
+  actorPlayerId: string;
+  actionType: string;
+  reason?: string | null;
+  durationMinutes?: number | null;
+  expiresAt?: Date | null;
+  revokedAt?: Date | null;
+  revokedByPlayerId?: string | null;
+  revocationReason?: string | null;
+  targetResourceId?: string | null;
+  // STAFF / MODERATION — PHASE 6 — lets a test seed a role_grant/
+  // role_revoke-shaped row directly (see moderation-history-view.
+  // service.test.ts) without going through recordStaffRoleChange first.
+  metadata?: unknown;
+  createdAt?: Date;
+}) {
+  const id = row.id ?? nextId("moderation_action");
+  const full: ModerationActionRow = {
+    id,
+    targetPlayerId: row.targetPlayerId,
+    actorPlayerId: row.actorPlayerId,
+    actionType: row.actionType,
+    reason: row.reason ?? null,
+    durationMinutes: row.durationMinutes ?? null,
+    expiresAt: row.expiresAt ?? null,
+    revokedAt: row.revokedAt ?? null,
+    revokedByPlayerId: row.revokedByPlayerId ?? null,
+    revocationReason: row.revocationReason ?? null,
+    targetResourceId: row.targetResourceId ?? null,
+    metadata: row.metadata ?? null,
+    createdAt: row.createdAt ?? new Date(),
+  };
+  moderationActions.set(id, full);
+  return full;
+}
+
+export function getModerationActionRow(id: string) {
+  const row = moderationActions.get(id);
+  return row ? { ...row } : undefined;
+}
+
+// STAFF / MODERATION — PHASE 4 — same "seed + read-only getter" pair
+// every other fake table here already provides, for
+// lib/auth/session-revocation.ts's own test coverage.
+export function seedAuthSession(row: { id?: string; userId: string; token?: string; expiresAt?: Date }) {
+  const id = row.id ?? nextId("auth_session");
+  const now = new Date();
+  const full: AuthSessionRow = {
+    id,
+    userId: row.userId,
+    token: row.token ?? id,
+    expiresAt: row.expiresAt ?? new Date(now.getTime() + 24 * 60 * 60 * 1000),
+    createdAt: now,
+    updatedAt: now,
+    ipAddress: null,
+    userAgent: null,
+  };
+  authSessions.set(id, full);
+  return full;
+}
+
+export function getAuthSessionRowsForUser(userId: string) {
+  return [...authSessions.values()].filter((row) => row.userId === userId).map((row) => ({ ...row }));
+}
+
+export function getAuthSessionCount() {
+  return authSessions.size;
+}
+
+export function getModerationActionRowsForPlayer(playerId: string) {
+  return [...moderationActions.values()]
+    .filter((row) => row.targetPlayerId === playerId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((row) => ({ ...row }));
+}
+
 export function seedFieldBattleSession(row: {
   playerId: string;
   zoneId: string;
@@ -1326,6 +1538,10 @@ function matchesValue(actual: unknown, expected: unknown): boolean {
     if ("not" in operators) return actual !== operators.not;
     if ("gte" in operators) return (actual as number) >= (operators.gte as number);
     if ("gt" in operators) return (actual as number) > (operators.gt as number);
+    // STAFF / MODERATION — PHASE 1 — mirrors real Prisma's `{ field: { lt:
+    // n } }` filter, needed by StaffRosterCounter's own guarded
+    // conditional updateMany (staff-role.service.ts's appointStaffRole).
+    if ("lt" in operators) return (actual as number) < (operators.lt as number);
     // GYMS & LEAGUES PHASE 9 — mirrors real Prisma's `{ field: { in: [...] }
     // }` filter (getPlayerProfilesByIds' own bulk id lookup, lib/auth/
     // player-profile.ts).
@@ -1637,6 +1853,13 @@ const client = {
       where: { id: string } | { userId: string };
       select?: {
         id?: boolean;
+        // STAFF / MODERATION — PHASE 4 — features/moderation/services/
+        // site-ban.service.ts's own playerId -> userId resolution (needed
+        // to revoke the right Better Auth Session rows). This fake's own
+        // "profile id === session user id" convention (see this
+        // parameter's own doc comment above) is what makes `row.id` a
+        // correct stand-in for `userId` here too.
+        userId?: boolean;
         fieldBattleSession?: boolean;
         pokemon?: { where?: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc">; take?: number };
       };
@@ -1649,6 +1872,9 @@ const client = {
       const result: Record<string, unknown> = {};
       if (select.id) {
         result.id = row.id;
+      }
+      if (select.userId) {
+        result.userId = row.id;
       }
       if (select.fieldBattleSession) {
         result.fieldBattleSession = sessions.get(lookupId) ?? null;
@@ -2905,6 +3131,18 @@ const client = {
       globalChatMessages.set(id, full);
       return { ...full };
     },
+    // STAFF / MODERATION — PHASE 5 — features/moderation/services/
+    // delete-message.service.ts's own by-id lookup + hard delete.
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = globalChatMessages.get(where.id);
+      return row ? { ...row } : null;
+    },
+    async delete({ where }: { where: { id: string } }) {
+      const row = globalChatMessages.get(where.id);
+      if (!row) throw new Error(`fake prisma: globalChatMessage ${where.id} not found for delete`);
+      globalChatMessages.delete(where.id);
+      return { ...row };
+    },
     async findFirst({
       where,
       orderBy,
@@ -3396,6 +3634,216 @@ const client = {
       if (!row) throw new Error("fake prisma: playerPendingMoveLearning row not found for update");
       Object.assign(row, data);
       return { ...row };
+    },
+  },
+  // STAFF / MODERATION — PHASE 1 — mirrors staff-role.service.ts's exact
+  // call shapes (findUnique by playerId, create, delete, findMany by
+  // role).
+  staffMember: {
+    async findUnique({ where }: { where: { playerId: string } }) {
+      const row = staffMembers.get(where.playerId);
+      return row ? { ...row } : null;
+    },
+    async create({ data }: { data: { playerId: string; role: string; appointedByPlayerId?: string | null } }) {
+      const now = new Date();
+      const full: StaffMemberRow = {
+        id: nextId("staff_member"),
+        playerId: data.playerId,
+        role: data.role,
+        appointedByPlayerId: data.appointedByPlayerId ?? null,
+        appointedAt: now,
+        updatedAt: now,
+      };
+      staffMembers.set(data.playerId, full);
+      return { ...full };
+    },
+    async delete({ where }: { where: { playerId: string } }) {
+      const row = staffMembers.get(where.playerId);
+      if (!row) throw new Error(`fake prisma: staffMember ${where.playerId} not found for delete`);
+      staffMembers.delete(where.playerId);
+      return { ...row };
+    },
+    async findMany({ where }: { where?: Record<string, unknown> } = {}) {
+      return [...staffMembers.values()].filter((row) => matches(row, where)).map((row) => ({ ...row }));
+    },
+  },
+  // STAFF / MODERATION — PHASE 1 — the singleton counter row
+  // appointStaffRole/removeStaffRole's own guarded-updateMany CAS
+  // mechanism reads/writes (staff-role.service.ts). `upsert` mirrors real
+  // Prisma's own "no-op update on an already-existing row" shape
+  // (playerProfile.upsert above already establishes this same pattern for
+  // ensurePlayerProfile).
+  staffRosterCounter: {
+    async upsert({
+      where,
+      create,
+    }: {
+      where: { id: string };
+      create: { id: string };
+      update: Record<string, unknown>;
+    }) {
+      const existing = staffRosterCounters.get(where.id);
+      if (existing) return { ...existing };
+      const full: StaffRosterCounterRow = { id: create.id, deputyCount: 0, supportCount: 0, updatedAt: new Date() };
+      staffRosterCounters.set(create.id, full);
+      return { ...full };
+    },
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of staffRosterCounters.values()) {
+        if (matches(row, where)) {
+          applyNumericOperators(row as unknown as Record<string, unknown>, data);
+          row.updatedAt = new Date();
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  // STAFF / MODERATION — PHASE 1 — mirrors moderation-progression.
+  // service.ts's own recordProgressiveChatBan/recordProgressiveSiteBan
+  // upsert-and-increment call shape exactly, same idiom loginAttemptLock's
+  // own upsert above already establishes.
+  playerModerationCounters: {
+    async findUnique({ where }: { where: { playerId: string } }) {
+      const row = playerModerationCounters.get(where.playerId);
+      return row ? { ...row } : null;
+    },
+    async upsert({
+      where,
+      create,
+      update,
+    }: {
+      where: { playerId: string };
+      create: { playerId: string; chatBanCount?: number; siteBanCount?: number };
+      update: Record<string, unknown>;
+    }) {
+      const existing = playerModerationCounters.get(where.playerId);
+      if (!existing) {
+        const full: PlayerModerationCountersRow = {
+          playerId: create.playerId,
+          chatBanCount: create.chatBanCount ?? 0,
+          siteBanCount: create.siteBanCount ?? 0,
+          updatedAt: new Date(),
+        };
+        playerModerationCounters.set(where.playerId, full);
+        return { ...full };
+      }
+      applyNumericOperators(existing as unknown as Record<string, unknown>, update);
+      existing.updatedAt = new Date();
+      return { ...existing };
+    },
+  },
+  // STAFF / MODERATION — PHASE 1 — mirrors moderation-progression.
+  // service.ts's/active-ban.service.ts's own call shapes (create,
+  // findFirst for the active-ban derivation, findMany for history,
+  // update for revocation).
+  // STAFF / MODERATION — PHASE 4 — mirrors lib/auth/session-revocation.ts's
+  // own single call shape exactly (a plain deleteMany by userId).
+  session: {
+    async deleteMany({ where }: { where: Record<string, unknown> }) {
+      let count = 0;
+      for (const [id, row] of authSessions) {
+        if (matches(row, where)) {
+          authSessions.delete(id);
+          count += 1;
+        }
+      }
+      return { count };
+    },
+  },
+  moderationAction: {
+    async create({
+      data,
+    }: {
+      data: {
+        targetPlayerId: string;
+        actorPlayerId: string;
+        actionType: string;
+        reason?: string | null;
+        durationMinutes?: number | null;
+        expiresAt?: Date | null;
+        targetResourceId?: string | null;
+        // STAFF / MODERATION — PHASE 6 — recordStaffRoleChange's own
+        // {role: StaffRole} payload (moderation-progression.service.ts) —
+        // a plain passthrough, same "opaque JSON, never interpreted by
+        // this fake" treatment every other Json-typed fake field already
+        // gets (e.g. FieldBattleSession.participants).
+        metadata?: unknown;
+      };
+    }) {
+      const id = nextId("moderation_action");
+      const full: ModerationActionRow = {
+        id,
+        targetPlayerId: data.targetPlayerId,
+        actorPlayerId: data.actorPlayerId,
+        actionType: data.actionType,
+        reason: data.reason ?? null,
+        durationMinutes: data.durationMinutes ?? null,
+        expiresAt: data.expiresAt ?? null,
+        revokedAt: null,
+        revokedByPlayerId: null,
+        revocationReason: null,
+        targetResourceId: data.targetResourceId ?? null,
+        metadata: data.metadata ?? null,
+        createdAt: new Date(),
+      };
+      moderationActions.set(id, full);
+      return { ...full };
+    },
+    // STAFF / MODERATION — PHASE 3 — revoke-ban.service.ts's own by-id
+    // lookup before it validates whether a given action is revocable.
+    async findUnique({ where }: { where: { id: string } }) {
+      const row = moderationActions.get(where.id);
+      return row ? { ...row } : null;
+    },
+    async findFirst({
+      where,
+      orderBy,
+    }: {
+      where: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc">;
+    }) {
+      const rows = [...moderationActions.values()].filter((candidate) => matches(candidate, where));
+      const sorted = applyOrderBy(rows, orderBy);
+      return sorted[0] ? { ...sorted[0] } : null;
+    },
+    async findMany({
+      where,
+      orderBy,
+    }: {
+      where?: Record<string, unknown>;
+      orderBy?: Record<string, "asc" | "desc">;
+    } = {}) {
+      const rows = [...moderationActions.values()].filter((row) => matches(row, where));
+      const sorted = applyOrderBy(rows, orderBy);
+      return sorted.map((row) => ({ ...row }));
+    },
+    async update({
+      where,
+      data,
+    }: {
+      where: { id: string };
+      data: { revokedAt?: Date; revokedByPlayerId?: string; revocationReason?: string | null };
+    }) {
+      const row = moderationActions.get(where.id);
+      if (!row) throw new Error(`fake prisma: moderationAction ${where.id} not found for update`);
+      Object.assign(row, data);
+      return { ...row };
+    },
+    // STAFF / MODERATION — PHASE 3 — mirrors revokeModerationAction's own
+    // guarded conditional updateMany (moderation-progression.service.ts) —
+    // same shape as loginAttemptLock.updateMany/accountDeletionRequest.
+    // updateMany above.
+    async updateMany({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+      let count = 0;
+      for (const row of moderationActions.values()) {
+        if (matches(row, where)) {
+          Object.assign(row, data);
+          count += 1;
+        }
+      }
+      return { count };
     },
   },
   // `tx` is deliberately untyped here (not `typeof client`) to avoid a

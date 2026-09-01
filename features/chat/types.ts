@@ -4,6 +4,8 @@
 // plain shared types" split features/notifications/types.ts already
 // establishes for NotificationBellData/NotificationSummary.
 
+import type { StaffRole } from "@/features/moderation/types";
+
 export interface GlobalChatMessageView {
   id: string;
   playerDisplayName: string;
@@ -25,14 +27,31 @@ export interface GlobalChatMessageView {
   // fresh on every poll tick (getRecentGlobalChatMessages), so it stays
   // live without any dedicated presence poll of its own.
   isOnline: boolean;
+  // STAFF / MODERATION — PHASE 5 — the sender's own resolved staff role
+  // (null for a plain player) — the one extra fact features/chat/
+  // components/GlobalChatWindow.tsx needs, alongside the current viewer's
+  // OWN role (features/moderation/context/viewer-staff-role-context.tsx),
+  // to decide locally whether to render a ⋮ moderation control on this
+  // message at all (features/moderation/permissions/chat-moderation-menu.
+  // ts's getAvailableChatModerationActions) — never itself an
+  // authorization decision; every Server Action this menu can reach still
+  // re-derives its own authorization from the database independently.
+  senderStaffRole: StaffRole | null;
 }
 
 // "unauthenticated" is only ever produced by the action layer (see
 // global-chat.actions.ts) — sendGlobalChatMessage itself (global-chat.
 // service.ts) always receives an already-resolved, trusted playerId and
 // never needs to reason about session state, so it never returns this one.
-export type SendGlobalChatMessageError = "empty" | "too-long" | "cooldown" | "unauthenticated";
+//
+// STAFF / MODERATION — PHASE 4 — "chat-banned" is produced by
+// sendGlobalChatMessage itself (global-chat.service.ts), the ONE new
+// error this phase adds — carries its own `expiresAt` (see
+// SendGlobalChatMessageResult below) so a future UI can explain when the
+// restriction ends, without a second round trip.
+export type SendGlobalChatMessageError = "empty" | "too-long" | "cooldown" | "unauthenticated" | "chat-banned";
 
 export type SendGlobalChatMessageResult =
   | { ok: true; message: GlobalChatMessageView }
-  | { ok: false; error: SendGlobalChatMessageError };
+  | { ok: false; error: "chat-banned"; expiresAt: string }
+  | { ok: false; error: Exclude<SendGlobalChatMessageError, "chat-banned"> };

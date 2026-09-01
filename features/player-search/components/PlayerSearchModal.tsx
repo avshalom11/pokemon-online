@@ -9,6 +9,14 @@ import type { PlayerSearchResultView } from "@/features/player-search/types";
 
 interface PlayerSearchModalProps {
   onClose: () => void;
+  // STAFF / MODERATION — PHASE 6 — when provided, selecting a result
+  // calls this INSTEAD of navigating to their profile (the sidebar's own
+  // "חיפוש שחקנים" entry point never passes this, so its existing
+  // navigate-to-profile behavior is completely unchanged) — reused as the
+  // staff-admin panel's own player picker, per that phase's own "reuse
+  // the existing player-search infrastructure" instruction, rather than a
+  // second search UI duplicating this debounce/input/list logic.
+  onSelectPlayer?: (player: PlayerSearchResultView) => void;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -20,7 +28,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 // than a bolted-on new pattern. Every search goes through the one server
 // action (searchPlayersByUsernameAction -> player-search.service.ts's
 // searchPlayersByUsername) — never a direct Prisma query here.
-export function PlayerSearchModal({ onClose }: PlayerSearchModalProps) {
+export function PlayerSearchModal({ onClose, onSelectPlayer }: PlayerSearchModalProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlayerSearchResultView[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -90,13 +98,9 @@ export function PlayerSearchModal({ onClose }: PlayerSearchModalProps) {
             <p className="py-6 text-center text-sm text-slate-500">לא נמצאו שחקנים תואמים.</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {results.map((result) => (
-                <li key={result.username}>
-                  <Link
-                    href={`/profile/${encodeURIComponent(result.username)}`}
-                    onClick={onClose}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5"
-                  >
+              {results.map((result) => {
+                const content = (
+                  <>
                     {result.avatarUrl ? (
                       <SpriteImage
                         src={result.avatarUrl}
@@ -113,9 +117,34 @@ export function PlayerSearchModal({ onClose }: PlayerSearchModalProps) {
                       <span className="text-sm font-semibold text-slate-100">{result.displayName}</span>
                       <span dir="auto" className="text-xs text-slate-500">{`@${result.username}`}</span>
                     </div>
-                  </Link>
-                </li>
-              ))}
+                  </>
+                );
+
+                return (
+                  <li key={result.username}>
+                    {onSelectPlayer ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectPlayer(result);
+                          onClose();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-right transition-colors hover:bg-white/5"
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      <Link
+                        href={`/profile/${encodeURIComponent(result.username)}`}
+                        onClick={onClose}
+                        className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5"
+                      >
+                        {content}
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

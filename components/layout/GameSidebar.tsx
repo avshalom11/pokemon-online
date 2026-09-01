@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useActiveBattle } from "@/features/battle-session/context/active-battle-context";
 import { buildSidebarCategories, type SidebarMenuItem } from "@/features/navigation/data/sidebar-menu";
+import { useViewerStaffRole } from "@/features/moderation/context/viewer-staff-role-context";
 import { PlayerSearchModal } from "@/features/player-search/components/PlayerSearchModal";
 import { useTutorial, useTutorialTarget } from "@/features/tutorial/context/tutorial-context";
 import { useSidebarOpen } from "@/components/layout/sidebar-open-context";
@@ -34,7 +35,8 @@ interface GameSidebarProps {
 // independently-tracked "am I in battle" flag, and never pathname matching.
 export function GameSidebar({ username }: GameSidebarProps) {
   const { isActiveBattle } = useActiveBattle();
-  const categories = buildSidebarCategories(username);
+  const viewerStaffRole = useViewerStaffRole();
+  const categories = buildSidebarCategories(username, viewerStaffRole === "OWNER");
 
   // RIGHT SIDEBAR — PUSH FRIENDS BAR + GLOBAL CHAT. Open/closed state (and
   // its localStorage persistence) now lives in the shared SidebarOpenProvider

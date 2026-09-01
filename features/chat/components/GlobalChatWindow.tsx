@@ -7,6 +7,7 @@ import { PlayerNameLink } from "@/components/social/PlayerNameLink";
 import { CHAT_ACCENT_TEXT_CLASSNAME, CHAT_INPUT_CLASSNAME, CHAT_SEND_BUTTON_CLASSNAME } from "@/features/chat/components/chat-theme";
 import { GLOBAL_CHAT_MESSAGE_MAX_LENGTH } from "@/features/chat/config/global-chat.config";
 import type { DisplayMessage } from "@/features/chat/hooks/use-global-chat";
+import { ChatModerationMenu } from "@/features/moderation/components/ChatModerationMenu";
 
 interface GlobalChatWindowProps {
   messages: DisplayMessage[];
@@ -17,6 +18,10 @@ interface GlobalChatWindowProps {
   sendError: string | null;
   listRef: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
+  // STAFF / MODERATION — PHASE 5 — see use-global-chat.ts's own
+  // removeMessage doc comment: called after a successful deletion so the
+  // row disappears from this client immediately.
+  onMessageDeleted: (messageId: string) => void;
 }
 
 // GLOBAL CHAT — the message list + composer shared by BOTH chat
@@ -26,7 +31,17 @@ interface GlobalChatWindowProps {
 // the OUTER chrome (fixed-vs-embedded container, minimize control) differs
 // between the two callers; this is the part that must look and behave
 // identically in both.
-export function GlobalChatWindow({ messages, inputValue, onInputChange, onSubmit, isSending, sendError, listRef, onScroll }: GlobalChatWindowProps) {
+export function GlobalChatWindow({
+  messages,
+  inputValue,
+  onInputChange,
+  onSubmit,
+  isSending,
+  sendError,
+  listRef,
+  onScroll,
+  onMessageDeleted,
+}: GlobalChatWindowProps) {
   return (
     <>
       <div ref={listRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 py-2">
@@ -46,6 +61,19 @@ export function GlobalChatWindow({ messages, inputValue, onInputChange, onSubmit
                     className={`text-sm font-semibold ${CHAT_ACCENT_TEXT_CLASSNAME}`}
                   />
                   <span className="text-[11px] text-slate-400">{message.sentTimeLabel}</span>
+                  {/* STAFF / MODERATION — PHASE 5 — never rendered at all for a
+                      pending/optimistic message (no real messageId yet to act
+                      on server-side) — renders nothing itself unless the
+                      current viewer is staff AND allowed to moderate this
+                      sender (ChatModerationMenu's own doc comment). */}
+                  {message.pending ? null : (
+                    <ChatModerationMenu
+                      messageId={message.id}
+                      targetDisplayName={message.playerDisplayName}
+                      senderStaffRole={message.senderStaffRole}
+                      onMessageDeleted={onMessageDeleted}
+                    />
+                  )}
                 </div>
                 <p className="whitespace-pre-wrap break-words text-sm text-slate-100">{message.message}</p>
               </li>

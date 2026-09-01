@@ -30,8 +30,14 @@ import { prisma } from "@/lib/db/prisma";
 // self-heal for an account that somehow reached a protected page with no
 // profile yet. A player who already has a row is never touched by this
 // function again, regardless of how many times it's called afterward.
+// STAFF / MODERATION — PHASE 4 — now returns the (created-or-existing)
+// row, primarily so getCurrentSession()'s own self-heal branch has the
+// freshly-created PlayerProfile.id on hand for its site-ban check without
+// a second round trip. Every pre-existing caller (auth.ts's
+// databaseHooks) already discarded the previous void return, so this is
+// a purely additive change.
 export async function ensurePlayerProfile(userId: string, displayName: string) {
-  await prisma.playerProfile.upsert({
+  return prisma.playerProfile.upsert({
     where: { userId },
     create: { userId, displayName, coins: STARTING_MONEY, gold: STARTING_GOLD },
     update: {},
