@@ -2,6 +2,7 @@ import type { ProfileThemeId } from "../themes/profile-themes";
 import type { ProfileContentBlock } from "./profile-content.types";
 import type { FriendshipStatus } from "@/features/friends/types";
 import type { LeagueId } from "@/features/leagues/types/league.types";
+import type { StaffRole } from "@/features/moderation/types";
 import type { RegionId } from "@/shared/types/region";
 
 // A single displayed party member on the PUBLIC profile — deliberately NOT
@@ -133,6 +134,17 @@ export interface PublicProfileView {
   // "nothing shown".
   aboutMe: string | null;
   isOwner: boolean;
+  // STAFF / MODERATION — PROFILE SITE-BAN ENTRY POINT. This profile's own
+  // OWNER's resolved StaffRole (null for a plain player) — the profile
+  // equivalent of GlobalChatMessageView.senderStaffRole
+  // (features/chat/types.ts). ProfileModerationControl feeds this straight
+  // into getAvailableProfileModerationActions alongside the CURRENT
+  // VIEWER's own role (from ViewerStaffRoleProvider) to decide which
+  // site-ban controls to show — never re-derived or guessed client-side,
+  // and never itself an authorization decision (every Server Action it can
+  // reach still re-derives its own authorization via
+  // authorizeModerationAction).
+  targetStaffRole: StaffRole | null;
   // FRIENDS PHASE 1 — the VIEWER's own relationship to this profile,
   // computed server-side (public-profile-view.service.ts) from the one
   // Friendship table — drives which state AddFriendButton renders (never

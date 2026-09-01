@@ -7,7 +7,9 @@ import { PlayerNameLink } from "@/components/social/PlayerNameLink";
 import { CHAT_ACCENT_TEXT_CLASSNAME, CHAT_INPUT_CLASSNAME, CHAT_SEND_BUTTON_CLASSNAME } from "@/features/chat/components/chat-theme";
 import { GLOBAL_CHAT_MESSAGE_MAX_LENGTH } from "@/features/chat/config/global-chat.config";
 import type { DisplayMessage } from "@/features/chat/hooks/use-global-chat";
+import { getStaffRolePresentation } from "@/features/moderation/config/staff-role-presentation";
 import { ChatModerationMenu } from "@/features/moderation/components/ChatModerationMenu";
+import { StaffRoleLabel } from "@/features/moderation/components/StaffRoleLabel";
 
 interface GlobalChatWindowProps {
   messages: DisplayMessage[];
@@ -58,8 +60,12 @@ export function GlobalChatWindow({
                   <PlayerNameLink
                     username={message.playerUsername}
                     displayName={message.playerDisplayName}
-                    className={`text-sm font-semibold ${CHAT_ACCENT_TEXT_CLASSNAME}`}
+                    className={`text-sm font-semibold ${getStaffRolePresentation(message.senderStaffRole)?.nameClassName ?? CHAT_ACCENT_TEXT_CLASSNAME}`}
                   />
+                  {/* STAFF / MODERATION — ROLE PRESENTATION — see
+                      StaffRoleLabel.tsx's own doc comment. Renders nothing
+                      for a plain player (message.senderStaffRole === null). */}
+                  <StaffRoleLabel role={message.senderStaffRole} />
                   <span className="text-[11px] text-slate-400">{message.sentTimeLabel}</span>
                   {/* STAFF / MODERATION — PHASE 5 — never rendered at all for a
                       pending/optimistic message (no real messageId yet to act

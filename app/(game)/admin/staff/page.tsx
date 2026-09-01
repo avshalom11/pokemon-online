@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { GameScreen } from "@/components/layout/GameScreen";
 import { StaffAdminPanel } from "@/features/moderation/components/StaffAdminPanel";
 import { isStaffAdminRole } from "@/features/moderation/services/staff-admin-access";
 import { getStaffRole } from "@/features/moderation/services/staff-role.service";
@@ -45,9 +46,16 @@ export default async function StaffAdminPage() {
   const roster = await getStaffRosterView();
 
   return (
-    <div dir="rtl" className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
-      <h1 className="font-fantasy text-2xl font-semibold text-slate-100">ניהול צוות</h1>
-      <StaffAdminPanel initialRoster={roster} />
-    </div>
+    <GameScreen>
+      <div
+        dir="rtl"
+        className="relative h-full w-full overflow-y-auto bg-gradient-to-b from-slate-950 via-indigo-950/40 to-slate-950"
+      >
+        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
+          <h1 className="font-fantasy text-2xl font-semibold text-slate-100">ניהול צוות</h1>
+          <StaffAdminPanel initialRoster={roster} />
+        </div>
+      </div>
+    </GameScreen>
   );
 }

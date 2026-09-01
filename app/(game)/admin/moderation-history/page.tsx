@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { GameScreen } from "@/components/layout/GameScreen";
 import { ModerationHistoryTable } from "@/features/moderation/components/ModerationHistoryTable";
 import { getAllModerationHistory } from "@/features/moderation/services/moderation-history-view.service";
 import { isStaffAdminRole } from "@/features/moderation/services/staff-admin-access";
@@ -29,9 +30,16 @@ export default async function ModerationHistoryPage() {
   const history = await getAllModerationHistory();
 
   return (
-    <div dir="rtl" className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6">
-      <h1 className="font-fantasy text-2xl font-semibold text-slate-100">היסטוריית ניהול</h1>
-      <ModerationHistoryTable initialHistory={history} />
-    </div>
+    <GameScreen>
+      <div
+        dir="rtl"
+        className="relative h-full w-full overflow-y-auto bg-gradient-to-b from-slate-950 via-indigo-950/40 to-slate-950"
+      >
+        <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6">
+          <h1 className="font-fantasy text-2xl font-semibold text-slate-100">היסטוריית ניהול</h1>
+          <ModerationHistoryTable initialHistory={history} />
+        </div>
+      </div>
+    </GameScreen>
   );
 }

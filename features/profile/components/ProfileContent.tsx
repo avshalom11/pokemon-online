@@ -13,6 +13,7 @@ import { ProfileStatsSection } from "./ProfileStatsSection";
 import { SecurityAccountSection } from "./SecurityAccountSection";
 import { BackButton } from "@/components/layout/BackButton";
 import { ProfileFriendsSection } from "@/features/friends/components/ProfileFriendsSection";
+import { ProfileModerationControl } from "@/features/moderation/components/ProfileModerationControl";
 import { getProfileTheme } from "../themes/profile-themes";
 import type { ProfileEditViewModel, PublicProfileView } from "../types/profile.types";
 
@@ -70,6 +71,21 @@ export function ProfileContent({ view, editData, ownerEmail }: ProfileContentPro
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-6">
           <ProfileHeader view={view} onEditClick={() => setIsEditOpen(true)} />
         </div>
+
+        {/* STAFF / MODERATION — PROFILE SITE-BAN ENTRY POINT. Never
+            rendered for the viewer's own profile (view.isOwner) — a
+            stronger, simpler exclusion than hierarchy alone (canModerateTarget
+            never actually needs a self-target rule of its own here, since
+            this gate never even mounts the component at all in that case).
+            ProfileModerationControl itself decides, per role/hierarchy,
+            whether it renders anything at all. */}
+        {!view.isOwner ? (
+          <ProfileModerationControl
+            targetUsername={view.username}
+            targetDisplayName={view.displayName}
+            targetStaffRole={view.targetStaffRole}
+          />
+        ) : null}
 
         {view.isOwner && ownerEmail !== null ? (
           <SecurityAccountSection currentUsername={view.username} ownerEmail={ownerEmail} onUsernameChanged={handleUsernameChanged} />
