@@ -2,7 +2,9 @@ import "server-only";
 
 import { cache } from "react";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
+import { resolveSiteBanRedirectPath } from "@/features/moderation/services/site-access.service";
 import { auth } from "@/lib/auth/auth";
 import { ensurePlayerProfile } from "@/lib/auth/player-profile";
 import { prisma } from "@/lib/db/prisma";
@@ -40,12 +42,53 @@ export const getCurrentSession = cache(async () => {
 
     const existingProfile = await prisma.playerProfile.findUnique({
       where: { userId: user.id },
-      select: { userId: true },
+      select: { id: true },
     });
 
-    if (!existingProfile) {
-      const displayName = user.displayUsername ?? user.username ?? user.name ?? "שחקן";
-      await ensurePlayerProfile(user.id, displayName);
+    const profileId = existingProfile
+      ? existingProfile.id
+      : (await ensurePlayerProfile(user.id, user.displayUsername ?? user.username ?? user.name ?? "שחקן")).id;
+
+    // STAFF / MODERATION — PHASE 4 — SITE BAN ENFORCEMENT. The one
+    // universal chokepoint: every protected page (via app/(game)/layout.tsx,
+    // which calls this function first) and every authenticated Server
+    // Action across the whole codebase (each already calls this function
+    // itself at its own entry — the established "session validation, then
+    // delegate to a service" convention, e.g. features/chat/actions/
+    // global-chat.actions.ts) is protected by this one check, with zero
+    // per-call-site wiring — exactly what makes it impossible to bypass
+    // merely by calling a Server Action directly instead of navigating a
+    // page.
+    //
+    // resolveSiteBanRedirectPath (features/moderation/services/
+    // site-access.service.ts) does the actual DB lookup (never trusting
+    // anything cached — a fresh query every call, regardless of Better
+    // Auth's own 5-minute cookie cache for the session itself) and is the
+    // unit-tested piece; redirect() itself is a three-line, obviously-
+    // correct call, reviewed by inspection (see lib/auth/
+    // stale-session-redirect-loop.test.ts's own doc comment for why: it
+    // pulls in next/navigation + next/headers, neither importable under
+    // this project's plain node:test runner).
+    //
+    // NO RECURSION: resolveSiteBanRedirectPath -> isSiteBanned/
+    // isPermanentlySiteBanned (features/moderation/services/active-ban.
+    // service.ts) touch nothing but `prisma` directly — no call back into
+    // getCurrentSession, getPlayerProfile, or any other lib/auth/ export,
+    // so this can never loop back on itself. app/banned/page.tsx (the
+    // redirect target) deliberately never calls this function either — it
+    // resolves its own session via a raw `auth.api.getSession()` call, so
+    // a banned user visiting /banned can never be redirected back to
+    // /banned by this check.
+    //
+    // A staff member (OWNER/DEPUTY/SUPPORT) authenticates through this
+    // exact same path, completely unmodified — this check only ever
+    // fires for a player who actually has an active site ban, which
+    // hierarchy already makes impossible for OWNER and requires an
+    // explicit OWNER action for DEPUTY/SUPPORT; there is no staff-specific
+    // branch here to keep in sync.
+    const redirectPath = await resolveSiteBanRedirectPath(profileId);
+    if (redirectPath) {
+      redirect(redirectPath);
     }
   }
 
@@ -55,8 +98,9 @@ export const getCurrentSession = cache(async () => {
 // FIELD BATTLE PERFORMANCE — a lighter session check for hot, repeat-call
 // paths where the caller is guaranteed to have already passed through a
 // full getCurrentSession() very recently in the SAME browser session — see
-// battle-action.action.ts's own call site (the only caller today) for why
-// that guarantee holds there: reaching the battle screen at all requires
+// battle-action.action.ts's own call site (one of several today — see
+// STAFF / MODERATION — PHASE 7 note below for the full list) for why that
+// guarantee holds there: reaching the battle screen at all requires
 // app/(game)/layout.tsx and app/(game)/battle/page.tsx to have both already
 // called the full getCurrentSession() (and therefore already self-healed
 // any missing PlayerProfile) moments earlier, before a single attack click
@@ -71,6 +115,50 @@ export const getCurrentSession = cache(async () => {
 // profile self-heal guarantee for that path. Session/auth validation itself
 // (auth.api.getSession) is completely unchanged; only the profile
 // existence check is skipped.
+//
+// STAFF / MODERATION — PHASE 7 — SECURITY REVIEW FINDING, FIXED. This
+// function is reached by real mutations, not just reads: field-battle
+// attacks (features/battle/actions/battle-action.action.ts), Gym/Regional
+// battle turns/switches/item-use (features/gyms/actions/gym-battle.
+// actions.ts), and League PvP turns/switches (features/leagues/actions/
+// league-battle.actions.ts). Before this fix, NONE of them ever re-checked
+// site-ban status: the missing-profile self-heal being safe to skip (the
+// guarantee this function's own doc comment describes) does NOT imply the
+// site-ban check is also safe to skip — a player who gets banned WHILE
+// already mid-battle could otherwise keep submitting real attacks/turns
+// through this exact path for as long as their client-side session
+// resolves as valid (up to Better Auth's own 5-minute session cookie-cache
+// window — lib/auth/auth.ts's session.cookieCache — even after
+// site-ban.service.ts's own session revocation already deleted their
+// underlying Session row). That is a real, if narrow, ban-enforcement
+// bypass; the fix below closes it.
+//
+// The fix deliberately does NOT restore the missing-profile self-heal
+// (still correctly skipped — that guarantee still holds) and does NOT call
+// the full getCurrentSession(): it adds ONLY the one further check that
+// must never be skipped anywhere reachable — the SAME always-fresh,
+// never-cached resolveSiteBanRedirectPath query the real getCurrentSession
+// already uses (features/moderation/services/site-access.service.ts) —
+// gated behind one cheap, indexed PlayerProfile.userId lookup (skipped
+// entirely, with no ban check at all, only in the "no profile" case this
+// function's own self-heal guarantee already treats as never-expected-in-
+// practice). Two small extra queries per hot-path call, not the full
+// self-heal/write path this function exists to avoid.
 export const getCurrentSessionFast = cache(async () => {
-  return auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({ headers: await headers() });
+
+  if (session) {
+    const profile = await prisma.playerProfile.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+    if (profile) {
+      const redirectPath = await resolveSiteBanRedirectPath(profile.id);
+      if (redirectPath) {
+        redirect(redirectPath);
+      }
+    }
+  }
+
+  return session;
 });

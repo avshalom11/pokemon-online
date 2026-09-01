@@ -60,6 +60,7 @@ export function HomeChatPanel({ initialMessages, currentPlayerDisplayName, curre
           sendError={chat.sendError}
           listRef={chat.listRef}
           onScroll={chat.handleScroll}
+          onMessageDeleted={chat.removeMessage}
         />
       )}
     </div>

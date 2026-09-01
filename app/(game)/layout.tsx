@@ -20,6 +20,8 @@ import { PrivateChatWindowProvider } from "@/features/friends/context/private-ch
 import { getFriendsAndRequests } from "@/features/friends/services/friendship.service";
 import { hasActiveNpcBattleSession } from "@/features/gyms/services/gym-battle-session.service";
 import { hasActiveLeagueBattleSession } from "@/features/leagues/services/league-battle-session.service";
+import { ViewerStaffRoleProvider } from "@/features/moderation/context/viewer-staff-role-context";
+import { getStaffRole } from "@/features/moderation/services/staff-role.service";
 import { getNotificationBellData } from "@/features/notifications/services/notification-service";
 import { getOnboardingRedirectTarget } from "@/features/onboarding/services/onboarding-status";
 import { PresenceHeartbeat } from "@/features/presence/components/PresenceHeartbeat";
@@ -76,7 +78,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // one DB round trip — needed here only to get the PlayerProfile id
   // getNotificationBellData is scoped by.
   const profile = await getPlayerProfile(session.user.id);
-  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle, globalChatMessages, friendsData, tutorialProgress] = await Promise.all([
+  const [player, notifications, hasFieldBattle, hasNpcBattle, hasLeagueBattle, globalChatMessages, friendsData, tutorialProgress, viewerStaffRole] = await Promise.all([
     getPlayerHeaderData(session.user.id, session.user.username ?? null),
     getNotificationBellData(profile.id),
     hasActiveBattleSession(profile.id),
@@ -112,6 +114,13 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     // any (game) route, and what seeds TutorialProvider's client state on
     // every render after that.
     getTutorialProgressView(profile.id),
+    // STAFF / MODERATION — PHASE 5 — the CURRENT VIEWER's own resolved
+    // staff role (null for a plain player), seeded once here into
+    // ViewerStaffRoleProvider below — see that context's own doc comment
+    // for why every Global Chat moderation-menu decision reads it from
+    // there rather than a prop threaded through Home's own separate page
+    // component.
+    getStaffRole(profile.id),
   ]);
   const activeBattle = hasFieldBattle || hasNpcBattle || hasLeagueBattle;
 
@@ -124,6 +133,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     // providers below, since none of them are things a future Tutorial
     // stage's own real-action detection needs to reach through.
     <TutorialProvider initial={tutorialProgress}>
+      <ViewerStaffRoleProvider role={viewerStaffRole}>
       <SoundSettingsProvider initial={profile.soundEnabled ?? true}>
         <PlayerProgressionProvider initial={player.progress}>
           <DailyBattleCountProvider initial={player.dailyBattleCount}>
@@ -185,6 +195,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           </DailyBattleCountProvider>
         </PlayerProgressionProvider>
       </SoundSettingsProvider>
+      </ViewerStaffRoleProvider>
     </TutorialProvider>
   );
 }

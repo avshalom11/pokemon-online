@@ -8,7 +8,6 @@ import { markOffline } from "@/features/presence/services/presence.service";
 import type { AuthActionState, PasswordResetActionState } from "@/lib/auth/auth-action-state";
 import { auth } from "@/lib/auth/auth";
 import { getLoginErrorMessage, getRegistrationErrorMessage } from "@/lib/auth/auth-errors";
-import { getCurrentSession } from "@/lib/auth/auth-session";
 import {
   getProgressiveDelayMs,
   isLockedOut,
@@ -238,9 +237,28 @@ export async function resetPasswordAction(
 // losing connection without hitting this button entirely bypasses this —
 // that path still relies purely on the existing heartbeat timeout
 // (PRESENCE_ONLINE_WINDOW_MS), completely unchanged by this addition.
+//
+// STAFF / MODERATION — PHASE 4/7 — deliberately a RAW auth.api.getSession()
+// call, NOT getCurrentSession() and NOT getCurrentSessionFast() either
+// (PHASE 7: that one now ALSO redirects to /banned for a site-banned
+// player, closing a real ban-enforcement gap in the battle-action paths —
+// see auth-session.ts's own doc comment — which means it carries the
+// exact same "would hijack sign-out" problem getCurrentSession() already
+// had here). This action is reachable from a "sign out" button a banned
+// player can still see on an already-rendered page (the header, or
+// /banned's own sign-out button) — since Next's redirect() throws and
+// MUST be called outside a try/catch (its own documented rule), letting
+// either wrapper's redirect fire here would either get silently swallowed
+// by the try/catch below (never actually redirecting) or, if this call
+// were moved outside the try, would hijack this action's own sign-out
+// flow and prevent the user from ever signing out at all. The raw call
+// (same one app/banned/page.tsx and app/api/clear-stale-session/route.ts
+// already use) has no redirect side effect of any kind, sidestepping the
+// whole question — this action's only real need is `session.user.id`,
+// nothing ban-status-related.
 export async function logoutAction() {
   try {
-    const session = await getCurrentSession();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (session) {
       const profile = await getPlayerProfile(session.user.id);
       await markOffline(profile.id);

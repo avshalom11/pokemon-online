@@ -297,6 +297,16 @@ model PlayerProfile {
   // requester/addressee and playerA/playerB splits.
   marketplaceListingsAsSeller  MarketplaceListing[]             @relation("MarketplaceListingSeller")
   marketplaceListingsAsBuyer   MarketplaceListing[]             @relation("MarketplaceListingBuyer")
+  // STAFF / MODERATION — PHASE 1. At most one row — see StaffMember's own
+  // doc comment below ("row existence is the fact": no row means PLAYER).
+  staffMembership               StaffMember?
+  moderationCounters            PlayerModerationCounters?
+  // Two separate relations to the same model (the player being acted on
+  // vs. the staff member who acted), same named-@relation precedent
+  // Friendship/PrivateConversation/MarketplaceListing already establish
+  // elsewhere in this file for their own directional pairs.
+  moderationActionsReceived     ModerationAction[]                @relation("ModerationActionTarget")
+  moderationActionsPerformed    ModerationAction[]                @relation("ModerationActionActor")
   createdAt                    DateTime                         @default(now())
   updatedAt                    DateTime                         @updatedAt
 
@@ -1791,6 +1801,194 @@ model PlayerTutorialProgress {
   updatedAt DateTime @updatedAt
 
   @@map("player_tutorial_progress")
+}
+
+// STAFF / MODERATION — PHASE 1. Persistence-only foundation: no role is
+// assigned yet, no ban has ever been issued, and none of the four models
+// below are wired into any enforcement path (auth session resolution,
+// Global Chat sending) — that is later work. Every model follows this
+// schema's own established conventions: plain String role/type columns
+// (no Prisma enum — same precedent as Notification.type/
+// FieldBattleSession.zoneId elsewhere in this file), "row existence/
+// derived state is the fact" (StaffMember's mere existence IS "this
+// player is staff" — same idiom PlayerSeenSpecies/PlayerGymBadge already
+// establish), and the guarded conditional-updateMany CAS idiom
+// (AccountDeletionRequest.consumedAt, LeagueTournament.rewardsGrantedAt)
+// for anything that must be exactly-once/race-safe under concurrent staff
+// actions (features/moderation/services/staff-role.service.ts's
+// appointStaffRole).
+
+// One row per non-PLAYER staff member — absence of a row for a given
+// playerId means PLAYER (no special permissions), never a separate
+// boolean "isStaff" column that could drift out of sync with which rows
+// actually exist. `role` is a plain String ("OWNER" | "DEPUTY" |
+// "SUPPORT" — features/moderation/types.ts's StaffRole), validated at the
+// app layer. Keyed by playerId (PlayerProfile's own stable id, itself 1:1
+// with the Better Auth User via userId) — never by username, so a later
+// username change can never affect who holds a staff role.
+//
+// Deliberately NOT a field on Better Auth's own User table (CLI-owned/
+// regenerated per PROJECT_RULES.md's Authentication & Database rules) —
+// this stays entirely within the hand-owned game-domain layer, the same
+// boundary lib/auth/player-profile.ts already establishes as the one
+// bridge between lib/auth/ and features/.
+//
+// appointedByPlayerId is nullable so the eventual one-time OWNER seed
+// (a later phase — never performed by this one) can be recorded as
+// "appointed by nobody" (the system's own root of trust) rather than
+// needing a self-referential appointedBy.
+model StaffMember {
+  id       String        @id @default(cuid())
+  playerId String        @unique
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  role String
+
+  appointedByPlayerId String?
+  appointedAt         DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("staff_member")
+}
+
+// STAFF / MODERATION — PHASE 1. A single fixed-id singleton row (id is
+// always the literal "global" — see appointStaffRole's own
+// ensureStaffRosterCounter helper) holding race-safe, global counters for
+// the staff role caps (max 1 DEPUTY, max 3 SUPPORT —
+// features/moderation/config/staff-roles.config.ts's STAFF_LIMITS).
+// Deliberately NOT a live COUNT(*) over StaffMember at appointment time:
+// appointStaffRole's own guarded conditional updateMany (`WHERE id =
+// "global" AND deputyCount < 1`, the exact same CAS idiom
+// AccountDeletionRequest.consumedAt/LeagueTournament.rewardsGrantedAt
+// already establish elsewhere in this file) is what makes two concurrent
+// OWNER appointment requests for the same role provably unable to both
+// succeed — a plain COUNT-then-INSERT has exactly the race this column
+// exists to close. Denormalized (StaffMember rows remain the real source
+// of truth for WHO holds a role) but always kept in agreement with them:
+// every appointStaffRole/removeStaffRole call updates this row and its
+// own StaffMember row in the SAME transaction.
+model StaffRosterCounter {
+  id           String @id
+  deputyCount  Int    @default(0)
+  supportCount Int    @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("staff_roster_counter")
+}
+
+// STAFF / MODERATION — PHASE 1. Race-safe, per-player progressive-
+// punishment counters — completely independent for chat vs. site bans per
+// spec (chatBanCount/siteBanCount never share or influence each other).
+// Keyed by playerId as its own primary key (same shared-PK "one row per
+// player, lazily created on first real write" idiom PlayerDaycareStay/
+// PlayerEggIncubation already establish elsewhere in this file), upserted
+// with an atomic `{ increment: 1 }` INSIDE the same transaction that
+// creates the matching ModerationAction row (see
+// features/moderation/services/moderation-progression.service.ts) —
+// Postgres's own row lock on that single upsert statement is what
+// serializes two staff members racing to issue "the first ban" against
+// the same target, exactly like this schema's existing LoginAttemptLock
+// upsert-and-increment precedent (lib/auth/login-lockout.ts's
+// recordFailedLoginAttempt).
+//
+// Never decremented by anything, including revocation — see
+// ModerationAction's own doc comment below for why that is the rule that
+// keeps a removed ban's progression permanent (a revoked 1st ban's next
+// progressive ban is still the 2nd, not another 1st).
+model PlayerModerationCounters {
+  playerId String        @id
+  player   PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  chatBanCount Int @default(0)
+  siteBanCount Int @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("player_moderation_counters")
+}
+
+// STAFF / MODERATION — PHASE 1. The one append-oriented audit/history
+// table for every moderation action, present and future (chat ban, site
+// ban, permanent site ban, global-chat message deletion, and later staff
+// appointment/removal if audited here too) — a single generalized model
+// with a plain String actionType (no Prisma enum, same
+// FieldBattleSession.zoneId/Notification.type precedent) rather than a
+// separate ChatBan/SiteBan/PermanentBan/RoleAudit table per action kind:
+// this is both the audit log AND (via targetPlayerId + actionType) the
+// exact source progressive-duration counts are ultimately verifiable
+// against, so the two can never drift apart the way four independent
+// tables risk doing. See features/moderation/types.ts's
+// ModerationActionType for the closed set of values this app validates
+// against.
+//
+// Current-ban status is never a separate mutable flag on this row or
+// elsewhere — it is always DERIVED ("does an unrevoked row of the right
+// actionType exist for this target with expiresAt > now, or with no
+// expiresAt at all for a permanent ban") — same "row existence/derived
+// state is the fact" idiom this schema already establishes elsewhere
+// (PlayerSeenSpecies, PlayerGymBadge, ...). See
+// features/moderation/services/active-ban.service.ts's isChatBanned/
+// isSiteBanned/isPermanentlySiteBanned, the one place that derivation is
+// computed.
+//
+// durationMinutes/expiresAt are both null for a permanent site ban
+// (actionType "permanent_site_ban") and for actions with no duration at
+// all (message deletion, staff-role changes) — populated only for
+// "chat_ban"/"site_ban". expiresAt is a stored, computed-once snapshot
+// (createdAt + durationMinutes) rather than always re-derived at read
+// time, so a later change to the progression config can never
+// reinterpret an already-issued ban's own real expiry.
+//
+// revokedAt/revokedByPlayerId/revocationReason are set exactly once, by
+// an explicit unban action — NEVER by expiry alone (an expired-but-never-
+// revoked row stays revokedAt: null forever; isChatBanned/isSiteBanned
+// simply stop counting it as ACTIVE once past its own expiresAt, but its
+// historical existence — and its contribution to this player's
+// progressive-duration COUNT — is permanent). This single-row shape
+// (revocation as fields on the punishment row, not a second "unban" row)
+// is what makes "revoking a ban must never decrement progression" true by
+// construction: PlayerModerationCounters is bumped once, at creation, and
+// revocation never touches it.
+//
+// targetResourceId is a free-form nullable reference (e.g. a
+// GlobalChatMessage.id for a "message_delete" action) — a bare string,
+// not an enforced FK, since it means something different per actionType
+// and the referenced row may itself later be deleted (Global Chat's own
+// cap-and-trim cleanup) — same "static/foreign reference resolved by id,
+// never an enforced relation" precedent PlayerPokemon.speciesId already
+// establishes for cross-domain references in this file. `metadata` is the
+// same "optional structured data, nullable, costs nothing until a type
+// actually needs it" precedent Notification.metadata already establishes
+// — reserved for e.g. a "role_grant" row's own granted-role value; unused
+// by every actionType this phase actually creates.
+model ModerationAction {
+  id String @id @default(cuid())
+
+  targetPlayerId String
+  target         PlayerProfile @relation("ModerationActionTarget", fields: [targetPlayerId], references: [id], onDelete: Cascade)
+
+  actorPlayerId String
+  actor         PlayerProfile @relation("ModerationActionActor", fields: [actorPlayerId], references: [id], onDelete: Cascade)
+
+  actionType String
+
+  reason String?
+
+  durationMinutes Int?
+  expiresAt       DateTime?
+
+  revokedAt         DateTime?
+  revokedByPlayerId String?
+  revocationReason  String?
+
+  targetResourceId String?
+  metadata         Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([targetPlayerId, actionType, createdAt])
+  @@index([actorPlayerId, createdAt])
+  @@map("moderation_action")
 }
 
 model Session {

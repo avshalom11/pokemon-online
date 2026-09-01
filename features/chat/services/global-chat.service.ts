@@ -6,6 +6,9 @@ import {
   GLOBAL_CHAT_SEND_COOLDOWN_MS,
 } from "@/features/chat/config/global-chat.config";
 import type { GlobalChatMessageView, SendGlobalChatMessageResult } from "@/features/chat/types";
+import { getActiveChatBanExpiry } from "@/features/moderation/services/active-ban.service";
+import { getStaffRolesByPlayerIds } from "@/features/moderation/services/staff-role.service";
+import type { StaffRole } from "@/features/moderation/types";
 import { getOnlinePlayerIdSet } from "@/features/presence/services/presence.service";
 import { getPlayerIdentitiesByIds, type PlayerIdentity } from "@/lib/auth/player-profile";
 import { formatChatMessageTimestamp } from "@/lib/chat/format-message-timestamp";
@@ -14,7 +17,8 @@ import { prisma } from "@/lib/db/prisma";
 function toView(
   row: { id: string; playerId: string; message: string; createdAt: Date },
   identityByPlayerId: Map<string, PlayerIdentity>,
-  onlinePlayerIds: Set<string>
+  onlinePlayerIds: Set<string>,
+  staffRoleByPlayerId: Map<string, StaffRole>
 ): GlobalChatMessageView {
   const identity = identityByPlayerId.get(row.playerId);
   return {
@@ -26,6 +30,8 @@ function toView(
     sentTimeLabel: formatChatMessageTimestamp(row.createdAt),
     // ONLINE PRESENCE
     isOnline: onlinePlayerIds.has(row.playerId),
+    // STAFF / MODERATION — PHASE 5
+    senderStaffRole: staffRoleByPlayerId.get(row.playerId) ?? null,
   };
 }
 
@@ -43,14 +49,19 @@ export async function getRecentGlobalChatMessages(): Promise<GlobalChatMessageVi
   });
   const ascending = [...rows].reverse();
   const senderIds = ascending.map((row) => row.playerId);
-  const [identityByPlayerId, onlinePlayerIds] = await Promise.all([
+  const [identityByPlayerId, onlinePlayerIds, staffRoleByPlayerId] = await Promise.all([
     getPlayerIdentitiesByIds(senderIds),
     // ONLINE PRESENCE — recomputed fresh on every read (this function is
     // polled ~every GLOBAL_CHAT_POLL_INTERVAL_MS), so each sender's dot
     // stays live without a dedicated presence poll of its own.
     getOnlinePlayerIdSet(senderIds),
+    // STAFF / MODERATION — PHASE 5 — same "recomputed fresh on every
+    // read" reasoning as presence above: a role change (or the one-time
+    // OWNER bootstrap) must be reflected on the very next poll, never
+    // cached.
+    getStaffRolesByPlayerIds(senderIds),
   ]);
-  return ascending.map((row) => toView(row, identityByPlayerId, onlinePlayerIds));
+  return ascending.map((row) => toView(row, identityByPlayerId, onlinePlayerIds, staffRoleByPlayerId));
 }
 
 // Validates, rate-limits, inserts, then trims the table back down to the
@@ -70,6 +81,21 @@ export async function getRecentGlobalChatMessages(): Promise<GlobalChatMessageVi
 // "race-safe enough for multiple users sending at the same time" bar this
 // feature was explicitly scoped to — not a hardened distributed lock.
 export async function sendGlobalChatMessage(playerId: string, rawMessage: string): Promise<SendGlobalChatMessageResult> {
+  // STAFF / MODERATION — PHASE 4 — CHAT BAN ENFORCEMENT. Checked FIRST,
+  // before the empty/length/cooldown business-rule checks below — a
+  // banned player is rejected on access-control grounds regardless of
+  // what they typed, same "authorization before business validation"
+  // ordering this feature's own orchestration services (chat-ban.
+  // service.ts) already follow. Read fresh on every single send (never
+  // cached), so a ban that started or ended moments ago is reflected
+  // immediately. Scoped to THIS function alone — getRecentGlobalChatMessages
+  // (reading) and every private-chat function (a completely separate
+  // model/service) are untouched, so neither is affected by a chat ban.
+  const activeBanExpiresAt = await getActiveChatBanExpiry(playerId);
+  if (activeBanExpiresAt) {
+    return { ok: false, error: "chat-banned", expiresAt: activeBanExpiresAt.toISOString() };
+  }
+
   const trimmed = rawMessage.trim();
   if (trimmed.length === 0) return { ok: false, error: "empty" };
   if (trimmed.length > GLOBAL_CHAT_MESSAGE_MAX_LENGTH) return { ok: false, error: "too-long" };
@@ -97,10 +123,13 @@ export async function sendGlobalChatMessage(playerId: string, rawMessage: string
     return row;
   });
 
-  const identityByPlayerId = await getPlayerIdentitiesByIds([playerId]);
+  const [identityByPlayerId, staffRoleByPlayerId] = await Promise.all([
+    getPlayerIdentitiesByIds([playerId]),
+    getStaffRolesByPlayerIds([playerId]),
+  ]);
   // ONLINE PRESENCE — the sender is, by definition, online right now (this
   // very call is a live server round trip from their own client) — no need
   // for a second getOnlinePlayerIdSet lookup just to confirm what's already
   // certain.
-  return { ok: true, message: toView(created, identityByPlayerId, new Set([playerId])) };
+  return { ok: true, message: toView(created, identityByPlayerId, new Set([playerId]), staffRoleByPlayerId) };
 }

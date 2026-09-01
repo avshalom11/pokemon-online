@@ -18,6 +18,13 @@ export const GLOBAL_CHAT_ERROR_LABELS: Record<SendGlobalChatMessageError, string
   // authenticated (game) layout), but included so the error union stays
   // exhaustively handled.
   unauthenticated: "יש להתחבר כדי לשלוח הודעות",
+  // STAFF / MODERATION — PHASE 4 — a generic label only; the real
+  // SendGlobalChatMessageResult also carries the ban's own `expiresAt`
+  // (features/chat/types.ts) for a future richer UI to read directly —
+  // this flat Record<..., string> lookup has no slot for that per-result
+  // data, so it's dropped here on purpose rather than baked into a
+  // static string that could go stale.
+  "chat-banned": "לא ניתן לשלוח הודעות לצ׳אט הראשי כרגע — החשבון מורחק זמנית",
 };
 
 // A locally-sent message shown the instant Send is clicked, before the
@@ -66,6 +73,17 @@ export interface UseGlobalChatResult {
   handleSend: (event: FormEvent) => Promise<void>;
   listRef: RefObject<HTMLDivElement | null>;
   handleScroll: () => void;
+  // STAFF / MODERATION — PHASE 5 — called by ChatModerationMenu right
+  // after a successful deleteGlobalChatMessageAction, so the message
+  // disappears from THIS client's view immediately rather than waiting
+  // for the next poll tick (spec: "remove/update it immediately... rather
+  // than waiting unnecessarily for the next poll"). A plain local
+  // removal, not itself a re-fetch — the next real poll tick's own
+  // mergeWithFresh naturally confirms the row is gone from the server's
+  // canonical list too, so this can never leave the UI permanently out of
+  // sync with the database even if this specific removal were somehow
+  // wrong.
+  removeMessage: (messageId: string) => void;
 }
 
 // GLOBAL CHAT — the message-list/poll/send/scroll behavior shared by BOTH
@@ -172,6 +190,16 @@ export function useGlobalChat({
         // ONLINE PRESENCE — the caller sending this message is, by
         // definition, online right now.
         isOnline: true,
+        // STAFF / MODERATION — PHASE 5 — deliberately null even for a
+        // staff sender's own optimistic message: the real value (and any
+        // ⋮ menu it would enable) arrives on the very next poll tick via
+        // mergeWithFresh below, same "optimistic message is a temporary
+        // approximation" precedent every other field here already
+        // follows — not worth threading the caller's own role into this
+        // hook just to shave one poll interval off self-moderation, which
+        // is nonsensical anyway (canModerateTarget already forbids acting
+        // on your own message's sender at the same rank).
+        senderStaffRole: null,
         pending: true,
       },
     ]);
@@ -192,5 +220,9 @@ export function useGlobalChat({
     });
   }
 
-  return { messages, inputValue, setInputValue, isSending, sendError, handleSend, listRef, handleScroll };
+  function removeMessage(messageId: string) {
+    setMessages((current) => current.filter((message) => message.id !== messageId));
+  }
+
+  return { messages, inputValue, setInputValue, isSending, sendError, handleSend, listRef, handleScroll, removeMessage };
 }
