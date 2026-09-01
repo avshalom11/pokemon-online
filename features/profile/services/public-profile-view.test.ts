@@ -12,7 +12,7 @@ import fs from "node:fs";
 import { test, beforeEach } from "node:test";
 
 import { getPublicProfileView } from "@/features/profile/services/public-profile-view.service";
-import { seedFriendship, seedPlayerProfile, resetFakeDb } from "../../../test/support/fakes/prisma.fake.ts";
+import { seedFriendship, seedPlayerProfile, seedStaffMember, resetFakeDb } from "../../../test/support/fakes/prisma.fake.ts";
 
 beforeEach(() => {
   resetFakeDb();
@@ -51,6 +51,44 @@ test("4: an anonymous/no-session viewer still renders the profile — isOwner fa
   assert.ok(view);
   assert.equal(view?.isOwner, false);
   assert.equal(view?.friendshipStatus, "none");
+});
+
+// 4b — STAFF / MODERATION — ROLE PRESENTATION — targetStaffRole reflects
+// the profile's own PERSISTED staff role (never inferred from anything
+// else), and is null for a plain player.
+test("4b: targetStaffRole reflects the profile owner's real persisted StaffMember role", async () => {
+  seedStaffMember({ playerId: "owner-1", role: "DEPUTY" });
+  const view = await getPublicProfileView("owner1", null);
+  assert.equal(view?.targetStaffRole, "DEPUTY");
+});
+
+test("4c: targetStaffRole is null for a plain player with no StaffMember row", async () => {
+  const view = await getPublicProfileView("owner1", null);
+  assert.equal(view?.targetStaffRole, null);
+});
+
+// 4d — DEV BUG FIX REGRESSION GUARD — staff identity is PUBLIC
+// presentation: targetStaffRole must be IDENTICAL regardless of who is
+// looking, since getPublicProfileView never even branches on viewerUserId
+// to compute it (see this function's own doc comment on targetStaffRole in
+// public-profile-view.service.ts). Exercises the exact three viewer shapes
+// a real request can have: another staff member, a plain player, and no
+// session at all.
+test("4d: targetStaffRole is identical for a staff viewer, a plain-player viewer, and an anonymous (null) viewer — never gated by who is looking", async () => {
+  seedStaffMember({ playerId: "owner-1", role: "SUPPORT" });
+  seedPlayerProfile({ id: "other-staff-1", username: "otherstaff1" });
+  seedStaffMember({ playerId: "other-staff-1", role: "OWNER" });
+
+  // viewer-1 (seeded in beforeEach) has no StaffMember row of its own — a
+  // genuine plain-player viewer. other-staff-1 is a genuine staff viewer.
+  // null is the anonymous/no-session case.
+  const asStaffViewer = await getPublicProfileView("owner1", "other-staff-1");
+  const asPlainPlayerViewer = await getPublicProfileView("owner1", "viewer-1");
+  const asAnonymousViewer = await getPublicProfileView("owner1", null);
+
+  assert.equal(asStaffViewer?.targetStaffRole, "SUPPORT");
+  assert.equal(asPlainPlayerViewer?.targetStaffRole, "SUPPORT");
+  assert.equal(asAnonymousViewer?.targetStaffRole, "SUPPORT");
 });
 
 // 5 — friendshipStatus states.

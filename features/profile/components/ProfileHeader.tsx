@@ -1,5 +1,7 @@
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { AddFriendButton } from "@/features/friends/components/AddFriendButton";
+import { getStaffRolePresentation } from "@/features/moderation/config/staff-role-presentation";
+import { StaffRoleLabel } from "@/features/moderation/components/StaffRoleLabel";
 import { getAvatarImageUrl } from "../themes/profile-avatars";
 import type { PublicProfileView } from "../types/profile.types";
 
@@ -32,7 +34,14 @@ export function ProfileHeader({ view, onEditClick }: ProfileHeaderProps) {
 
       <div className="flex flex-1 flex-col items-center gap-1 sm:items-start">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-          <h1 className="text-xl font-bold text-slate-100">{view.displayName}</h1>
+          <h1 className={`text-xl font-bold ${getStaffRolePresentation(view.targetStaffRole)?.nameClassName ?? "text-slate-100"}`}>
+            {view.displayName}
+          </h1>
+          {/* STAFF / MODERATION — ROLE PRESENTATION — uses the profile
+              TARGET's own persisted staff role (view.targetStaffRole), never
+              the current viewer's — see StaffRoleLabel.tsx's own doc
+              comment. Renders nothing for a plain player. */}
+          <StaffRoleLabel role={view.targetStaffRole} />
           <span dir="auto" className="text-xs text-slate-500">{`@${view.username}`}</span>
         </div>
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getFriendshipRelation } from "@/features/friends/services/friendship.service";
+import { getStaffRole } from "@/features/moderation/services/staff-role.service";
 import { getPokedexCounts } from "@/features/pokedex/services/pokedex-view.service";
 import { getOwnedPokemonStats, getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getPlayerProgress } from "@/features/player-progression/progression-calculations";
@@ -56,6 +57,12 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
   const showGymAchievementsOnProfile = profile.showGymAchievementsOnProfile ?? true;
   const aboutMeValue = profile.aboutMe ?? "";
   const isOwner = viewerUserId !== null && viewerUserId === user.id;
+
+  // STAFF / MODERATION — PROFILE SITE-BAN ENTRY POINT — see
+  // PublicProfileView.targetStaffRole's own doc comment (profile.types.ts)
+  // for why this profile's OWNER's resolved role travels with the view
+  // rather than being re-looked-up by ProfileModerationControl itself.
+  const targetStaffRole = await getStaffRole(profile.id);
 
   // FRIENDS PHASE 1 — resolved once here, never re-derived client-side.
   // Owner viewing their own profile is always "self" without an extra
@@ -113,6 +120,7 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
     themeId: theme.id,
     aboutMe,
     isOwner,
+    targetStaffRole,
     friendshipStatus: friendshipRelation.status,
     incomingFriendRequestId: friendshipRelation.requestId,
     party,
