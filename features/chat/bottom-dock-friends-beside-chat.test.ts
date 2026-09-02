@@ -76,8 +76,10 @@ test("10: SocialDock's row-mode branch is a plain flex grouping with no position
   assert.ok(!rowBranch.includes("fixed"), "row mode must never self-position — BottomDock already supplies the one fixed wrapper");
 });
 
-test("11: SocialDock's standalone branch (Home / expanded chat) is completely unchanged — still self-fixed, still right-4/sidebar-aware", () => {
-  assert.match(socialDockSrc, /className="fixed bottom-\S*\s+right-4[^"]*"/);
+test("11: SocialDock's standalone branch (Home / expanded chat) is still self-fixed and right-4/sidebar-aware; bottom clearance now differs by case (CHAT/FRIENDS OVERLAP FIX) instead of always reusing the collapsed bar's height", () => {
+  assert.match(socialDockSrc, /className="fixed right-4[^"]*"/);
+  assert.match(socialDockSrc, /const chatClearanceVar = isHome \? "var\(--app-chat-bar-height\)" : "var\(--app-chat-panel-height\)";/);
+  assert.match(socialDockSrc, /bottom: `calc\(\$\{chatClearanceVar\} \+ 1rem\)`/);
 });
 
 test("12: chat/friends functionality itself is untouched by this ticket — same useGlobalChat hook, same FriendsDataProvider-backed FriendsBar, no new polling introduced", () => {

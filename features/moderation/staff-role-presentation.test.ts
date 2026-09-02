@@ -15,18 +15,18 @@ function readSourceNormalized(path: string): string {
 }
 
 // 1 — OWNER: gold, exact label
-test('1: OWNER presentation is exactly label "מנהל האתר" with a gold (amber) name color', () => {
-  assert.deepEqual(getStaffRolePresentation("OWNER"), { label: "מנהל האתר", nameClassName: "text-amber-400" });
+test('1: OWNER presentation is exactly label "מנהל האתר" with a gold name color', () => {
+  assert.deepEqual(getStaffRolePresentation("OWNER"), { label: "מנהל האתר", nameClassName: "text-[#C99700]" });
 });
 
-// 2 — DEPUTY: blue, exact label
-test('2: DEPUTY presentation is exactly label "סגן מנהל אתר" with a blue name color', () => {
-  assert.deepEqual(getStaffRolePresentation("DEPUTY"), { label: "סגן מנהל אתר", nameClassName: "text-blue-400" });
+// 2 — DEPUTY: light-cyan/blue, exact label
+test('2: DEPUTY presentation is exactly label "סגן מנהל אתר" with a light-cyan/blue name color', () => {
+  assert.deepEqual(getStaffRolePresentation("DEPUTY"), { label: "סגן מנהל אתר", nameClassName: "text-[#38D9FF]" });
 });
 
 // 3 — SUPPORT: green, exact label
-test('3: SUPPORT presentation is exactly label "תמיכה" with a green (emerald) name color', () => {
-  assert.deepEqual(getStaffRolePresentation("SUPPORT"), { label: "תמיכה", nameClassName: "text-emerald-400" });
+test('3: SUPPORT presentation is exactly label "תמיכה" with a green name color', () => {
+  assert.deepEqual(getStaffRolePresentation("SUPPORT"), { label: "תמיכה", nameClassName: "text-[#39FF88]" });
 });
 
 // 4 — PLAYER (null role): no presentation at all

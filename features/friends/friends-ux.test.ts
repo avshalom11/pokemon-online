@@ -80,7 +80,11 @@ test("6: (source) the floating window is a plain SocialDock flex child in both m
   assert.ok(!floatingWindowSrc.includes("fixed bottom-"), "the floating window itself must never carry its own fixed bottom-right positioning");
   assert.ok(!floatingWindowSrc.includes("right-4"), "the floating window itself must never carry its own right offset");
   const dockSrc = fs.readFileSync("features/friends/components/SocialDock.tsx", "utf8");
-  assert.match(dockSrc, /fixed bottom-\S*\s+right-4/, "SocialDock must be the one place bottom-right fixed positioning lives");
+  // CHAT/FRIENDS OVERLAP FIX moved the bottom offset from a static class
+  // into an inline style (see features/chat/bottom-dock-friends-beside-chat.test.ts's
+  // own test 11) — still exactly one shared place (SocialDock).
+  assert.match(dockSrc, /className="fixed right-4/, "SocialDock must be the one place bottom-right fixed positioning lives");
+  assert.match(dockSrc, /bottom: `calc\(\$\{chatClearanceVar\} \+ 1rem\)`/);
   const layoutSrc = fs.readFileSync("app/(game)/layout.tsx", "utf8");
   const dockOpenIndex = layoutSrc.indexOf("<SocialDock>");
   const floatingIndex = layoutSrc.indexOf("<FloatingPrivateChatWindow");

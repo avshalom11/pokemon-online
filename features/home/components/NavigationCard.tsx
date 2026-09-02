@@ -6,11 +6,19 @@ interface NavigationCardProps {
   icon: ReactNode;
   href?: string;
   comingSoon?: boolean;
+  // HOME QUICK ACCESS — for the one card (today: player search) whose
+  // destination isn't a route but a client-side action (opens a
+  // modal/panel in place) — same href/action split
+  // features/navigation/data/sidebar-menu.ts's own hasAction already
+  // establishes for the sidebar's identical "חיפוש שחקנים" entry, reused
+  // here rather than a second convention. Mutually exclusive with href;
+  // callers pass exactly one.
+  onClick?: () => void;
 }
 
 // A single big game-card. Working cards pass href; anything without a real
 // destination yet passes comingSoon instead of a dead/placeholder link.
-export function NavigationCard({ title, icon, href, comingSoon }: NavigationCardProps) {
+export function NavigationCard({ title, icon, href, comingSoon, onClick }: NavigationCardProps) {
   const content = (
     <div
       className={`group relative flex h-28 flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border p-4 text-center transition-all sm:h-32 ${
@@ -29,6 +37,14 @@ export function NavigationCard({ title, icon, href, comingSoon }: NavigationCard
       ) : null}
     </div>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="block w-full">
+        {content}
+      </button>
+    );
+  }
 
   if (comingSoon || !href) {
     return (

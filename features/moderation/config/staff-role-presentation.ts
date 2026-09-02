@@ -24,22 +24,22 @@ export interface StaffRolePresentation {
   // StaffRoleLabel.tsx), since the parentheses are punctuation around the
   // label, not part of the canonical label text itself.
   label: string;
-  // A Tailwind text-color utility class, reusing this codebase's own
-  // existing color-name conventions rather than inventing new shades:
-  // amber-400 is already this project's established "gold" (currency/
-  // reward amounts throughout, e.g. ChangeUsernameDialog.tsx), emerald-400
-  // is already its established "green" (success/price text throughout,
-  // e.g. SecurityAccountSection.tsx), and blue-400 is Tailwind's own
-  // literal "blue" — deliberately distinct from this feature's own
-  // violet/indigo moderation-dialog accents so a staff name never reads as
-  // "just another purple UI element."
+  // A Tailwind text-color utility class. Each role uses an explicit
+  // arbitrary hex value (text-[#RRGGBB]) rather than a named Tailwind
+  // shade, so the exact on-brand tone is pinned precisely: #C99700 is a
+  // dark/rich metallic gold for OWNER (deliberately not a plain yellow),
+  // #38D9FF is a bright glowing light-cyan/light-blue for DEPUTY, and
+  // #39FF88 is a bright glowing green for SUPPORT — each visually distinct
+  // from the others and from this feature's own violet/indigo
+  // moderation-dialog accents so a staff name never reads as "just another
+  // purple UI element."
   nameClassName: string;
 }
 
 const STAFF_ROLE_PRESENTATION: Record<StaffRole, StaffRolePresentation> = {
-  OWNER: { label: "מנהל האתר", nameClassName: "text-amber-400" },
-  DEPUTY: { label: "סגן מנהל אתר", nameClassName: "text-blue-400" },
-  SUPPORT: { label: "תמיכה", nameClassName: "text-emerald-400" },
+  OWNER: { label: "מנהל האתר", nameClassName: "text-[#C99700]" },
+  DEPUTY: { label: "סגן מנהל אתר", nameClassName: "text-[#38D9FF]" },
+  SUPPORT: { label: "תמיכה", nameClassName: "text-[#39FF88]" },
 };
 
 // Returns null for a plain player (role === null) — every call site treats

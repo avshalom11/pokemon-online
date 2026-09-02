@@ -59,7 +59,13 @@ test("2: (source) neither FriendsBar nor FloatingPrivateChatWindow carries its o
     assert.ok(!code.includes("right-4"), "must never carry its own right offset");
     assert.ok(!code.includes("right-["), "must never carry its own hardcoded rem/px right offset for one particular state");
   }
-  assert.match(socialDockSrc, /fixed bottom-\S*\s+right-4/, "exactly one shared place (SocialDock) owns the fixed bottom-right anchor");
+  // CHAT/FRIENDS OVERLAP FIX moved the bottom offset from a static class
+  // into an inline style (it now varies by Home vs. expanded-chat — see
+  // features/chat/bottom-dock-friends-beside-chat.test.ts's own test 11)
+  // — still exactly one shared place (SocialDock) owning the anchor, just
+  // split across className (fixed + right-4) and style (bottom).
+  assert.match(socialDockSrc, /className="fixed right-4/, "exactly one shared place (SocialDock) owns the fixed right anchor");
+  assert.match(socialDockSrc, /bottom: `calc\(\$\{chatClearanceVar\} \+ 1rem\)`/, "and the same place owns the bottom clearance, now via inline style");
 });
 
 // 3 — User1 removal updates their OWN Friends list immediately (already

@@ -25,12 +25,18 @@ interface PartySlotProps {
   // isActive tracks the mid-battle active Pokémon instead, which can be a
   // different member than the leader after a switch.
   activeLabel?: string;
+  // HOME VISUAL PROMINENCE — see PartySection's own doc comment. Boosts
+  // empty-slot border/background/icon/text contrast (the "too faint to see
+  // what it represents" problem) and gives occupied slots a touch more
+  // separation from the (also-boosted) section background. Defaults to off
+  // for every other caller.
+  emphasized?: boolean;
 }
 
 // Pure/presentational by design — takes exactly the slot it should render
 // and nothing else, so a future drag & drop reorder only needs to change
 // what array position feeds this component, not this component itself.
-export function PartySlot({ pokemon, isActive, variant = "compact", onSelect, disabled, activeLabel = "מוביל" }: PartySlotProps) {
+export function PartySlot({ pokemon, isActive, variant = "compact", onSelect, disabled, activeLabel = "מוביל", emphasized = false }: PartySlotProps) {
   const interactive = Boolean(onSelect) && !disabled;
 
   if (!pokemon) {
@@ -39,11 +45,11 @@ export function PartySlot({ pokemon, isActive, variant = "compact", onSelect, di
         onClick={interactive ? onSelect : undefined}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
-        className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-slate-900/30 p-3 text-slate-600 ${
-          interactive ? "cursor-pointer hover:border-indigo-400/40 hover:text-slate-400" : ""
-        }`}
+        className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-3 ${
+          emphasized ? "border-dashed border-white/30 bg-black/40 text-slate-300" : "border-dashed border-white/10 bg-slate-900/30 text-slate-600"
+        } ${interactive ? "cursor-pointer hover:border-indigo-400/40 hover:text-slate-400" : ""}`}
       >
-        <EmptyOrbIcon />
+        <EmptyOrbIcon emphasized={emphasized} />
         <span className="text-xs font-medium">ריק</span>
       </div>
     );
@@ -58,7 +64,11 @@ export function PartySlot({ pokemon, isActive, variant = "compact", onSelect, di
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-colors ${
-        isActive ? "animate-home-glow border-indigo-400/70 bg-indigo-500/10" : "border-white/10 bg-slate-900/60"
+        isActive
+          ? "animate-home-glow border-indigo-400/70 bg-indigo-500/10"
+          : emphasized
+            ? "border-white/15 bg-slate-800/70"
+            : "border-white/10 bg-slate-900/60"
       } ${interactive ? "cursor-pointer hover:border-indigo-400/50" : ""} ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
     >
       {isActive ? (
@@ -122,10 +132,13 @@ export function PartySlot({ pokemon, isActive, variant = "compact", onSelect, di
 
 // Original "capture orb" glyph for an empty slot — deliberately not a
 // red/white Poké Ball (this project avoids recognizable Pokémon IP, see
-// lib/battle/battleThemes.ts's GHOST_THEME note).
-function EmptyOrbIcon() {
+// lib/battle/battleThemes.ts's GHOST_THEME note). `emphasized` raises its
+// opacity (see PartySlot's own doc comment) — it was previously faint
+// enough (0.4, on top of an already-muted text-slate-600 container color)
+// that players couldn't tell what an empty slot represented.
+function EmptyOrbIcon({ emphasized = false }: { emphasized?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-10 w-10 opacity-40">
+    <svg viewBox="0 0 24 24" className={`h-10 w-10 ${emphasized ? "opacity-70" : "opacity-40"}`}>
       <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="3 3" />
       <circle cx="12" cy="12" r="2.5" fill="currentColor" />
     </svg>

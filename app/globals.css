@@ -23,16 +23,29 @@
      deliberately does NOT reflow the page underneath it. Keep
      lib/layout/gameLayout.ts's APP_CHAT_BAR_HEIGHT_PX in sync. */
   --app-chat-bar-height: 44px;
+
+  /* Height of the EXPANDED Global Chat panel (features/chat/components/
+     GlobalChatBar.tsx's own sm:h-80) — the desktop/tablet (sm and up)
+     value; the mobile override below matches its own h-72. The only
+     consumer is SocialDock.tsx's stacked-above-chat position (Friends bar +
+     private chat), so that dock clears the panel's actual rendered height
+     instead of the collapsed bar's --app-chat-bar-height — the two heights
+     are unrelated and were previously conflated, which is what let the
+     Friends bar overlap the bottom of an opened chat panel. */
+  --app-chat-panel-height: 20rem;
 }
 
 /* Below the sm: breakpoint (640px, matching every other responsive class in
    this project), the header stacks the XP bar + numeric progress onto a
    second row instead of hiding them — see GameHeader.tsx — so it needs more
    vertical room here. Every --app-header-height consumer reads this same
-   variable, so they all adapt automatically without per-component changes. */
+   variable, so they all adapt automatically without per-component changes.
+   Same breakpoint also drops --app-chat-panel-height to GlobalChatBar's own
+   mobile h-72 (its sm:h-80 only applies at sm and up). */
 @media (max-width: 639px) {
   :root {
     --app-header-height: 84px;
+    --app-chat-panel-height: 18rem;
   }
 }
 
@@ -364,4 +377,47 @@ body {
   animation-name: league-firework-particle;
   animation-timing-function: cubic-bezier(0.15, 0.6, 0.35, 1);
   animation-fill-mode: forwards;
+}
+
+/* RICH PROFILE EDITOR — SPECIAL TEXT STYLES. Fixed, allowlisted classes
+   only (features/profile/rich-content/config/rich-text-style-options.ts's
+   RICH_TEXT_EFFECT_OPTIONS is the one place an effect id maps to one of
+   these classNames) — a saved rich-profile document only ever carries the
+   id, never any of the actual CSS below. Both the live editor
+   (profile-text-style.extension.ts) and the public renderer
+   (RichProfileContentRenderer.tsx) apply the exact same class, so the
+   editing canvas and the final public render always match. */
+.profile-text-effect-glow {
+  text-shadow:
+    0 0 6px rgba(129, 140, 248, 0.85),
+    0 0 14px rgba(129, 140, 248, 0.5);
+}
+
+.profile-text-effect-neon {
+  color: #6ee7f2;
+  text-shadow:
+    0 0 4px rgba(110, 231, 242, 0.9),
+    0 0 10px rgba(110, 231, 242, 0.7),
+    0 0 20px rgba(45, 212, 191, 0.5);
+}
+
+.profile-text-effect-shadow {
+  text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Deliberately subtle — a slow opacity breathe, never a fast/high-contrast
+   flash (this ticket's own "avoid extreme flashing" requirement). */
+@keyframes profile-text-shimmer {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.profile-text-effect-shimmer {
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  animation: profile-text-shimmer 2.6s ease-in-out infinite;
 }
