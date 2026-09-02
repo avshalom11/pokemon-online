@@ -1,5 +1,5 @@
 import type { ProfileThemeId } from "../themes/profile-themes";
-import type { ProfileContentBlock } from "./profile-content.types";
+import type { RichProfileContentDoc } from "@/features/profile/rich-content/types/rich-profile-content.types";
 import type { FriendshipStatus } from "@/features/friends/types";
 import type { LeagueId } from "@/features/leagues/types/league.types";
 import type { StaffRole } from "@/features/moderation/types";
@@ -171,14 +171,16 @@ export interface PublicProfileView {
   // ProfileAchievementsView's own doc comment for the full privacy
   // contract.
   achievements: ProfileAchievementsView;
-  // The owner's structured showcase content — an ADDITIONAL section, never
+  // RICH PROFILE EDITOR — the owner's structured showcase content, never
   // gated by any of the three privacy toggles above (per this feature's
   // own spec: "an additional showcase area, not a replacement for the
-  // existing profile header and privacy settings"). Always an array
-  // (never null) — an empty array is a real, valid state ("no custom
-  // content yet") and the UI renders nothing at all for it, never a
-  // broken/empty section.
-  contentBlocks: ProfileContentBlock[];
+  // existing profile header and privacy settings"). null means "never
+  // saved through the editor yet" (features/profile/rich-content/services/
+  // parse-rich-profile-content.ts's own doc comment); the old
+  // profileContentBlocks block editor has been retired from the UI (its
+  // stored data is kept, untouched, purely as rollback/migration safety —
+  // see features/profile/rich-content's own doc comments).
+  richProfileContent: RichProfileContentDoc | null;
 }
 
 // The owner-only edit view model — always the REAL current settings
@@ -199,5 +201,9 @@ export interface ProfileEditViewModel {
   // separate switch per achievement kind — see this feature's own spec).
   showGymAchievementsOnProfile: boolean;
   partyPreview: PublicPartyMemberView[];
-  contentBlocks: ProfileContentBlock[];
+  // RICH PROFILE EDITOR — see PublicProfileView.richProfileContent's own
+  // doc comment above; the owner's edit view always reads the real,
+  // current value (same as every other field on this model), never
+  // filtered by any toggle (this feature has none yet).
+  richProfileContent: RichProfileContentDoc | null;
 }

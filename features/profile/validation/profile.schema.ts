@@ -1,9 +1,9 @@
 import * as z from "zod";
 
 import { passwordSchema, usernameSchema } from "@/lib/auth/validation";
+import { richProfileContentDocSchema } from "@/features/profile/rich-content/validation/rich-profile-content.schema";
 import { isAllowedAvatarDexNumber } from "../themes/profile-avatars";
 import { PROFILE_THEME_IDS } from "../themes/profile-themes";
-import { profileContentBlocksSchema } from "./profile-content.schema";
 
 export const ABOUT_ME_MAX_LENGTH = 150;
 
@@ -35,7 +35,16 @@ export const updateProfileSchema = z.object({
   showStatsOnProfile: z.boolean(),
   showAboutMeOnProfile: z.boolean(),
   showGymAchievementsOnProfile: z.boolean(),
-  contentBlocks: profileContentBlocksSchema,
+  // RICH PROFILE EDITOR — the official profile-content editor (the old
+  // profileContentBlocks block editor has been retired from the UI; see
+  // features/profile/rich-content's own doc comments and
+  // update-profile.service.ts's own comment on why profileContentBlocks is
+  // no longer written here at all). Optional/nullable so a caller that
+  // never sends this field (a legacy request, or an existing test fixture
+  // predating this feature — see profile.schema.test.ts) still validates
+  // successfully; null means "no rich content saved this time", handled
+  // identically to "the field was omitted" by update-profile.service.ts.
+  richProfileContent: richProfileContentDocSchema.nullable().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

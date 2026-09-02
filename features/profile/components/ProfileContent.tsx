@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { EditProfileModal } from "./EditProfileModal";
 import { ProfileAboutMe } from "./ProfileAboutMe";
 import { ProfileAchievementsSection } from "./ProfileAchievementsSection";
-import { ProfileContentBlocksSection } from "./ProfileContentBlocksSection";
+import { RichProfileContentRenderer } from "@/features/profile/rich-content/components/RichProfileContentRenderer";
 import { ProfileHeader } from "./ProfileHeader";
 import { ProfilePartySection } from "./ProfilePartySection";
 import { ProfileStatsSection } from "./ProfileStatsSection";
@@ -102,7 +102,15 @@ export function ProfileContent({ view, editData, ownerEmail }: ProfileContentPro
         <ProfileStatsSection stats={view.stats} />
         <ProfileAchievementsSection achievements={view.achievements} />
         {view.isOwner ? <ProfileFriendsSection /> : null}
-        <ProfileContentBlocksSection blocks={view.contentBlocks} />
+        {/* RICH PROFILE EDITOR — the owner's structured showcase content;
+            renders nothing at all when the owner has never saved anything
+            through the editor (RichProfileContentRenderer's own
+            null/empty-doc handling), never a broken/empty section. The old
+            block-based editor's section has been retired from the UI — see
+            features/profile/rich-content's own architecture doc comments;
+            its stored data is kept, untouched, purely as rollback/migration
+            safety. */}
+        <RichProfileContentRenderer content={view.richProfileContent} />
       </div>
 
       {isEditOpen && editData ? (

@@ -34,7 +34,6 @@ test("updateProfileSchema no longer accepts/requires a username field — userna
     showStatsOnProfile: true,
     showAboutMeOnProfile: true,
     showGymAchievementsOnProfile: true,
-    contentBlocks: [],
   });
   assert.ok(parsed.success, "the free profile-content save must not require a username at all");
   assert.ok(!("username" in (parsed.success ? parsed.data : {})), "updateProfileSchema must never carry a username field");
