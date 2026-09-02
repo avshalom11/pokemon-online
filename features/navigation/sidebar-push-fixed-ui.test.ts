@@ -44,9 +44,10 @@ test("3: SidebarOpenProvider actually wraps GameSidebar, GlobalChatBar, and Soci
   }
 });
 
-test("4: sidebar closed — SocialDock keeps its exact prior right-4 positioning (no inline override applied)", () => {
-  assert.match(socialDockSrc, /className="fixed bottom-\S*\s+right-4[^"]*"/, "the closed-state class must still carry the original right-4 offset, pixel-identical to before");
-  assert.match(socialDockSrc, /style=\{isOpen \? \{ right: `calc\(\$\{SIDEBAR_PANEL_WIDTH_CSS\} \+ 1rem\)` \} : undefined\}/, "only an open sidebar may override the right offset inline");
+test("4: sidebar closed — SocialDock keeps its exact prior right-4 positioning class; bottom clearance moved into inline style (CHAT/FRIENDS OVERLAP FIX, features/chat/bottom-dock-friends-beside-chat.test.ts's own test 11) since it now varies by Home vs. expanded-chat instead of always being the same class", () => {
+  assert.match(socialDockSrc, /className="fixed right-4[^"]*"/, "the closed-state class must still carry the original right-4 offset, pixel-identical to before");
+  assert.match(socialDockSrc, /bottom: `calc\(\$\{chatClearanceVar\} \+ 1rem\)`/);
+  assert.match(socialDockSrc, /\.\.\.\(isOpen \? \{ right: `calc\(\$\{SIDEBAR_PANEL_WIDTH_CSS\} \+ 1rem\)` \} : \{\}\)/, "only an open sidebar may override the right offset inline");
 });
 
 test("5: sidebar open — SocialDock shifts left by the sidebar's own shared width, with a transition matching the sidebar's own 200ms", () => {

@@ -17,7 +17,7 @@ export function NewsPanel() {
         {NEWS_ENTRIES.map((entry) => (
           <li key={entry.id} className="border-r-2 border-indigo-400/60 pr-3">
             <p className="text-sm font-semibold text-slate-100">{entry.title}</p>
-            <p className="text-xs text-slate-500">{entry.body}</p>
+            <p className="text-xs text-slate-200">{entry.body}</p>
           </li>
         ))}
       </ul>

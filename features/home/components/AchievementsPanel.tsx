@@ -7,7 +7,7 @@ import { PanelCard } from "./PanelCard";
 export function AchievementsPanel() {
   return (
     <PanelCard title="הישגים">
-      <p className="mb-3 text-sm text-slate-500">עוד לא נפתחו הישגים. התחל לשחק כדי לצבור את הראשון!</p>
+      <p className="mb-3 text-sm text-slate-200">עוד לא נפתחו הישגים. התחל לשחק כדי לצבור את הראשון!</p>
       <ProgressBar percent={0} fillStyle={{ backgroundColor: "#818cf8" }} height="sm" />
     </PanelCard>
   );

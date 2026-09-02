@@ -56,11 +56,14 @@ import { SIDEBAR_PANEL_WIDTH_CSS } from "@/lib/layout/gameLayout";
 // is just a plain flex-row grouping, no positioning of its own, since the
 // shared BottomDock wrapper (components/layout/BottomDock.tsx) already
 // supplies ONE fixed, sidebar-aware, centered row for both this dock and
-// the chat bar together; (2) the ORIGINAL standalone stacked-above-chat
-// position below, completely unchanged, for the two cases that fall
-// outside row mode — Home (no chat bar exists there at all) and an
-// expanded chat panel (deliberately left exactly as it was by this
-// ticket).
+// the chat bar together; (2) the standalone stacked-above-chat position
+// below, for the two cases that fall outside row mode — Home (no chat bar
+// exists there at all) and an expanded chat panel. Those two cases now pick
+// a DIFFERENT bottom clearance each (see CHAT/FRIENDS OVERLAP FIX below) —
+// Home's is pixel-identical to before this dock existed, but an expanded
+// panel's is not: it used to reuse Home's same clearance too, which was the
+// bug (the panel is far taller than the collapsed bar Home's clearance was
+// actually sized for, so this dock overlapped its bottom).
 export function SocialDock({ children }: { children: ReactNode }) {
   const { isOpen } = useSidebarOpen();
   const { isHome, minimized } = useGlobalChatBarLayout();
@@ -79,6 +82,16 @@ export function SocialDock({ children }: { children: ReactNode }) {
     );
   }
 
+  // CHAT/FRIENDS OVERLAP FIX — the remaining two cases both land here (Home,
+  // and an EXPANDED chat panel on a non-Home page), and need different
+  // bottom clearance: Home has no chat bar at all, so it keeps clearing only
+  // the collapsed bar's height (--app-chat-bar-height) exactly as before;
+  // an expanded panel is taller (GlobalChatBar's own h-72/sm:h-80), so this
+  // dock must clear that instead (--app-chat-panel-height, same file) or it
+  // physically overlaps the panel's own newest-message/composer area since
+  // this dock's z-[45] sits above the chat panel's z-40.
+  const chatClearanceVar = isHome ? "var(--app-chat-bar-height)" : "var(--app-chat-panel-height)";
+
   // Sidebar closed: right-4 (the class) applies untouched — pixel-identical
   // to this dock's prior positioning. Sidebar open: an inline `right`
   // override (which always wins over the utility class) shifts it left by
@@ -87,8 +100,11 @@ export function SocialDock({ children }: { children: ReactNode }) {
     <div
       ref={friendsBarTargetRef}
       dir="ltr"
-      className="fixed bottom-[calc(var(--app-chat-bar-height)+1rem)] right-4 z-[45] flex flex-row items-end gap-3 transition-[right] duration-200"
-      style={isOpen ? { right: `calc(${SIDEBAR_PANEL_WIDTH_CSS} + 1rem)` } : undefined}
+      className="fixed right-4 z-[45] flex flex-row items-end gap-3 transition-[right] duration-200"
+      style={{
+        bottom: `calc(${chatClearanceVar} + 1rem)`,
+        ...(isOpen ? { right: `calc(${SIDEBAR_PANEL_WIDTH_CSS} + 1rem)` } : {}),
+      }}
     >
       {children}
     </div>

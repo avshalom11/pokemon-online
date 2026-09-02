@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+
 import { NavigationCard } from "./NavigationCard";
+import { PlayerSearchModal } from "@/features/player-search/components/PlayerSearchModal";
 
 interface NavigationGridProps {
   // Null only if the session somehow lacks a username (never expected in
@@ -28,9 +33,23 @@ const STATIC_NAVIGATION_ITEMS = [
   { title: "תיק ציוד", icon: "🎒", href: "/inventory" },
   { title: "פוקדקס", icon: "📖", href: "/pokedex" },
   { title: "חנות", icon: "🛒", href: "/shop" },
+  // HOME QUICK ACCESS — same route + label/icon the sidebar's own
+  // "שירותים וחנויות" category already uses for these two
+  // (features/navigation/data/sidebar-menu.ts), reused verbatim here so the
+  // two menus never drift into disagreeing wording/iconography for the
+  // same destinations — no new route invented for either.
+  { title: "שוק", icon: "🏪", href: "/marketplace" },
+  { title: "מעון פוקימונים", icon: "🏡", href: "/daycare" },
 ] as const;
 
 export function NavigationGrid({ username }: NavigationGridProps) {
+  // HOME QUICK ACCESS — PLAYER SEARCH. Same "opens a modal in place, not a
+  // route" action the sidebar's own "חיפוש שחקנים" entry already uses
+  // (hasAction in features/navigation/data/sidebar-menu.ts, rendered as a
+  // button by GameSidebar.tsx) — reusing the exact same PlayerSearchModal
+  // component/flow here rather than a second search UI or a new route.
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
   return (
     <section dir="rtl">
       <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">תפריט המשחק</h2>
@@ -48,7 +67,10 @@ export function NavigationGrid({ username }: NavigationGridProps) {
           href={username ? `/profile/${username}` : undefined}
           comingSoon={!username}
         />
+        <NavigationCard title="חיפוש שחקנים" icon="🔍" onClick={() => setIsSearchOpen(true)} />
       </div>
+
+      {isSearchOpen ? <PlayerSearchModal onClose={() => setIsSearchOpen(false)} /> : null}
     </section>
   );
 }
