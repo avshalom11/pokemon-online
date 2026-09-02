@@ -2,14 +2,14 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 
-import { ProfileContentEditor } from "./ProfileContentEditor";
 import { SpriteImage } from "@/components/media/SpriteImage";
 import { updateProfileAction } from "@/features/profile/actions/update-profile.action";
+import { RichProfileEditor } from "@/features/profile/rich-content/components/RichProfileEditor";
+import type { RichProfileContentDoc } from "@/features/profile/rich-content/types/rich-profile-content.types";
 import { PROFILE_AVATAR_OPTIONS } from "@/features/profile/themes/profile-avatars";
 import { PROFILE_THEMES, PROFILE_THEME_IDS, type ProfileThemeId } from "@/features/profile/themes/profile-themes";
 import { ABOUT_ME_MAX_LENGTH } from "@/features/profile/validation/profile.schema";
 import { getFrontSpritePath } from "@/features/pokemon/media/pokemon-media-paths";
-import type { ProfileContentBlock } from "../types/profile-content.types";
 import type { ProfileEditViewModel } from "../types/profile.types";
 
 interface EditProfileModalProps {
@@ -34,7 +34,12 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
   const [showStatsOnProfile, setShowStatsOnProfile] = useState(data.showStatsOnProfile);
   const [showAboutMeOnProfile, setShowAboutMeOnProfile] = useState(data.showAboutMeOnProfile);
   const [showGymAchievementsOnProfile, setShowGymAchievementsOnProfile] = useState(data.showGymAchievementsOnProfile);
-  const [contentBlocks, setContentBlocks] = useState<ProfileContentBlock[]>(data.contentBlocks ?? []);
+  // RICH PROFILE EDITOR — starts at the owner's last-saved doc (or null,
+  // "never saved through this editor yet"); RichProfileEditor itself owns
+  // the live Tiptap editor state and only calls back up here on every
+  // change (see that component's own doc comment for why this isn't fed
+  // back INTO the editor on every re-render).
+  const [richProfileContent, setRichProfileContent] = useState<RichProfileContentDoc | null>(data.richProfileContent);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -49,7 +54,17 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
         showStatsOnProfile,
         showAboutMeOnProfile,
         showGymAchievementsOnProfile,
-        contentBlocks,
+        // JSON round-trip: strips ProseMirror/Tiptap's own non-plain
+        // object prototypes off editor.getJSON()'s output (attrs objects
+        // in particular) before this crosses the Server Action RSC
+        // boundary. Without this, React's Flight serializer treats those
+        // non-plain-prototype objects as unserializable and silently
+        // substitutes an opaque "temporary client reference" for them
+        // (a function-shaped proxy that throws when the server touches
+        // it), which reaches the server as attrs: [Function] and fails
+        // richProfileContentDocSchema validation with a generic error —
+        // confirmed by inspecting the exact value server-side.
+        richProfileContent: richProfileContent ? (JSON.parse(JSON.stringify(richProfileContent)) as RichProfileContentDoc) : null,
       });
 
       if (result.status === "success") {
@@ -168,8 +183,14 @@ export function EditProfileModal({ data, onClose, onSaved }: EditProfileModalPro
             </Field>
           ) : null}
 
+          {/* RICH PROFILE EDITOR — the official profile-content editor (the
+              old block-based editor has been retired from the UI; its
+              stored data is kept untouched as rollback/migration safety —
+              see features/profile/rich-content's own architecture doc
+              comments and update-profile.service.ts's own comment on why
+              profileContentBlocks is never written by this save anymore). */}
           <Field label="תוכן הפרופיל הציבורי">
-            <ProfileContentEditor blocks={contentBlocks} onChange={setContentBlocks} />
+            <RichProfileEditor initialContent={data.richProfileContent} onChange={setRichProfileContent} />
           </Field>
         </div>
 

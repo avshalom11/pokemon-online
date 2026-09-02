@@ -1,13 +1,13 @@
 import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import { Prisma } from "@/lib/generated/prisma/client";
 import type { UpdateProfileInput } from "../validation/profile.schema";
 
 export type UpdateProfileResult = { status: "success" } | { status: "error"; message: string };
 
 // The only place a profile-content edit (about me, avatar, theme, privacy
-// toggles, showcase blocks) is ever persisted. Username is deliberately NOT
+// toggles, rich profile content) is ever persisted. Username is deliberately NOT
 // handled here — see updateProfileSchema's own doc comment: changing it
 // costs 100 Gold and goes through change-username.service.ts's own
 // dedicated, atomic flow instead.
@@ -22,14 +22,26 @@ export async function updateProfile(playerId: string, input: UpdateProfileInput)
       showStatsOnProfile: input.showStatsOnProfile,
       showAboutMeOnProfile: input.showAboutMeOnProfile,
       showGymAchievementsOnProfile: input.showGymAchievementsOnProfile,
-      // Already fully validated by updateProfileSchema's own
-      // profileContentBlocksSchema (max block count, max text lengths,
-      // allowed font/color/alignment/image ids) before this function is
-      // ever reached — never re-validated or reshaped here. Same
-      // as-unknown-as-InputJsonValue cast battle-session.service.ts's own
-      // serializeParticipants already uses for a typed array going into a
-      // Prisma Json column.
-      profileContentBlocks: input.contentBlocks as unknown as Prisma.InputJsonValue,
+      // profileContentBlocks is DELIBERATELY absent from this update — the
+      // old block editor was retired from the UI (see
+      // features/profile/rich-content's own doc comments) but its stored
+      // data is kept as rollback/migration safety, per that retirement's
+      // own explicit data-safety rule. Omitting a field from Prisma's
+      // `data` object (as opposed to setting it to `undefined` explicitly,
+      // which has the same effect) tells Prisma to leave the column
+      // completely untouched — never overwritten/cleared by a profile save
+      // through this now-old-block-free form.
+      //
+      // RICH PROFILE EDITOR — already fully validated by
+      // updateProfileSchema's own richProfileContentDocSchema before this
+      // function is ever reached. Prisma.DbNull (never a bare JS `null`) is
+      // required to actually write SQL NULL to a nullable Json? column —
+      // assigning `undefined` would instead tell Prisma to leave the column
+      // untouched, which is never what "the owner sent no rich content this
+      // save" should mean (this is a full profile-content save, not a
+      // partial patch, unlike profileContentBlocks above).
+      richProfileContent:
+        input.richProfileContent == null ? Prisma.DbNull : (input.richProfileContent as unknown as Prisma.InputJsonValue),
     },
   });
 

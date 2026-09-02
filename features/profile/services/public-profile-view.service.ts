@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
 import { REGION_LABELS } from "@/shared/types/region-labels";
 import { toRegionId } from "@/shared/types/region";
-import { parseProfileContentBlocks } from "./parse-profile-content";
+import { parseRichProfileContent } from "@/features/profile/rich-content/services/parse-rich-profile-content";
 import { getProfileAchievementsView } from "./profile-achievements-view.service";
 import { getProfileTheme } from "../themes/profile-themes";
 import type { PublicPartyMemberView, PublicProfileView, PublicStatsView } from "../types/profile.types";
@@ -126,6 +126,6 @@ export async function getPublicProfileView(usernameParam: string, viewerUserId: 
     party,
     stats,
     achievements,
-    contentBlocks: parseProfileContentBlocks(profile.profileContentBlocks),
+    richProfileContent: parseRichProfileContent(profile.richProfileContent ?? null),
   };
 }

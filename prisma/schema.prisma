@@ -252,6 +252,24 @@ model PlayerProfile {
   // FieldBattleSession.participants) already follow.
   profileContentBlocks Json @default("[]")
 
+  // RICH PROFILE EDITOR (PHASE A) — the new Tiptap/ProseMirror-JSON
+  // WYSIWYG document, ADDITIONAL to (never replacing) profileContentBlocks
+  // above during this DEV transition — see features/profile/rich-content's
+  // own doc comments for the full architecture. Nullable with no @default
+  // (unlike profileContentBlocks' `Json @default("[]")`): null means "the
+  // owner has never saved anything through the new editor yet", distinct
+  // from an explicitly-saved empty document — same nullable-JSON
+  // convention this model's own avatarDexNumber/lastSeenAt already
+  // establish for "not set yet" fields. Never trusted raw on read — always
+  // re-validated through the exact same Zod schema that guards writes
+  // (features/profile/rich-content/validation/
+  // rich-profile-content.schema.ts's parseRichProfileContent) — same
+  // "invalid -> safe null fallback" philosophy profileContentBlocks above
+  // already follows. The eventual plan is for this to REPLACE
+  // profileContentBlocks once the new editor is fully rolled out — that
+  // migration is a deliberate future step, not part of this change.
+  richProfileContent Json?
+
   pokemon                      PlayerPokemon[]
   fieldBattleSession           FieldBattleSession?
   notifications                Notification[]

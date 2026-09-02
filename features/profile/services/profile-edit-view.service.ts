@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPlayerParty } from "@/features/pokemon/services/player-pokemon";
 import { getPlayerProfile } from "@/lib/auth/player-profile";
-import { parseProfileContentBlocks } from "./parse-profile-content";
+import { parseRichProfileContent } from "@/features/profile/rich-content/services/parse-rich-profile-content";
 import { getProfileTheme } from "../themes/profile-themes";
 import type { ProfileEditViewModel, PublicPartyMemberView } from "../types/profile.types";
 
@@ -42,6 +42,6 @@ export async function getProfileEditViewModel(userId: string): Promise<ProfileEd
     showAboutMeOnProfile: profile.showAboutMeOnProfile ?? true,
     showGymAchievementsOnProfile: profile.showGymAchievementsOnProfile ?? true,
     partyPreview,
-    contentBlocks: parseProfileContentBlocks(profile.profileContentBlocks),
+    richProfileContent: parseRichProfileContent(profile.richProfileContent ?? null),
   };
 }
