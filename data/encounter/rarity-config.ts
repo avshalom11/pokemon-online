@@ -16,7 +16,7 @@ import type { PokemonRarity } from "@/shared/types/pokemon";
 // nothing else needs to change when these numbers change.
 export const RARITY_ENCOUNTER_PROBABILITIES: Record<PokemonRarity, number> = {
   common: 79.15,
-  rare: 20,
-  "very-rare": 0.6,
-  legendary: 0.25,
+  rare: 20.28,
+  "very-rare": 0.4,
+  legendary: 0.17,
 };
